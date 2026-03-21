@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --pflx-cyan: #00d4ff;
+  --pflx-teal: #00b8d4;
+  --pflx-dark: #0a0e17;
+  --pflx-darker: #060a12;
+  --pflx-magenta: #ff00ff;
+  --pflx-purple: #8b5cf6;
+  --pflx-yellow: #ffd700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: var(--pflx-darker);
+  color: #e0e0e0;
+  font-family: 'Rajdhani', sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--pflx-darker); }
+::-webkit-scrollbar-thumb { background: var(--pflx-cyan); border-radius: 3px; }
+
+.text-glow {
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 30px rgba(0, 212, 255, 0.3);
+}
+
+.text-glow-yellow {
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.3);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.scanline {
+  position: relative;
+  overflow: hidden;
+}
+.scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pflx-cyan), transparent);
+  animation: scanline 4s linear infinite;
+  opacity: 0.3;
+}
+@keyframes scanline {
+  0% { top: 0; }
+  100% { top: 100%; }
+}
+
+.border-glow {
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.1), inset 0 0 15px rgba(0, 212, 255, 0.05);
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(0, 212, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0); }
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+.starfield {
+  background: radial-gradient(ellipse at center, #0d1b2a 0%, #060a12 70%);
+  position: relative;
+}
+
+.starfield::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, rgba(0, 212, 255, 0.3), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.2), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(0, 212, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 130px 80px, rgba(255, 255, 255, 0.15), transparent),
+    radial-gradient(2px 2px at 160px 30px, rgba(0, 212, 255, 0.2), transparent),
+    radial-gradient(1px 1px at 200px 60px, rgba(255, 0, 255, 0.15), transparent),
+    radial-gradient(1px 1px at 60px 100px, rgba(255, 255, 255, 0.2), transparent),
+    radial-gradient(2px 2px at 250px 50px, rgba(0, 212, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 80px 130px, rgba(139, 92, 246, 0.2), transparent);
+  background-size: 300px 150px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hud-corners {
+  position: relative;
+}
+.hud-corners::before,
+.hud-corners::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--pflx-cyan);
+  border-style: solid;
+  pointer-events: none;
+}
+.hud-corners::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+.hud-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+.pathway-card {
+  transition: all 0.3s ease;
+}
+.pathway-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 0 40px rgba(0, 212, 255, 0.3), 0 0 80px rgba(0, 212, 255, 0.1);
+}
+
+.hex-badge {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}

@@ -1,0 +1,2800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PFLX Pathway — Skill Tree</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --pflx-cyan: #00d4ff;
+      --pflx-teal: #00b8d4;
+      --pflx-dark: #0a0e17;
+      --pflx-darker: #050810;
+      --pflx-magenta: #ff00ff;
+      --pflx-purple: #8b5cf6;
+      --accent: #00d4ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: #050810;
+      color: #e0e0e0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      user-select: none;
+    }
+
+    /* ========== FRAME ========== */
+    .frame {
+      position: absolute; inset: 0;
+      border: 2px solid rgba(0,212,255,0.25);
+      border-radius: 12px; margin: 6px;
+      pointer-events: none; z-index: 50;
+    }
+    .frame-bottom-bar {
+      position: absolute; bottom: 6px; left: 30px; right: 30px;
+      height: 10px;
+      background: linear-gradient(90deg, rgba(0,212,255,0.15), rgba(0,212,255,0.25), rgba(0,212,255,0.15));
+      border-radius: 0 0 4px 4px; z-index: 50; pointer-events: none;
+    }
+    .frame-top-bar {
+      position: absolute; top: 6px; left: 100px; right: 100px;
+      height: 4px; z-index: 50; pointer-events: none;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .frame-top-bar::before {
+      content: ''; width: 60%; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent);
+    }
+    .frame-side {
+      position: absolute; top: 30%; bottom: 30%; width: 3px;
+      z-index: 50; pointer-events: none;
+    }
+    .frame-side.left { left: 7px; background: linear-gradient(180deg, transparent, rgba(0,212,255,0.2), transparent); }
+    .frame-side.right { right: 7px; background: linear-gradient(180deg, transparent, rgba(0,212,255,0.2), transparent); }
+
+    /* ========== STARFIELD ========== */
+    .starfield { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+    .star {
+      position: absolute; border-radius: 50%; background: white;
+      animation: twinkle var(--dur) ease-in-out infinite alternate;
+    }
+    @keyframes twinkle { from { opacity: 0.2; } to { opacity: var(--max-op); } }
+
+    /* ========== RADIAL BG ========== */
+    .radial-bg {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px; height: 800px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.04) 0%, rgba(0,212,255,0.02) 40%, transparent 70%);
+      pointer-events: none; z-index: 1;
+    }
+    .radial-ring {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.06);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      pointer-events: none; z-index: 1;
+    }
+    .rotating-ring {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 620px; height: 620px; border-radius: 50%;
+      border: 1px dashed rgba(0,212,255,0.05);
+      animation: slowSpin 60s linear infinite;
+      pointer-events: none; z-index: 1;
+    }
+    @keyframes slowSpin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+    /* ========== FLOATING PARTICLES ========== */
+    .particle-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+    .particle { position: absolute; border-radius: 50%; }
+
+    /* ========== PULSE RINGS ========== */
+    .pulse-ring-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+    .pulse-ring {
+      position: absolute; border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.2);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.3);
+      opacity: 0;
+    }
+
+    /* ========== ENERGY SCAN LINES ========== */
+    .scan-line-layer { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+    .scan-line {
+      position: absolute; left: 0; width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,212,255,0.0) 10%, rgba(0,212,255,0.4) 50%, rgba(0,212,255,0.0) 90%, transparent 100%);
+      box-shadow: 0 0 20px 4px rgba(0,212,255,0.15), 0 0 60px 8px rgba(0,212,255,0.06);
+      opacity: 0;
+    }
+
+    /* ========== AURORA GRADIENT ========== */
+    .aurora-layer {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* ========== WORLD MAP WIDGET ========== */
+    .world-map {
+      position: absolute; top: 60px; right: 20px;
+      width: 120px; height: 68px;
+      border: 1px solid rgba(0,212,255,0.35);
+      background: rgba(6,10,18,0.9);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 90; overflow: hidden;
+    }
+    .world-map svg { width: 100px; height: 50px; opacity: 0.6; }
+
+    /* ========== RADAR WIDGET ========== */
+    .radar {
+      position: absolute; top: 140px; right: 45px;
+      width: 70px; height: 70px;
+      border: 1px solid rgba(0,212,255,0.25);
+      border-radius: 50%; background: rgba(6,10,18,0.7);
+      z-index: 90; overflow: hidden;
+    }
+    .radar-sweep {
+      position: absolute; top: 50%; left: 50%;
+      width: 50%; height: 2px;
+      background: linear-gradient(90deg, rgba(0,212,255,0.8), transparent);
+      transform-origin: left center;
+      animation: radarSweep 3s linear infinite;
+    }
+    .radar-cross {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(0,212,255,0.4); font-family: 'Orbitron'; font-size: 14px;
+    }
+    .radar::before {
+      content: ''; position: absolute; top: 50%; left: 0; right: 0;
+      height: 1px; background: rgba(0,212,255,0.1);
+    }
+    .radar::after {
+      content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+      width: 1px; background: rgba(0,212,255,0.1);
+    }
+    @keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* ========== HUD BARS (top right) ========== */
+    .hud-bars-container {
+      position: absolute; top: 60px; left: 20px; z-index: 90;
+    }
+    .hud-bars-box {
+      width: 80px; height: 50px;
+      border: 1px solid rgba(0,212,255,0.3);
+      background: rgba(6,10,18,0.8);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 6px 8px; gap: 3px;
+    }
+    .hud-b {
+      width: 6px; background: rgba(0,212,255,0.55); border-radius: 1px;
+      transition: height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+    }
+
+    /* ========== TOP BAR: BACK + PATHWAY TITLE ========== */
+    .top-bar {
+      position: absolute; top: 16px; left: 20px; right: 20px;
+      display: flex; align-items: center; gap: 16px;
+      z-index: 100;
+    }
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.3);
+      color: var(--accent); font-family: 'Orbitron'; font-size: 11px;
+      padding: 8px 14px; cursor: pointer; text-transform: uppercase;
+      letter-spacing: 2px; transition: all 0.3s;
+    }
+    .back-btn:hover { background: rgba(0,212,255,0.2); box-shadow: 0 0 15px rgba(0,212,255,0.3); }
+    .back-btn svg { width: 14px; height: 14px; }
+
+    .pathway-header {
+      display: flex; align-items: center; gap: 14px; flex: 1;
+    }
+    .pathway-icon-img { width: 48px; height: 48px; border-radius: 50%; filter: drop-shadow(0 0 8px var(--accent)); }
+    .pathway-title-area { display: flex; flex-direction: column; }
+    .pathway-title {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 20px;
+      color: var(--accent); letter-spacing: 3px; text-transform: uppercase;
+      text-shadow: 0 0 10px var(--accent), 0 0 30px color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    .pathway-subtitle {
+      font-family: 'Rajdhani'; font-weight: 400; font-size: 13px;
+      color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase;
+    }
+
+    /* ========== PFLX LOGO (top right) ========== */
+    .logo-top-right {
+      position: absolute; top: 16px; right: 20px; z-index: 100;
+    }
+    .logo-top-right img { height: 36px; filter: drop-shadow(0 0 10px rgba(0,212,255,0.4)); }
+
+    /* ========== NODE MAP CANVAS ========== */
+    .node-canvas {
+      position: absolute; inset: 0; z-index: 10;
+      cursor: grab;
+    }
+    .node-canvas.dragging-canvas { cursor: grabbing; }
+
+    .node-layer {
+      position: absolute;
+      width: 2000px; height: 2000px;
+      top: 0; left: 0;
+      transition: none;
+    }
+
+    /* ========== SVG CONNECTORS ========== */
+    .connector-svg {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 5;
+      overflow: visible;
+    }
+    .connector-line {
+      stroke-width: 2.5; fill: none;
+      stroke-dasharray: 10 6;
+      vector-effect: non-scaling-stroke;
+    }
+    .connector-line.locked { stroke: rgba(100,140,180,0.35); stroke-dasharray: 5 7; }
+    .connector-line.unlocked { stroke: rgba(0,212,255,0.65); animation: connectorPulse 2.5s ease-in-out infinite; }
+    .connector-line.completed { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; filter: drop-shadow(0 0 8px var(--accent)); }
+    @keyframes connectorPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+    /* ========== SKILL NODES ========== */
+    .skill-node {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex; flex-direction: column; align-items: center;
+      cursor: pointer; z-index: 20;
+      transition: transform 0.1s ease-out;
+    }
+    .skill-node.dragging {
+      z-index: 100; cursor: grabbing;
+      transition: none;
+    }
+
+    .node-ring {
+      width: 90px; height: 90px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+    .node-ring::before {
+      content: ''; position: absolute; inset: -4px;
+      border-radius: 50%; border: 2px solid transparent;
+      transition: all 0.3s; z-index: 2;
+    }
+
+    /* Node states */
+    .skill-node[data-status="locked"] .node-ring {
+      background: rgba(30,35,50,0.8);
+      border: 2px solid rgba(100,110,130,0.3);
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+    }
+    .skill-node[data-status="locked"] .node-ring::before {
+      border-color: rgba(100,110,130,0.15);
+    }
+    .skill-node[data-status="locked"] .node-icon { opacity: 0.3; filter: grayscale(1); }
+    .skill-node[data-status="locked"] .node-label { color: rgba(255,255,255,0.3); }
+
+    .skill-node[data-status="unlocked"] .node-ring {
+      background: rgba(0,212,255,0.08);
+      border: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 20%, transparent),
+                  inset 0 0 15px color-mix(in srgb, var(--accent) 10%, transparent);
+      animation: nodeReady 2s ease-in-out infinite;
+    }
+    .skill-node[data-status="unlocked"] .node-ring::before {
+      border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+      animation: outerPulse 2s ease-in-out infinite;
+    }
+
+    .skill-node[data-status="in_progress"] .node-ring {
+      background: rgba(255,200,0,0.08);
+      border: 2px solid rgba(255,200,0,0.5);
+      box-shadow: 0 0 20px rgba(255,200,0,0.2), inset 0 0 15px rgba(255,200,0,0.1);
+    }
+
+    .skill-node[data-status="completed"] .node-ring {
+      background: rgba(0,255,120,0.08);
+      border: 2px solid rgba(0,255,120,0.5);
+      box-shadow: 0 0 25px rgba(0,255,120,0.25), inset 0 0 15px rgba(0,255,120,0.1);
+    }
+    .skill-node[data-status="completed"] .node-ring::after {
+      content: '✓'; position: absolute; bottom: -2px; right: -2px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #00ff78; color: #000; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 8px rgba(0,255,120,0.5);
+    }
+
+    .skill-node.coming-soon .node-ring {
+      border-style: dashed !important;
+    }
+
+    @keyframes nodeReady {
+      0%, 100% { box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 15%, transparent); }
+      50% { box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 30%, transparent); }
+    }
+    @keyframes outerPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.5; }
+    }
+
+    .node-icon {
+      font-size: 34px; transition: all 0.3s; z-index: 1;
+    }
+
+    .node-label {
+      margin-top: 8px;
+      font-family: 'Orbitron'; font-weight: 600; font-size: 10px;
+      color: rgba(255,255,255,0.8); letter-spacing: 1px;
+      text-transform: uppercase; text-align: center;
+      max-width: 120px; line-height: 1.3;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    }
+
+    .node-badge {
+      margin-top: 4px;
+      font-family: 'Rajdhani'; font-size: 9px;
+      padding: 2px 8px; border-radius: 10px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    .skill-node[data-status="locked"] .node-badge {
+      background: rgba(100,110,130,0.2); color: rgba(255,255,255,0.3); border: 1px solid rgba(100,110,130,0.3);
+    }
+    .skill-node[data-status="unlocked"] .node-badge {
+      background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    }
+    .skill-node[data-status="completed"] .node-badge {
+      background: rgba(0,255,120,0.1); color: #00ff78; border: 1px solid rgba(0,255,120,0.4);
+    }
+    .skill-node[data-status="in_progress"] .node-badge {
+      background: rgba(255,200,0,0.1); color: #ffc800; border: 1px solid rgba(255,200,0,0.4);
+    }
+    .coming-soon-tag {
+      background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3);
+    }
+
+    /* ========== HOVER EXPAND ========== */
+    .skill-node:hover .node-ring { transform: scale(1.1); }
+    .skill-node:hover .node-label { color: white; }
+
+    /* ========== NODE DETAIL PANEL ========== */
+    .detail-panel {
+      position: absolute; bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      width: 480px; max-width: 90vw;
+      background: rgba(8,12,24,0.95);
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      border-radius: 2px; padding: 0;
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      transform: translateX(-50%) translateY(20px);
+      backdrop-filter: blur(12px);
+    }
+    .detail-panel.active {
+      opacity: 1; pointer-events: all;
+      transform: translateX(-50%) translateY(0);
+    }
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      background: rgba(0,212,255,0.04);
+    }
+    .detail-header-left { display: flex; align-items: center; gap: 12px; }
+    .detail-icon { font-size: 24px; }
+    .detail-title {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 14px;
+      color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .detail-close {
+      background: none; border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.5); width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 14px; transition: all 0.2s;
+    }
+    .detail-close:hover { color: white; border-color: rgba(255,255,255,0.5); }
+    .detail-body { padding: 16px 18px; }
+    .detail-status {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-dot.locked { background: #555; }
+    .status-dot.unlocked { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .status-dot.completed { background: #00ff78; box-shadow: 0 0 6px #00ff78; }
+    .status-dot.in_progress { background: #ffc800; box-shadow: 0 0 6px #ffc800; }
+    .status-text { font-family: 'Orbitron'; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+    .detail-desc {
+      font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7);
+      margin-bottom: 16px;
+    }
+    .detail-requires {
+      font-family: 'Rajdhani'; font-size: 12px; color: rgba(255,255,255,0.4);
+      margin-bottom: 16px;
+    }
+    .detail-requires span { color: var(--accent); }
+
+    .launch-btn {
+      display: block; width: 100%;
+      font-family: 'Orbitron'; font-weight: 700; font-size: 13px;
+      letter-spacing: 3px; text-transform: uppercase;
+      padding: 14px; border: none; cursor: pointer;
+      transition: all 0.3s; text-align: center;
+    }
+    .launch-btn.ready {
+      background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #8b5cf6));
+      color: #000; box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .launch-btn.ready:hover {
+      box-shadow: 0 0 40px color-mix(in srgb, var(--accent) 50%, transparent);
+      transform: scale(1.02);
+    }
+    .launch-btn.locked-btn {
+      background: rgba(60,65,80,0.5); color: rgba(255,255,255,0.3);
+      cursor: not-allowed; border: 1px solid rgba(100,110,130,0.3);
+    }
+    .launch-btn.completed-btn {
+      background: rgba(0,255,120,0.15); color: #00ff78;
+      border: 1px solid rgba(0,255,120,0.3);
+    }
+
+    /* ========== MINIMAP ========== */
+    .minimap {
+      position: absolute; bottom: 20px; right: 20px;
+      width: 140px; height: 100px;
+      background: rgba(6,10,18,0.9);
+      border: 1px solid rgba(0,212,255,0.25);
+      z-index: 100; overflow: hidden;
+    }
+    .minimap-viewport {
+      position: absolute; border: 1px solid rgba(0,212,255,0.5);
+      background: rgba(0,212,255,0.05);
+    }
+    .minimap-dot {
+      position: absolute; width: 4px; height: 4px;
+      border-radius: 50%; transform: translate(-50%, -50%);
+    }
+
+    /* ========== PATHWAY PROGRESS BAR ========== */
+    .progress-bar-container {
+      position: absolute; bottom: 20px; left: 20px;
+      width: 200px; z-index: 100;
+    }
+    .progress-label {
+      font-family: 'Orbitron'; font-size: 9px; color: rgba(255,255,255,0.5);
+      letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px;
+    }
+    .progress-track {
+      width: 100%; height: 6px;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.2);
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #8b5cf6));
+      box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 40%, transparent);
+      transition: width 0.5s ease;
+    }
+    .progress-text {
+      font-family: 'Orbitron'; font-size: 10px; color: var(--accent);
+      margin-top: 4px; letter-spacing: 1px;
+    }
+
+    /* ========== ZOOM CONTROLS ========== */
+    .zoom-controls {
+      position: absolute; bottom: 135px; right: 20px;
+      display: flex; flex-direction: column; gap: 4px;
+      z-index: 100;
+    }
+    .zoom-btn {
+      width: 32px; height: 32px;
+      background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.25);
+      color: var(--accent); font-family: 'Orbitron'; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .zoom-btn:hover { background: rgba(0,212,255,0.15); }
+
+    /* ========== BOTTOM BAR ========== */
+    .bottom-bar {
+      position: absolute; bottom: 10px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      z-index: 55; pointer-events: none;
+    }
+    .bbar-segment {
+      width: 60px; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.3), transparent);
+    }
+    .bbar-label {
+      font-family: 'Orbitron'; font-size: 8px;
+      color: rgba(0,212,255,0.3); letter-spacing: 3px; text-transform: uppercase;
+    }
+
+    /* ========== GRID OVERLAY ========== */
+    .grid-overlay {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none; z-index: 2;
+    }
+
+    /* ========== PLAYER CARD ========== */
+    .player-card {
+      position: absolute;
+      top: 220px; right: 20px;
+      width: 270px;
+      border: 1px solid rgba(0,212,255,0.25);
+      background: rgba(6,10,18,0.92);
+      backdrop-filter: blur(10px);
+      z-index: 95;
+      display: none;
+      overflow: hidden;
+    }
+    .player-card::before, .player-card::after {
+      content: ''; position: absolute;
+      width: 16px; height: 16px;
+      border-color: rgba(0,212,255,0.5); border-style: solid;
+    }
+    .player-card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .player-card::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .pc-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid rgba(0,212,255,0.1);
+    }
+    .pc-avatar {
+      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+      overflow: hidden;
+      border: 2px solid rgba(0,212,255,0.4);
+      box-shadow: 0 0 12px rgba(0,212,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #00d4ff, #7c3aed);
+      font-family: 'Orbitron'; font-size: 14px; font-weight: 800; color: #fff;
+    }
+    .pc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .pc-info { flex: 1; overflow: hidden; }
+    .pc-brand {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 12px;
+      color: #ffffff; letter-spacing: 1px; text-transform: uppercase;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pc-designer-type {
+      font-family: 'Rajdhani'; font-size: 11px;
+      color: rgba(0,212,255,0.7); letter-spacing: 1px; margin-top: 2px;
+    }
+    .pc-role-badge {
+      font-family: 'Orbitron'; font-size: 8px; font-weight: 600;
+      padding: 2px 6px; border-radius: 3px; letter-spacing: 1.5px; text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .pc-role-badge.host { background: rgba(0,212,255,0.12); color: var(--pflx-cyan); border: 1px solid rgba(0,212,255,0.3); }
+    .pc-role-badge.player { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+
+    .pc-body { padding: 10px 14px 14px; }
+
+    .pc-rank-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .pc-rank-label {
+      font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      color: rgba(255,255,255,0.5); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .pc-rank-name {
+      font-family: 'Orbitron'; font-size: 10px; font-weight: 700;
+      color: var(--pflx-cyan); letter-spacing: 1px;
+    }
+    .pc-rank-bar-track {
+      width: 100%; height: 6px; background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.15); border-radius: 3px;
+      margin-bottom: 4px; overflow: hidden;
+    }
+    .pc-rank-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--pflx-cyan), #7c3aed);
+      border-radius: 3px;
+      box-shadow: 0 0 6px rgba(0,212,255,0.4);
+      transition: width 0.5s ease;
+    }
+    .pc-rank-progress-text {
+      font-family: 'Rajdhani'; font-size: 10px; color: rgba(255,255,255,0.35);
+      text-align: right; margin-bottom: 10px;
+    }
+
+    .pc-stats { display: flex; gap: 8px; }
+    .pc-stat {
+      flex: 1;
+      background: rgba(0,212,255,0.04);
+      border: 1px solid rgba(0,212,255,0.12);
+      border-radius: 4px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    .pc-stat-value {
+      font-family: 'Orbitron'; font-weight: 800; font-size: 14px;
+      color: #f5c842;
+      text-shadow: 0 0 8px rgba(245,200,66,0.4);
+    }
+    .pc-stat-value.xc-color { color: #4f8ef7; text-shadow: 0 0 8px rgba(79,142,247,0.4); }
+    .pc-stat-value.badge-color { color: var(--pflx-cyan); text-shadow: 0 0 8px rgba(0,212,255,0.4); }
+    .pc-stat-label {
+      font-family: 'Orbitron'; font-size: 7px; font-weight: 500;
+      color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .pc-logout {
+      display: block; width: 100%; margin-top: 10px;
+      background: rgba(255,80,80,0.06); border: 1px solid rgba(255,80,80,0.2);
+      color: rgba(255,80,80,0.6); font-family: 'Orbitron'; font-size: 9px;
+      font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+      padding: 6px; cursor: pointer; text-align: center; transition: all 0.2s;
+    }
+    .pc-logout:hover { background: rgba(255,80,80,0.12); color: #ff6b6b; }
+
+    /* ========== HOST EDIT MODE ========== */
+    .edit-toggle {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 200; display: none;
+    }
+    .edit-toggle button {
+      font-family: 'Orbitron'; font-size: 10px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      padding: 8px 20px; cursor: pointer; transition: all 0.3s;
+      border: 1px solid rgba(0,212,255,0.3); background: rgba(6,10,18,0.9);
+      color: rgba(0,212,255,0.6);
+    }
+    .edit-toggle button:hover { background: rgba(0,212,255,0.15); color: var(--pflx-cyan); }
+    .edit-toggle button.active {
+      background: linear-gradient(135deg, rgba(255,200,0,0.2), rgba(255,120,0,0.15));
+      border-color: rgba(255,200,0,0.5); color: #ffc800;
+    }
+    body.edit-mode .node-canvas { cursor: crosshair; }
+    body.edit-mode .skill-node { cursor: grab; }
+    body.edit-mode .edit-indicator {
+      position: absolute; top: 58px; left: 50%; transform: translateX(-50%);
+      font-family: 'Orbitron'; font-size: 9px; color: #ffc800;
+      letter-spacing: 3px; text-transform: uppercase; z-index: 200;
+      animation: editPulse 2s ease-in-out infinite;
+    }
+    @keyframes editPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+    /* Context Menu */
+    .ctx-menu {
+      position: fixed; z-index: 500;
+      background: rgba(8,12,24,0.96); border: 1px solid rgba(0,212,255,0.3);
+      backdrop-filter: blur(12px); min-width: 200px;
+      display: none; overflow: hidden;
+    }
+    .ctx-menu.show { display: block; }
+    .ctx-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; cursor: pointer;
+      font-family: 'Rajdhani'; font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,0.8); transition: all 0.15s;
+      border-bottom: 1px solid rgba(0,212,255,0.08);
+    }
+    .ctx-item:last-child { border-bottom: none; }
+    .ctx-item:hover { background: rgba(0,212,255,0.1); color: #fff; }
+    .ctx-item.danger:hover { background: rgba(255,80,80,0.15); color: #ff6b6b; }
+    .ctx-item .ctx-icon { font-size: 16px; width: 20px; text-align: center; }
+    .ctx-separator {
+      height: 1px; background: rgba(0,212,255,0.15); margin: 2px 0;
+    }
+
+    /* Node Editor Modal */
+    .node-editor-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .node-editor-overlay.show { display: flex; }
+    .node-editor {
+      width: 440px; max-height: 85vh; overflow-y: auto;
+      background: rgba(8,12,24,0.98); border: 1px solid rgba(0,212,255,0.3);
+      padding: 0;
+    }
+    .ne-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid rgba(0,212,255,0.15);
+      background: rgba(0,212,255,0.04);
+    }
+    .ne-title {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 14px;
+      color: var(--pflx-cyan); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .ne-close {
+      background: none; border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.5); width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 14px; transition: all 0.2s;
+    }
+    .ne-close:hover { color: white; border-color: rgba(255,255,255,0.5); }
+    .ne-body { padding: 20px; }
+    .ne-field { margin-bottom: 16px; }
+    .ne-label {
+      font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      color: rgba(0,212,255,0.7); letter-spacing: 2px; text-transform: uppercase;
+      margin-bottom: 6px; display: block;
+    }
+    .ne-input, .ne-select, .ne-textarea {
+      width: 100%; padding: 10px 14px;
+      font-family: 'Rajdhani'; font-size: 14px; font-weight: 500;
+      color: #e0e0e0; background: rgba(5,8,16,0.8);
+      border: 1px solid rgba(0,212,255,0.2); border-radius: 4px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .ne-input:focus, .ne-select:focus, .ne-textarea:focus {
+      border-color: rgba(0,212,255,0.5);
+    }
+    .ne-textarea { min-height: 60px; resize: vertical; }
+    .ne-select { cursor: pointer; }
+    .ne-row { display: flex; gap: 12px; }
+    .ne-row .ne-field { flex: 1; }
+    .ne-save {
+      width: 100%; padding: 12px;
+      font-family: 'Orbitron'; font-weight: 700; font-size: 12px;
+      letter-spacing: 3px; text-transform: uppercase;
+      background: linear-gradient(135deg, #00d4ff, #7c3aed);
+      color: #fff; border: none; cursor: pointer;
+      transition: all 0.3s; margin-top: 8px;
+    }
+    .ne-save:hover { box-shadow: 0 0 25px rgba(0,212,255,0.3); }
+
+    /* Connection mode indicator */
+    body.connect-mode .node-canvas { cursor: crosshair !important; }
+    body.connect-mode .skill-node { cursor: pointer !important; }
+    .connect-banner {
+      position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+      z-index: 300; padding: 8px 24px;
+      font-family: 'Orbitron'; font-size: 10px; font-weight: 600;
+      color: #ffc800; letter-spacing: 2px; text-transform: uppercase;
+      background: rgba(255,200,0,0.1); border: 1px solid rgba(255,200,0,0.3);
+      display: none;
+    }
+    body.connect-mode .connect-banner { display: block; }
+
+    /* Badge requirement indicator on nodes */
+    .badge-indicator {
+      position: absolute; top: -4px; right: -4px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: rgba(245,200,66,0.2); border: 1px solid rgba(245,200,66,0.5);
+      font-size: 10px; display: flex; align-items: center; justify-content: center;
+      z-index: 5;
+    }
+    .badge-indicator.earned {
+      background: rgba(0,255,120,0.2); border-color: rgba(0,255,120,0.5);
+    }
+
+    /* ─── CONNECTION HANDLE (drag-to-connect) ─── */
+    .conn-handle {
+      display: none; position: absolute;
+      bottom: -8px; left: 50%; transform: translateX(-50%);
+      width: 16px; height: 16px; border-radius: 50%;
+      background: rgba(0,212,255,0.3); border: 2px solid var(--pflx-cyan);
+      cursor: crosshair; z-index: 10;
+      transition: all 0.2s;
+    }
+    .conn-handle:hover {
+      background: rgba(0,212,255,0.6); box-shadow: 0 0 10px rgba(0,212,255,0.5);
+      transform: translateX(-50%) scale(1.3);
+    }
+    body.edit-mode .conn-handle { display: block; }
+
+    /* Disconnected node indicator (edit mode only) */
+    .skill-node.disconnected .node-ring {
+      border: 2px dashed rgba(255,200,0,0.4) !important;
+      box-shadow: none !important;
+    }
+    .skill-node.disconnected .node-label { color: rgba(255,200,0,0.6); }
+    .skill-node.disconnected .node-badge {
+      background: rgba(255,200,0,0.15); color: rgba(255,200,0,0.7);
+    }
+    .skill-node.disconnected .node-badge::after {
+      content: ' (HIDDEN)'; font-size: 8px;
+    }
+
+    /* Temp drag line */
+    .drag-connector { pointer-events: none; }
+
+    /* ─── DISCONNECT X BUTTONS on connectors ─── */
+    .conn-x-btn {
+      display: none; position: absolute;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(255,50,50,0.85); border: 2px solid rgba(255,120,120,0.7);
+      color: #fff; font-size: 14px; font-weight: bold; line-height: 24px;
+      text-align: center; cursor: pointer; z-index: 15;
+      transform: translate(-50%, -50%);
+      transition: all 0.2s;
+      box-shadow: 0 0 6px rgba(0,0,0,0.5);
+    }
+    .conn-x-btn:hover {
+      background: rgba(255,30,30,1); transform: translate(-50%, -50%) scale(1.3);
+      box-shadow: 0 0 12px rgba(255,60,60,0.7);
+    }
+    body.edit-mode .conn-x-btn { display: block; }
+
+    /* ─── NODE IMAGE ─── */
+    .node-image {
+      width: 100%; height: 100%; border-radius: 50%;
+      object-fit: cover; position: absolute; inset: 0;
+    }
+    .node-ring { position: relative; }
+    .node-image-upload {
+      display: none; position: absolute;
+      bottom: 2px; left: 2px;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,212,255,0.3); border: 1px solid var(--pflx-cyan);
+      color: #fff; font-size: 11px; cursor: pointer; z-index: 10;
+      text-align: center; line-height: 20px;
+      transition: all 0.2s;
+    }
+    .node-image-upload:hover {
+      background: rgba(0,212,255,0.6); box-shadow: 0 0 8px rgba(0,212,255,0.4);
+    }
+    body.edit-mode .node-image-upload { display: block; }
+    body.hide-labels .node-label, body.hide-labels .node-badge { display: none; }
+
+    /* ─── SETTINGS PANEL ─── */
+    #settingsBtn {
+      font-size: 16px; padding: 8px 12px; margin-left: 6px;
+      background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.3);
+      color: rgba(0,212,255,0.6); cursor: pointer; transition: all 0.3s;
+      font-family: inherit;
+    }
+    #settingsBtn:hover { background: rgba(0,212,255,0.15); color: var(--pflx-cyan); }
+
+    .settings-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .settings-overlay.show { display: flex; }
+    .settings-panel {
+      width: 460px; max-height: 85vh; overflow-y: auto;
+      background: rgba(8,12,24,0.98); border: 1px solid rgba(0,212,255,0.3);
+    }
+    .settings-section { margin-bottom: 20px; }
+    .settings-section-title {
+      font-family: 'Orbitron'; font-size: 10px; font-weight: 600;
+      color: var(--pflx-cyan); letter-spacing: 3px; text-transform: uppercase;
+      margin-bottom: 12px; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+    }
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; gap: 12px;
+    }
+    .settings-label {
+      font-family: 'Rajdhani'; font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,0.75); flex: 1;
+    }
+    .settings-value {
+      font-family: 'Rajdhani'; font-size: 13px; color: var(--pflx-cyan);
+      min-width: 36px; text-align: right;
+    }
+    .settings-slider {
+      width: 120px; height: 4px; -webkit-appearance: none; appearance: none;
+      background: rgba(0,212,255,0.2); border-radius: 2px; outline: none;
+      cursor: pointer;
+    }
+    .settings-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      border-radius: 50%; background: var(--pflx-cyan); cursor: pointer;
+      box-shadow: 0 0 6px rgba(0,212,255,0.5);
+    }
+
+    /* Toggle Switch */
+    .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: rgba(60,70,90,0.6); border-radius: 11px;
+      border: 1px solid rgba(100,110,130,0.4);
+      transition: all 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 16px; height: 16px;
+      left: 2px; bottom: 2px; border-radius: 50%;
+      background: rgba(180,190,200,0.6);
+      transition: all 0.3s;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: rgba(0,212,255,0.25); border-color: rgba(0,212,255,0.5);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(18px); background: var(--pflx-cyan);
+      box-shadow: 0 0 6px rgba(0,212,255,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Starfield -->
+  <div class="starfield" id="starfield"></div>
+
+  <!-- Aurora Background -->
+  <div class="aurora-layer" id="auroraLayer"></div>
+
+  <!-- Floating Particles -->
+  <div class="particle-layer" id="particleLayer"></div>
+
+  <!-- Energy Scan Lines -->
+  <div class="scan-line-layer" id="scanLineLayer"></div>
+
+  <!-- Pulse Rings -->
+  <div class="pulse-ring-layer" id="pulseRingLayer"></div>
+
+  <!-- Radial BG -->
+  <div class="radial-bg"></div>
+  <div class="radial-ring" style="width:300px;height:300px;"></div>
+  <div class="radial-ring" style="width:500px;height:500px;"></div>
+  <div class="radial-ring" style="width:700px;height:700px;"></div>
+  <div class="rotating-ring"></div>
+
+  <!-- Grid -->
+  <div class="grid-overlay"></div>
+
+  <!-- Frame -->
+  <div class="frame"></div>
+  <div class="frame-top-bar"></div>
+  <div class="frame-side left"></div>
+  <div class="frame-side right"></div>
+  <div class="frame-bottom-bar"></div>
+
+  <!-- World Map -->
+  <div class="world-map">
+    <svg viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="100" fill="none"/>
+      <path d="M30 30 Q40 20 55 25 Q65 28 70 35 Q72 40 68 45 Q60 50 50 48 Q40 45 35 40 Q28 35 30 30Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M75 20 Q85 15 100 18 Q115 22 120 30 Q125 38 118 45 Q110 52 100 50 Q88 48 82 42 Q75 35 75 28Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M125 25 Q135 20 148 22 Q160 25 165 32 Q168 38 162 42 Q155 46 145 44 Q135 42 130 36 Q125 30 125 25Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M55 55 Q65 50 80 52 Q90 55 95 62 Q98 68 92 74 Q85 78 75 76 Q63 73 58 66 Q53 60 55 55Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M105 55 Q112 50 122 52 Q130 55 132 60 Q134 65 128 68 Q120 72 112 70 Q105 66 105 60Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M140 50 Q148 46 158 48 Q170 52 174 58 Q176 64 170 68 Q162 72 152 70 Q142 66 140 58Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M80 78 Q86 74 95 76 Q102 78 100 84 Q95 88 88 86 Q82 84 80 78Z" fill="rgba(0,212,255,0.3)"/>
+    </svg>
+  </div>
+
+  <!-- Radar -->
+  <div class="radar">
+    <div class="radar-sweep"></div>
+    <div class="radar-cross">+</div>
+  </div>
+
+  <!-- HUD Bars -->
+  <div class="hud-bars-container">
+    <div class="hud-bars-box" id="hudBars"></div>
+  </div>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <a class="back-btn" id="returnBtn" href="preview.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Return
+    </a>
+    <div class="pathway-header">
+      <img class="pathway-icon-img" id="pathwayIconImg" src="" alt="">
+      <div class="pathway-title-area">
+        <div class="pathway-title" id="pathwayTitle"></div>
+        <div class="pathway-subtitle" id="pathwaySubtitle"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PFLX Logo -->
+  <div class="logo-top-right">
+    <img src="public/icons/pflx-logo.png" alt="PFLX">
+  </div>
+
+  <!-- Player Card (shown for logged-in players) -->
+  <div class="player-card" id="playerCard">
+    <div class="pc-header">
+      <div class="pc-avatar" id="pcAvatar"></div>
+      <div class="pc-info">
+        <div class="pc-brand" id="pcBrand"></div>
+        <div class="pc-designer-type" id="pcDesignerType"></div>
+      </div>
+      <span class="pc-role-badge" id="pcRoleBadge"></span>
+    </div>
+    <div class="pc-body">
+      <div class="pc-rank-row">
+        <span class="pc-rank-label">Evolution Rank</span>
+        <span class="pc-rank-name" id="pcRankName"></span>
+      </div>
+      <div class="pc-rank-bar-track">
+        <div class="pc-rank-bar-fill" id="pcRankFill"></div>
+      </div>
+      <div class="pc-rank-progress-text" id="pcRankProgress"></div>
+      <div class="pc-stats">
+        <div class="pc-stat">
+          <div class="pc-stat-value xc-color" id="pcXC"></div>
+          <div class="pc-stat-label">X-Coin</div>
+        </div>
+        <div class="pc-stat">
+          <div class="pc-stat-value badge-color" id="pcBadges"></div>
+          <div class="pc-stat-label">Badges</div>
+        </div>
+        <div class="pc-stat">
+          <div class="pc-stat-value" id="pcLevel"></div>
+          <div class="pc-stat-label">Level</div>
+        </div>
+      </div>
+      <button class="pc-logout" id="pcLogout">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- Node Canvas (pannable/zoomable) -->
+  <div class="node-canvas" id="nodeCanvas">
+    <div class="node-layer" id="nodeLayer">
+      <svg class="connector-svg" id="connectorSvg"></svg>
+    </div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <div class="detail-header-left">
+        <span class="detail-icon" id="detailIcon"></span>
+        <span class="detail-title" id="detailTitle"></span>
+      </div>
+      <button class="detail-close" id="detailClose">&times;</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-status">
+        <span class="status-dot" id="detailDot"></span>
+        <span class="status-text" id="detailStatus"></span>
+      </div>
+      <div class="detail-desc" id="detailDesc"></div>
+      <div class="detail-requires" id="detailRequires"></div>
+      <button class="launch-btn" id="launchBtn"></button>
+    </div>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar-container">
+    <div class="progress-label">Pathway Progress</div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">0 / 0 Nodes</div>
+  </div>
+
+  <!-- Minimap -->
+  <div class="minimap" id="minimap">
+    <div class="minimap-viewport" id="minimapViewport"></div>
+  </div>
+
+  <!-- Zoom Controls -->
+  <div class="zoom-controls">
+    <button class="zoom-btn" id="zoomIn">+</button>
+    <button class="zoom-btn" id="zoomOut">&minus;</button>
+    <button class="zoom-btn" id="zoomFit" style="font-size:10px;">FIT</button>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <div class="bbar-segment"></div>
+    <div class="bbar-label">PFLX Skill Tree v1.0</div>
+    <div class="bbar-segment"></div>
+  </div>
+
+  <!-- HOST: Edit Mode Toggle + Settings -->
+  <div class="edit-toggle" id="editToggle">
+    <button id="editToggleBtn">Edit Mode</button>
+    <button id="settingsBtn" title="Settings">⚙</button>
+  </div>
+  <div class="edit-indicator" id="editIndicator" style="display:none;">// Editing //</div>
+
+  <!-- HOST: Settings Panel -->
+  <div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-panel">
+      <div class="ne-header">
+        <span class="ne-title">Host Settings</span>
+        <button class="ne-close" id="settingsClose">&times;</button>
+      </div>
+      <div class="ne-body">
+        <div class="settings-section">
+          <h3 class="settings-section-title">Sound Effects</h3>
+          <div class="settings-row">
+            <span class="settings-label">Enable Sounds</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sfxEnabled" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Volume</span>
+            <input type="range" id="sfxVolume" min="0" max="100" value="60" class="settings-slider">
+            <span class="settings-value" id="sfxVolumeVal">60%</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">UI Sounds (hover, click)</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sfxUI" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Achievement Sounds</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sfxAchieve" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Ambient Background</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="sfxAmbient">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3 class="settings-section-title">Display</h3>
+          <div class="settings-row">
+            <span class="settings-label">Show Connector Lines</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="showConnectors" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Show Node Labels</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="showLabels" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Starfield Animation</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="showStarfield" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <button class="ne-save" id="settingsSave">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOST: Context Menu -->
+  <div class="ctx-menu" id="ctxMenu">
+    <div class="ctx-item" data-action="edit"><span class="ctx-icon">✏️</span> Edit Node</div>
+    <div class="ctx-item" data-action="connect"><span class="ctx-icon">🔗</span> Connect To...</div>
+    <div class="ctx-item" data-action="disconnect"><span class="ctx-icon">✂️</span> Remove Connections</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" data-action="duplicate"><span class="ctx-icon">📋</span> Duplicate Node</div>
+    <div class="ctx-item danger" data-action="delete"><span class="ctx-icon">🗑️</span> Delete Node</div>
+  </div>
+
+  <!-- HOST: Connection Mode Banner -->
+  <div class="connect-banner" id="connectBanner">Click a target node to connect — ESC to cancel</div>
+
+  <!-- HOST: Node Editor Modal -->
+  <div class="node-editor-overlay" id="nodeEditorOverlay">
+    <div class="node-editor">
+      <div class="ne-header">
+        <span class="ne-title" id="neTitle">Edit Node</span>
+        <button class="ne-close" id="neClose">&times;</button>
+      </div>
+      <div class="ne-body">
+        <div class="ne-row">
+          <div class="ne-field">
+            <label class="ne-label">Title</label>
+            <input class="ne-input" id="neNodeTitle" placeholder="Node title...">
+          </div>
+          <div class="ne-field" style="max-width:80px;">
+            <label class="ne-label">Emoji</label>
+            <input class="ne-input" id="neEmoji" placeholder="🚀" style="text-align:center;font-size:20px;">
+          </div>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">Node Image</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div id="neImagePreview" style="width:60px;height:60px;border-radius:50%;overflow:hidden;border:1px solid rgba(0,212,255,0.2);background:rgba(5,8,16,0.8);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;" title="Click to upload image">
+              <span style="color:rgba(255,255,255,0.3);font-size:20px;" id="neImagePlaceholder">📷</span>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+              <button class="ne-input" id="neImageUpload" style="cursor:pointer;text-align:center;padding:8px;font-size:12px;color:var(--pflx-cyan);">Upload PNG / Icon</button>
+              <select class="ne-select" id="neImageFit" style="font-size:12px;padding:6px 8px;">
+                <option value="cover">Cover (fill, crop)</option>
+                <option value="contain">Contain (fit)</option>
+                <option value="fill">Stretch</option>
+              </select>
+            </div>
+            <button id="neImageClear" style="background:none;border:1px solid rgba(255,60,60,0.3);color:rgba(255,60,60,0.7);padding:6px 10px;cursor:pointer;font-size:11px;border-radius:4px;font-family:'Rajdhani';" title="Remove image">✕</button>
+          </div>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">Description</label>
+          <textarea class="ne-textarea" id="neDesc" placeholder="What will players learn or do?"></textarea>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">External URL (opens on Start)</label>
+          <input class="ne-input" id="neUrl" placeholder="https://classroom.google.com/...">
+        </div>
+        <div class="ne-row">
+          <div class="ne-field">
+            <label class="ne-label">Status</label>
+            <select class="ne-select" id="neStatus">
+              <option value="locked">Locked</option>
+              <option value="unlocked">Unlocked</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="ne-field">
+            <label class="ne-label">Completion Badge</label>
+            <select class="ne-select" id="neBadge">
+              <option value="">— None —</option>
+              <optgroup label="🏅 Signature Badges (Skill Mastery)">
+                <option value="Cert: Photoshop">Cert: Photoshop</option>
+                <option value="Cert: Premiere">Cert: Premiere</option>
+                <option value="Master Builder">Master Builder</option>
+              </optgroup>
+              <optgroup label="💎 Premium Badges (Achievement)">
+                <option value="Beacon of Knowledge">Beacon of Knowledge</option>
+                <option value="Beacon of Creativity">Beacon of Creativity</option>
+                <option value="Beacon of X-Cellence">Beacon of X-Cellence</option>
+                <option value="Beacon of Collaboration">Beacon of Collaboration</option>
+              </optgroup>
+              <optgroup label="💼 Executive Badges (Jobs)">
+                <option value="Executive Producer">Executive Producer</option>
+                <option value="Creative Director">Creative Director</option>
+                <option value="Director of Photography">Director of Photography</option>
+                <option value="Project Manager">Project Manager</option>
+                <option value="Lead Editor">Lead Editor</option>
+                <option value="Technical Director">Technical Director</option>
+                <option value="Stage Manager">Stage Manager</option>
+                <option value="Video Editor">Video Editor</option>
+                <option value="Studio Director">Studio Director</option>
+                <option value="Lighting Technician">Lighting Technician</option>
+                <option value="Host/Anchor/Actor">Host/Anchor/Actor</option>
+                <option value="Camera Operator">Camera Operator</option>
+              </optgroup>
+              <optgroup label="⭐ Primary Badges (Behavior)">
+                <option value="Battle Arena Champion">Battle Arena Champion</option>
+                <option value="Self Directed Player">Self Directed Player</option>
+                <option value="Strategic Organizer">Strategic Organizer</option>
+                <option value="Entrepreneurial Spirit">Entrepreneurial Spirit</option>
+                <option value="Self Advocate">Self Advocate</option>
+                <option value="Focus Optimizer">Focus Optimizer</option>
+                <option value="Gamification Guru">Gamification Guru</option>
+                <option value="Professional Communicator">Professional Communicator</option>
+                <option value="Critical Thinker">Critical Thinker</option>
+                <option value="Master Collaborator">Master Collaborator</option>
+                <option value="Innovative Creator">Innovative Creator</option>
+                <option value="Digital Tool Master">Digital Tool Master</option>
+                <option value="Resilient Learner">Resilient Learner</option>
+                <option value="Growth Mindset">Growth Mindset</option>
+                <option value="Goal Setter">Goal Setter</option>
+                <option value="Time Manager">Time Manager</option>
+                <option value="Peer Supporter">Peer Supporter</option>
+                <option value="Positive Participant">Positive Participant</option>
+                <option value="Digital Citizen">Digital Citizen</option>
+                <option value="Emerging Leader">Emerging Leader</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="neComingSoon" style="width:14px;height:14px;"> Coming Soon
+          </label>
+        </div>
+        <button class="ne-save" id="neSave">Save Node</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ==================== PATHWAY DATA ====================
+const PATHWAYS = {
+  'professional-entrepreneur': {
+    title: 'Professional Entrepreneur',
+    subtitle: 'Welcome to the Universe of Entrepreneurship',
+    icon: 'public/icons/professional-entrepreneur.png',
+    accent: '#00d4ff',
+    nodes: [
+      { id: 'pe-intro', title: 'Intro to Entrepreneurship', emoji: '🚀', x: 50, y: 85, status: 'unlocked', desc: 'Begin your entrepreneurship journey. Learn the mindset, tools, and strategies of successful founders.' },
+      { id: 'pe-branding', title: 'Personal Branding', emoji: '🏷️', x: 30, y: 72, status: 'locked', requires: ['pe-intro'], desc: 'Craft your personal brand identity. Define your story, style, and audience reach.' },
+      { id: 'pe-pitch', title: 'Perfect Pitch', emoji: '🎯', x: 18, y: 58, status: 'locked', requires: ['pe-branding'], desc: 'Master the art of pitching your ideas. Elevator pitches, investor decks, and persuasion.' },
+      { id: 'pe-team', title: 'Team Building', emoji: '👥', x: 18, y: 42, status: 'locked', requires: ['pe-pitch'], desc: 'Build and lead a high-performing team. Communication, delegation, and culture.' },
+      { id: 'pe-digital-citizen', title: 'Digital Citizen & Age of Tech', emoji: '🌐', x: 50, y: 56, status: 'locked', requires: ['pe-branding'], desc: 'Navigate the digital world responsibly. Ethics, media literacy, and digital footprints.' },
+      { id: 'pe-video-ad', title: 'Brand Video Ad Dev', emoji: '🎬', x: 42, y: 40, status: 'locked', requires: ['pe-digital-citizen'], desc: 'Create professional brand video advertisements using modern production techniques.' },
+      { id: 'pe-exhibit', title: 'Exhibit Design', emoji: '🏛️', x: 55, y: 28, status: 'locked', requires: ['pe-video-ad'], desc: 'Design immersive exhibition experiences. Spatial design, visitor flow, and storytelling.' },
+      { id: 'pe-portfolio', title: 'Portfolio Development', emoji: '📁', x: 72, y: 56, status: 'locked', requires: ['pe-digital-citizen'], desc: 'Build a professional portfolio showcasing your skills, projects, and growth.' },
+      { id: 'pe-second-brain', title: 'Second Brain', emoji: '🧠', x: 18, y: 28, status: 'locked', comingSoon: true, requires: ['pe-team'], desc: 'Organize your knowledge with a personal knowledge management system. Coming soon!' },
+      { id: 'pe-signal-noise', title: 'Signal to Noise Ratio', emoji: '📡', x: 18, y: 16, status: 'locked', comingSoon: true, requires: ['pe-second-brain'], desc: 'Learn to filter signal from noise in the information age. Coming soon!' },
+    ]
+  },
+  'content-creator': {
+    title: 'Content Creator',
+    subtitle: 'Welcome to the Universe of Content Creation',
+    icon: 'public/icons/content-creator.png',
+    accent: '#ff6ec7',
+    nodes: [
+      { id: 'cc-intro', title: 'Intro to Media Production', emoji: '🎬', x: 50, y: 85, status: 'unlocked', desc: 'Learn the fundamentals of media production, storytelling, and creative workflows.' },
+      { id: 'cc-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['cc-intro'], desc: 'Master narrative structure and visual storyboarding techniques.' },
+      { id: 'cc-screenwriting', title: 'Screenwriting', emoji: '✍️', x: 20, y: 56, status: 'locked', requires: ['cc-storyboard'], desc: 'Write scripts for film, video, and digital media.' },
+      { id: 'cc-media-capture', title: 'Media Capture Techniques', emoji: '📸', x: 70, y: 56, status: 'locked', requires: ['cc-intro'], desc: 'Photography, videography, lighting, and composition fundamentals.' },
+      { id: 'cc-sound-design', title: 'Sound Design', emoji: '🎵', x: 18, y: 42, status: 'locked', requires: ['cc-screenwriting'], desc: 'Create and mix audio for media projects.' },
+      { id: 'cc-video-editing', title: 'Video Editing', emoji: '🎞️', x: 45, y: 42, status: 'locked', requires: ['cc-screenwriting', 'cc-media-capture'], desc: 'Edit video using professional tools and techniques.' },
+      { id: 'cc-project-pilot', title: 'Project Pilot', emoji: '🛫', x: 55, y: 28, status: 'locked', requires: ['cc-video-editing'], desc: 'Create your first full media production from concept to delivery.' },
+    ]
+  },
+  'digital-artist': {
+    title: 'Digital Artist',
+    subtitle: 'Welcome to the Universe of Digital Art',
+    icon: 'public/icons/digital-artist.png',
+    accent: '#c084fc',
+    nodes: [
+      { id: 'da-intro', title: 'Graphic Design Concepts', emoji: '🎨', x: 50, y: 85, status: 'unlocked', desc: 'Foundations of visual design — color, composition, typography, and layout.' },
+      { id: 'da-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['da-intro'], desc: 'Visual narrative and storyboarding for digital art projects.' },
+      { id: 'da-digitize', title: 'Digitize Art', emoji: '🖌️', x: 25, y: 56, status: 'locked', requires: ['da-storyboard'], desc: 'Transform hand-drawn art into digital formats.' },
+      { id: 'da-flipbook', title: 'Flipbook Animation', emoji: '📖', x: 70, y: 56, status: 'locked', requires: ['da-intro'], desc: 'Create frame-by-frame flipbook-style animations.' },
+      { id: 'da-vector', title: 'Vector Graphics', emoji: '✏️', x: 18, y: 42, status: 'locked', requires: ['da-digitize'], desc: 'Master vector illustration with professional design tools.' },
+      { id: 'da-photo', title: 'Photo Art', emoji: '📷', x: 38, y: 40, status: 'locked', requires: ['da-digitize'], desc: 'Photo manipulation, compositing, and digital photo artistry.' },
+      { id: 'da-digital-anim', title: 'Digital Animation', emoji: '🎞️', x: 65, y: 40, status: 'locked', requires: ['da-flipbook'], desc: 'Create digital animations using modern tools and techniques.' },
+      { id: 'da-comic', title: 'Comicbook Creator', emoji: '💥', x: 38, y: 26, status: 'locked', requires: ['da-photo'], desc: 'Design and produce your own comic book from concept to final art.' },
+      { id: 'da-infinity', title: 'Infinity Art', emoji: '♾️', x: 18, y: 26, status: 'locked', requires: ['da-vector'], desc: 'Explore generative and infinite art concepts.' },
+      { id: 'da-animated-adv', title: 'Animated Adventure', emoji: '🎬', x: 60, y: 24, status: 'locked', requires: ['da-digital-anim'], desc: 'Produce a short animated adventure combining all your skills.' },
+    ]
+  },
+  '3d-modeler': {
+    title: '3D Modeler',
+    subtitle: 'Welcome to the Universe of 3D Modeling',
+    icon: 'public/icons/3d-modeler.png',
+    accent: '#22d3ee',
+    nodes: [
+      { id: '3d-intro', title: 'Intro to 3D Modeling', emoji: '🧊', x: 50, y: 85, status: 'unlocked', desc: 'Begin your journey into 3D space — navigation, modeling basics, and terminology.' },
+      { id: '3d-mazes', title: 'Amazing World of Mazes', emoji: '🌀', x: 25, y: 72, status: 'locked', requires: ['3d-intro'], desc: 'Design and build 3D mazes and puzzle environments.' },
+      { id: '3d-earthship', title: 'Earthship Colony', emoji: '🌍', x: 22, y: 54, status: 'locked', requires: ['3d-mazes'], desc: 'Model sustainable earthship architecture and colony designs.' },
+      { id: '3d-3dprint', title: '3D Printing', emoji: '🖨️', x: 70, y: 60, status: 'locked', requires: ['3d-intro'], desc: 'Design for 3D printing — from digital model to physical object.' },
+      { id: '3d-character', title: 'Character Creator', emoji: '🧑‍🎤', x: 68, y: 44, status: 'locked', requires: ['3d-3dprint'], desc: 'Sculpt and model 3D characters with personality and detail.' },
+      { id: '3d-asd-map', title: 'ASD 3D Map', emoji: '🗺️', x: 50, y: 44, status: 'locked', requires: ['3d-earthship'], desc: 'Build a detailed 3D map of your school campus.' },
+      { id: '3d-expo', title: 'Expo 4020 Dubai UAE', emoji: '🏙️', x: 20, y: 38, status: 'locked', requires: ['3d-earthship'], desc: 'Design a futuristic expo exhibition for Dubai 4020.' },
+      { id: '3d-home', title: 'Home Designer', emoji: '🏠', x: 50, y: 30, status: 'locked', requires: ['3d-asd-map'], desc: 'Design complete home interiors and exteriors in 3D.' },
+      { id: '3d-park', title: 'Park of Tomorrow', emoji: '🌳', x: 30, y: 22, status: 'locked', requires: ['3d-expo'], desc: 'Conceptualize and model the ultimate futuristic park.' },
+    ]
+  },
+  'cs-ai-specialist': {
+    title: 'CS/AI Specialist',
+    subtitle: 'Welcome to the Universe of Computer Science & AI',
+    icon: 'public/icons/cs-ai-specialist.png',
+    accent: '#a78bfa',
+    nodes: [
+      { id: 'cs-intro', title: 'Intro to CS/AI', emoji: '🤖', x: 55, y: 85, status: 'unlocked', desc: 'Explore the foundations of computer science and artificial intelligence.' },
+      { id: 'cs-prompt', title: 'AI Prompt Engineering', emoji: '💬', x: 25, y: 72, status: 'locked', requires: ['cs-intro'], desc: 'Master the art of writing effective AI prompts.' },
+      { id: 'cs-digital-citizen', title: 'Digital Citizen & Age of Tech', emoji: '🌐', x: 28, y: 56, status: 'locked', requires: ['cs-prompt'], desc: 'Digital citizenship, ethics, and technology literacy.' },
+      { id: 'cs-codeorg', title: 'Code.org Express', emoji: '💻', x: 55, y: 60, status: 'locked', requires: ['cs-intro'], desc: 'Learn programming fundamentals through Code.org.' },
+      { id: 'cs-karel', title: 'Intro to Programming with Karel', emoji: '🤖', x: 68, y: 48, status: 'locked', requires: ['cs-codeorg'], desc: 'Build programming logic with Karel the Robot on CodeHS.' },
+      { id: 'cs-webdev', title: 'Web Dev', emoji: '🌍', x: 42, y: 44, status: 'locked', requires: ['cs-digital-citizen', 'cs-codeorg'], desc: 'Build websites with HTML, CSS, and JavaScript.' },
+      { id: 'cs-python', title: 'Intro to Python with Tracy', emoji: '🐍', x: 62, y: 34, status: 'locked', requires: ['cs-karel'], desc: 'Learn Python programming with Tracy the Turtle on CodeHS.' },
+      { id: 'cs-coming-soon', title: 'Coming Soon', emoji: '🔮', x: 20, y: 36, status: 'locked', comingSoon: true, requires: ['cs-digital-citizen'], desc: 'New CS/AI modules coming soon!' },
+    ]
+  },
+  'sound-designer': {
+    title: 'Sound Designer',
+    subtitle: 'Welcome to the Universe of Sound Design',
+    icon: 'public/icons/sound-designer.png',
+    accent: '#f472b6',
+    nodes: [
+      { id: 'sd-intro', title: 'Intro to Sound Design', emoji: '🎧', x: 55, y: 85, status: 'unlocked', desc: 'Discover the world of sound — acoustics, digital audio, and creative sound design.' },
+      { id: 'sd-music', title: 'Music Production', emoji: '🎹', x: 30, y: 72, status: 'locked', requires: ['sd-intro'], desc: 'Learn music production from recording to mixing and mastering.' },
+      { id: 'sd-songwriting', title: 'Song Writing & Composition', emoji: '🎼', x: 25, y: 56, status: 'locked', requires: ['sd-music'], desc: 'Write songs, compose melodies, and create arrangements.' },
+      { id: 'sd-cover', title: 'Cover Song', emoji: '🎤', x: 18, y: 42, status: 'locked', requires: ['sd-songwriting'], desc: 'Produce a professional cover song recording.' },
+      { id: 'sd-fl-studio', title: 'FL Studio', emoji: '🎚️', x: 22, y: 28, status: 'locked', requires: ['sd-cover'], desc: 'Master FL Studio for advanced music production.' },
+      { id: 'sd-challenge', title: 'Sound Design Challenge', emoji: '🏆', x: 48, y: 44, status: 'locked', requires: ['sd-songwriting'], desc: 'Complete a creative sound design challenge project.' },
+      { id: 'sd-podcasting', title: 'Podcasting', emoji: '🎙️', x: 70, y: 44, status: 'locked', requires: ['sd-intro'], desc: 'Plan, record, edit, and publish your own podcast.' },
+    ]
+  },
+  'game-designer': {
+    title: 'Game Designer',
+    subtitle: 'Welcome to the Universe of Game Design',
+    icon: 'public/icons/game-designer.png',
+    accent: '#34d399',
+    nodes: [
+      { id: 'gd-intro', title: 'Intro to Game Design', emoji: '🎮', x: 55, y: 85, status: 'unlocked', desc: 'Enter the world of game design — mechanics, aesthetics, and player experience.' },
+      { id: 'gd-gamedev', title: 'Game Dev', emoji: '⚙️', x: 35, y: 72, status: 'locked', requires: ['gd-intro'], desc: 'Core game development concepts and workflows.' },
+      { id: 'gd-scratch', title: 'Scratch', emoji: '🐱', x: 22, y: 56, status: 'locked', requires: ['gd-gamedev'], desc: 'Create games with Scratch visual programming.' },
+      { id: 'gd-makecode', title: 'MakeCode Arcade', emoji: '👾', x: 18, y: 42, status: 'locked', requires: ['gd-scratch'], desc: 'Build retro arcade games with MakeCode Arcade.' },
+      { id: 'gd-godot', title: 'Godot', emoji: '🤖', x: 20, y: 28, status: 'locked', requires: ['gd-makecode'], desc: 'Develop games with Godot Engine — 2D and 3D.' },
+      { id: 'gd-unity', title: 'Unity', emoji: '🎯', x: 42, y: 42, status: 'locked', requires: ['gd-scratch'], desc: 'Game development with Unity — the industry standard.' },
+      { id: 'gd-unreal', title: 'Unreal Engine', emoji: '🌟', x: 50, y: 28, status: 'locked', comingSoon: true, requires: ['gd-unity'], desc: 'AAA game development with Unreal Engine. Coming soon!' },
+      { id: 'gd-gimkit', title: 'Gimkit Creative', emoji: '🎲', x: 68, y: 42, status: 'locked', requires: ['gd-intro'], desc: 'Design interactive game-based learning with Gimkit Creative.' },
+      { id: 'gd-beta', title: 'Beta Testers Network', emoji: '🧪', x: 68, y: 56, status: 'locked', requires: ['gd-gimkit'], desc: 'Join the beta testing community and provide gameplay feedback.' },
+      { id: 'gd-project-bac', title: 'Project BAC', emoji: '🏗️', x: 72, y: 30, status: 'locked', requires: ['gd-beta'], desc: 'Build and present your capstone game project.' },
+    ]
+  }
+};
+
+// ==================== INITIALIZATION ====================
+const params = new URLSearchParams(window.location.search);
+const pathwaySlug = params.get('p') || 'professional-entrepreneur';
+const pathway = PATHWAYS[pathwaySlug];
+if (!pathway) { document.body.innerHTML = '<h1 style="color:red;text-align:center;margin-top:200px;">Pathway not found</h1>'; throw new Error('bad pathway'); }
+
+// Set accent color
+document.documentElement.style.setProperty('--accent', pathway.accent);
+
+// Edit mode state
+let editMode = false;
+let connectSource = null; // node being connected from
+
+// Set header
+document.getElementById('pathwayTitle').textContent = pathway.title;
+document.getElementById('pathwaySubtitle').textContent = pathway.subtitle;
+document.getElementById('pathwayIconImg').src = pathway.icon;
+
+// ==================== STARFIELD ====================
+const starfield = document.getElementById('starfield');
+for (let i = 0; i < 120; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;width:${Math.random()*2+0.5}px;height:${Math.random()*2+0.5}px;--dur:${Math.random()*3+2}s;--max-op:${Math.random()*0.6+0.3};animation-delay:${Math.random()*3}s;`;
+  starfield.appendChild(s);
+}
+
+// ==================== HUD BARS (JS-driven animation) ====================
+const hb = document.getElementById('hudBars');
+const hudBars = [];
+for (let i = 0; i < 10; i++) {
+  const b = document.createElement('div');
+  b.className = 'hud-b';
+  const baseH = 6 + i * 3;
+  b.style.height = baseH + 'px';
+  hb.appendChild(b);
+  hudBars.push({ el: b, base: baseH });
+}
+setInterval(() => {
+  hudBars.forEach(bar => {
+    const h = bar.base + Math.random() * 16 - 4;
+    const clamped = Math.max(3, Math.min(38, h));
+    bar.el.style.height = clamped + 'px';
+    bar.el.style.opacity = 0.4 + (clamped / 38) * 0.6;
+  });
+}, 700);
+
+// ==================== FLOATING PARTICLES (dramatic, JS-driven) ====================
+const particleLayer = document.getElementById('particleLayer');
+const particles = [];
+const PARTICLE_COLORS = [
+  { rgb: '0,212,255',   maxOp: 0.6,  weight: 0.40 },
+  { rgb: '139,92,246',  maxOp: 0.5,  weight: 0.25 },
+  { rgb: '255,0,255',   maxOp: 0.35, weight: 0.15 },
+  { rgb: '255,255,255', maxOp: 0.25, weight: 0.20 },
+];
+function pickColor() {
+  let r = Math.random(), cum = 0;
+  for (const c of PARTICLE_COLORS) { cum += c.weight; if (r < cum) return c; }
+  return PARTICLE_COLORS[0];
+}
+for (let i = 0; i < 55; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  const size = Math.random() * 4.5 + 1.5;
+  const c = pickColor();
+  const x = Math.random() * 100;
+  const y = Math.random() * 100;
+  p.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:0;`;
+  particleLayer.appendChild(p);
+  particles.push({ el: p, color: c.rgb, maxOp: c.maxOp, size, baseX: x, baseY: y,
+    phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 0.6 });
+}
+function animateParticles() {
+  const t = Date.now() / 1000;
+  particles.forEach(p => {
+    const cycle = Math.sin(t * p.speed + p.phase);
+    const drift = Math.sin(t * 0.25 + p.phase * 2);
+    const pulse = (Math.sin(t * 1.2 + p.phase * 3) + 1) * 0.15;
+    const op = Math.min(1, ((cycle + 1) / 2) * p.maxOp + pulse);
+    const tx = drift * 80;
+    const ty = Math.cos(t * 0.3 + p.phase) * 60;
+    p.el.style.opacity = op.toFixed(3);
+    p.el.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+    p.el.style.boxShadow = `0 0 ${p.size * 5}px rgba(${p.color},${(op * 0.7).toFixed(3)}), 0 0 ${p.size * 12}px rgba(${p.color},${(op * 0.2).toFixed(3)})`;
+    p.el.style.background = `rgba(${p.color},${op.toFixed(3)})`;
+  });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ==================== PULSE RINGS (dramatic, JS-driven) ====================
+const pulseRingLayer = document.getElementById('pulseRingLayer');
+const pulseRings = [];
+const ringColors = ['0,212,255','139,92,246','255,0,255','0,212,255','139,92,246'];
+for (let i = 0; i < 5; i++) {
+  const ring = document.createElement('div');
+  ring.className = 'pulse-ring';
+  const maxSize = 300 + i * 200;
+  ring.style.cssText = `width:${maxSize}px;height:${maxSize}px;border-color:rgba(${ringColors[i]},0.25);`;
+  pulseRingLayer.appendChild(ring);
+  pulseRings.push({ el: ring, duration: 5000 + i * 2500, offset: i * 2000, start: Date.now(), color: ringColors[i] });
+}
+function animatePulseRings() {
+  const now = Date.now();
+  pulseRings.forEach(r => {
+    const elapsed = (now - r.start + r.offset) % r.duration;
+    const progress = elapsed / r.duration;
+    const scale = 0.2 + progress * 0.8;
+    const op = progress < 0.08 ? (progress / 0.08) * 0.4
+             : progress < 0.4 ? 0.4 - (progress - 0.08) / 0.32 * 0.25
+             : Math.max(0, 0.15 - (progress - 0.4) / 0.6 * 0.15);
+    r.el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+    r.el.style.opacity = op.toFixed(3);
+    r.el.style.borderColor = `rgba(${r.color},${(op * 0.6).toFixed(3)})`;
+    r.el.style.boxShadow = `0 0 30px rgba(${r.color},${(op * 0.3).toFixed(3)}), inset 0 0 30px rgba(${r.color},${(op * 0.1).toFixed(3)})`;
+  });
+  requestAnimationFrame(animatePulseRings);
+}
+animatePulseRings();
+
+// ==================== ENERGY SCAN LINES ====================
+const scanLineLayer = document.getElementById('scanLineLayer');
+const scanLines = [];
+const scanColors = ['0,212,255','139,92,246','255,0,255'];
+for (let i = 0; i < 3; i++) {
+  const line = document.createElement('div');
+  line.className = 'scan-line';
+  line.style.background = `linear-gradient(90deg, transparent 0%, rgba(${scanColors[i]},0.0) 10%, rgba(${scanColors[i]},0.4) 50%, rgba(${scanColors[i]},0.0) 90%, transparent 100%)`;
+  line.style.boxShadow = `0 0 20px 4px rgba(${scanColors[i]},0.15), 0 0 60px 8px rgba(${scanColors[i]},0.06)`;
+  scanLineLayer.appendChild(line);
+  scanLines.push({ el: line, duration: 8000 + i * 3000, offset: i * 3500, start: Date.now() });
+}
+function animateScanLines() {
+  const now = Date.now();
+  scanLines.forEach(s => {
+    const elapsed = (now - s.start + s.offset) % s.duration;
+    const progress = elapsed / s.duration;
+    const yPos = progress * 120 - 10;
+    const op = progress < 0.05 ? progress / 0.05
+             : progress < 0.9 ? 1
+             : (1 - progress) / 0.1;
+    s.el.style.top = yPos + '%';
+    s.el.style.opacity = (op * 0.5).toFixed(3);
+  });
+  requestAnimationFrame(animateScanLines);
+}
+animateScanLines();
+
+// ==================== AURORA GRADIENT ====================
+const auroraLayer = document.getElementById('auroraLayer');
+function animateAurora() {
+  const t = Date.now() / 1000;
+  const x1 = 30 + Math.sin(t * 0.1) * 20;
+  const y1 = 20 + Math.cos(t * 0.08) * 15;
+  const x2 = 70 + Math.sin(t * 0.12 + 2) * 20;
+  const y2 = 80 + Math.cos(t * 0.09 + 1) * 15;
+  const op = 0.4 + Math.sin(t * 0.15) * 0.2;
+  auroraLayer.style.background = `
+    radial-gradient(ellipse at ${x1}% ${y1}%, rgba(0,212,255,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at ${x2}% ${y2}%, rgba(139,92,246,0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,0,255,0.04) 0%, transparent 60%)`;
+  auroraLayer.style.opacity = op.toFixed(3);
+  requestAnimationFrame(animateAurora);
+}
+animateAurora();
+
+// ==================== CANVAS STATE ====================
+const canvas = document.getElementById('nodeCanvas');
+const nodeLayer = document.getElementById('nodeLayer');
+let panX = 0, panY = 0, zoom = 1;
+const MAP_W = 2000, MAP_H = 2000;
+
+function applyTransform() {
+  nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  updateMinimap();
+}
+
+// Center on nodes initially
+function centerView() {
+  // Only consider rendered nodes (skips disconnected nodes in player mode)
+  const rendered = Object.values(nodeElements);
+  if (!rendered.length) return;
+  // Find bounding box of all rendered nodes
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  rendered.forEach(ne => {
+    const px = parseFloat(ne.el.style.left);
+    const py = parseFloat(ne.el.style.top);
+    minX = Math.min(minX, px); minY = Math.min(minY, py);
+    maxX = Math.max(maxX, px); maxY = Math.max(maxY, py);
+  });
+  // Add padding
+  const pad = 120;
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const bw = maxX - minX;
+  const bh = maxY - minY;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  // Fit all nodes in view
+  const vw = window.innerWidth;
+  const vh = window.innerHeight - 60; // account for header
+  zoom = Math.min(vw / bw, vh / bh, 1);
+  zoom = Math.max(0.3, Math.min(1, zoom));
+  panX = vw / 2 - cx * zoom;
+  panY = vh / 2 + 30 - cy * zoom;
+  applyTransform();
+}
+
+// ==================== PAN ====================
+let isPanning = false, panStartX, panStartY;
+canvas.addEventListener('mousedown', e => {
+  if (e.target.closest('.skill-node')) return;
+  isPanning = true;
+  panStartX = e.clientX - panX;
+  panStartY = e.clientY - panY;
+  canvas.classList.add('dragging-canvas');
+});
+window.addEventListener('mousemove', e => {
+  if (isPanning) {
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    applyTransform();
+  }
+});
+window.addEventListener('mouseup', () => {
+  isPanning = false;
+  canvas.classList.remove('dragging-canvas');
+});
+
+// ==================== ZOOM ====================
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const oldZoom = zoom;
+  // Gentle zoom: normalize deltaY so trackpads & mice both feel smooth
+  const delta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 60);
+  const factor = 1 - delta * 0.0015;  // ~3-4% per tick instead of 10%
+  zoom *= factor;
+  zoom = Math.max(0.3, Math.min(2, zoom));
+  panX = mx - (mx - panX) * zoom / oldZoom;
+  panY = my - (my - panY) * zoom / oldZoom;
+  applyTransform();
+}, { passive: false });
+
+document.getElementById('zoomIn').onclick = () => { zoom = Math.min(2, zoom * 1.08); applyTransform(); };
+document.getElementById('zoomOut').onclick = () => { zoom = Math.max(0.3, zoom / 1.08); applyTransform(); };
+document.getElementById('zoomFit').onclick = centerView;
+
+// ==================== RENDER NODES ====================
+const nodeElements = {};
+
+// Build set of connected node IDs for initial render
+const initialConnectedIds = new Set();
+pathway.nodes.forEach(n => {
+  if (n.requires && n.requires.length > 0) {
+    initialConnectedIds.add(n.id);
+    n.requires.forEach(rid => initialConnectedIds.add(rid));
+  }
+});
+
+pathway.nodes.forEach(n => {
+  // In player mode, hide disconnected nodes
+  const isConnected = initialConnectedIds.has(n.id);
+  if (!editMode && !isConnected) return;
+
+  const px = n.x / 100 * MAP_W;
+  const py = n.y / 100 * MAP_H;
+
+  const el = document.createElement('div');
+  el.className = 'skill-node' + (n.comingSoon ? ' coming-soon' : '') + (!isConnected ? ' disconnected' : '');
+  el.dataset.status = n.status;
+  el.dataset.id = n.id;
+  el.style.left = px + 'px';
+  el.style.top = py + 'px';
+
+  const statusLabels = { locked: 'LOCKED', unlocked: 'READY', in_progress: 'IN PROGRESS', completed: 'COMPLETE' };
+
+  const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
+  const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
+  el.innerHTML = `
+    <div class="node-ring">${badgeHTML}${imageHTML}<span class="node-icon" ${n.image ? 'style="display:none"' : ''}>${n.emoji}</span><div class="node-image-upload" title="Upload image">📷</div></div>
+    <span class="node-label">${n.title}</span>
+    <span class="node-badge ${n.comingSoon ? 'coming-soon-tag' : ''}">${n.comingSoon ? 'COMING SOON' : statusLabels[n.status]}</span>
+    <div class="conn-handle" title="Drag to connect"></div>
+  `;
+
+  // Click to show detail
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    if (document.body.classList.contains('connect-mode')) return; // handled by connect logic
+    showDetail(n);
+  });
+
+  // Right-click for edit mode context menu
+  el.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!editMode) return;
+    showContextMenu(e.clientX, e.clientY, n);
+  });
+
+  // Drag node (edit mode only)
+  let isDragging = false, dragOffX, dragOffY;
+  el.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    if (!editMode) return; // Players cannot drag nodes
+    isDragging = false;
+    dragOffX = e.clientX;
+    dragOffY = e.clientY;
+
+    const moveHandler = ev => {
+      const dx = ev.clientX - dragOffX;
+      const dy = ev.clientY - dragOffY;
+      if (!isDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        isDragging = true;
+        el.classList.add('dragging');
+      }
+      if (isDragging) {
+        const newLeft = px + dx / zoom;
+        const newTop = py + dy / zoom;
+        el.style.left = newLeft + 'px';
+        el.style.top = newTop + 'px';
+        drawConnectors();
+        updateMinimap();
+      }
+    };
+    const upHandler = ev => {
+      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener('mouseup', upHandler);
+      el.classList.remove('dragging');
+      if (isDragging) {
+        // Update stored position
+        const rect = el.getBoundingClientRect();
+        n._px = parseFloat(el.style.left);
+        n._py = parseFloat(el.style.top);
+      }
+    };
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', upHandler);
+  });
+
+  nodeLayer.appendChild(el);
+  nodeElements[n.id] = { el, node: n, px, py };
+});
+
+// ==================== DRAW CONNECTORS ====================
+function drawConnectors() {
+  const svg = document.getElementById('connectorSvg');
+  svg.innerHTML = '';
+  // Remove old disconnect buttons
+  document.querySelectorAll('.conn-x-btn').forEach(b => b.remove());
+
+  pathway.nodes.forEach(n => {
+    if (!n.requires) return;
+    const target = nodeElements[n.id];
+    if (!target) return; // Node not rendered (disconnected in player mode)
+    const tEl = target.el;
+    const tx = parseFloat(tEl.style.left);
+    const ty = parseFloat(tEl.style.top);
+
+    n.requires.forEach(reqId => {
+      const source = nodeElements[reqId];
+      if (!source) return;
+      const sEl = source.el;
+      const sx = parseFloat(sEl.style.left);
+      const sy = parseFloat(sEl.style.top);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      // Curved connector
+      const midY = (sy + ty) / 2;
+      const d = `M ${sx} ${sy} C ${sx} ${midY}, ${tx} ${midY}, ${tx} ${ty}`;
+      line.setAttribute('d', d);
+
+      // Determine state
+      const sourceStatus = source.node.status;
+      const targetStatus = n.status;
+      let cls = 'connector-line ';
+      if (sourceStatus === 'completed' && (targetStatus === 'completed' || targetStatus === 'in_progress')) {
+        cls += 'completed';
+      } else if (sourceStatus === 'completed' || sourceStatus === 'unlocked' || targetStatus === 'unlocked') {
+        cls += 'unlocked';
+      } else {
+        cls += 'locked';
+      }
+      line.setAttribute('class', cls);
+      // Completed connectors use the pathway's accent color
+      if (cls.includes('completed')) {
+        line.style.stroke = pathway.accent;
+      }
+      svg.appendChild(line);
+
+      // Add disconnect X button on the connection line (edit mode only)
+      if (editMode) {
+        // Place at 30% from target toward source (close to where line meets target node)
+        const t = 0.3;
+        const btnX = tx + (sx - tx) * t;
+        const btnY = ty + (sy - ty) * t;
+        const xBtn = document.createElement('div');
+        xBtn.className = 'conn-x-btn';
+        xBtn.textContent = '✕';
+        xBtn.style.left = btnX + 'px';
+        xBtn.style.top = btnY + 'px';
+        xBtn.title = 'Remove this connection';
+        xBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          n.requires = n.requires.filter(r => r !== reqId);
+          savePathwayEdits();
+          drawConnectors();
+        });
+        document.getElementById('nodeLayer').appendChild(xBtn);
+      }
+    });
+  });
+}
+
+drawConnectors();
+
+// ==================== DETAIL PANEL ====================
+const detailPanel = document.getElementById('detailPanel');
+const detailClose = document.getElementById('detailClose');
+let selectedNode = null;
+
+function showDetail(n) {
+  selectedNode = n;
+  document.getElementById('detailIcon').textContent = n.emoji;
+  document.getElementById('detailTitle').textContent = n.title;
+  document.getElementById('detailDot').className = 'status-dot ' + n.status;
+  const statusNames = { locked: 'LOCKED', unlocked: 'READY TO BEGIN', in_progress: 'IN PROGRESS', completed: 'COMPLETED' };
+  document.getElementById('detailStatus').textContent = n.comingSoon ? 'COMING SOON' : statusNames[n.status];
+  document.getElementById('detailDesc').textContent = n.desc || '';
+
+  // Requirements
+  const reqEl = document.getElementById('detailRequires');
+  let reqHTML = '';
+  if (n.requires && n.requires.length) {
+    const names = n.requires.map(rid => {
+      const found = pathway.nodes.find(x => x.id === rid);
+      return found ? found.title : rid;
+    });
+    reqHTML += 'Requires: ' + names.map(name => `<span>${name}</span>`).join(', ');
+  }
+  if (n.requiredBadge) {
+    reqHTML += (reqHTML ? '<br>' : '') + 'Completion Badge: <span>' + n.requiredBadge + '</span>';
+  }
+  reqEl.innerHTML = reqHTML;
+  reqEl.style.display = reqHTML ? 'block' : 'none';
+
+  // Launch button
+  const btn = document.getElementById('launchBtn');
+  btn.onclick = null; // clear old handler
+  if (n.comingSoon) {
+    btn.className = 'launch-btn locked-btn';
+    btn.textContent = '// COMING SOON //';
+  } else if (n.status === 'locked') {
+    btn.className = 'launch-btn locked-btn';
+    btn.textContent = '// LOCKED //';
+  } else if (n.status === 'completed') {
+    btn.className = 'launch-btn completed-btn';
+    btn.textContent = 'MISSION COMPLETE ✓';
+  } else {
+    btn.className = 'launch-btn ready';
+    btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
+    if (n.url) {
+      btn.onclick = () => window.open(n.url, '_blank');
+    }
+  }
+
+  detailPanel.classList.add('active');
+}
+
+detailClose.onclick = () => detailPanel.classList.remove('active');
+canvas.addEventListener('click', e => {
+  if (!e.target.closest('.skill-node') && !e.target.closest('.detail-panel')) {
+    detailPanel.classList.remove('active');
+  }
+});
+
+// ==================== PROGRESS ====================
+function updateProgress() {
+  // Only count rendered (visible) nodes
+  const visibleNodes = pathway.nodes.filter(n => nodeElements[n.id]);
+  const total = visibleNodes.filter(n => !n.comingSoon).length;
+  const done = visibleNodes.filter(n => n.status === 'completed').length;
+  const pct = total > 0 ? (done / total * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${total} Nodes`;
+}
+updateProgress();
+
+// ==================== MINIMAP ====================
+function updateMinimap() {
+  const minimap = document.getElementById('minimap');
+  const mmW = minimap.offsetWidth;
+  const mmH = minimap.offsetHeight;
+  const scaleX = mmW / (MAP_W * zoom);
+  const scaleY = mmH / (MAP_H * zoom);
+
+  // Draw dots
+  minimap.querySelectorAll('.minimap-dot').forEach(d => d.remove());
+  pathway.nodes.forEach(n => {
+    const ne = nodeElements[n.id];
+    if (!ne) return; // Skip disconnected nodes not rendered
+    const nx = parseFloat(ne.el.style.left);
+    const ny = parseFloat(ne.el.style.top);
+    const dot = document.createElement('div');
+    dot.className = 'minimap-dot';
+    const dotColor = n.status === 'completed' ? '#00ff78' :
+                     n.status === 'unlocked' ? pathway.accent :
+                     n.status === 'in_progress' ? '#ffc800' : '#444';
+    dot.style.background = dotColor;
+    if (n.status !== 'locked') dot.style.boxShadow = `0 0 3px ${dotColor}`;
+    dot.style.left = (nx / MAP_W * mmW) + 'px';
+    dot.style.top = (ny / MAP_H * mmH) + 'px';
+    minimap.appendChild(dot);
+  });
+
+  // Viewport rectangle
+  const vp = document.getElementById('minimapViewport');
+  const vpLeft = (-panX / zoom) / MAP_W * mmW;
+  const vpTop = (-panY / zoom) / MAP_H * mmH;
+  const vpW = (window.innerWidth / zoom) / MAP_W * mmW;
+  const vpH = (window.innerHeight / zoom) / MAP_H * mmH;
+  vp.style.left = vpLeft + 'px';
+  vp.style.top = vpTop + 'px';
+  vp.style.width = vpW + 'px';
+  vp.style.height = vpH + 'px';
+}
+
+// ==================== INIT ====================
+centerView();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    detailPanel.classList.remove('active');
+    hideContextMenu();
+    cancelConnectMode();
+    closeNodeEditor();
+  }
+  if (e.key === '+' || e.key === '=') { zoom = Math.min(2, zoom * 1.06); applyTransform(); }
+  if (e.key === '-') { zoom = Math.max(0.3, zoom / 1.06); applyTransform(); }
+});
+
+// ==================== PLAYER CARD ====================
+const RANK_TABLE = [
+  { level: 1,  name: "Player",            xc: 0 },
+  { level: 2,  name: "Advanced Player",   xc: 5000 },
+  { level: 3,  name: "Apprentice",        xc: 15000 },
+  { level: 4,  name: "Manager/Head",      xc: 50000 },
+  { level: 5,  name: "Director/Producer", xc: 125000 },
+  { level: 6,  name: "Mentor/Intern",     xc: 250000 },
+  { level: 7,  name: "Associate",         xc: 400000 },
+  { level: 8,  name: "Senior",            xc: 600000 },
+  { level: 9,  name: "Chief",             xc: 800000 },
+  { level: 10, name: "Partner",           xc: 1000000 },
+];
+const PATHWAY_DESIGNER_MAP = {
+  'Digital Design':    'Visual Designer',
+  'Content Creator':   'Content Strategist',
+  'Web Dev':           'Web Developer',
+  'Game Design':       'Game Architect',
+  'Sound Design':      'Sound Engineer',
+  '3D Modeling':       '3D Environment Artist',
+  'CS/AI':             'AI Specialist',
+  'Host':              'System Host',
+};
+function getCurrentRank(totalXcoin) {
+  return [...RANK_TABLE].reverse().find(r => totalXcoin >= r.xc) || RANK_TABLE[0];
+}
+function getRankProgress(totalXcoin) {
+  const current = getCurrentRank(totalXcoin);
+  const nextIdx = RANK_TABLE.findIndex(r => r.level === current.level) + 1;
+  if (nextIdx >= RANK_TABLE.length) return 100;
+  const next = RANK_TABLE[nextIdx];
+  return ((totalXcoin - current.xc) / (next.xc - current.xc)) * 100;
+}
+function getNextRank(totalXcoin) {
+  const current = getCurrentRank(totalXcoin);
+  const nextIdx = RANK_TABLE.findIndex(r => r.level === current.level) + 1;
+  return nextIdx < RANK_TABLE.length ? RANK_TABLE[nextIdx] : null;
+}
+
+(function initPlayerCard() {
+  const stored = localStorage.getItem('pflx_pathway_user');
+  if (!stored) return;
+  try {
+    const user = JSON.parse(stored);
+    const isHost = user.role === 'admin' || user.isHost === true;
+    document.getElementById('playerCard').style.display = 'block';
+
+    // Avatar
+    const avatarEl = document.getElementById('pcAvatar');
+    if (user.image) {
+      avatarEl.innerHTML = `<img src="${user.image}" alt="">`;
+    } else {
+      avatarEl.textContent = user.avatar || user.name?.slice(0,2).toUpperCase() || '??';
+    }
+
+    // Brand name
+    document.getElementById('pcBrand').textContent = user.brandName || user.name;
+
+    // Designer type
+    const designerType = PATHWAY_DESIGNER_MAP[user.pathway] || user.pathway || 'Explorer';
+    document.getElementById('pcDesignerType').textContent = designerType;
+
+    // Role badge
+    const roleBadge = document.getElementById('pcRoleBadge');
+    if (isHost) {
+      roleBadge.textContent = 'HOST';
+      roleBadge.className = 'pc-role-badge host';
+    } else {
+      roleBadge.textContent = 'PLAYER';
+      roleBadge.className = 'pc-role-badge player';
+    }
+
+    // Rank
+    const totalXC = user.totalXcoin || 0;
+    const rank = getCurrentRank(totalXC);
+    const progress = getRankProgress(totalXC);
+    const nextRank = getNextRank(totalXC);
+    document.getElementById('pcRankName').textContent = `${rank.name} (Rank ${rank.level})`;
+    document.getElementById('pcRankFill').style.width = `${Math.min(100, progress)}%`;
+    document.getElementById('pcRankProgress').textContent = nextRank
+      ? `${totalXC.toLocaleString()} / ${nextRank.xc.toLocaleString()} XC`
+      : 'MAX RANK';
+
+    // Stats
+    document.getElementById('pcXC').textContent = (user.xcoin || 0).toLocaleString();
+    document.getElementById('pcBadges').textContent = (user.digitalBadges || 0).toLocaleString();
+    document.getElementById('pcLevel').textContent = user.level || 1;
+
+    // Logout
+    document.getElementById('pcLogout').addEventListener('click', () => {
+      localStorage.removeItem('pflx_pathway_user');
+      localStorage.removeItem('pflx_pathway_keep_signed_in');
+      window.location.href = 'login.html';
+    });
+  } catch (e) {
+    console.error('Player card error:', e);
+  }
+})();
+
+// ==================== HOST EDIT MODE ====================
+const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
+
+// Show edit toggle for host users
+(function initEditMode() {
+  // Ensure clean state on load
+  editMode = false;
+  connectSource = null;
+  document.body.classList.remove('edit-mode', 'connect-mode');
+
+  const stored = localStorage.getItem('pflx_pathway_user');
+  if (!stored) return;
+  try {
+    const user = JSON.parse(stored);
+    if (user.role === 'admin' || user.isHost === true) {
+      document.getElementById('editToggle').style.display = 'block';
+    }
+  } catch(e) {}
+
+  // Load saved edits
+  loadPathwayEdits();
+})();
+
+function toggleEditMode() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  const btn = document.getElementById('editToggleBtn');
+  btn.classList.toggle('active', editMode);
+  btn.textContent = editMode ? 'Exit Edit Mode' : 'Edit Mode';
+  document.getElementById('editIndicator').style.display = editMode ? 'block' : 'none';
+  if (!editMode) {
+    hideContextMenu();
+    cancelConnectMode();
+    closeNodeEditor();
+  }
+  // Rebuild to show/hide disconnected nodes based on mode
+  rebuildNodes();
+}
+document.getElementById('editToggleBtn').addEventListener('click', toggleEditMode);
+
+// ─── SAVE / LOAD EDITS ───
+function savePathwayEdits() {
+  const data = pathway.nodes.map(n => {
+    const obj = {
+      id: n.id, title: n.title, emoji: n.emoji,
+      x: n.x, y: n.y, status: n.status,
+      desc: n.desc, url: n.url || '',
+      requiredBadge: n.requiredBadge || '',
+      comingSoon: n.comingSoon || false,
+      requires: n.requires || [],
+    };
+    if (n.image) { obj.image = n.image; obj.imageFit = n.imageFit || 'cover'; }
+    return obj;
+  });
+  localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+}
+
+function loadPathwayEdits() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw);
+    // Merge saved data into pathway.nodes
+    saved.forEach(sn => {
+      const existing = pathway.nodes.find(n => n.id === sn.id);
+      if (existing) {
+        Object.assign(existing, sn);
+      } else {
+        // New node added by host
+        pathway.nodes.push(sn);
+      }
+    });
+    // Remove nodes that were deleted (in saved but not all original IDs)
+    const savedIds = saved.map(s => s.id);
+    pathway.nodes = pathway.nodes.filter(n => {
+      // Keep if it's in saved data, or if it wasn't originally saved (shouldn't happen)
+      return savedIds.includes(n.id);
+    });
+    // Re-render everything
+    rebuildNodes();
+  } catch(e) { console.error('Load edits error:', e); }
+}
+
+function rebuildNodes() {
+  // Clear existing nodes
+  Object.values(nodeElements).forEach(ne => ne.el.remove());
+  Object.keys(nodeElements).forEach(k => delete nodeElements[k]);
+
+  const statusLabels = { locked: 'LOCKED', unlocked: 'READY', in_progress: 'IN PROGRESS', completed: 'COMPLETE' };
+
+  // Build set of connected node IDs (has requires OR is required by another node)
+  const connectedIds = new Set();
+  pathway.nodes.forEach(n => {
+    if (n.requires && n.requires.length > 0) {
+      connectedIds.add(n.id);
+      n.requires.forEach(rid => connectedIds.add(rid));
+    }
+  });
+
+  pathway.nodes.forEach(n => {
+    // In player mode, hide disconnected nodes (no connections at all)
+    const isConnected = connectedIds.has(n.id);
+    if (!editMode && !isConnected) return; // Skip disconnected nodes for players
+
+    const px = n.x / 100 * MAP_W;
+    const py = n.y / 100 * MAP_H;
+
+    const el = document.createElement('div');
+    el.className = 'skill-node' + (n.comingSoon ? ' coming-soon' : '') + (!isConnected ? ' disconnected' : '');
+    el.dataset.status = n.status;
+    el.dataset.id = n.id;
+    el.style.left = px + 'px';
+    el.style.top = py + 'px';
+
+    const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
+    const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
+    el.innerHTML = `
+      <div class="node-ring">${badgeHTML}${imageHTML}<span class="node-icon" ${n.image ? 'style="display:none"' : ''}>${n.emoji}</span><div class="node-image-upload" title="Upload image">📷</div></div>
+      <span class="node-label">${n.title}</span>
+      <span class="node-badge ${n.comingSoon ? 'coming-soon-tag' : ''}">${n.comingSoon ? 'COMING SOON' : statusLabels[n.status] || 'LOCKED'}</span>
+      <div class="conn-handle" title="Drag to connect"></div>
+    `;
+
+    // Image upload button
+    const imgBtn = el.querySelector('.node-image-upload');
+    imgBtn.addEventListener('click', e => { e.stopPropagation(); openImageUpload(n); });
+    imgBtn.addEventListener('mousedown', e => e.stopPropagation());
+
+    // Connection handle drag
+    const handle = el.querySelector('.conn-handle');
+    setupConnHandle(handle, n);
+
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if (document.body.classList.contains('connect-mode')) {
+        handleConnectTarget(n);
+        return;
+      }
+      showDetail(n);
+    });
+
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!editMode) return;
+      showContextMenu(e.clientX, e.clientY, n);
+    });
+
+    // Drag node (edit mode repositioning)
+    setupNodeDrag(el, n, px, py);
+
+    nodeLayer.appendChild(el);
+    nodeElements[n.id] = { el, node: n, px, py };
+  });
+
+  drawConnectors();
+  updateProgress();
+  updateMinimap();
+}
+
+function setupNodeDrag(el, n, px, py) {
+  let isDragging = false, dragOffX, dragOffY;
+  el.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    if (!editMode) return; // Players cannot drag nodes
+    isDragging = false;
+    dragOffX = e.clientX;
+    dragOffY = e.clientY;
+
+    const moveHandler = ev => {
+      const dx = ev.clientX - dragOffX;
+      const dy = ev.clientY - dragOffY;
+      if (!isDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        isDragging = true;
+        el.classList.add('dragging');
+      }
+      if (isDragging) {
+        const newLeft = px + dx / zoom;
+        const newTop = py + dy / zoom;
+        el.style.left = newLeft + 'px';
+        el.style.top = newTop + 'px';
+        drawConnectors();
+        updateMinimap();
+      }
+    };
+    const upHandler = ev => {
+      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener('mouseup', upHandler);
+      el.classList.remove('dragging');
+      if (isDragging && editMode) {
+        // Persist new position
+        n.x = parseFloat(el.style.left) / MAP_W * 100;
+        n.y = parseFloat(el.style.top) / MAP_H * 100;
+        // Update stored px/py
+        const ne = nodeElements[n.id];
+        if (ne) { ne.px = parseFloat(el.style.left); ne.py = parseFloat(el.style.top); }
+        savePathwayEdits();
+      }
+    };
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', upHandler);
+  });
+}
+
+// ─── CONTEXT MENU ───
+const ctxMenu = document.getElementById('ctxMenu');
+let ctxNode = null;
+
+function showContextMenu(x, y, node) {
+  ctxNode = node;
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+  ctxMenu.classList.add('show');
+}
+function hideContextMenu() {
+  ctxMenu.classList.remove('show');
+  ctxNode = null;
+}
+
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.ctx-menu') && ctxMenu.classList.contains('show')) {
+    // Small delay to allow contextmenu event to process first
+    setTimeout(() => hideContextMenu(), 50);
+  }
+});
+
+ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const action = item.dataset.action;
+    const node = ctxNode; // Capture before hideContextMenu clears it
+    if (!node) return;
+    hideContextMenu();
+
+    switch(action) {
+      case 'edit': SFX.open(); openNodeEditor(node); break;
+      case 'connect': SFX.toggle(); startConnectMode(node); break;
+      case 'disconnect': SFX.disconnect(); disconnectNode(node); break;
+      case 'duplicate': SFX.nodeSave(); duplicateNode(node); break;
+      case 'delete': SFX.nodeDelete(); deleteNode(node); break;
+    }
+  });
+});
+
+// ─── NODE EDITOR ───
+const editorOverlay = document.getElementById('nodeEditorOverlay');
+let editorNode = null;
+
+function openNodeEditor(node, isNew) {
+  editorNode = node;
+  document.getElementById('neTitle').textContent = isNew ? 'New Node' : 'Edit Node';
+  document.getElementById('neNodeTitle').value = node.title || '';
+  document.getElementById('neEmoji').value = node.emoji || '';
+  document.getElementById('neDesc').value = node.desc || '';
+  document.getElementById('neUrl').value = node.url || '';
+  document.getElementById('neStatus').value = node.status || 'locked';
+  document.getElementById('neBadge').value = node.requiredBadge || '';
+  document.getElementById('neComingSoon').checked = node.comingSoon || false;
+  document.getElementById('neImageFit').value = node.imageFit || 'cover';
+
+  // Image preview
+  const preview = document.getElementById('neImagePreview');
+  const placeholder = document.getElementById('neImagePlaceholder');
+  if (node.image) {
+    preview.innerHTML = `<img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'cover'};">`;
+  } else {
+    preview.innerHTML = `<span style="color:rgba(255,255,255,0.3);font-size:20px;" id="neImagePlaceholder">📷</span>`;
+  }
+
+  editorOverlay.classList.add('show');
+}
+function closeNodeEditor() {
+  editorOverlay.classList.remove('show');
+  editorNode = null;
+}
+
+document.getElementById('neClose').addEventListener('click', closeNodeEditor);
+editorOverlay.addEventListener('click', e => {
+  if (e.target === editorOverlay) closeNodeEditor();
+});
+
+document.getElementById('neSave').addEventListener('click', () => {
+  if (!editorNode) return;
+  editorNode.title = document.getElementById('neNodeTitle').value || 'Untitled';
+  editorNode.emoji = document.getElementById('neEmoji').value || '📦';
+  editorNode.desc = document.getElementById('neDesc').value || '';
+  editorNode.url = document.getElementById('neUrl').value || '';
+  editorNode.status = document.getElementById('neStatus').value || 'locked';
+  editorNode.requiredBadge = document.getElementById('neBadge').value || '';
+  editorNode.comingSoon = document.getElementById('neComingSoon').checked;
+  editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
+
+  savePathwayEdits();
+  rebuildNodes();
+  closeNodeEditor();
+});
+
+// Image upload in node editor
+document.getElementById('neImageUpload').addEventListener('click', () => {
+  if (!editorNode) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = re => {
+      editorNode.image = re.target.result;
+      const preview = document.getElementById('neImagePreview');
+      const fit = document.getElementById('neImageFit').value || 'cover';
+      preview.innerHTML = `<img src="${re.target.result}" style="width:100%;height:100%;object-fit:${fit};">`;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+});
+document.getElementById('neImagePreview').addEventListener('click', () => {
+  document.getElementById('neImageUpload').click();
+});
+document.getElementById('neImageFit').addEventListener('change', e => {
+  const img = document.querySelector('#neImagePreview img');
+  if (img) img.style.objectFit = e.target.value;
+});
+document.getElementById('neImageClear').addEventListener('click', () => {
+  if (!editorNode) return;
+  delete editorNode.image;
+  delete editorNode.imageFit;
+  const preview = document.getElementById('neImagePreview');
+  preview.innerHTML = `<span style="color:rgba(255,255,255,0.3);font-size:20px;">📷</span>`;
+});
+
+// ─── CONNECT MODE ───
+function startConnectMode(node) {
+  connectSource = node;
+  document.body.classList.add('connect-mode');
+}
+function cancelConnectMode() {
+  connectSource = null;
+  document.body.classList.remove('connect-mode');
+}
+function handleConnectTarget(targetNode) {
+  if (!connectSource || connectSource.id === targetNode.id) {
+    cancelConnectMode();
+    return;
+  }
+  // Add connection: target requires source
+  if (!targetNode.requires) targetNode.requires = [];
+  if (!targetNode.requires.includes(connectSource.id)) {
+    targetNode.requires.push(connectSource.id);
+    savePathwayEdits();
+    drawConnectors();
+  }
+  cancelConnectMode();
+}
+
+function disconnectNode(node) {
+  // Remove all incoming connections to this node
+  node.requires = [];
+  // Also remove this node from other nodes' requires
+  pathway.nodes.forEach(n => {
+    if (n.requires) {
+      n.requires = n.requires.filter(r => r !== node.id);
+    }
+  });
+  savePathwayEdits();
+  drawConnectors();
+}
+
+// ─── DUPLICATE NODE ───
+function duplicateNode(node) {
+  const newId = node.id + '-copy-' + Date.now().toString(36);
+  const newNode = {
+    ...JSON.parse(JSON.stringify(node)),
+    id: newId,
+    title: node.title + ' (Copy)',
+    x: Math.min(95, node.x + 5),
+    y: Math.min(95, node.y + 5),
+    requires: [],
+  };
+  pathway.nodes.push(newNode);
+  savePathwayEdits();
+  rebuildNodes();
+}
+
+// ─── DELETE NODE ───
+function deleteNode(node) {
+  // Remove from requires of other nodes
+  pathway.nodes.forEach(n => {
+    if (n.requires) {
+      n.requires = n.requires.filter(r => r !== node.id);
+    }
+  });
+  // Remove node itself
+  pathway.nodes = pathway.nodes.filter(n => n.id !== node.id);
+  savePathwayEdits();
+  rebuildNodes();
+}
+
+// ─── ADD NEW NODE (double-click on canvas in edit mode) ───
+canvas.addEventListener('dblclick', e => {
+  if (!editMode) return;
+  if (e.target.closest('.skill-node')) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const worldX = (e.clientX - rect.left - panX) / zoom;
+  const worldY = (e.clientY - rect.top - panY) / zoom;
+  const xPct = (worldX / MAP_W) * 100;
+  const yPct = (worldY / MAP_H) * 100;
+
+  const newId = pathwaySlug.slice(0,2) + '-new-' + Date.now().toString(36);
+  const newNode = {
+    id: newId, title: 'New Node', emoji: '📦',
+    x: Math.max(2, Math.min(98, xPct)),
+    y: Math.max(2, Math.min(98, yPct)),
+    status: 'locked', desc: '', url: '', requiredBadge: '',
+    requires: [], comingSoon: false,
+  };
+
+  pathway.nodes.push(newNode);
+  savePathwayEdits();
+  rebuildNodes();
+  openNodeEditor(newNode, true);
+});
+
+// ─── DRAG-TO-CONNECT (from connection handle) ───
+function setupConnHandle(handle, sourceNode) {
+  handle.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!editMode) return;
+
+    const svg = document.getElementById('connectorSvg');
+    const canvas = document.getElementById('nodeCanvas');
+    const canvasRect = canvas.getBoundingClientRect();
+
+    // Source position
+    const sEl = nodeElements[sourceNode.id].el;
+    const sx = parseFloat(sEl.style.left);
+    const sy = parseFloat(sEl.style.top);
+
+    // Create temp drag line
+    const tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tempLine.setAttribute('class', 'connector-line drag-connector');
+    tempLine.style.stroke = '#ffc800';
+    tempLine.style.strokeWidth = '2';
+    tempLine.style.strokeDasharray = '8 4';
+    svg.appendChild(tempLine);
+
+    // Highlight potential targets
+    document.body.classList.add('connect-mode');
+
+    const moveHandler = ev => {
+      const mx = (ev.clientX - canvasRect.left - panX) / zoom;
+      const my = (ev.clientY - canvasRect.top - panY) / zoom;
+      const midY = (sy + my) / 2;
+      tempLine.setAttribute('d', `M ${sx} ${sy} C ${sx} ${midY}, ${mx} ${midY}, ${mx} ${my}`);
+    };
+
+    const upHandler = ev => {
+      window.removeEventListener('mousemove', moveHandler);
+      window.removeEventListener('mouseup', upHandler);
+      tempLine.remove();
+      document.body.classList.remove('connect-mode');
+
+      // Check if dropped on a node
+      const dropEl = document.elementFromPoint(ev.clientX, ev.clientY);
+      const nodeEl = dropEl?.closest('.skill-node');
+      if (nodeEl && nodeEl.dataset.id !== sourceNode.id) {
+        const targetNode = pathway.nodes.find(n => n.id === nodeEl.dataset.id);
+        if (targetNode) {
+          if (!targetNode.requires) targetNode.requires = [];
+          if (!targetNode.requires.includes(sourceNode.id)) {
+            targetNode.requires.push(sourceNode.id);
+            savePathwayEdits();
+            drawConnectors();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', moveHandler);
+    window.addEventListener('mouseup', upHandler);
+  });
+}
+
+// ─── NODE IMAGE UPLOAD ───
+function openImageUpload(node) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = re => {
+      node.image = re.target.result;
+      node.imageFit = node.imageFit || 'cover';
+      savePathwayEdits();
+      rebuildNodes();
+      // Open image adjust dialog
+      openImageAdjust(node);
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// ─── IMAGE ADJUST DIALOG ───
+function openImageAdjust(node) {
+  const overlay = document.createElement('div');
+  overlay.className = 'node-editor-overlay show';
+  overlay.style.zIndex = '450';
+  overlay.innerHTML = `
+    <div class="node-editor" style="width:360px;">
+      <div class="ne-header">
+        <span class="ne-title">Adjust Image</span>
+        <button class="ne-close" id="imgAdjClose">&times;</button>
+      </div>
+      <div class="ne-body" style="text-align:center;">
+        <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;margin:0 auto 16px;border:2px solid rgba(0,212,255,0.3);position:relative;">
+          <img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'cover'};" id="imgPreview">
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">Image Fit</label>
+          <select class="ne-select" id="imgFitSelect">
+            <option value="cover" ${node.imageFit==='cover'?'selected':''}>Cover (fill circle, crop edges)</option>
+            <option value="contain" ${node.imageFit==='contain'?'selected':''}>Contain (fit whole image)</option>
+            <option value="fill" ${node.imageFit==='fill'?'selected':''}>Stretch to fill</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="ne-save" id="imgSave" style="flex:1;">Save</button>
+          <button class="ne-save" id="imgRemove" style="flex:0 0 auto;background:rgba(255,60,60,0.6);padding:12px 20px;">Remove Image</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const preview = overlay.querySelector('#imgPreview');
+  overlay.querySelector('#imgFitSelect').addEventListener('change', e => {
+    preview.style.objectFit = e.target.value;
+  });
+  overlay.querySelector('#imgAdjClose').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#imgSave').addEventListener('click', () => {
+    node.imageFit = overlay.querySelector('#imgFitSelect').value;
+    savePathwayEdits();
+    rebuildNodes();
+    overlay.remove();
+  });
+  overlay.querySelector('#imgRemove').addEventListener('click', () => {
+    delete node.image;
+    delete node.imageFit;
+    savePathwayEdits();
+    rebuildNodes();
+    overlay.remove();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SOUND FX ENGINE (Web Audio API — synthesized cyberpunk tones)
+// ═══════════════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  const settings = JSON.parse(localStorage.getItem('pflx_pathway_settings') || '{}');
+  const state = {
+    enabled: settings.sfxEnabled !== false,
+    volume: settings.sfxVolume ?? 60,
+    ui: settings.sfxUI !== false,
+    achieve: settings.sfxAchieve !== false,
+    ambient: settings.sfxAmbient || false,
+  };
+
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function vol() { return (state.volume / 100) * 0.4; }
+
+  function playTone(freq, duration, type, fadeOut) {
+    if (!state.enabled) return;
+    const c = getCtx();
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, c.currentTime);
+    gain.gain.setValueAtTime(vol(), c.currentTime);
+    if (fadeOut !== false) gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(c.currentTime);
+    osc.stop(c.currentTime + duration);
+  }
+
+  function playChord(freqs, duration, type) {
+    freqs.forEach(f => playTone(f, duration, type));
+  }
+
+  return {
+    state,
+    // UI sounds
+    hover() { if (state.ui) playTone(1200, 0.06, 'sine'); },
+    click() { if (state.ui) playTone(800, 0.08, 'square'); },
+    open() { if (state.ui) { playTone(600, 0.12, 'sine'); setTimeout(() => playTone(900, 0.12, 'sine'), 60); } },
+    close() { if (state.ui) { playTone(900, 0.08, 'sine'); setTimeout(() => playTone(600, 0.08, 'sine'), 50); } },
+    toggle() { if (state.ui) { playTone(500, 0.06, 'triangle'); setTimeout(() => playTone(700, 0.1, 'triangle'), 40); } },
+    // Edit mode
+    editOn() { if (state.ui) playChord([440, 660, 880], 0.2, 'triangle'); },
+    editOff() { if (state.ui) playChord([880, 660, 440], 0.15, 'triangle'); },
+    // Node actions
+    nodeSave() { if (state.ui) { playTone(600, 0.1, 'sine'); setTimeout(() => playTone(800, 0.15, 'sine'), 80); } },
+    nodeDelete() { if (state.ui) playTone(200, 0.25, 'sawtooth'); },
+    connect() { if (state.ui) { playTone(500, 0.08, 'sine'); setTimeout(() => playTone(750, 0.12, 'sine'), 60); setTimeout(() => playTone(1000, 0.08, 'sine'), 120); } },
+    disconnect() { if (state.ui) playTone(300, 0.15, 'square'); },
+    // Achievement sounds
+    unlock() { if (state.achieve) playChord([523, 659, 784], 0.4, 'sine'); },
+    complete() { if (state.achieve) { playChord([523, 659, 784], 0.3, 'sine'); setTimeout(() => playChord([659, 784, 1047], 0.5, 'sine'), 250); } },
+    levelUp() { if (state.achieve) { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.3, 'sine'), i*120)); } },
+    // Navigation
+    navigate() { if (state.ui) playTone(440, 0.1, 'triangle'); },
+    error() { if (state.ui) { playTone(200, 0.15, 'square'); setTimeout(() => playTone(180, 0.2, 'square'), 120); } },
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// SETTINGS PANEL
+// ═══════════════════════════════════════════════════════════════════
+const settingsOverlay = document.getElementById('settingsOverlay');
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  SFX.open();
+  // Load current state into UI
+  document.getElementById('sfxEnabled').checked = SFX.state.enabled;
+  document.getElementById('sfxVolume').value = SFX.state.volume;
+  document.getElementById('sfxVolumeVal').textContent = SFX.state.volume + '%';
+  document.getElementById('sfxUI').checked = SFX.state.ui;
+  document.getElementById('sfxAchieve').checked = SFX.state.achieve;
+  document.getElementById('sfxAmbient').checked = SFX.state.ambient;
+  // Display settings
+  document.getElementById('showConnectors').checked = document.getElementById('connectorSvg').style.display !== 'none';
+  document.getElementById('showLabels').checked = !document.body.classList.contains('hide-labels');
+  document.getElementById('showStarfield').checked = document.getElementById('starfield').style.display !== 'none';
+  settingsOverlay.classList.add('show');
+});
+
+document.getElementById('settingsClose').addEventListener('click', () => {
+  SFX.close();
+  settingsOverlay.classList.remove('show');
+});
+settingsOverlay.addEventListener('click', e => {
+  if (e.target === settingsOverlay) { SFX.close(); settingsOverlay.classList.remove('show'); }
+});
+
+document.getElementById('sfxVolume').addEventListener('input', e => {
+  document.getElementById('sfxVolumeVal').textContent = e.target.value + '%';
+});
+
+document.getElementById('settingsSave').addEventListener('click', () => {
+  SFX.state.enabled = document.getElementById('sfxEnabled').checked;
+  SFX.state.volume = parseInt(document.getElementById('sfxVolume').value);
+  SFX.state.ui = document.getElementById('sfxUI').checked;
+  SFX.state.achieve = document.getElementById('sfxAchieve').checked;
+  SFX.state.ambient = document.getElementById('sfxAmbient').checked;
+
+  // Display settings
+  document.getElementById('connectorSvg').style.display = document.getElementById('showConnectors').checked ? '' : 'none';
+  if (document.getElementById('showLabels').checked) {
+    document.body.classList.remove('hide-labels');
+  } else {
+    document.body.classList.add('hide-labels');
+  }
+  const sfShow = document.getElementById('showStarfield').checked ? '' : 'none';
+  document.getElementById('starfield').style.display = sfShow;
+  document.getElementById('particleLayer').style.display = sfShow;
+  document.getElementById('pulseRingLayer').style.display = sfShow;
+
+  // Persist
+  localStorage.setItem('pflx_pathway_settings', JSON.stringify({
+    sfxEnabled: SFX.state.enabled, sfxVolume: SFX.state.volume,
+    sfxUI: SFX.state.ui, sfxAchieve: SFX.state.achieve, sfxAmbient: SFX.state.ambient,
+    showConnectors: document.getElementById('showConnectors').checked,
+    showLabels: document.getElementById('showLabels').checked,
+    showStarfield: document.getElementById('showStarfield').checked,
+  }));
+
+  SFX.nodeSave();
+  settingsOverlay.classList.remove('show');
+});
+
+// Apply saved display settings on load
+(function applySettings() {
+  const s = JSON.parse(localStorage.getItem('pflx_pathway_settings') || '{}');
+  if (s.showConnectors === false) document.getElementById('connectorSvg').style.display = 'none';
+  if (s.showLabels === false) document.body.classList.add('hide-labels');
+  if (s.showStarfield === false) {
+    document.getElementById('starfield').style.display = 'none';
+    document.getElementById('particleLayer').style.display = 'none';
+    document.getElementById('pulseRingLayer').style.display = 'none';
+  }
+})();
+
+// Wire SFX into existing interactions
+// Edit mode toggle
+const origToggle = toggleEditMode;
+toggleEditMode = function() {
+  const wasEdit = editMode;
+  origToggle();
+  if (editMode && !wasEdit) SFX.editOn();
+  else if (!editMode && wasEdit) SFX.editOff();
+};
+document.getElementById('editToggleBtn').removeEventListener('click', origToggle);
+document.getElementById('editToggleBtn').addEventListener('click', toggleEditMode);
+
+// Node hover
+document.addEventListener('mouseover', e => {
+  if (e.target.closest('.skill-node')) SFX.hover();
+});
+
+// Node click (detail panel)
+document.addEventListener('click', e => {
+  if (e.target.closest('.skill-node') && !editMode) SFX.click();
+});
+
+// Return button SFX
+document.getElementById('returnBtn').addEventListener('click', e => {
+  e.preventDefault();
+  SFX.navigate();
+  setTimeout(() => { window.location.href = 'preview.html'; }, 120);
+});
+</script>
+</body>
+</html>

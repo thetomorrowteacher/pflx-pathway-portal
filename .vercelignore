@@ -1,0 +1,19 @@
+node_modules
+.next
+app
+*.png
+!public/**/*.png
+package.json
+package-lock.json
+next.config.mjs
+next-env.d.ts
+postcss.config.js
+tailwind.config.js
+tsconfig.json
+.env.local
+.DS_Store
+pathway 2.html
+preview 2.html
+screenshot.png
+screenshot2.png
+screenshot_preview.png

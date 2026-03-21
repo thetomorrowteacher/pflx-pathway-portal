@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PFLX Core Pathway Development — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --pflx-cyan: #00d4ff;
+      --pflx-teal: #00b8d4;
+      --pflx-dark: #0a0e17;
+      --pflx-darker: #050810;
+      --pflx-magenta: #ff00ff;
+      --pflx-purple: #8b5cf6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: #050810;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(5,8,16,0.7) 100%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .login-container {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center;
+      width: 100%; max-width: 520px;
+      padding: 40px 20px;
+    }
+
+    /* Logo */
+    .logo-wrapper { margin-bottom: 24px; position: relative; }
+    .logo-wrapper img {
+      width: 140px; height: 140px; object-fit: contain;
+      filter: drop-shadow(0 0 25px rgba(0,212,255,0.4)) drop-shadow(0 0 50px rgba(139,92,246,0.2));
+    }
+    .logo-wrapper::before {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 160px; height: 160px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Title */
+    .app-title {
+      font-family: 'Orbitron'; font-weight: 800; font-size: 42px;
+      color: #ffffff; letter-spacing: 6px; text-align: center;
+      margin-bottom: 8px; text-shadow: 0 0 20px rgba(255,255,255,0.1);
+    }
+    .app-subtitle {
+      font-family: 'Orbitron'; font-weight: 500; font-size: 13px;
+      color: var(--pflx-cyan); letter-spacing: 5px; text-transform: uppercase;
+      text-align: center; margin-bottom: 40px;
+      text-shadow: 0 0 15px rgba(0,212,255,0.4);
+    }
+
+    /* Form Card */
+    .form-card {
+      width: 100%;
+      border: 1px solid rgba(0,212,255,0.15);
+      border-radius: 16px;
+      background: rgba(8,12,24,0.6);
+      backdrop-filter: blur(10px);
+      padding: 36px 32px;
+    }
+
+    /* Labels */
+    .field-label {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 12px;
+      color: var(--pflx-cyan); letter-spacing: 3px; text-transform: uppercase;
+      margin-bottom: 10px; display: block;
+    }
+
+    /* Input */
+    .field-input {
+      width: 100%; padding: 16px 18px;
+      font-family: 'Rajdhani'; font-weight: 500; font-size: 16px;
+      color: #e0e0e0; background: rgba(5,8,16,0.8);
+      border: 1.5px solid rgba(0,212,255,0.25); border-radius: 8px;
+      outline: none; transition: all 0.3s ease; letter-spacing: 0.5px;
+    }
+    .field-input::placeholder { color: rgba(0,212,255,0.35); font-weight: 400; }
+    .field-input:focus {
+      border-color: rgba(0,212,255,0.6);
+      box-shadow: 0 0 15px rgba(0,212,255,0.15), inset 0 0 10px rgba(0,212,255,0.05);
+    }
+    .field-input.error { border-color: rgba(255,80,80,0.6); }
+
+    /* Select */
+    .field-select {
+      width: 100%; padding: 16px 18px;
+      font-family: 'Rajdhani'; font-weight: 500; font-size: 16px;
+      color: rgba(0,212,255,0.35); background: rgba(5,8,16,0.8);
+      border: 1.5px solid rgba(0,212,255,0.25); border-radius: 8px;
+      outline: none; appearance: none; -webkit-appearance: none;
+      cursor: pointer; transition: all 0.3s ease;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2300d4ff' stroke-width='1.5' fill='none' opacity='0.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 18px center;
+    }
+    .field-select:focus { border-color: rgba(0,212,255,0.6); box-shadow: 0 0 15px rgba(0,212,255,0.15); }
+    .field-select option { background: #0a0e17; color: #e0e0e0; }
+
+    /* Checkbox */
+    .checkbox-row { display: flex; align-items: center; gap: 10px; margin: 16px 0 24px 0; }
+    .checkbox-custom {
+      width: 18px; height: 18px; border: 1.5px solid rgba(0,212,255,0.3);
+      border-radius: 3px; background: rgba(5,8,16,0.8);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; flex-shrink: 0;
+    }
+    .checkbox-custom.checked { background: rgba(0,212,255,0.15); border-color: var(--pflx-cyan); }
+    .checkbox-custom.checked::after { content: '✓'; color: var(--pflx-cyan); font-size: 12px; font-weight: 700; }
+    .checkbox-label {
+      font-family: 'Orbitron'; font-weight: 400; font-size: 10px;
+      color: rgba(255,255,255,0.4); letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn-primary {
+      width: 100%; padding: 18px;
+      font-family: 'Orbitron'; font-weight: 700; font-size: 14px;
+      letter-spacing: 4px; text-transform: uppercase;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: all 0.3s ease; text-align: center;
+    }
+    .btn-initialize {
+      background: rgba(40,48,65,0.8); color: rgba(255,255,255,0.35);
+    }
+    .btn-initialize.active {
+      background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(0,212,255,0.2);
+    }
+    .btn-initialize.active:hover {
+      box-shadow: 0 0 35px rgba(0,212,255,0.35);
+      transform: translateY(-1px);
+    }
+    .btn-claim {
+      background: transparent; color: var(--pflx-cyan);
+      border: 1.5px solid rgba(0,212,255,0.25); border-radius: 8px;
+    }
+    .btn-claim:hover {
+      background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.5);
+      box-shadow: 0 0 20px rgba(0,212,255,0.15);
+    }
+
+    /* Divider */
+    .divider { display: flex; align-items: center; gap: 16px; margin: 28px 0; }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,212,255,0.2), transparent); }
+    .divider-text {
+      font-family: 'Orbitron'; font-weight: 500; font-size: 10px;
+      color: var(--pflx-cyan); letter-spacing: 3px; text-transform: uppercase; white-space: nowrap;
+    }
+
+    /* Error text */
+    .error-text { margin: 6px 0 0; font-size: 12px; color: #ff6b6b; letter-spacing: 0.02em; }
+
+    /* User preview card (PIN step) */
+    .user-preview {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; margin-bottom: 22px;
+      background: rgba(0,212,255,0.05);
+      border: 1px solid rgba(0,212,255,0.15);
+      border-radius: 10px;
+    }
+    .user-avatar {
+      width: 44px; height: 44px; border-radius: 8px; flex-shrink: 0;
+      overflow: hidden;
+      background: linear-gradient(135deg, #00d4ff, #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Orbitron'; font-size: 13px; font-weight: 800; color: #fff;
+      box-shadow: 0 0 12px rgba(0,212,255,0.3);
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-info { flex: 1; overflow: hidden; }
+    .user-brand {
+      font-family: 'Rajdhani'; font-weight: 700; font-size: 15px;
+      color: #ffffff; letter-spacing: 0.02em;
+    }
+    .user-email {
+      font-family: 'Rajdhani'; font-size: 12px;
+      color: rgba(0,212,255,0.6); letter-spacing: 0.05em;
+    }
+    .user-role-tag {
+      font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px; letter-spacing: 2px; text-transform: uppercase;
+    }
+    .user-role-tag.host {
+      background: rgba(0,212,255,0.12); color: var(--pflx-cyan); border: 1px solid rgba(0,212,255,0.3);
+    }
+    .user-role-tag.player {
+      background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3);
+    }
+    .change-btn {
+      background: none; border: none; color: rgba(0,212,255,0.6);
+      cursor: pointer; font-family: 'Orbitron'; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase; transition: color 0.2s;
+    }
+    .change-btn:hover { color: var(--pflx-cyan); }
+
+    /* PIN input */
+    .pin-input {
+      width: 100%; padding: 16px 48px 16px 18px;
+      font-family: 'Rajdhani'; font-weight: 600; font-size: 24px;
+      color: #e0e0e0; background: rgba(5,8,16,0.8);
+      border: 1.5px solid rgba(0,212,255,0.25); border-radius: 8px;
+      outline: none; transition: all 0.3s ease;
+      text-align: center; letter-spacing: 0.5em;
+    }
+    .pin-input::placeholder { color: rgba(0,212,255,0.25); font-size: 20px; letter-spacing: 0.3em; }
+    .pin-input:focus {
+      border-color: rgba(0,212,255,0.6);
+      box-shadow: 0 0 15px rgba(0,212,255,0.15), inset 0 0 10px rgba(0,212,255,0.05);
+    }
+    .pin-input.error { border-color: rgba(255,80,80,0.6); }
+    .pin-field { position: relative; }
+    .pin-toggle {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: rgba(0,212,255,0.5); font-size: 18px; transition: color 0.2s;
+    }
+    .pin-toggle:hover { color: var(--pflx-cyan); }
+
+    /* Keep signed in + Reset PIN row */
+    .pin-options {
+      display: flex; justify-content: space-between; align-items: center; margin: 16px 0 22px;
+    }
+    .pin-options label {
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer; font-family: 'Orbitron'; font-size: 10px;
+      color: rgba(255,255,255,0.35); letter-spacing: 0.05em;
+    }
+    .pin-check {
+      width: 15px; height: 15px; border-radius: 3px; flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.2);
+      background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .pin-check.checked { border-color: var(--pflx-cyan); background: rgba(0,212,255,0.2); }
+    .pin-check.checked::after { content: '✓'; color: var(--pflx-cyan); font-size: 9px; font-weight: 900; }
+    .reset-pin-btn {
+      background: none; border: none; color: rgba(0,212,255,0.6);
+      font-family: 'Orbitron'; font-size: 11px; font-weight: 700;
+      cursor: pointer; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+
+    /* Footer */
+    .login-footer {
+      margin-top: 28px; font-family: 'Orbitron'; font-weight: 400;
+      font-size: 9px; color: rgba(0,212,255,0.3);
+      letter-spacing: 3px; text-transform: uppercase; text-align: center;
+    }
+
+    /* Powered by PFLX */
+    .powered-by {
+      position: fixed; bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      z-index: 50;
+    }
+    .powered-by-text {
+      font-family: 'Orbitron'; font-weight: 500; font-size: 10px;
+      color: rgba(255,255,255,0.35); letter-spacing: 3px; text-transform: uppercase;
+    }
+    .powered-by-logo {
+      height: 22px; filter: drop-shadow(0 0 8px rgba(0,212,255,0.3));
+      opacity: 0.7;
+    }
+    .powered-by-xcoin {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 12px;
+      background: linear-gradient(135deg, var(--pflx-cyan), var(--pflx-purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: 2px;
+    }
+
+    /* Step visibility */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .field-group { margin-bottom: 0; }
+    .field-group + .field-group { margin-top: 20px; }
+
+    /* ========== WORLD MAP WIDGET ========== */
+    .world-map {
+      position: fixed; top: 18px; left: 18px;
+      width: 120px; height: 68px;
+      border: 1px solid rgba(0,212,255,0.35);
+      background: rgba(6,10,18,0.9);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 60; overflow: hidden;
+    }
+    .world-map svg { width: 100px; height: 50px; opacity: 0.6; }
+
+    /* ========== RADAR WIDGET ========== */
+    .radar {
+      position: fixed; top: 110px; left: 24px;
+      width: 70px; height: 70px;
+      border: 1px solid rgba(0,212,255,0.25);
+      border-radius: 50%; background: rgba(6,10,18,0.7);
+      z-index: 60; overflow: hidden;
+    }
+    .radar-sweep {
+      position: absolute; top: 50%; left: 50%;
+      width: 50%; height: 2px;
+      background: linear-gradient(90deg, rgba(0,212,255,0.8), transparent);
+      transform-origin: left center;
+      animation: radarSweep 3s linear infinite;
+    }
+    .radar-cross {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(0,212,255,0.4); font-family: 'Orbitron'; font-size: 14px;
+    }
+    .radar::before {
+      content: ''; position: absolute; top: 50%; left: 0; right: 0;
+      height: 1px; background: rgba(0,212,255,0.1);
+    }
+    .radar::after {
+      content: ''; position: absolute; left: 50%; top: 0; bottom: 0;
+      width: 1px; background: rgba(0,212,255,0.1);
+    }
+    @keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* ========== HUD BARS (top right) ========== */
+    .hud-bars-container {
+      position: fixed; top: 18px; right: 20px; z-index: 60;
+    }
+    .hud-bars-box {
+      width: 80px; height: 50px;
+      border: 1px solid rgba(0,212,255,0.3);
+      background: rgba(6,10,18,0.8);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding: 6px 8px; gap: 3px;
+    }
+    .hud-b {
+      width: 6px; background: rgba(0,212,255,0.55); border-radius: 1px;
+      transition: height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+    }
+
+    /* ========== FLOATING PARTICLES ========== */
+    .particle-layer { position: fixed; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+    .particle { position: absolute; border-radius: 50%; }
+
+    /* ========== PULSE RINGS ========== */
+    .pulse-ring-layer { position: fixed; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+    .pulse-ring {
+      position: absolute; border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.2);
+      top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.3);
+      opacity: 0;
+    }
+
+    /* ========== ENERGY SCAN LINES ========== */
+    .scan-line-layer { position: fixed; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+    .scan-line {
+      position: absolute; left: 0; width: 100%; height: 2px;
+      opacity: 0;
+    }
+
+    /* ========== AURORA GRADIENT ========== */
+    .aurora-layer {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 0.5;
+    }
+
+    /* ========== STARS ========== */
+    .star {
+      position: fixed; border-radius: 50%; pointer-events: none;
+      animation: twinkle var(--dur) ease-in-out infinite;
+      animation-delay: var(--delay); z-index: 0;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.1; }
+      50% { opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Aurora Background -->
+  <div class="aurora-layer" id="auroraLayer"></div>
+
+  <!-- Floating Particles -->
+  <div class="particle-layer" id="particleLayer"></div>
+
+  <!-- Energy Scan Lines -->
+  <div class="scan-line-layer" id="scanLineLayer"></div>
+
+  <!-- Pulse Rings -->
+  <div class="pulse-ring-layer" id="pulseRingLayer"></div>
+
+  <!-- World Map -->
+  <div class="world-map">
+    <svg viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="200" height="100" fill="none"/>
+      <path d="M30 30 Q40 20 55 25 Q65 28 70 35 Q72 40 68 45 Q60 50 50 48 Q40 45 35 40 Q28 35 30 30Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M75 20 Q85 15 100 18 Q115 22 120 30 Q125 38 118 45 Q110 52 100 50 Q88 48 82 42 Q75 35 75 28Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M125 25 Q135 20 148 22 Q160 25 165 32 Q168 38 162 42 Q155 46 145 44 Q135 42 130 36 Q125 30 125 25Z" fill="rgba(0,212,255,0.4)"/>
+      <path d="M55 55 Q65 50 80 52 Q90 55 95 62 Q98 68 92 74 Q85 78 75 76 Q63 73 58 66 Q53 60 55 55Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M105 55 Q112 50 122 52 Q130 55 132 60 Q134 65 128 68 Q120 72 112 70 Q105 66 105 60Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M140 50 Q148 46 158 48 Q170 52 174 58 Q176 64 170 68 Q162 72 152 70 Q142 66 140 58Z" fill="rgba(0,212,255,0.35)"/>
+      <path d="M80 78 Q86 74 95 76 Q102 78 100 84 Q95 88 88 86 Q82 84 80 78Z" fill="rgba(0,212,255,0.3)"/>
+    </svg>
+  </div>
+
+  <!-- Radar -->
+  <div class="radar">
+    <div class="radar-sweep"></div>
+    <div class="radar-cross">+</div>
+  </div>
+
+  <!-- HUD Bars -->
+  <div class="hud-bars-container">
+    <div class="hud-bars-box" id="hudBars"></div>
+  </div>
+
+  <div class="login-container">
+    <!-- Logo -->
+    <div class="logo-wrapper">
+      <img id="loginLogo" src="public/icons/core-pathway-logo.png" alt="Core Pathway">
+    </div>
+
+    <!-- Title -->
+    <div class="app-title">CORE PATHWAY</div>
+    <div class="app-subtitle">Development Portal</div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+
+      <!-- ═══ STEP 1: Select Brand ═══ -->
+      <div class="step active" id="stepSelect">
+        <!-- Brand Select -->
+        <div class="field-group">
+          <label class="field-label">Select Your Brand</label>
+          <select class="field-select" id="brandSelect">
+            <option value="" disabled selected>Choose your brand name...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ═══ STEP 2: PIN Entry ═══ -->
+      <div class="step" id="stepPin">
+        <!-- User Preview -->
+        <div class="user-preview" id="userPreview">
+          <div class="user-avatar" id="userAvatar"></div>
+          <div class="user-info">
+            <div class="user-brand" id="userBrand"></div>
+            <div class="user-email" id="userEmail"></div>
+          </div>
+          <span class="user-role-tag" id="userRole"></span>
+          <button class="change-btn" id="changeBtn">Change</button>
+        </div>
+
+        <!-- Security PIN -->
+        <div class="field-group">
+          <label class="field-label">Security PIN</label>
+          <div class="pin-field">
+            <input class="pin-input" type="password" id="pinInput" placeholder="••••" maxlength="4" autocomplete="off">
+            <button class="pin-toggle" id="pinToggle">👁</button>
+          </div>
+          <p class="error-text" id="pinError" style="display:none;"></p>
+        </div>
+
+        <!-- Keep signed in + Reset PIN -->
+        <div class="pin-options">
+          <label>
+            <div class="pin-check" id="keepCheck"></div>
+            KEEP ME SIGNED IN
+          </label>
+          <button class="reset-pin-btn" id="resetPinBtn">Reset PIN</button>
+        </div>
+
+        <!-- Initialize Session -->
+        <button class="btn-primary btn-initialize" id="pinSubmitBtn">Enter</button>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="login-footer">System Version 1.0.0 // Secure Connection</div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED USER DATA — mirrors X-Coin app's mockUsers from app/lib/data.ts
+// In production, both apps will read from the same Supabase backend.
+// ═══════════════════════════════════════════════════════════════════════════
+const mockUsers = [
+  {
+    id: "admin-0", name: "PrototypeFLX", brandName: "PrototypeFLX",
+    role: "admin", avatar: "PF", cohort: "N/A", pathway: "Host",
+    email: "host@prototypeflx.com", pin: "0000", claimed: true, isHost: false,
+    digitalBadges: 0, xcoin: 0, totalXcoin: 0, level: 99, rank: 10,
+  },
+  {
+    id: "admin-1", name: "Mr. Johnson", brandName: "TheTomorrowTeacher",
+    role: "admin", avatar: "MJ", cohort: "N/A", pathway: "Host",
+    email: "ennisjohnsonjr@thetomorrowteacher.org", pin: "1111", claimed: true, isHost: false,
+    digitalBadges: 0, xcoin: 0, totalXcoin: 0, level: 99, rank: 10,
+  },
+  {
+    id: "player-1", name: "Alex Rivera", brandName: "PixelProphet",
+    role: "player", avatar: "AR", cohort: "Cohort 2", pathway: "Digital Design",
+    email: "alex.rivera@school.edu", pin: "3847", claimed: true, isHost: false,
+    digitalBadges: 28, xcoin: 1850, totalXcoin: 8500, level: 9, rank: 3,
+  },
+  {
+    id: "player-2", name: "Jordan Lee", brandName: "MotionMaster",
+    role: "player", avatar: "JL", cohort: "Cohort 3", pathway: "Content Creator",
+    email: "jordan.lee@school.edu", pin: "5291", claimed: false, isHost: false,
+    digitalBadges: 42, xcoin: 2900, totalXcoin: 12500, level: 13, rank: 4,
+  },
+  {
+    id: "player-3", name: "Sam Chen", brandName: "CodeCrafter",
+    role: "player", avatar: "SC", cohort: "Cohort 2", pathway: "Web Dev",
+    email: "sam.chen@school.edu", pin: "7063", claimed: false, isHost: false,
+    digitalBadges: 15, xcoin: 450, totalXcoin: 2100, level: 4, rank: 2,
+  },
+];
+
+function isHostUser(u) { return u.role === "admin" || u.isHost === true; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MERGE PROFILE IMAGES FROM X-COIN APP (shared localStorage)
+// X-Coin stores uploaded profile pics in "pflx_player_images" as { id: base64 }
+// ═══════════════════════════════════════════════════════════════════════════
+(function applyStoredImages() {
+  try {
+    const raw = localStorage.getItem('pflx_player_images');
+    if (!raw) return;
+    const imageMap = JSON.parse(raw);
+    mockUsers.forEach(u => {
+      if (imageMap[u.id]) u.image = imageMap[u.id];
+    });
+  } catch (e) { /* ignore parse errors */ }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+let selectedUser = null;
+let showPin = false;
+let keepSignedIn = false;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DOM REFS
+// ═══════════════════════════════════════════════════════════════════════════
+const brandSelect = document.getElementById('brandSelect');
+const stepSelect = document.getElementById('stepSelect');
+const stepPin = document.getElementById('stepPin');
+const pinInput = document.getElementById('pinInput');
+const pinError = document.getElementById('pinError');
+const pinSubmitBtn = document.getElementById('pinSubmitBtn');
+const keepCheck = document.getElementById('keepCheck');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POPULATE BRAND DROPDOWN — same structure as X-Coin
+// ═══════════════════════════════════════════════════════════════════════════
+function populateBrands() {
+  const hosts = mockUsers.filter(u => isHostUser(u));
+  const players = mockUsers.filter(u => u.role === "player" && !u.isHost);
+
+  // Host group
+  const hostGroup = document.createElement('optgroup');
+  hostGroup.label = '── Host ──';
+  hosts.forEach(h => {
+    const opt = document.createElement('option');
+    opt.value = h.id;
+    opt.textContent = '🛡 ' + (h.brandName || h.name);
+    opt.style.background = '#0a1218';
+    opt.style.color = '#fff';
+    hostGroup.appendChild(opt);
+  });
+  brandSelect.appendChild(hostGroup);
+
+  // Player group
+  const playerGroup = document.createElement('optgroup');
+  playerGroup.label = '── Players ──';
+  players.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.brandName || p.name;
+    opt.style.background = '#0a1218';
+    opt.style.color = '#fff';
+    playerGroup.appendChild(opt);
+  });
+  brandSelect.appendChild(playerGroup);
+}
+populateBrands();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 1 HANDLER — Brand select goes straight to PIN
+// ═══════════════════════════════════════════════════════════════════════════
+brandSelect.addEventListener('change', () => {
+  const id = brandSelect.value;
+  if (!id) return;
+  const match = mockUsers.find(u => u.id === id);
+  if (match) {
+    selectUser(match);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSITION TO PIN STEP
+// ═══════════════════════════════════════════════════════════════════════════
+function selectUser(user) {
+  selectedUser = user;
+  // Populate preview
+  const avatarEl = document.getElementById('userAvatar');
+  if (user.image) {
+    avatarEl.innerHTML = `<img src="${user.image}" alt="">`;
+  } else {
+    avatarEl.textContent = user.avatar;
+  }
+  document.getElementById('userBrand').textContent = user.brandName || user.name;
+  document.getElementById('userEmail').textContent = user.cohort ? user.cohort : (user.pathway || '');
+
+  const roleTag = document.getElementById('userRole');
+  if (isHostUser(user)) {
+    roleTag.textContent = 'HOST';
+    roleTag.className = 'user-role-tag host';
+  } else {
+    roleTag.textContent = 'PLAYER';
+    roleTag.className = 'user-role-tag player';
+  }
+
+  // Switch steps
+  stepSelect.classList.remove('active');
+  stepPin.classList.add('active');
+  pinInput.value = '';
+  pinError.style.display = 'none';
+  pinInput.classList.remove('error');
+  pinSubmitBtn.classList.remove('active');
+  setTimeout(() => pinInput.focus(), 100);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 2: PIN HANDLERS
+// ═══════════════════════════════════════════════════════════════════════════
+pinInput.addEventListener('input', () => {
+  pinInput.value = pinInput.value.replace(/\D/g, '').slice(0, 4);
+  pinError.style.display = 'none';
+  pinInput.classList.remove('error');
+  pinSubmitBtn.classList.toggle('active', pinInput.value.length === 4);
+});
+
+pinInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && pinInput.value.length === 4) handlePinSubmit();
+});
+
+pinSubmitBtn.addEventListener('click', handlePinSubmit);
+
+function handlePinSubmit() {
+  if (!selectedUser || pinInput.value.length < 4) return;
+
+  const correctPin = selectedUser.pin || (selectedUser.role === 'admin' ? '0000' : '1234');
+  if (pinInput.value === correctPin) {
+    // Save session
+    localStorage.setItem('pflx_pathway_user', JSON.stringify(selectedUser));
+    if (keepSignedIn) localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
+    // Navigate to portal
+    window.location.href = 'preview.html';
+  } else {
+    pinError.textContent = 'Incorrect PIN. Contact your instructor.';
+    pinError.style.display = 'block';
+    pinInput.classList.add('error');
+    pinInput.value = '';
+    pinSubmitBtn.classList.remove('active');
+  }
+}
+
+// Change button — go back to step 1
+document.getElementById('changeBtn').addEventListener('click', () => {
+  selectedUser = null;
+  stepPin.classList.remove('active');
+  stepSelect.classList.add('active');
+  pinInput.value = '';
+  brandSelect.value = '';
+});
+
+// PIN toggle visibility
+document.getElementById('pinToggle').addEventListener('click', () => {
+  showPin = !showPin;
+  pinInput.type = showPin ? 'text' : 'password';
+  pinInput.style.letterSpacing = showPin ? '0.2em' : '0.5em';
+  document.getElementById('pinToggle').textContent = showPin ? '🙈' : '👁';
+});
+
+// Keep signed in checkbox
+keepCheck.addEventListener('click', () => {
+  keepSignedIn = !keepSignedIn;
+  keepCheck.classList.toggle('checked', keepSignedIn);
+});
+
+// Reset PIN
+document.getElementById('resetPinBtn').addEventListener('click', () => {
+  alert('Contact your instructor to reset your PIN.');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-LOGIN CHECK
+// ═══════════════════════════════════════════════════════════════════════════
+const existingSession = localStorage.getItem('pflx_pathway_user');
+const staySignedIn = localStorage.getItem('pflx_pathway_keep_signed_in');
+if (existingSession && staySignedIn) {
+  // Auto-login
+  window.location.href = 'preview.html';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BACKGROUND ANIMATIONS
+// ═══════════════════════════════════════════════════════════════════
+
+// Stars
+for (let i = 0; i < 80; i++) {
+  const star = document.createElement('div');
+  star.className = 'star';
+  const size = Math.random() * 2.5 + 0.5;
+  const colors = ['rgba(0,212,255,0.5)','rgba(255,255,255,0.25)','rgba(139,92,246,0.4)','rgba(255,255,255,0.15)'];
+  star.style.cssText = `
+    width:${size}px;height:${size}px;
+    top:${Math.random()*100}%;left:${Math.random()*100}%;
+    background:${colors[Math.floor(Math.random()*colors.length)]};
+    --dur:${2+Math.random()*5}s;--delay:${Math.random()*4}s;
+  `;
+  document.body.appendChild(star);
+}
+
+// HUD Bars (JS-driven animation)
+const hb = document.getElementById('hudBars');
+const hudBars = [];
+for (let i = 0; i < 10; i++) {
+  const b = document.createElement('div');
+  b.className = 'hud-b';
+  const baseH = 6 + i * 3;
+  b.style.height = baseH + 'px';
+  hb.appendChild(b);
+  hudBars.push({ el: b, base: baseH });
+}
+setInterval(() => {
+  hudBars.forEach(bar => {
+    const h = bar.base + Math.random() * 16 - 4;
+    const clamped = Math.max(3, Math.min(38, h));
+    bar.el.style.height = clamped + 'px';
+    bar.el.style.opacity = 0.4 + (clamped / 38) * 0.6;
+  });
+}, 700);
+
+// Floating Particles (dramatic, JS-driven)
+const particleLayer = document.getElementById('particleLayer');
+const particles = [];
+const PARTICLE_COLORS = [
+  { rgb: '0,212,255',   maxOp: 0.6,  weight: 0.40 },
+  { rgb: '139,92,246',  maxOp: 0.5,  weight: 0.25 },
+  { rgb: '255,0,255',   maxOp: 0.35, weight: 0.15 },
+  { rgb: '255,255,255', maxOp: 0.25, weight: 0.20 },
+];
+function pickColor() {
+  let r = Math.random(), cum = 0;
+  for (const c of PARTICLE_COLORS) { cum += c.weight; if (r < cum) return c; }
+  return PARTICLE_COLORS[0];
+}
+for (let i = 0; i < 55; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  const size = Math.random() * 4.5 + 1.5;
+  const c = pickColor();
+  const x = Math.random() * 100;
+  const y = Math.random() * 100;
+  p.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:0;`;
+  particleLayer.appendChild(p);
+  particles.push({ el: p, color: c.rgb, maxOp: c.maxOp, size, baseX: x, baseY: y,
+    phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 0.6 });
+}
+function animateParticles() {
+  const t = Date.now() / 1000;
+  particles.forEach(p => {
+    const cycle = Math.sin(t * p.speed + p.phase);
+    const drift = Math.sin(t * 0.25 + p.phase * 2);
+    const pulse = (Math.sin(t * 1.2 + p.phase * 3) + 1) * 0.15;
+    const op = Math.min(1, ((cycle + 1) / 2) * p.maxOp + pulse);
+    const tx = drift * 80;
+    const ty = Math.cos(t * 0.3 + p.phase) * 60;
+    p.el.style.opacity = op.toFixed(3);
+    p.el.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
+    p.el.style.boxShadow = `0 0 ${p.size * 5}px rgba(${p.color},${(op * 0.7).toFixed(3)}), 0 0 ${p.size * 12}px rgba(${p.color},${(op * 0.2).toFixed(3)})`;
+    p.el.style.background = `rgba(${p.color},${op.toFixed(3)})`;
+  });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// Pulse Rings (dramatic, JS-driven)
+const pulseRingLayer = document.getElementById('pulseRingLayer');
+const pulseRings = [];
+const ringColors = ['0,212,255','139,92,246','255,0,255','0,212,255','139,92,246'];
+for (let i = 0; i < 5; i++) {
+  const ring = document.createElement('div');
+  ring.className = 'pulse-ring';
+  const maxSize = 300 + i * 200;
+  ring.style.cssText = `width:${maxSize}px;height:${maxSize}px;border-color:rgba(${ringColors[i]},0.25);`;
+  pulseRingLayer.appendChild(ring);
+  pulseRings.push({ el: ring, duration: 5000 + i * 2500, offset: i * 2000, start: Date.now(), color: ringColors[i] });
+}
+function animatePulseRings() {
+  const now = Date.now();
+  pulseRings.forEach(r => {
+    const elapsed = (now - r.start + r.offset) % r.duration;
+    const progress = elapsed / r.duration;
+    const scale = 0.2 + progress * 0.8;
+    const op = progress < 0.08 ? (progress / 0.08) * 0.4
+             : progress < 0.4 ? 0.4 - (progress - 0.08) / 0.32 * 0.25
+             : Math.max(0, 0.15 - (progress - 0.4) / 0.6 * 0.15);
+    r.el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+    r.el.style.opacity = op.toFixed(3);
+    r.el.style.borderColor = `rgba(${r.color},${(op * 0.6).toFixed(3)})`;
+    r.el.style.boxShadow = `0 0 30px rgba(${r.color},${(op * 0.3).toFixed(3)}), inset 0 0 30px rgba(${r.color},${(op * 0.1).toFixed(3)})`;
+  });
+  requestAnimationFrame(animatePulseRings);
+}
+animatePulseRings();
+
+// Energy Scan Lines
+const scanLineLayer = document.getElementById('scanLineLayer');
+const scanLines = [];
+const scanColors = ['0,212,255','139,92,246','255,0,255'];
+for (let i = 0; i < 3; i++) {
+  const line = document.createElement('div');
+  line.className = 'scan-line';
+  line.style.background = `linear-gradient(90deg, transparent 0%, rgba(${scanColors[i]},0.0) 10%, rgba(${scanColors[i]},0.4) 50%, rgba(${scanColors[i]},0.0) 90%, transparent 100%)`;
+  line.style.boxShadow = `0 0 20px 4px rgba(${scanColors[i]},0.15), 0 0 60px 8px rgba(${scanColors[i]},0.06)`;
+  scanLineLayer.appendChild(line);
+  scanLines.push({ el: line, duration: 8000 + i * 3000, offset: i * 3500, start: Date.now() });
+}
+function animateScanLines() {
+  const now = Date.now();
+  scanLines.forEach(s => {
+    const elapsed = (now - s.start + s.offset) % s.duration;
+    const progress = elapsed / s.duration;
+    const yPos = progress * 120 - 10;
+    const op = progress < 0.05 ? progress / 0.05
+             : progress < 0.9 ? 1
+             : (1 - progress) / 0.1;
+    s.el.style.top = yPos + '%';
+    s.el.style.opacity = (op * 0.5).toFixed(3);
+  });
+  requestAnimationFrame(animateScanLines);
+}
+animateScanLines();
+
+// Aurora Gradient
+const auroraLayer = document.getElementById('auroraLayer');
+function animateAurora() {
+  const t = Date.now() / 1000;
+  const x1 = 30 + Math.sin(t * 0.1) * 20;
+  const y1 = 20 + Math.cos(t * 0.08) * 15;
+  const x2 = 70 + Math.sin(t * 0.12 + 2) * 20;
+  const y2 = 80 + Math.cos(t * 0.09 + 1) * 15;
+  const op = 0.4 + Math.sin(t * 0.15) * 0.2;
+  auroraLayer.style.background = `
+    radial-gradient(ellipse at ${x1}% ${y1}%, rgba(0,212,255,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at ${x2}% ${y2}%, rgba(139,92,246,0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255,0,255,0.04) 0%, transparent 60%)`;
+  auroraLayer.style.opacity = op.toFixed(3);
+  requestAnimationFrame(animateAurora);
+}
+animateAurora();
+</script>
+
+  <!-- Powered by PFLX -->
+  <div class="powered-by">
+    <span class="powered-by-text">Powered by</span>
+    <img class="powered-by-logo" src="public/icons/pflx-logo.png" alt="PFLX">
+    <span class="powered-by-xcoin">X-COIN</span>
+  </div>
+
+</body>
+</html>
