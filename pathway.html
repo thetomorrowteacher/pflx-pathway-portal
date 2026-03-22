@@ -2003,16 +2003,26 @@ pathway.nodes.forEach(n => {
       window.removeEventListener('mousemove', moveHandler);
       window.removeEventListener('mouseup', upHandler);
       el.classList.remove('dragging');
-      if (isDragging) {
-        // Update stored position
-        const rect = el.getBoundingClientRect();
-        n._px = parseFloat(el.style.left);
-        n._py = parseFloat(el.style.top);
+      if (isDragging && editMode) {
+        // Persist new position (convert px back to percentage)
+        n.x = parseFloat(el.style.left) / MAP_W * 100;
+        n.y = parseFloat(el.style.top) / MAP_H * 100;
+        // Update stored px/py
+        const ne = nodeElements[n.id];
+        if (ne) { ne.px = parseFloat(el.style.left); ne.py = parseFloat(el.style.top); }
+        savePathwayEdits();
       }
     };
     window.addEventListener('mousemove', moveHandler);
     window.addEventListener('mouseup', upHandler);
   });
+
+  // Image upload button (edit mode)
+  const imgBtn = el.querySelector('.node-image-upload');
+  if (imgBtn) {
+    imgBtn.addEventListener('click', e => { e.stopPropagation(); openImageUpload(n); });
+    imgBtn.addEventListener('mousedown', e => e.stopPropagation());
+  }
 
   nodeLayer.appendChild(el);
   nodeElements[n.id] = { el, node: n, px, py };
@@ -2531,7 +2541,7 @@ function getNextRank(totalXcoin) {
 const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
 
 // Show edit toggle for host users
-(function initEditMode() {
+(async function initEditMode() {
   // Ensure clean state on load
   editMode = false;
   connectSource = null;
@@ -2548,7 +2558,8 @@ const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
   }
 
   // Always load saved pathway edits (host edits affect all users)
-  loadPathwayEdits();
+  // MUST await so nodes are rebuilt with saved data before user interacts
+  await loadPathwayEdits();
   // centerView is handled by the window load handler at end of script
 })();
 
@@ -2615,7 +2626,11 @@ async function loadPathwayEdits() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) { try { saved = JSON.parse(raw); } catch(e) {} }
   }
-  if (!saved) return;
+  if (!saved) {
+    // No saved data — still rebuild to attach proper event handlers
+    rebuildNodes();
+    return;
+  }
   try {
     // Merge saved data into pathway.nodes
     saved.forEach(sn => {
