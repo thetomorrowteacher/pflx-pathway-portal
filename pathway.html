@@ -800,7 +800,7 @@
 
     /* Node Editor Modal */
     .node-editor-overlay {
-      position: fixed; inset: 0; z-index: 400;
+      position: fixed; inset: 0; z-index: 600;
       background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
       display: none; align-items: center; justify-content: center;
     }
@@ -2817,6 +2817,12 @@ const editorOverlay = document.getElementById('nodeEditorOverlay');
 let editorNode = null;
 
 function openNodeEditor(node, isNew) {
+  // Close detail panel if open (it has z-index 500, would block editor)
+  if (detailOverlay.classList.contains('active')) {
+    detailPanel.classList.remove('active');
+    detailOverlay.classList.remove('active');
+    detailOverlay.style.display = 'none';
+  }
   editorNode = node;
   document.getElementById('neTitle').textContent = isNew ? 'New Node' : 'Edit Node';
   document.getElementById('neNodeTitle').value = node.title || '';
