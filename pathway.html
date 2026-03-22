@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PFLX Pathway — Skill Tree</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    // Shared Supabase backend (same as X-Coin app)
+    const SUPABASE_URL = 'https://hyxiagexyptzvetqjmnj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY';
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
   <style>
     :root {
       --pflx-cyan: #00d4ff;
@@ -2467,6 +2474,59 @@ function getNextRank(totalXcoin) {
   }
 })();
 
+// ─── SYNC WITH X-COIN APP (profile pics, stats, badges) ───
+(async function syncXCoinData() {
+  const stored = localStorage.getItem('pflx_pathway_user');
+  if (!stored) return;
+  try {
+    const localUser = JSON.parse(stored);
+    if (!localUser.id) return;
+    // Pull users array from shared Supabase app_data
+    const { data, error } = await _supabase
+      .from('app_data')
+      .select('data')
+      .eq('key', 'users')
+      .single();
+    if (error || !data || !data.data) return;
+    const xcUsers = data.data;
+    const xcUser = xcUsers.find(u => u.id === localUser.id || u.email === localUser.email);
+    if (!xcUser) return;
+    // Update local user with fresh X-Coin data
+    const updated = { ...localUser };
+    let changed = false;
+    if (xcUser.image && xcUser.image !== localUser.image) { updated.image = xcUser.image; changed = true; }
+    if (xcUser.xcoin !== undefined && xcUser.xcoin !== localUser.xcoin) { updated.xcoin = xcUser.xcoin; changed = true; }
+    if (xcUser.totalXcoin !== undefined && xcUser.totalXcoin !== localUser.totalXcoin) { updated.totalXcoin = xcUser.totalXcoin; changed = true; }
+    if (xcUser.digitalBadges !== undefined && xcUser.digitalBadges !== localUser.digitalBadges) { updated.digitalBadges = xcUser.digitalBadges; changed = true; }
+    if (xcUser.level !== undefined && xcUser.level !== localUser.level) { updated.level = xcUser.level; changed = true; }
+    if (xcUser.brandName && xcUser.brandName !== localUser.brandName) { updated.brandName = xcUser.brandName; changed = true; }
+    if (xcUser.name && xcUser.name !== localUser.name) { updated.name = xcUser.name; changed = true; }
+    if (xcUser.rank !== undefined) { updated.rank = xcUser.rank; changed = true; }
+    if (xcUser.isHost !== undefined) { updated.isHost = xcUser.isHost; changed = true; }
+    if (xcUser.role) { updated.role = xcUser.role; changed = true; }
+    if (changed) {
+      localStorage.setItem('pflx_pathway_user', JSON.stringify(updated));
+      // Update player card UI
+      const avatarEl = document.getElementById('pcAvatar');
+      if (updated.image) avatarEl.innerHTML = '<img src="' + updated.image + '" alt="">';
+      document.getElementById('pcBrand').textContent = updated.brandName || updated.name;
+      document.getElementById('pcXC').textContent = (updated.xcoin || 0).toLocaleString();
+      document.getElementById('pcBadges').textContent = (updated.digitalBadges || 0).toLocaleString();
+      document.getElementById('pcLevel').textContent = updated.level || 1;
+      const totalXC = updated.totalXcoin || 0;
+      const rank = getCurrentRank(totalXC);
+      const progress = getRankProgress(totalXC);
+      const nextRank = getNextRank(totalXC);
+      document.getElementById('pcRankName').textContent = rank.name + ' (Rank ' + rank.level + ')';
+      document.getElementById('pcRankFill').style.width = Math.min(100, progress) + '%';
+      document.getElementById('pcRankProgress').textContent = nextRank
+        ? totalXC.toLocaleString() + ' / ' + nextRank.xc.toLocaleString() + ' XC'
+        : 'MAX RANK';
+      console.log('[PFLX] Synced player data from X-Coin app');
+    }
+  } catch(e) { console.warn('[PFLX] X-Coin sync error:', e); }
+})();
+
 // ==================== HOST EDIT MODE ====================
 const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
 
@@ -2509,7 +2569,7 @@ function toggleEditMode() {
 }
 document.getElementById('editToggleBtn').addEventListener('click', toggleEditMode);
 
-// ─── SAVE / LOAD EDITS ───
+// ─── SAVE / LOAD EDITS (Supabase-backed with localStorage fallback) ───
 function savePathwayEdits() {
   const data = pathway.nodes.map(n => {
     const obj = {
@@ -2524,14 +2584,39 @@ function savePathwayEdits() {
     if (n.titleGraphic) { obj.titleGraphic = n.titleGraphic; }
     return obj;
   });
+  // Save to localStorage as instant cache
   localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  // Save to Supabase for persistence across devices/refreshes
+  _supabase.from('app_data').upsert({
+    key: 'pathway_' + pathwaySlug,
+    data: data,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'key' }).then(({ error }) => {
+    if (error) console.error('[PFLX] Supabase save error:', error);
+    else console.log('[PFLX] Pathway saved to Supabase');
+  });
 }
 
-function loadPathwayEdits() {
-  const raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) return;
+async function loadPathwayEdits() {
+  let saved = null;
+  // Try Supabase first
   try {
-    const saved = JSON.parse(raw);
+    const { data, error } = await _supabase
+      .from('app_data')
+      .select('data')
+      .eq('key', 'pathway_' + pathwaySlug)
+      .single();
+    if (!error && data && data.data) {
+      saved = data.data;
+    }
+  } catch(e) { console.warn('[PFLX] Supabase load failed, trying localStorage:', e); }
+  // Fall back to localStorage
+  if (!saved) {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) { try { saved = JSON.parse(raw); } catch(e) {} }
+  }
+  if (!saved) return;
+  try {
     // Merge saved data into pathway.nodes
     saved.forEach(sn => {
       const existing = pathway.nodes.find(n => n.id === sn.id);
@@ -2545,7 +2630,6 @@ function loadPathwayEdits() {
     // Remove nodes that were deleted (in saved but not all original IDs)
     const savedIds = saved.map(s => s.id);
     pathway.nodes = pathway.nodes.filter(n => {
-      // Keep if it's in saved data, or if it wasn't originally saved (shouldn't happen)
       return savedIds.includes(n.id);
     });
     // Re-render everything
