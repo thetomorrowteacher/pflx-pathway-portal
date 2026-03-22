@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PFLX Core Pathway Development — Login</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://hyxiagexyptzvetqjmnj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY';
+    const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
   <style>
     :root {
       --pflx-cyan: #00d4ff;
@@ -508,10 +514,10 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
-// SHARED USER DATA — mirrors X-Coin app's mockUsers from app/lib/data.ts
-// In production, both apps will read from the same Supabase backend.
+// SHARED USER DATA — loaded from Supabase (shared with X-Coin app)
+// Falls back to hardcoded defaults if Supabase is unavailable.
 // ═══════════════════════════════════════════════════════════════════════════
-const mockUsers = [
+let mockUsers = [
   {
     id: "admin-0", name: "PrototypeFLX", brandName: "PrototypeFLX",
     role: "admin", avatar: "PF", cohort: "N/A", pathway: "Host",
@@ -547,19 +553,37 @@ const mockUsers = [
 function isHostUser(u) { return u.role === "admin" || u.isHost === true; }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MERGE PROFILE IMAGES FROM X-COIN APP (shared localStorage)
-// X-Coin stores uploaded profile pics in "pflx_player_images" as { id: base64 }
+// LOAD USERS FROM SUPABASE (X-Coin shared backend)
+// Pulls profile pictures, stats, badges, and any new players
 // ═══════════════════════════════════════════════════════════════════════════
-(function applyStoredImages() {
+let _supabaseUsersLoaded = false;
+async function loadUsersFromSupabase() {
   try {
-    const raw = localStorage.getItem('pflx_player_images');
-    if (!raw) return;
-    const imageMap = JSON.parse(raw);
-    mockUsers.forEach(u => {
-      if (imageMap[u.id]) u.image = imageMap[u.id];
-    });
-  } catch (e) { /* ignore parse errors */ }
-})();
+    const { data, error } = await _supabase
+      .from('app_data')
+      .select('data')
+      .eq('key', 'users')
+      .single();
+    if (!error && data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+      mockUsers = data.data;
+      _supabaseUsersLoaded = true;
+      // Re-populate the brand dropdown with fresh data
+      brandSelect.innerHTML = '<option value="" disabled selected>Choose your brand…</option>';
+      populateBrands();
+      // Update the selected user preview if one was already selected
+      if (selectedUser) {
+        const fresh = mockUsers.find(u => u.id === selectedUser.id);
+        if (fresh) {
+          selectedUser = fresh;
+          selectUser(fresh);
+        }
+      }
+      console.log('[PFLX] Loaded ' + mockUsers.length + ' users from Supabase');
+    }
+  } catch(e) { console.warn('[PFLX] Supabase user load failed, using defaults:', e); }
+}
+// Fire immediately — will update the dropdown when ready
+loadUsersFromSupabase();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // STATE
