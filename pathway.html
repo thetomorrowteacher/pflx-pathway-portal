@@ -1461,7 +1461,7 @@
             <input type="checkbox" id="neComingSoon" style="width:14px;height:14px;"> Coming Soon
           </label>
         </div>
-        <button class="ne-save" id="neSave">Save Node</button>
+        <button class="ne-save" id="neSave" onclick="window._neSaveClick && window._neSaveClick()">Save Node</button>
       </div>
     </div>
   </div>
@@ -2603,8 +2603,8 @@ function savePathwayEdits() {
     data: data,
     updated_at: new Date().toISOString()
   }, { onConflict: 'key' }).then(({ error }) => {
-    if (error) console.error('[PFLX] Supabase save error:', error);
-    else console.log('[PFLX] Pathway saved to Supabase');
+    if (error) { console.error('[PFLX] Supabase save error:', error); if (typeof showSaveToast === 'function') showSaveToast('Save error!'); }
+    else { console.log('[PFLX] Pathway saved to Supabase'); if (typeof showSaveToast === 'function') showSaveToast('Saved to cloud ✓'); }
   });
 }
 
@@ -2855,8 +2855,8 @@ editorOverlay.addEventListener('click', e => {
   if (e.target === editorOverlay) closeNodeEditor();
 });
 
-document.getElementById('neSave').addEventListener('click', () => {
-  if (!editorNode) return;
+function _doSaveNode() {
+  if (!editorNode) { console.warn('[PFLX] Save failed: no editorNode'); return; }
   editorNode.title = document.getElementById('neNodeTitle').value || 'Untitled';
   editorNode.emoji = document.getElementById('neEmoji').value || '📦';
   editorNode.desc = document.getElementById('neDesc').value || '';
@@ -2869,7 +2869,27 @@ document.getElementById('neSave').addEventListener('click', () => {
   savePathwayEdits();
   rebuildNodes();
   closeNodeEditor();
-});
+  // Show save toast
+  showSaveToast('Node saved!');
+}
+// Register on both addEventListener AND window for inline onclick backup
+document.getElementById('neSave').addEventListener('click', _doSaveNode);
+window._neSaveClick = _doSaveNode;
+
+// ─── SAVE TOAST ───
+function showSaveToast(msg) {
+  let toast = document.getElementById('pflxSaveToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'pflxSaveToast';
+    toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;padding:10px 28px;border-radius:6px;font-family:Orbitron;font-size:11px;letter-spacing:2px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;text-transform:uppercase;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+}
 
 // Image upload in node editor
 document.getElementById('neImageUpload').addEventListener('click', () => {
