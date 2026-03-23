@@ -524,6 +524,25 @@
     .pc-role-badge.host { background: rgba(0,212,255,0.12); color: var(--pflx-cyan); border: 1px solid rgba(0,212,255,0.3); }
     .pc-role-badge.player { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
 
+    .pc-toggle {
+      position: absolute; top: 6px; right: 6px;
+      width: 22px; height: 22px; border: none; border-radius: 4px;
+      background: rgba(0,212,255,0.1); color: rgba(0,212,255,0.7);
+      font-size: 14px; line-height: 22px; text-align: center;
+      cursor: pointer; z-index: 5; padding: 0; transition: background 0.2s;
+    }
+    .pc-toggle:hover { background: rgba(0,212,255,0.25); color: #fff; }
+
+    .pc-restore {
+      position: absolute; top: 80px; right: 20px;
+      width: 36px; height: 36px; border-radius: 6px;
+      background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.25);
+      color: rgba(0,212,255,0.7); font-size: 16px; cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+      z-index: 60; transition: all 0.2s; backdrop-filter: blur(8px);
+    }
+    .pc-restore:hover { background: rgba(0,212,255,0.15); color: #fff; }
+
     .pc-body { padding: 10px 14px 14px; }
 
     /* Rank section */
@@ -805,6 +824,7 @@
 
   <!-- Player Card (shown for logged-in players) -->
   <div class="player-card" id="playerCard">
+    <button class="pc-toggle" id="pcToggle" title="Hide Player Card">✕</button>
     <div class="pc-header">
       <div class="pc-avatar" id="pcAvatar"></div>
       <div class="pc-info">
@@ -839,6 +859,7 @@
       <button class="pc-logout" id="pcLogout">Sign Out</button>
     </div>
   </div>
+  <button class="pc-restore" id="pcRestore" title="Show Player Card">👤</button>
 
   <!-- Logo -->
   <div class="logo-area">
@@ -1311,8 +1332,14 @@
         const user = JSON.parse(stored);
         const isHost = user.role === 'admin' || user.isHost === true;
 
-        // Show player card, hide info panel
-        document.getElementById('playerCard').style.display = 'block';
+        // Show player card (unless hidden by toggle), hide info panel
+        const pcHidden = sessionStorage.getItem('pflx_pc_hidden') === '1';
+        if (pcHidden) {
+          document.getElementById('playerCard').style.display = 'none';
+          document.getElementById('pcRestore').style.display = 'flex';
+        } else {
+          document.getElementById('playerCard').style.display = 'block';
+        }
         document.getElementById('infoPanel').style.display = 'none';
 
         // Show settings button for hosts
@@ -1367,6 +1394,18 @@
           localStorage.removeItem('pflx_pathway_user');
           localStorage.removeItem('pflx_pathway_keep_signed_in');
           window.location.href = 'login.html';
+        });
+
+        // Player card show / hide toggle
+        document.getElementById('pcToggle').addEventListener('click', () => {
+          document.getElementById('playerCard').style.display = 'none';
+          document.getElementById('pcRestore').style.display = 'flex';
+          sessionStorage.setItem('pflx_pc_hidden', '1');
+        });
+        document.getElementById('pcRestore').addEventListener('click', () => {
+          document.getElementById('playerCard').style.display = 'block';
+          document.getElementById('pcRestore').style.display = 'none';
+          sessionStorage.removeItem('pflx_pc_hidden');
         });
       } catch (e) {
         console.error('Player card error:', e);

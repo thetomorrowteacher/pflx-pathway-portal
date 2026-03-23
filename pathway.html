@@ -702,9 +702,17 @@
       cursor: pointer; z-index: 5; padding: 0; transition: background 0.2s;
     }
     .pc-toggle:hover { background: rgba(0,212,255,0.25); color: #fff; }
-    .player-card.collapsed .pc-body { display: none; }
-    .player-card.collapsed .pc-header { border-bottom: none; }
-    .player-card.collapsed { width: auto; min-width: 180px; }
+
+    /* Floating restore button when player card is hidden */
+    .pc-restore {
+      position: fixed; top: 220px; right: 20px;
+      width: 36px; height: 36px; border-radius: 6px;
+      background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.25);
+      color: rgba(0,212,255,0.7); font-size: 16px; cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+      z-index: 200; transition: all 0.2s; backdrop-filter: blur(8px);
+    }
+    .pc-restore:hover { background: rgba(0,212,255,0.15); color: #fff; }
 
     .pc-body { padding: 10px 14px 14px; }
 
@@ -1180,7 +1188,7 @@
 
   <!-- Player Card (shown for logged-in players) -->
   <div class="player-card" id="playerCard">
-    <button class="pc-toggle" id="pcToggle" title="Minimize / Expand">▾</button>
+    <button class="pc-toggle" id="pcToggle" title="Hide Player Card">✕</button>
     <div class="pc-header">
       <div class="pc-avatar" id="pcAvatar"></div>
       <div class="pc-info">
@@ -1215,6 +1223,7 @@
       <button class="pc-logout" id="pcLogout">Sign Out</button>
     </div>
   </div>
+  <button class="pc-restore" id="pcRestore" title="Show Player Card">👤</button>
 
   <!-- Node Canvas (pannable/zoomable) -->
   <div class="node-canvas" id="nodeCanvas">
@@ -2545,18 +2554,29 @@ function getNextRank(totalXcoin) {
     });
   }
 
-  // ── Player Card minimize / expand toggle ──
+  // ── Player Card show / hide toggle ──
   const pcToggleBtn = document.getElementById('pcToggle');
   const pcCard = document.getElementById('playerCard');
-  if (localStorage.getItem('pflx_pc_collapsed') === '1') {
-    pcCard.classList.add('collapsed');
-    pcToggleBtn.textContent = '▸';
+  const pcRestore = document.getElementById('pcRestore');
+
+  function hidePlayerCard() {
+    pcCard.style.display = 'none';
+    pcRestore.style.display = 'flex';
+    sessionStorage.setItem('pflx_pc_hidden', '1');
   }
-  pcToggleBtn.addEventListener('click', () => {
-    const collapsed = pcCard.classList.toggle('collapsed');
-    pcToggleBtn.textContent = collapsed ? '▸' : '▾';
-    localStorage.setItem('pflx_pc_collapsed', collapsed ? '1' : '0');
-  });
+  function showPlayerCard() {
+    pcCard.style.display = 'block';
+    pcRestore.style.display = 'none';
+    sessionStorage.removeItem('pflx_pc_hidden');
+  }
+
+  // Restore hidden state from previous page
+  if (sessionStorage.getItem('pflx_pc_hidden') === '1') {
+    hidePlayerCard();
+  }
+
+  pcToggleBtn.addEventListener('click', () => { hidePlayerCard(); });
+  pcRestore.addEventListener('click', () => { showPlayerCard(); });
 })();
 
 // ─── SYNC WITH X-COIN APP (profile pics, stats, badges) ───
