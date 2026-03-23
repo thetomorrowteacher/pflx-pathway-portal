@@ -694,6 +694,18 @@
     .pc-role-badge.host { background: rgba(0,212,255,0.12); color: var(--pflx-cyan); border: 1px solid rgba(0,212,255,0.3); }
     .pc-role-badge.player { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
 
+    .pc-toggle {
+      position: absolute; top: 6px; right: 6px;
+      width: 22px; height: 22px; border: none; border-radius: 4px;
+      background: rgba(0,212,255,0.1); color: rgba(0,212,255,0.7);
+      font-size: 14px; line-height: 22px; text-align: center;
+      cursor: pointer; z-index: 5; padding: 0; transition: background 0.2s;
+    }
+    .pc-toggle:hover { background: rgba(0,212,255,0.25); color: #fff; }
+    .player-card.collapsed .pc-body { display: none; }
+    .player-card.collapsed .pc-header { border-bottom: none; }
+    .player-card.collapsed { width: auto; min-width: 180px; }
+
     .pc-body { padding: 10px 14px 14px; }
 
     .pc-rank-row {
@@ -1168,6 +1180,7 @@
 
   <!-- Player Card (shown for logged-in players) -->
   <div class="player-card" id="playerCard">
+    <button class="pc-toggle" id="pcToggle" title="Minimize / Expand">▾</button>
     <div class="pc-header">
       <div class="pc-avatar" id="pcAvatar"></div>
       <div class="pc-info">
@@ -1255,6 +1268,7 @@
     <button class="zoom-btn" id="zoomOut">&minus;</button>
     <button class="zoom-btn" id="zoomFit" style="font-size:10px;">FIT</button>
     <button class="zoom-btn" id="zoomMag" title="Magnify: click to zoom in, Shift+click to zoom out" style="font-size:14px;">🔍</button>
+    <button class="zoom-btn" id="fullscreenBtn" title="Toggle Fullscreen" style="font-size:14px; margin-top:4px;">⛶</button>
   </div>
 
   <!-- Bottom Bar -->
@@ -1335,13 +1349,6 @@
             <span class="settings-label">Starfield Animation</span>
             <label class="toggle-switch">
               <input type="checkbox" id="showStarfield" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Show Player Card</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="showPlayerCard" checked>
               <span class="toggle-slider"></span>
             </label>
           </div>
@@ -1936,6 +1943,20 @@ canvas.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Shift' && magMode) canvas.classList.add('mag-out'); });
 document.addEventListener('keyup', e => { if (e.key === 'Shift' && magMode) canvas.classList.remove('mag-out'); });
 
+// Fullscreen toggle
+const fsBtn = document.getElementById('fullscreenBtn');
+fsBtn.onclick = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
+};
+document.addEventListener('fullscreenchange', () => {
+  fsBtn.textContent = document.fullscreenElement ? '⊡' : '⛶';
+  fsBtn.title = document.fullscreenElement ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+});
+
 // ==================== RENDER NODES ====================
 const nodeElements = {};
 
@@ -2506,6 +2527,19 @@ function getNextRank(totalXcoin) {
       window.location.href = 'login.html';
     });
   }
+
+  // ── Player Card minimize / expand toggle ──
+  const pcToggleBtn = document.getElementById('pcToggle');
+  const pcCard = document.getElementById('playerCard');
+  if (localStorage.getItem('pflx_pc_collapsed') === '1') {
+    pcCard.classList.add('collapsed');
+    pcToggleBtn.textContent = '▸';
+  }
+  pcToggleBtn.addEventListener('click', () => {
+    const collapsed = pcCard.classList.toggle('collapsed');
+    pcToggleBtn.textContent = collapsed ? '▸' : '▾';
+    localStorage.setItem('pflx_pc_collapsed', collapsed ? '1' : '0');
+  });
 })();
 
 // ─── SYNC WITH X-COIN APP (profile pics, stats, badges) ───
@@ -3323,7 +3357,6 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('showConnectors').checked = document.getElementById('connectorSvg').style.display !== 'none';
   document.getElementById('showLabels').checked = !document.body.classList.contains('hide-labels');
   document.getElementById('showStarfield').checked = document.getElementById('starfield').style.display !== 'none';
-  document.getElementById('showPlayerCard').checked = document.getElementById('playerCard').style.display !== 'none';
   settingsOverlay.classList.add('show');
 });
 
@@ -3358,10 +3391,6 @@ document.getElementById('settingsSave').addEventListener('click', () => {
   document.getElementById('particleLayer').style.display = sfShow;
   document.getElementById('pulseRingLayer').style.display = sfShow;
 
-  // Player card visibility
-  const pcShow = document.getElementById('showPlayerCard').checked;
-  document.getElementById('playerCard').style.display = pcShow ? 'block' : 'none';
-
   // Persist
   localStorage.setItem('pflx_pathway_settings', JSON.stringify({
     sfxEnabled: SFX.state.enabled, sfxVolume: SFX.state.volume,
@@ -3369,7 +3398,6 @@ document.getElementById('settingsSave').addEventListener('click', () => {
     showConnectors: document.getElementById('showConnectors').checked,
     showLabels: document.getElementById('showLabels').checked,
     showStarfield: document.getElementById('showStarfield').checked,
-    showPlayerCard: document.getElementById('showPlayerCard').checked,
   }));
 
   SFX.nodeSave();
@@ -3385,9 +3413,6 @@ document.getElementById('settingsSave').addEventListener('click', () => {
     document.getElementById('starfield').style.display = 'none';
     document.getElementById('particleLayer').style.display = 'none';
     document.getElementById('pulseRingLayer').style.display = 'none';
-  }
-  if (s.showPlayerCard === false) {
-    document.getElementById('playerCard').style.display = 'none';
   }
 })();
 
