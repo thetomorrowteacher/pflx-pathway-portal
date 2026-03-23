@@ -1280,8 +1280,8 @@
     <button class="zoom-btn" id="fullscreenBtn" title="Toggle Fullscreen" style="font-size:14px; margin-top:4px;">⛶</button>
   </div>
 
-  <!-- Bottom Bar -->
-  <div class="bottom-bar">
+  <!-- Bottom Bar (hidden) -->
+  <div class="bottom-bar" style="display:none;">
     <div class="bbar-segment"></div>
     <div class="bbar-label">PFLX Skill Tree v1.0</div>
     <div class="bbar-segment"></div>
@@ -2051,6 +2051,7 @@ pathway.nodes.forEach(n => {
       if (!isDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
         isDragging = true;
         el.classList.add('dragging');
+        SFX.nodeDragStart();
       }
       if (isDragging) {
         const newLeft = px + dx / zoom;
@@ -2066,6 +2067,7 @@ pathway.nodes.forEach(n => {
       window.removeEventListener('mouseup', upHandler);
       el.classList.remove('dragging');
       if (isDragging && editMode) {
+        SFX.nodeDragEnd();
         // Persist new position (convert px back to percentage)
         n.x = parseFloat(el.style.left) / MAP_W * 100;
         n.y = parseFloat(el.style.top) / MAP_H * 100;
@@ -2285,6 +2287,7 @@ function showDetail(n) {
 
   // Show overlay + panel with slight delay for zoom
   setTimeout(() => {
+    SFX.detailOpen();
     detailOverlay.style.display = 'flex';
     requestAnimationFrame(() => {
       detailOverlay.classList.add('active');
@@ -2882,6 +2885,7 @@ function setupNodeDrag(el, n, px, py) {
       if (!isDragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
         isDragging = true;
         el.classList.add('dragging');
+        SFX.nodeDragStart();
       }
       if (isDragging) {
         const newLeft = px + dx / zoom;
@@ -2897,6 +2901,7 @@ function setupNodeDrag(el, n, px, py) {
       window.removeEventListener('mouseup', upHandler);
       el.classList.remove('dragging');
       if (isDragging && editMode) {
+        SFX.nodeDragEnd();
         // Persist new position
         n.x = parseFloat(el.style.left) / MAP_W * 100;
         n.y = parseFloat(el.style.top) / MAP_H * 100;
@@ -2942,9 +2947,9 @@ ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
 
     switch(action) {
       case 'edit': SFX.open(); openNodeEditor(node); break;
-      case 'connect': SFX.toggle(); startConnectMode(node); break;
+      case 'connect': SFX.connect(); startConnectMode(node); break;
       case 'disconnect': SFX.disconnect(); disconnectNode(node); break;
-      case 'duplicate': SFX.nodeSave(); duplicateNode(node); break;
+      case 'duplicate': SFX.duplicate(); duplicateNode(node); break;
       case 'delete': SFX.nodeDelete(); deleteNode(node); break;
     }
   });
@@ -3315,6 +3320,7 @@ function openImageAdjust(node) {
 // ═══════════════════════════════════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
+  let ambientNodes = null;
   const settings = JSON.parse(localStorage.getItem('pflx_pathway_settings') || '{}');
   const state = {
     enabled: settings.sfxEnabled !== false,
@@ -3330,49 +3336,454 @@ const SFX = (() => {
     return ctx;
   }
   function vol() { return (state.volume / 100) * 0.4; }
+  function v(mult) { return vol() * (mult || 1); }
 
-  function playTone(freq, duration, type, fadeOut) {
+  // ── Core: tone with optional frequency sweep ──
+  function playTone(freq, duration, type, fadeOut, endFreq) {
     if (!state.enabled) return;
-    const c = getCtx();
+    const c = getCtx(); const t = c.currentTime;
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.type = type || 'sine';
-    osc.frequency.setValueAtTime(freq, c.currentTime);
-    gain.gain.setValueAtTime(vol(), c.currentTime);
-    if (fadeOut !== false) gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(c.destination);
-    osc.start(c.currentTime);
-    osc.stop(c.currentTime + duration);
+    osc.frequency.setValueAtTime(freq, t);
+    if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t + duration);
+    gain.gain.setValueAtTime(vol(), t);
+    if (fadeOut !== false) gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(t); osc.stop(t + duration);
   }
 
   function playChord(freqs, duration, type) {
     freqs.forEach(f => playTone(f, duration, type));
   }
 
+  // ── Filtered noise burst (whoosh, static, hiss) ──
+  function playNoise(duration, filterFreq, filterType, gainMult) {
+    if (!state.enabled) return;
+    const c = getCtx(); const t = c.currentTime;
+    const bufSize = c.sampleRate * duration;
+    const buf = c.createBuffer(1, bufSize, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const filter = c.createBiquadFilter();
+    filter.type = filterType || 'bandpass';
+    filter.frequency.setValueAtTime(filterFreq || 2000, t);
+    filter.Q.setValueAtTime(1.5, t);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(v(gainMult || 0.3), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    src.connect(filter); filter.connect(gain); gain.connect(c.destination);
+    src.start(t); src.stop(t + duration);
+  }
+
+  // ── Frequency sweep (sci-fi scanner / energy charge) ──
+  function playSweep(startFreq, endFreq, duration, type, gainMult) {
+    if (!state.enabled) return;
+    const c = getCtx(); const t = c.currentTime;
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(startFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(endFreq, t + duration);
+    gain.gain.setValueAtTime(v(gainMult || 0.5), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(t); osc.stop(t + duration);
+  }
+
+  // ── FM synthesis (metallic, bell-like, digital) ──
+  function playFM(carrierFreq, modFreq, modDepth, duration, gainMult) {
+    if (!state.enabled) return;
+    const c = getCtx(); const t = c.currentTime;
+    const mod = c.createOscillator();
+    const modGain = c.createGain();
+    mod.frequency.setValueAtTime(modFreq, t);
+    modGain.gain.setValueAtTime(modDepth, t);
+    modGain.gain.exponentialRampToValueAtTime(1, t + duration);
+    const carrier = c.createOscillator();
+    carrier.frequency.setValueAtTime(carrierFreq, t);
+    const outGain = c.createGain();
+    outGain.gain.setValueAtTime(v(gainMult || 0.4), t);
+    outGain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    mod.connect(modGain); modGain.connect(carrier.frequency);
+    carrier.connect(outGain); outGain.connect(c.destination);
+    mod.start(t); carrier.start(t);
+    mod.stop(t + duration); carrier.stop(t + duration);
+  }
+
+  // ── Ambient engine (low drone + filtered noise bed) ──
+  function startAmbient() {
+    if (ambientNodes) return;
+    const c = getCtx(); const t = c.currentTime;
+    const master = c.createGain();
+    master.gain.setValueAtTime(0, t);
+    master.gain.linearRampToValueAtTime(v(0.12), t + 2);
+    master.connect(c.destination);
+    // Low drone
+    const drone = c.createOscillator();
+    drone.type = 'sine'; drone.frequency.setValueAtTime(55, t);
+    const droneGain = c.createGain(); droneGain.gain.setValueAtTime(0.6, t);
+    drone.connect(droneGain); droneGain.connect(master); drone.start(t);
+    // Sub-harmonic pulse
+    const sub = c.createOscillator();
+    sub.type = 'sine'; sub.frequency.setValueAtTime(27.5, t);
+    const subGain = c.createGain(); subGain.gain.setValueAtTime(0.3, t);
+    sub.connect(subGain); subGain.connect(master); sub.start(t);
+    // Filtered noise bed
+    const bufSize = c.sampleRate * 4;
+    const buf = c.createBuffer(1, bufSize, c.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const noiseSrc = c.createBufferSource();
+    noiseSrc.buffer = buf; noiseSrc.loop = true;
+    const noiseFilter = c.createBiquadFilter();
+    noiseFilter.type = 'lowpass'; noiseFilter.frequency.setValueAtTime(400, t);
+    noiseFilter.Q.setValueAtTime(0.5, t);
+    const noiseGain = c.createGain(); noiseGain.gain.setValueAtTime(0.15, t);
+    noiseSrc.connect(noiseFilter); noiseFilter.connect(noiseGain);
+    noiseGain.connect(master); noiseSrc.start(t);
+    // Slow LFO on drone pitch for movement
+    const lfo = c.createOscillator();
+    lfo.type = 'sine'; lfo.frequency.setValueAtTime(0.08, t);
+    const lfoGain = c.createGain(); lfoGain.gain.setValueAtTime(3, t);
+    lfo.connect(lfoGain); lfoGain.connect(drone.frequency); lfo.start(t);
+    ambientNodes = { master, drone, sub, noiseSrc, lfo, droneGain, subGain, noiseGain };
+  }
+  function stopAmbient() {
+    if (!ambientNodes) return;
+    const c = getCtx(); const t = c.currentTime;
+    ambientNodes.master.gain.linearRampToValueAtTime(0, t + 1.5);
+    const nodes = ambientNodes;
+    setTimeout(() => {
+      try { nodes.drone.stop(); nodes.sub.stop(); nodes.noiseSrc.stop(); nodes.lfo.stop(); } catch(e){}
+    }, 2000);
+    ambientNodes = null;
+  }
+
   return {
     state,
-    // UI sounds
-    hover() { if (state.ui) playTone(1200, 0.06, 'sine'); },
-    click() { if (state.ui) playTone(800, 0.08, 'square'); },
-    open() { if (state.ui) { playTone(600, 0.12, 'sine'); setTimeout(() => playTone(900, 0.12, 'sine'), 60); } },
-    close() { if (state.ui) { playTone(900, 0.08, 'sine'); setTimeout(() => playTone(600, 0.08, 'sine'), 50); } },
-    toggle() { if (state.ui) { playTone(500, 0.06, 'triangle'); setTimeout(() => playTone(700, 0.1, 'triangle'), 40); } },
-    // Edit mode
-    editOn() { if (state.ui) playChord([440, 660, 880], 0.2, 'triangle'); },
-    editOff() { if (state.ui) playChord([880, 660, 440], 0.15, 'triangle'); },
-    // Node actions
-    nodeSave() { if (state.ui) { playTone(600, 0.1, 'sine'); setTimeout(() => playTone(800, 0.15, 'sine'), 80); } },
-    nodeDelete() { if (state.ui) playTone(200, 0.25, 'sawtooth'); },
-    connect() { if (state.ui) { playTone(500, 0.08, 'sine'); setTimeout(() => playTone(750, 0.12, 'sine'), 60); setTimeout(() => playTone(1000, 0.08, 'sine'), 120); } },
-    disconnect() { if (state.ui) playTone(300, 0.15, 'square'); },
-    // Achievement sounds
-    unlock() { if (state.achieve) playChord([523, 659, 784], 0.4, 'sine'); },
-    complete() { if (state.achieve) { playChord([523, 659, 784], 0.3, 'sine'); setTimeout(() => playChord([659, 784, 1047], 0.5, 'sine'), 250); } },
-    levelUp() { if (state.achieve) { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.3, 'sine'), i*120)); } },
-    // Navigation
-    navigate() { if (state.ui) playTone(440, 0.1, 'triangle'); },
-    error() { if (state.ui) { playTone(200, 0.15, 'square'); setTimeout(() => playTone(180, 0.2, 'square'), 120); } },
+
+    // ═══ UI SOUNDS ═══
+    hover() {
+      if (!state.ui) return;
+      playTone(2400, 0.04, 'sine');
+      playNoise(0.03, 4000, 'highpass', 0.08);
+    },
+    click() {
+      if (!state.ui) return;
+      playTone(800, 0.06, 'square');
+      playNoise(0.04, 3000, 'bandpass', 0.15);
+      setTimeout(() => playTone(1100, 0.04, 'sine'), 30);
+    },
+    open() {
+      if (!state.ui) return;
+      playSweep(300, 1200, 0.2, 'sine', 0.35);
+      playNoise(0.15, 2000, 'bandpass', 0.12);
+      setTimeout(() => playTone(1200, 0.1, 'triangle'), 100);
+    },
+    close() {
+      if (!state.ui) return;
+      playSweep(1200, 300, 0.15, 'sine', 0.3);
+      playNoise(0.1, 1500, 'bandpass', 0.1);
+    },
+    toggle() {
+      if (!state.ui) return;
+      playTone(500, 0.05, 'triangle');
+      setTimeout(() => playTone(750, 0.08, 'triangle'), 35);
+      playNoise(0.06, 3000, 'highpass', 0.08);
+    },
+
+    // ═══ NAVIGATION ═══
+    navigate() {
+      if (!state.ui) return;
+      playSweep(600, 1400, 0.18, 'sine', 0.3);
+      playNoise(0.12, 2500, 'bandpass', 0.15);
+      setTimeout(() => playTone(1400, 0.08, 'triangle'), 100);
+    },
+    pageTransition() {
+      if (!state.ui) return;
+      playSweep(200, 2000, 0.35, 'sine', 0.25);
+      playNoise(0.3, 1500, 'lowpass', 0.2);
+      setTimeout(() => playFM(1200, 300, 400, 0.2, 0.15), 150);
+    },
+    menuOpen() {
+      if (!state.ui) return;
+      playSweep(400, 900, 0.15, 'triangle', 0.3);
+      playNoise(0.08, 2000, 'bandpass', 0.1);
+      setTimeout(() => playTone(900, 0.06, 'sine'), 80);
+    },
+    menuClose() {
+      if (!state.ui) return;
+      playSweep(900, 400, 0.12, 'triangle', 0.25);
+      playNoise(0.06, 1800, 'bandpass', 0.08);
+    },
+    pathwaySelect() {
+      if (!state.ui) return;
+      playFM(600, 200, 300, 0.25, 0.3);
+      setTimeout(() => playSweep(600, 1200, 0.2, 'sine', 0.2), 80);
+      playNoise(0.15, 3000, 'bandpass', 0.12);
+    },
+    returnBack() {
+      if (!state.ui) return;
+      playSweep(1000, 400, 0.2, 'sine', 0.3);
+      playNoise(0.15, 1200, 'lowpass', 0.15);
+    },
+
+    // ═══ NODE INTERACTIONS ═══
+    nodeHover() {
+      if (!state.ui) return;
+      playTone(1800, 0.04, 'sine');
+      playNoise(0.025, 5000, 'highpass', 0.05);
+    },
+    nodeSelect() {
+      if (!state.ui) return;
+      playFM(800, 400, 200, 0.15, 0.35);
+      playNoise(0.08, 3000, 'bandpass', 0.12);
+      setTimeout(() => playTone(1200, 0.08, 'sine'), 60);
+    },
+    nodeDeselect() {
+      if (!state.ui) return;
+      playSweep(800, 400, 0.12, 'sine', 0.2);
+      playNoise(0.06, 1500, 'lowpass', 0.08);
+    },
+    nodeDragStart() {
+      if (!state.ui) return;
+      playTone(500, 0.06, 'triangle');
+      playNoise(0.04, 2000, 'bandpass', 0.1);
+    },
+    nodeDragEnd() {
+      if (!state.ui) return;
+      playFM(600, 150, 100, 0.1, 0.2);
+      playNoise(0.06, 2500, 'bandpass', 0.08);
+    },
+    nodeSave() {
+      if (!state.ui) return;
+      playTone(600, 0.08, 'sine');
+      setTimeout(() => playTone(900, 0.12, 'sine'), 60);
+      setTimeout(() => { playTone(1200, 0.1, 'triangle'); playNoise(0.08, 3000, 'highpass', 0.08); }, 120);
+    },
+    nodeDelete() {
+      if (!state.ui) return;
+      playSweep(600, 80, 0.35, 'sawtooth', 0.35);
+      playNoise(0.25, 800, 'lowpass', 0.25);
+      setTimeout(() => playTone(100, 0.3, 'square'), 100);
+    },
+    nodeUnlock() {
+      if (!state.ui) return;
+      playFM(500, 250, 400, 0.2, 0.3);
+      setTimeout(() => playSweep(500, 1500, 0.25, 'sine', 0.25), 100);
+      playNoise(0.2, 2000, 'bandpass', 0.1);
+    },
+
+    // ═══ EDIT MODE ═══
+    editOn() {
+      if (!state.ui) return;
+      playChord([330, 440, 660], 0.15, 'triangle');
+      setTimeout(() => playSweep(400, 1200, 0.25, 'sine', 0.2), 100);
+      playNoise(0.2, 1500, 'bandpass', 0.12);
+      setTimeout(() => playFM(880, 220, 300, 0.15, 0.15), 200);
+    },
+    editOff() {
+      if (!state.ui) return;
+      playSweep(1200, 400, 0.2, 'sine', 0.25);
+      playChord([660, 440, 330], 0.12, 'triangle');
+      playNoise(0.15, 1200, 'lowpass', 0.1);
+    },
+    connect() {
+      if (!state.ui) return;
+      playSweep(400, 1200, 0.2, 'sine', 0.3);
+      setTimeout(() => playFM(1000, 300, 200, 0.12, 0.2), 100);
+      playNoise(0.15, 3000, 'bandpass', 0.1);
+    },
+    disconnect() {
+      if (!state.ui) return;
+      playSweep(800, 200, 0.2, 'sawtooth', 0.25);
+      playNoise(0.15, 1000, 'lowpass', 0.15);
+    },
+    imageUpload() {
+      if (!state.ui) return;
+      playFM(700, 350, 200, 0.15, 0.25);
+      playNoise(0.1, 2500, 'bandpass', 0.08);
+    },
+    duplicate() {
+      if (!state.ui) return;
+      playTone(600, 0.06, 'sine');
+      setTimeout(() => playTone(600, 0.06, 'sine'), 80);
+      setTimeout(() => playTone(900, 0.1, 'triangle'), 160);
+      playNoise(0.08, 2000, 'bandpass', 0.08);
+    },
+
+    // ═══ DETAIL / LAUNCH ═══
+    detailOpen() {
+      if (!state.ui) return;
+      playSweep(200, 800, 0.3, 'sine', 0.3);
+      playNoise(0.2, 1500, 'bandpass', 0.15);
+      setTimeout(() => playFM(800, 200, 300, 0.2, 0.2), 150);
+      setTimeout(() => playTone(1000, 0.1, 'triangle'), 250);
+    },
+    detailClose() {
+      if (!state.ui) return;
+      playSweep(800, 200, 0.2, 'sine', 0.25);
+      playNoise(0.12, 1200, 'lowpass', 0.1);
+    },
+    launch() {
+      if (!state.ui) return;
+      playSweep(100, 3000, 0.6, 'sawtooth', 0.2);
+      playNoise(0.5, 2000, 'bandpass', 0.2);
+      setTimeout(() => playChord([523, 659, 784, 1047], 0.4, 'sine'), 200);
+      setTimeout(() => playFM(1500, 500, 800, 0.3, 0.15), 350);
+      setTimeout(() => playNoise(0.3, 4000, 'highpass', 0.15), 400);
+    },
+
+    // ═══ ZOOM & VIEW ═══
+    zoomIn() {
+      if (!state.ui) return;
+      playTone(1000, 0.05, 'sine');
+      setTimeout(() => playTone(1200, 0.04, 'sine'), 30);
+    },
+    zoomOut() {
+      if (!state.ui) return;
+      playTone(1000, 0.05, 'sine');
+      setTimeout(() => playTone(800, 0.04, 'sine'), 30);
+    },
+    zoomFit() {
+      if (!state.ui) return;
+      playSweep(600, 1000, 0.12, 'triangle', 0.2);
+      playNoise(0.08, 2000, 'bandpass', 0.06);
+    },
+    magnify() {
+      if (!state.ui) return;
+      playFM(1200, 600, 150, 0.08, 0.2);
+      playNoise(0.04, 4000, 'highpass', 0.06);
+    },
+
+    // ═══ SAVE / TOAST ═══
+    saveSuccess() {
+      if (!state.ui) return;
+      playTone(700, 0.08, 'sine');
+      setTimeout(() => playTone(1000, 0.08, 'sine'), 70);
+      setTimeout(() => playTone(1400, 0.12, 'triangle'), 140);
+      playNoise(0.06, 3000, 'highpass', 0.06);
+    },
+    saveError() {
+      if (!state.ui) return;
+      playTone(200, 0.15, 'square');
+      setTimeout(() => playTone(150, 0.2, 'square'), 120);
+      playNoise(0.2, 500, 'lowpass', 0.15);
+    },
+
+    // ═══ CONTEXT MENU ═══
+    contextMenu() {
+      if (!state.ui) return;
+      playTone(600, 0.06, 'triangle');
+      playNoise(0.04, 2500, 'bandpass', 0.08);
+      setTimeout(() => playTone(800, 0.05, 'sine'), 40);
+    },
+    contextSelect() {
+      if (!state.ui) return;
+      playFM(700, 200, 100, 0.08, 0.25);
+      playNoise(0.03, 3000, 'highpass', 0.06);
+    },
+
+    // ═══ PLAYER CARD ═══
+    cardHide() {
+      if (!state.ui) return;
+      playSweep(800, 300, 0.15, 'sine', 0.2);
+      playNoise(0.08, 1200, 'lowpass', 0.08);
+    },
+    cardShow() {
+      if (!state.ui) return;
+      playSweep(300, 800, 0.15, 'sine', 0.2);
+      playNoise(0.08, 2000, 'bandpass', 0.08);
+    },
+    signOut() {
+      if (!state.ui) return;
+      playSweep(600, 150, 0.3, 'sine', 0.25);
+      playNoise(0.2, 800, 'lowpass', 0.15);
+    },
+
+    // ═══ ACHIEVEMENT & PROGRESS ═══
+    unlock() {
+      if (!state.achieve) return;
+      playChord([523, 659, 784], 0.35, 'sine');
+      setTimeout(() => playFM(1047, 300, 500, 0.25, 0.2), 200);
+      playNoise(0.3, 3000, 'bandpass', 0.1);
+    },
+    complete() {
+      if (!state.achieve) return;
+      playChord([523, 659, 784], 0.25, 'sine');
+      setTimeout(() => playChord([659, 784, 1047], 0.4, 'sine'), 200);
+      setTimeout(() => playFM(1047, 500, 800, 0.3, 0.15), 350);
+      setTimeout(() => playNoise(0.3, 4000, 'highpass', 0.1), 400);
+      setTimeout(() => playSweep(1047, 2094, 0.3, 'sine', 0.12), 500);
+    },
+    levelUp() {
+      if (!state.achieve) return;
+      const notes = [523, 659, 784, 1047, 1319];
+      notes.forEach((f, i) => setTimeout(() => {
+        playTone(f, 0.3, 'sine');
+        playFM(f, f/2, 200, 0.2, 0.12);
+      }, i * 110));
+      setTimeout(() => playChord([1047, 1319, 1568], 0.5, 'triangle'), notes.length * 110);
+      setTimeout(() => playNoise(0.4, 3000, 'bandpass', 0.12), 200);
+    },
+    badgeEarned() {
+      if (!state.achieve) return;
+      playFM(800, 400, 600, 0.15, 0.3);
+      setTimeout(() => playSweep(800, 1600, 0.2, 'sine', 0.25), 100);
+      setTimeout(() => playChord([1047, 1319], 0.3, 'triangle'), 200);
+      playNoise(0.2, 2500, 'bandpass', 0.1);
+    },
+    xpGain() {
+      if (!state.achieve) return;
+      playFM(600, 300, 150, 0.1, 0.2);
+      playTone(900, 0.08, 'sine');
+      playNoise(0.06, 3000, 'highpass', 0.06);
+    },
+    rankUp() {
+      if (!state.achieve) return;
+      playSweep(200, 800, 0.4, 'sine', 0.2);
+      setTimeout(() => playChord([523, 784, 1047], 0.3, 'sine'), 200);
+      setTimeout(() => playChord([659, 1047, 1319], 0.4, 'sine'), 400);
+      setTimeout(() => playFM(1568, 400, 800, 0.35, 0.15), 550);
+      setTimeout(() => playNoise(0.4, 3000, 'bandpass', 0.12), 300);
+    },
+
+    // ═══ FULLSCREEN ═══
+    fullscreenOn() {
+      if (!state.ui) return;
+      playSweep(300, 1000, 0.2, 'sine', 0.2);
+      playNoise(0.15, 1500, 'bandpass', 0.08);
+    },
+    fullscreenOff() {
+      if (!state.ui) return;
+      playSweep(1000, 300, 0.15, 'sine', 0.2);
+      playNoise(0.1, 1200, 'lowpass', 0.06);
+    },
+
+    // ═══ MINIMAP ═══
+    minimapClick() {
+      if (!state.ui) return;
+      playTone(1000, 0.04, 'sine');
+      playNoise(0.03, 3000, 'highpass', 0.05);
+    },
+
+    // ═══ AMBIENT ENGINE ═══
+    startAmbient() { if (state.enabled && state.ambient) startAmbient(); },
+    stopAmbient() { stopAmbient(); },
+    updateAmbient() {
+      if (state.enabled && state.ambient && !ambientNodes) startAmbient();
+      else if ((!state.enabled || !state.ambient) && ambientNodes) stopAmbient();
+    },
+
+    // ═══ ERROR ═══
+    error() {
+      if (!state.ui) return;
+      playTone(200, 0.15, 'square');
+      setTimeout(() => playTone(150, 0.2, 'square'), 120);
+      playNoise(0.2, 500, 'lowpass', 0.2);
+    },
   };
 })();
 
@@ -3453,7 +3864,10 @@ document.getElementById('settingsSave').addEventListener('click', () => {
   }
 })();
 
-// Wire SFX into existing interactions
+// ═══════════════════════════════════════════════════════════════════
+// WIRE SFX INTO ALL INTERACTIONS
+// ═══════════════════════════════════════════════════════════════════
+
 // Edit mode toggle
 const origToggle = toggleEditMode;
 toggleEditMode = function() {
@@ -3465,22 +3879,84 @@ toggleEditMode = function() {
 document.getElementById('editToggleBtn').removeEventListener('click', origToggle);
 document.getElementById('editToggleBtn').addEventListener('click', toggleEditMode);
 
-// Node hover
+// Node hover (throttled to prevent sound spam)
+let lastHoverTime = 0;
 document.addEventListener('mouseover', e => {
-  if (e.target.closest('.skill-node')) SFX.hover();
+  if (e.target.closest('.skill-node') && Date.now() - lastHoverTime > 100) {
+    lastHoverTime = Date.now();
+    SFX.nodeHover();
+  }
 });
 
-// Node click (detail panel)
+// Node click → detail panel open
 document.addEventListener('click', e => {
-  if (e.target.closest('.skill-node') && !editMode) SFX.click();
+  if (e.target.closest('.skill-node') && !editMode) SFX.nodeSelect();
 });
 
-// Return button SFX
+// Detail panel close
+const origCloseDetail = closeDetail;
+closeDetail = function() {
+  SFX.detailClose();
+  origCloseDetail();
+};
+
+// Return button → navigate back
 document.getElementById('returnBtn').addEventListener('click', e => {
   e.preventDefault();
-  SFX.navigate();
-  setTimeout(() => { window.location.href = 'preview.html'; }, 120);
+  SFX.returnBack();
+  setTimeout(() => { window.location.href = 'preview.html'; }, 180);
 });
+
+// Zoom controls
+document.getElementById('zoomIn').addEventListener('click', () => SFX.zoomIn());
+document.getElementById('zoomOut').addEventListener('click', () => SFX.zoomOut());
+document.getElementById('zoomFit').addEventListener('click', () => SFX.zoomFit());
+document.getElementById('zoomMag').addEventListener('click', () => SFX.magnify());
+
+// Fullscreen toggle SFX
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) SFX.fullscreenOn();
+  else SFX.fullscreenOff();
+});
+
+// Minimap click
+document.getElementById('minimap').addEventListener('mousedown', () => SFX.minimapClick());
+
+// Player card toggle
+document.getElementById('pcToggle').addEventListener('click', () => SFX.cardHide());
+document.getElementById('pcRestore').addEventListener('click', () => SFX.cardShow());
+
+// Sign out
+document.getElementById('pcLogout').addEventListener('click', () => SFX.signOut());
+
+// Settings panel open/close
+document.getElementById('settingsBtn').addEventListener('click', () => SFX.menuOpen());
+document.getElementById('settingsClose').addEventListener('click', () => SFX.menuClose());
+
+// Settings save
+document.getElementById('settingsSave').addEventListener('click', () => {
+  SFX.nodeSave();
+  // Update ambient state after settings change
+  setTimeout(() => SFX.updateAmbient(), 100);
+});
+
+// Context menu (right-click on nodes)
+document.addEventListener('contextmenu', e => {
+  if (e.target.closest('.skill-node') && editMode) SFX.contextMenu();
+});
+
+// Save toast SFX — hook into showSaveToast
+const origShowSaveToast = window.showSaveToast;
+if (origShowSaveToast) {
+  window.showSaveToast = function(msg) {
+    if (msg && msg.includes('error')) SFX.saveError();
+    else SFX.saveSuccess();
+    origShowSaveToast(msg);
+  };
+}
+
+// Start ambient if enabled
+SFX.updateAmbient();
 
 // ==================== COURSE LAUNCH OVERLAY ====================
 function showLaunchOverlay(node) {
@@ -3491,6 +3967,7 @@ function showLaunchOverlay(node) {
   document.getElementById('launchTitle').textContent = 'Initiating Warp Drive';
   document.getElementById('launchSubtitle').textContent = 'Preparing: ' + node.title;
 
+  SFX.launch();
   overlay.style.display = 'flex';
   requestAnimationFrame(() => overlay.classList.add('active'));
 
