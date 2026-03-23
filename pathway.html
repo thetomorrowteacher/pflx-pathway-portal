@@ -7,6 +7,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
+    // Global error handler — catches uncaught JS errors
+    window.onerror = function(msg, url, line, col, err) {
+      console.error('[PFLX-ERROR] Line ' + line + ': ' + msg);
+      document.title = 'ERR:L' + line + ':' + msg;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('[PFLX-PROMISE] Unhandled rejection:', e.reason);
+    });
     // Shared Supabase backend (same as X-Coin app)
     const SUPABASE_URL = 'https://hyxiagexyptzvetqjmnj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY';
@@ -1461,7 +1469,7 @@
             <input type="checkbox" id="neComingSoon" style="width:14px;height:14px;"> Coming Soon
           </label>
         </div>
-        <button class="ne-save" id="neSave" onclick="window._neSaveClick && window._neSaveClick()">Save Node</button>
+        <button class="ne-save" id="neSave" type="button">Save Node</button>
       </div>
     </div>
   </div>
@@ -2166,9 +2174,18 @@ function showDetail(n) {
         const reader = new FileReader();
         reader.onload = function(re) {
           n.titleGraphic = re.target.result;
+          // Immediately update the visible image
+          const tgImg = tgEl.querySelector('img');
+          if (tgImg) {
+            tgImg.src = re.target.result;
+          } else {
+            tgEl.innerHTML = '<img src="' + re.target.result + '" alt="' + n.title + '">' + (editMode ? '<button class="dtg-upload-btn" id="dtgUploadBtn">Change Graphic</button>' : '');
+          }
+          bgEl.style.backgroundImage = 'url(' + re.target.result + ')';
+          bgEl.style.opacity = '0.12';
           savePathwayEdits();
           inp.remove();
-          showDetail(n); // Refresh
+          showSaveToast('Title graphic uploaded');
         };
         reader.readAsDataURL(file);
       };
@@ -2581,31 +2598,74 @@ function toggleEditMode() {
 document.getElementById('editToggleBtn').addEventListener('click', toggleEditMode);
 
 // ─── SAVE / LOAD EDITS (Supabase-backed with localStorage fallback) ───
-function savePathwayEdits() {
-  const data = pathway.nodes.map(n => {
-    const obj = {
-      id: n.id, title: n.title, emoji: n.emoji,
-      x: n.x, y: n.y, status: n.status,
-      desc: n.desc, url: n.url || '',
-      requiredBadge: n.requiredBadge || '',
-      comingSoon: n.comingSoon || false,
-      requires: n.requires || [],
+// Compress a base64 image to max dimensions while maintaining aspect ratio
+function compressImage(base64, maxW, maxH) {
+  return new Promise((resolve) => {
+    // If not a data URL or already small, return as-is
+    if (!base64 || !base64.startsWith('data:image')) { resolve(base64); return; }
+    const img = new Image();
+    img.onload = function() {
+      // Only compress if larger than max dimensions
+      if (img.width <= maxW && img.height <= maxH) { resolve(base64); return; }
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (h > maxH) { w = w * maxH / h; h = maxH; }
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
     };
-    if (n.image) { obj.image = n.image; obj.imageFit = n.imageFit || 'cover'; }
-    if (n.titleGraphic) { obj.titleGraphic = n.titleGraphic; }
-    return obj;
+    img.onerror = function() { resolve(base64); };
+    img.src = base64;
   });
-  // Save to localStorage as instant cache
-  localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  // Save to Supabase for persistence across devices/refreshes
-  _supabase.from('app_data').upsert({
-    key: 'pathway_' + pathwaySlug,
-    data: data,
-    updated_at: new Date().toISOString()
-  }, { onConflict: 'key' }).then(({ error }) => {
-    if (error) { console.error('[PFLX] Supabase save error:', error); if (typeof showSaveToast === 'function') showSaveToast('Save error!'); }
-    else { console.log('[PFLX] Pathway saved to Supabase'); if (typeof showSaveToast === 'function') showSaveToast('Saved to cloud ✓'); }
-  });
+}
+
+async function savePathwayEdits() {
+  try {
+    // Compress images before saving to avoid Supabase payload limits
+    const data = [];
+    for (const n of pathway.nodes) {
+      const obj = {
+        id: n.id, title: n.title, emoji: n.emoji,
+        x: n.x, y: n.y, status: n.status,
+        desc: n.desc, url: n.url || '',
+        requiredBadge: n.requiredBadge || '',
+        comingSoon: n.comingSoon || false,
+        requires: n.requires || [],
+      };
+      if (n.image) {
+        obj.image = await compressImage(n.image, 256, 256);
+        obj.imageFit = n.imageFit || 'cover';
+      }
+      if (n.titleGraphic) {
+        obj.titleGraphic = await compressImage(n.titleGraphic, 800, 450);
+      }
+      data.push(obj);
+    }
+    console.log('[PFLX] savePathwayEdits: saving', data.length, 'nodes, key=pathway_' + pathwaySlug);
+
+    // Save to localStorage as instant cache
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e) { console.warn('[PFLX] localStorage save failed (quota?):', e); }
+
+    // Save to Supabase for persistence across devices/refreshes
+    const { error } = await _supabase.from('app_data').upsert({
+      key: 'pathway_' + pathwaySlug,
+      data: data,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'key' });
+
+    if (error) {
+      console.error('[PFLX] Supabase save error:', error);
+      showSaveToast('Save error: ' + (error.message || error.code));
+    } else {
+      console.log('[PFLX] Pathway saved to Supabase OK');
+      showSaveToast('Saved to cloud ✓');
+    }
+  } catch (err) {
+    console.error('[PFLX] savePathwayEdits exception:', err);
+    showSaveToast('Save exception: ' + err.message);
+  }
 }
 
 async function loadPathwayEdits() {
@@ -2856,24 +2916,41 @@ editorOverlay.addEventListener('click', e => {
 });
 
 function _doSaveNode() {
-  if (!editorNode) { console.warn('[PFLX] Save failed: no editorNode'); return; }
-  editorNode.title = document.getElementById('neNodeTitle').value || 'Untitled';
-  editorNode.emoji = document.getElementById('neEmoji').value || '📦';
-  editorNode.desc = document.getElementById('neDesc').value || '';
-  editorNode.url = document.getElementById('neUrl').value || '';
-  editorNode.status = document.getElementById('neStatus').value || 'locked';
-  editorNode.requiredBadge = document.getElementById('neBadge').value || '';
-  editorNode.comingSoon = document.getElementById('neComingSoon').checked;
-  editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
+  try {
+    console.log('[PFLX] _doSaveNode called, editorNode:', editorNode ? editorNode.id : 'NULL');
+    if (!editorNode) {
+      console.warn('[PFLX] Save failed: no editorNode');
+      showSaveToast('Save failed: no node selected');
+      return;
+    }
+    editorNode.title = document.getElementById('neNodeTitle').value || 'Untitled';
+    editorNode.emoji = document.getElementById('neEmoji').value || '📦';
+    editorNode.desc = document.getElementById('neDesc').value || '';
+    editorNode.url = document.getElementById('neUrl').value || '';
+    editorNode.status = document.getElementById('neStatus').value || 'locked';
+    editorNode.requiredBadge = document.getElementById('neBadge').value || '';
+    editorNode.comingSoon = document.getElementById('neComingSoon').checked;
+    editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
+    console.log('[PFLX] Node updated:', editorNode.title, 'url:', editorNode.url);
 
-  savePathwayEdits();
-  rebuildNodes();
-  closeNodeEditor();
-  // Show save toast
-  showSaveToast('Node saved!');
+    savePathwayEdits();
+    rebuildNodes();
+    closeNodeEditor();
+    showSaveToast('Node saved!');
+  } catch (err) {
+    console.error('[PFLX] _doSaveNode error:', err);
+    showSaveToast('SAVE ERROR: ' + err.message);
+  }
 }
-// Register on both addEventListener AND window for inline onclick backup
-document.getElementById('neSave').addEventListener('click', _doSaveNode);
+// Register click handler — remove inline onclick to avoid double-fire
+const neSaveBtn = document.getElementById('neSave');
+neSaveBtn.removeAttribute('onclick');
+neSaveBtn.addEventListener('click', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  console.log('[PFLX] Save Node button clicked');
+  _doSaveNode();
+});
 window._neSaveClick = _doSaveNode;
 
 // ─── SAVE TOAST ───
