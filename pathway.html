@@ -1943,19 +1943,36 @@ canvas.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Shift' && magMode) canvas.classList.add('mag-out'); });
 document.addEventListener('keyup', e => { if (e.key === 'Shift' && magMode) canvas.classList.remove('mag-out'); });
 
-// Fullscreen toggle
+// Fullscreen toggle (with sessionStorage persistence across page navigation)
 const fsBtn = document.getElementById('fullscreenBtn');
 fsBtn.onclick = () => {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
+    document.documentElement.requestFullscreen().then(() => {
+      sessionStorage.setItem('pflx_fullscreen', '1');
+    }).catch(() => {});
   } else {
     document.exitFullscreen();
+    sessionStorage.removeItem('pflx_fullscreen');
   }
 };
 document.addEventListener('fullscreenchange', () => {
-  fsBtn.textContent = document.fullscreenElement ? '⊡' : '⛶';
-  fsBtn.title = document.fullscreenElement ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+  if (document.fullscreenElement) {
+    fsBtn.textContent = '⊡';
+    fsBtn.title = 'Exit Fullscreen';
+    sessionStorage.setItem('pflx_fullscreen', '1');
+  } else {
+    fsBtn.textContent = '⛶';
+    fsBtn.title = 'Toggle Fullscreen';
+    sessionStorage.removeItem('pflx_fullscreen');
+  }
 });
+// Auto-enter fullscreen if it was active on the previous page
+if (sessionStorage.getItem('pflx_fullscreen') === '1' && !document.fullscreenElement) {
+  document.addEventListener('click', function reEnterFS() {
+    document.documentElement.requestFullscreen().catch(() => {});
+    document.removeEventListener('click', reEnterFS);
+  }, { once: true });
+}
 
 // ==================== RENDER NODES ====================
 const nodeElements = {};

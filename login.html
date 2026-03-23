@@ -917,6 +917,53 @@ function animateAurora() {
 animateAurora();
 </script>
 
+  <!-- Fullscreen Toggle -->
+  <button id="fullscreenBtn" title="Toggle Fullscreen" style="
+    position: fixed; bottom: 20px; right: 20px; z-index: 300;
+    width: 36px; height: 36px; border-radius: 6px;
+    background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.25);
+    color: rgba(0,212,255,0.7); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; backdrop-filter: blur(8px);
+  ">⛶</button>
+  <script>
+  (function() {
+    const fsBtn = document.getElementById('fullscreenBtn');
+    fsBtn.addEventListener('mouseenter', () => { fsBtn.style.background = 'rgba(0,212,255,0.15)'; fsBtn.style.color = '#fff'; });
+    fsBtn.addEventListener('mouseleave', () => { fsBtn.style.background = 'rgba(6,10,18,0.9)'; fsBtn.style.color = 'rgba(0,212,255,0.7)'; });
+
+    fsBtn.onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          sessionStorage.setItem('pflx_fullscreen', '1');
+        }).catch(() => {});
+      } else {
+        document.exitFullscreen();
+        sessionStorage.removeItem('pflx_fullscreen');
+      }
+    };
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement) {
+        fsBtn.textContent = '⊡';
+        fsBtn.title = 'Exit Fullscreen';
+        sessionStorage.setItem('pflx_fullscreen', '1');
+      } else {
+        fsBtn.textContent = '⛶';
+        fsBtn.title = 'Toggle Fullscreen';
+        sessionStorage.removeItem('pflx_fullscreen');
+      }
+    });
+
+    // Auto-enter fullscreen if it was active on the previous page
+    if (sessionStorage.getItem('pflx_fullscreen') === '1' && !document.fullscreenElement) {
+      document.addEventListener('click', function reEnterFS() {
+        document.documentElement.requestFullscreen().catch(() => {});
+        document.removeEventListener('click', reEnterFS);
+      }, { once: true });
+    }
+  })();
+  </script>
+
   <!-- Powered by PFLX -->
   <div class="powered-by">
     <span class="powered-by-text">Powered by</span>
