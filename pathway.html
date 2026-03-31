@@ -3008,6 +3008,20 @@ async function loadPathwayEdits() {
     if (raw) { try { saved = JSON.parse(raw); } catch(e) {} }
   }
   if (!saved) {
+    // Try loading from bundled seed-data.json fallback
+    try {
+      const seedRes = await fetch('/seed-data.json');
+      if (seedRes.ok) {
+        const seedAll = await seedRes.json();
+        const seedKey = 'pathway_' + pathwaySlug;
+        if (seedAll[seedKey] && seedAll[seedKey].length > 0) {
+          saved = seedAll[seedKey];
+          console.log('[PFLX] Loaded pathway from seed-data.json fallback:', saved.length, 'nodes');
+        }
+      }
+    } catch(e) { console.warn('[PFLX] seed-data.json fallback failed:', e); }
+  }
+  if (!saved) {
     // No saved data — still rebuild to attach proper event handlers
     rebuildNodes();
     return;
