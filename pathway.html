@@ -2450,11 +2450,34 @@ function showDetail(n) {
   if (n.requiredBadge) {
     reqHTML += (reqHTML ? '<br>' : '') + 'Completion Badge: <span>' + n.requiredBadge + '</span>';
   }
-  // Add pitched-node info (XC value, creator credit)
+  // Add pitched-node info (XC value, creator credit, entry fee, NFT value, sponsor)
   if (n.isPitchedNode) {
     reqHTML += (reqHTML ? '<br>' : '') + '💡 <span style="color:#f59e0b;font-weight:700;">Player-Pitched Course</span>';
     if (n.xcValue) {
       reqHTML += '<br>XC Reward: <span style="color:#a78bfa;font-weight:700;">⚡ ' + n.xcValue + ' XC</span>';
+    }
+    // Entry Fee
+    if (n.entryFeeXC && n.entryFeeXC > 0) {
+      reqHTML += '<br>🎟️ Entry Fee: <span style="color:#22c55e;font-weight:700;">' + n.entryFeeXC + ' XC</span>';
+    }
+    // NFT Value
+    if (n.nftValue && n.nftValue > n.xcValue) {
+      reqHTML += '<br>🔮 Badge NFT Value: <span style="color:#f59e0b;font-weight:700;">' + n.nftValue + ' XC</span>';
+    }
+    // Rarity
+    if (n.rarity && n.rarity !== 'common') {
+      const rarityColors = { uncommon: '#6ee7b7', rare: '#3b82f6', epic: '#a78bfa', legendary: '#f59e0b' };
+      const rarityEmoji = { uncommon: '💚', rare: '💙', epic: '💜', legendary: '🌟' };
+      reqHTML += '<br>' + (rarityEmoji[n.rarity] || '') + ' Rarity: <span style="color:' + (rarityColors[n.rarity] || '#fff') + ';font-weight:700;">' + n.rarity.toUpperCase() + '</span>';
+    }
+    // Sponsor
+    if (n.sponsorType && n.sponsorType !== 'none') {
+      const sponsorLabel = n.sponsorType === 'partner' ? '🤝 Partner Sponsor' : '👤 Player Sponsor';
+      reqHTML += '<br>' + sponsorLabel + (n.sponsorName ? ': <span style="font-weight:700;">' + n.sponsorName + '</span>' : '');
+    }
+    // Completions
+    if (n.completionCount > 0) {
+      reqHTML += '<br>📊 ' + n.completionCount + ' completion' + (n.completionCount !== 1 ? 's' : '');
     }
   }
   reqEl.innerHTML = reqHTML;
@@ -2463,6 +2486,7 @@ function showDetail(n) {
   // Launch button
   const btn = document.getElementById('launchBtn');
   btn.onclick = null;
+  const hasEntryFee = n.isPitchedNode && n.entryFeeXC && n.entryFeeXC > 0 && n.status !== 'in_progress' && n.status !== 'completed';
   if (n.comingSoon) {
     btn.className = 'launch-btn locked-btn';
     btn.textContent = '// COMING SOON //';
@@ -2474,9 +2498,19 @@ function showDetail(n) {
     btn.textContent = 'MISSION COMPLETE ✓';
   } else {
     btn.className = 'launch-btn ready';
-    btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
+    if (hasEntryFee) {
+      btn.textContent = '🎟️ PAY ' + n.entryFeeXC + ' XC & START ▶';
+    } else {
+      btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
+    }
     if (n.url) {
-      btn.onclick = () => showLaunchOverlay(n);
+      btn.onclick = () => {
+        if (hasEntryFee) {
+          if (!confirm('This course requires a ' + n.entryFeeXC + ' XC entry fee. Proceed?')) return;
+          // Entry fee will be processed by the X-Coin app on completion
+        }
+        showLaunchOverlay(n);
+      };
     }
   }
 
@@ -2976,6 +3010,12 @@ async function savePathwayEdits() {
         obj.creatorId = n.creatorId || '';
         obj.xcValue = n.xcValue || 0;
         obj.residualPercent = n.residualPercent || 10;
+        obj.entryFeeXC = n.entryFeeXC || 0;
+        obj.sponsorType = n.sponsorType || 'none';
+        obj.sponsorName = n.sponsorName || '';
+        obj.nftValue = n.nftValue || n.xcValue || 0;
+        obj.rarity = n.rarity || 'common';
+        obj.completionCount = n.completionCount || 0;
       }
       data.push(obj);
     }
@@ -3109,6 +3149,18 @@ async function injectPitchedNodes() {
 
           const col = idx % 3;
           const row = Math.floor(idx / 3);
+          // Calculate NFT value using logarithmic formula
+          const baseVal = pitch.xcValue || 0;
+          const completions = pitch.completionCount || 0;
+          const nftMultiplier = completions > 0 ? 1 + Math.log10(1 + completions) * 0.6 : 1;
+          const nftValue = Math.round(baseVal * nftMultiplier);
+          // Calculate rarity
+          let rarity = 'common';
+          if (completions >= 100) rarity = 'legendary';
+          else if (completions >= 50) rarity = 'epic';
+          else if (completions >= 20) rarity = 'rare';
+          else if (completions >= 5) rarity = 'uncommon';
+
           const newNode = {
             id: pitch.pathwayNodeId,
             title: pitch.title || 'Pitched Course',
@@ -3126,6 +3178,13 @@ async function injectPitchedNodes() {
             creatorId: pitch.creatorId,
             xcValue: pitch.xcValue || 0,
             residualPercent: pitch.residualPercent || 10,
+            // Enhanced fields
+            entryFeeXC: pitch.entryFeeXC || 0,
+            sponsorType: pitch.sponsorType || 'none',
+            sponsorName: pitch.sponsorName || '',
+            nftValue: nftValue,
+            rarity: rarity,
+            completionCount: completions,
           };
           if (pitch.image) {
             newNode.image = pitch.image;
@@ -3239,7 +3298,15 @@ function rebuildNodes() {
 
     const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
     const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
-    const pitchTagHTML = isPitched ? `<div style="position:absolute;top:-8px;right:-8px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.08em;z-index:5;white-space:nowrap;box-shadow:0 0 10px rgba(245,158,11,0.4);">PLAYER PITCH</div>` : '';
+    let pitchTagHTML = isPitched ? `<div style="position:absolute;top:-8px;right:-8px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.08em;z-index:5;white-space:nowrap;box-shadow:0 0 10px rgba(245,158,11,0.4);">PLAYER PITCH</div>` : '';
+    // Entry fee tag
+    if (n.entryFeeXC && n.entryFeeXC > 0) {
+      pitchTagHTML += `<div style="position:absolute;bottom:-8px;right:-8px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.05em;z-index:5;white-space:nowrap;box-shadow:0 0 8px rgba(34,197,94,0.3);">🎟️ ${n.entryFeeXC} XC</div>`;
+    }
+    // Sponsor tag
+    if (n.sponsorType === 'partner') {
+      pitchTagHTML += `<div style="position:absolute;top:-8px;left:-8px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.05em;z-index:5;white-space:nowrap;box-shadow:0 0 8px rgba(59,130,246,0.3);">🤝 SPONSORED</div>`;
+    }
     el.innerHTML = `
       ${pitchTagHTML}
       <div class="node-target"><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-crosshair"></div><div class="node-target-scan"></div></div>
