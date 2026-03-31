@@ -2450,6 +2450,13 @@ function showDetail(n) {
   if (n.requiredBadge) {
     reqHTML += (reqHTML ? '<br>' : '') + 'Completion Badge: <span>' + n.requiredBadge + '</span>';
   }
+  // Add pitched-node info (XC value, creator credit)
+  if (n.isPitchedNode) {
+    reqHTML += (reqHTML ? '<br>' : '') + '💡 <span style="color:#f59e0b;font-weight:700;">Player-Pitched Course</span>';
+    if (n.xcValue) {
+      reqHTML += '<br>XC Reward: <span style="color:#a78bfa;font-weight:700;">⚡ ' + n.xcValue + ' XC</span>';
+    }
+  }
   reqEl.innerHTML = reqHTML;
   reqEl.style.display = reqHTML ? 'block' : 'none';
 
@@ -2962,6 +2969,14 @@ async function savePathwayEdits() {
       if (n.titleGraphic) {
         obj.titleGraphic = await compressImage(n.titleGraphic, 800, 450);
       }
+      // Preserve pitched-node metadata so it survives save/load
+      if (n.isPitchedNode) {
+        obj.isPitchedNode = true;
+        obj.pitchId = n.pitchId || '';
+        obj.creatorId = n.creatorId || '';
+        obj.xcValue = n.xcValue || 0;
+        obj.residualPercent = n.residualPercent || 10;
+      }
       data.push(obj);
     }
     console.log('[PFLX] savePathwayEdits: saving', data.length, 'nodes, key=pathway_' + pathwaySlug);
@@ -2986,6 +3001,143 @@ async function savePathwayEdits() {
   } catch (err) {
     console.error('[PFLX] savePathwayEdits exception:', err);
     showSaveToast('Save exception: ' + err.message);
+  }
+}
+
+// ─── RESIDUAL XC PAYMENT: pitched node completed ──────────────
+async function processResidualPayment(node) {
+  if (!node.isPitchedNode || !node.pitchId || !node.creatorId) return;
+  const xcValue = node.xcValue || 0;
+  const residualPct = node.residualPercent || 10;
+  const residualAmount = Math.round(xcValue * residualPct / 100);
+  if (residualAmount <= 0) return;
+
+  console.log('[PFLX] Processing residual payment:', residualAmount, 'XC to creator', node.creatorId);
+
+  try {
+    // 1. Fetch current transactions & users from Supabase
+    const [txRes, usersRes, pitchRes] = await Promise.all([
+      _supabase.from('app_data').select('data').eq('key', 'transactions').single(),
+      _supabase.from('app_data').select('data').eq('key', 'users').single(),
+      _supabase.from('app_data').select('data').eq('key', 'projectPitches').single(),
+    ]);
+
+    // 2. Create residual transaction
+    const transactions = (txRes.data && txRes.data.data) || [];
+    const newTx = {
+      id: 'res-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      userId: node.creatorId,
+      type: 'earned',
+      amount: residualAmount,
+      currency: 'xcoin',
+      description: '💡 Residual income: ' + node.title + ' (pitched course completed)',
+      createdAt: new Date().toISOString(),
+    };
+    transactions.push(newTx);
+
+    // 3. Update creator's XC balance
+    const users = (usersRes.data && usersRes.data.data) || [];
+    const creator = users.find(u => u.id === node.creatorId);
+    if (creator) {
+      creator.xcoin = (creator.xcoin || 0) + residualAmount;
+      creator.totalXcoin = (creator.totalXcoin || 0) + residualAmount;
+    }
+
+    // 4. Update pitch stats
+    const pitches = (pitchRes.data && pitchRes.data.data) || [];
+    const pitch = pitches.find(p => p.id === node.pitchId);
+    if (pitch) {
+      pitch.completionCount = (pitch.completionCount || 0) + 1;
+      pitch.totalResidualEarned = (pitch.totalResidualEarned || 0) + residualAmount;
+    }
+
+    // 5. Save all three collections back to Supabase
+    const now = new Date().toISOString();
+    await Promise.all([
+      _supabase.from('app_data').upsert({ key: 'transactions', data: transactions, updated_at: now }, { onConflict: 'key' }),
+      _supabase.from('app_data').upsert({ key: 'users', data: users, updated_at: now }, { onConflict: 'key' }),
+      _supabase.from('app_data').upsert({ key: 'projectPitches', data: pitches, updated_at: now }, { onConflict: 'key' }),
+    ]);
+
+    console.log('[PFLX] Residual payment processed:', residualAmount, 'XC to', node.creatorId);
+    showSaveToast('Residual ' + residualAmount + ' XC paid to pitch creator ✓');
+  } catch (err) {
+    console.error('[PFLX] Residual payment failed:', err);
+    showSaveToast('Residual payment error — see console');
+  }
+}
+
+// ─── INJECT APPROVED / LIVE PROJECT PITCHES AS NODES ──────────
+async function injectPitchedNodes() {
+  try {
+    const { data: pitchRow, error: pitchErr } = await _supabase
+      .from('app_data')
+      .select('data')
+      .eq('key', 'projectPitches')
+      .single();
+    if (!pitchErr && pitchRow && pitchRow.data && Array.isArray(pitchRow.data)) {
+      const pitches = pitchRow.data.filter(p =>
+        (p.status === 'approved' || p.status === 'live') &&
+        p.pathway === pathwaySlug &&
+        p.pathwayNodeId
+      );
+      if (pitches.length > 0) {
+        console.log('[PFLX] Injecting', pitches.length, 'pitched nodes for', pathwaySlug);
+        // Update any "approved" pitches to "live" since they're now visible on the Portal
+        const needsStatusUpdate = pitches.some(p => p.status === 'approved');
+        if (needsStatusUpdate) {
+          const allPitches = pitchRow.data;
+          allPitches.forEach(p => {
+            if (p.status === 'approved' && p.pathway === pathwaySlug && p.pathwayNodeId) {
+              p.status = 'live';
+            }
+          });
+          // Save updated pitch statuses back to Supabase
+          _supabase.from('app_data').upsert({
+            key: 'projectPitches',
+            data: allPitches,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'key' }).then(({ error }) => {
+            if (error) console.warn('[PFLX] Failed to update pitch statuses:', error);
+            else console.log('[PFLX] Updated approved pitches to live status');
+          });
+        }
+        let pitchY = 12;
+        pitches.forEach((pitch, idx) => {
+          const existingNode = pathway.nodes.find(n => n.id === pitch.pathwayNodeId);
+          if (existingNode) return; // Already exists (host may have moved/edited it)
+
+          const col = idx % 3;
+          const row = Math.floor(idx / 3);
+          const newNode = {
+            id: pitch.pathwayNodeId,
+            title: pitch.title || 'Pitched Course',
+            emoji: '💡',
+            x: 35 + (col * 18),
+            y: pitchY + (row * 14),
+            status: 'unlocked',
+            desc: pitch.description || '',
+            url: pitch.courseUrl || '',
+            requiredBadge: pitch.badgeName || '',
+            comingSoon: false,
+            requires: pitch.prerequisites || [],
+            isPitchedNode: true,
+            pitchId: pitch.id,
+            creatorId: pitch.creatorId,
+            xcValue: pitch.xcValue || 0,
+            residualPercent: pitch.residualPercent || 10,
+          };
+          if (pitch.image) {
+            newNode.image = pitch.image;
+            newNode.imageFit = 'cover';
+          }
+          pathway.nodes.push(newNode);
+          console.log('[PFLX] Added pitched node:', newNode.id, newNode.title);
+        });
+      }
+    }
+  } catch(pitchLoadErr) {
+    console.warn('[PFLX] Failed to load project pitches:', pitchLoadErr);
   }
 }
 
@@ -3022,7 +3174,8 @@ async function loadPathwayEdits() {
     } catch(e) { console.warn('[PFLX] seed-data.json fallback failed:', e); }
   }
   if (!saved) {
-    // No saved data — still rebuild to attach proper event handlers
+    // No saved data — still try loading pitched nodes before rebuilding
+    await injectPitchedNodes();
     rebuildNodes();
     return;
   }
@@ -3042,9 +3195,13 @@ async function loadPathwayEdits() {
     pathway.nodes = pathway.nodes.filter(n => {
       return savedIds.includes(n.id);
     });
-    // Re-render everything
-    rebuildNodes();
   } catch(e) { console.error('Load edits error:', e); }
+
+  // Inject any approved/live project pitches as nodes
+  await injectPitchedNodes();
+
+  // Re-render everything
+  rebuildNodes();
 }
 
 function rebuildNodes() {
@@ -3065,8 +3222,10 @@ function rebuildNodes() {
 
   pathway.nodes.forEach(n => {
     // In player mode, hide disconnected nodes (no connections at all)
+    // Exception: pitched nodes are always visible even if not yet connected
     const isConnected = connectedIds.has(n.id);
-    if (!editMode && !isConnected) return; // Skip disconnected nodes for players
+    const isPitched = n.isPitchedNode === true;
+    if (!editMode && !isConnected && !isPitched) return; // Skip disconnected nodes for players
 
     const px = n.x / 100 * MAP_W;
     const py = n.y / 100 * MAP_H;
@@ -3080,7 +3239,9 @@ function rebuildNodes() {
 
     const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
     const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
+    const pitchTagHTML = isPitched ? `<div style="position:absolute;top:-8px;right:-8px;background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.08em;z-index:5;white-space:nowrap;box-shadow:0 0 10px rgba(245,158,11,0.4);">PLAYER PITCH</div>` : '';
     el.innerHTML = `
+      ${pitchTagHTML}
       <div class="node-target"><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-crosshair"></div><div class="node-target-scan"></div></div>
       <div class="node-ring">${badgeHTML}${imageHTML}<span class="node-icon" ${n.image ? 'style="display:none"' : ''}>${n.emoji}</span><div class="node-image-upload" title="Upload image">📷</div></div>
       <span class="node-label">${n.title}</span>
@@ -3265,11 +3426,19 @@ function _doSaveNode() {
     editorNode.emoji = document.getElementById('neEmoji').value || '📦';
     editorNode.desc = document.getElementById('neDesc').value || '';
     editorNode.url = document.getElementById('neUrl').value || '';
+    const oldStatus = editorNode.status;
     editorNode.status = document.getElementById('neStatus').value || 'locked';
     editorNode.requiredBadge = document.getElementById('neBadge').value || '';
     editorNode.comingSoon = document.getElementById('neComingSoon').checked;
     editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
     console.log('[PFLX] Node updated:', editorNode.title, 'url:', editorNode.url);
+
+    // ── Residual XC income: when a pitched node is marked completed ──
+    if (editorNode.isPitchedNode && editorNode.status === 'completed' && oldStatus !== 'completed') {
+      processResidualPayment(editorNode).catch(err =>
+        console.warn('[PFLX] Residual payment error:', err)
+      );
+    }
 
     savePathwayEdits();
     rebuildNodes();
