@@ -748,6 +748,30 @@ document.getElementById('resetPinBtn').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PFLX SSO AUTO-LOGIN — bypass login when embedded in PFLX Overlay
+// ═══════════════════════════════════════════════════════════════════════════
+(function checkSSO() {
+  const params = new URLSearchParams(window.location.search);
+  const sso = params.get('sso');
+  const brand = params.get('brand');
+  const ssoPin = params.get('pin');
+  if (sso === 'pflx' && brand) {
+    // Find the user by brand name in loaded users (mockUsers or Supabase)
+    const allUsers = typeof mockUsers !== 'undefined' ? mockUsers : [];
+    const user = allUsers.find(u => (u.brandName || '').toLowerCase() === brand.toLowerCase());
+    if (user) {
+      const correctPin = user.pin || (user.role === 'admin' ? '0000' : '1234');
+      if (!ssoPin || ssoPin === correctPin) {
+        localStorage.setItem('pflx_pathway_user', JSON.stringify(user));
+        localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
+        window.location.href = 'preview.html';
+        return;
+      }
+    }
+  }
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════
 // AUTO-LOGIN CHECK
 // ═══════════════════════════════════════════════════════════════════════════
 const existingSession = localStorage.getItem('pflx_pathway_user');
