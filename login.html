@@ -579,6 +579,8 @@ async function loadUsersFromSupabase() {
         }
       }
       console.log('[PFLX] Loaded ' + mockUsers.length + ' users from Supabase');
+      // Retry SSO check with fresh Supabase users
+      attemptSSO();
     }
   } catch(e) { console.warn('[PFLX] Supabase user load failed, using defaults:', e); }
 }
@@ -749,19 +751,23 @@ document.getElementById('resetPinBtn').addEventListener('click', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PFLX SSO AUTO-LOGIN — bypass login when embedded in PFLX Overlay
+// Tries immediately with hardcoded users, retries after Supabase loads
 // ═══════════════════════════════════════════════════════════════════════════
-(function checkSSO() {
+let _ssoHandled = false;
+function attemptSSO() {
+  if (_ssoHandled) return;
   const params = new URLSearchParams(window.location.search);
   const sso = params.get('sso');
   const brand = params.get('brand');
   const ssoPin = params.get('pin');
   if (sso === 'pflx' && brand) {
-    // Find the user by brand name in loaded users (mockUsers or Supabase)
     const allUsers = typeof mockUsers !== 'undefined' ? mockUsers : [];
     const user = allUsers.find(u => (u.brandName || '').toLowerCase() === brand.toLowerCase());
     if (user) {
       const correctPin = user.pin || (user.role === 'admin' ? '0000' : '1234');
       if (!ssoPin || ssoPin === correctPin) {
+        _ssoHandled = true;
+        console.log('[PFLX] SSO auto-login for:', user.brandName || user.name);
         localStorage.setItem('pflx_pathway_user', JSON.stringify(user));
         localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
         window.location.href = 'preview.html';
@@ -769,7 +775,8 @@ document.getElementById('resetPinBtn').addEventListener('click', () => {
       }
     }
   }
-})();
+}
+attemptSSO();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTO-LOGIN CHECK
