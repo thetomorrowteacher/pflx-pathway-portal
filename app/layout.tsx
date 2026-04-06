@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import Ticker from './components/Ticker';
+import RoleGuard from './components/RoleGuard';
 
 export const metadata: Metadata = {
   title: 'PFLX Core Pathway Development',
@@ -15,6 +17,8 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         {children}
+        <Ticker />
+        <RoleGuard />
       </body>
     </html>
   );

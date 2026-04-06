@@ -140,3 +140,8 @@ html, body {
 .hex-badge {
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
+
+/* PFLX role visibility fallback */
+body[data-pflx-role="player"] .host-only,
+body[data-pflx-role="player"] .admin-only { display: none \!important; }
+body[data-pflx-role="host"] .player-only { display: none \!important; }
