@@ -2695,6 +2695,11 @@ function getNextRank(totalXcoin) {
 
 (function initPlayerCard() {
   const stored = localStorage.getItem('pflx_pathway_user');
+  // PFLX Platform writes `pflx_user` on shell sign-in. It's the canonical
+  // source of truth for the signed-in identity (including `image`) — so
+  // if `pflx_pathway_user` is stale or missing an `image` field, we fall
+  // back to / merge with `pflx_user` before rendering the card.
+  const platformStored = localStorage.getItem('pflx_user');
   const playerCard = document.getElementById('playerCard');
   if (!playerCard) { console.error('[PFLX] playerCard element not found'); return; }
 
@@ -2719,6 +2724,37 @@ function getNextRank(totalXcoin) {
       isGuest = false;
     } catch(e) {
       console.error('[PFLX] Failed to parse pflx_pathway_user:', e);
+    }
+  }
+
+  // ── Merge fresh identity from PFLX Platform (`pflx_user`) ──
+  // Ensures Platform profile-pic updates reach the pathway player card
+  // immediately, without waiting for the X-Coin Supabase sync below.
+  if (platformStored) {
+    try {
+      const platformUser = JSON.parse(platformStored);
+      if (platformUser && typeof platformUser === 'object') {
+        // If we had no pathway session at all, adopt the platform identity
+        if (isGuest) {
+          user = { ...defaultUser, ...platformUser };
+          isGuest = false;
+        } else {
+          // Otherwise, backfill fields that the pathway copy is missing
+          // (image is the main one we care about, but cover the others
+          // so hosts/stats stay consistent).
+          const fillIfMissing = (k) => {
+            if ((user[k] === undefined || user[k] === null || user[k] === '') && platformUser[k] !== undefined) {
+              user[k] = platformUser[k];
+            }
+          };
+          ['image','avatar','brandName','name','role','isHost','xcoin','totalXcoin','digitalBadges','level','rank','cohort','pathway','email','id']
+            .forEach(fillIfMissing);
+        }
+        // Persist the merged copy so subsequent reads see `image`.
+        try { localStorage.setItem('pflx_pathway_user', JSON.stringify(user)); } catch {}
+      }
+    } catch (e) {
+      console.warn('[PFLX] Failed to parse pflx_user for merge:', e);
     }
   }
 
