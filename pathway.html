@@ -461,6 +461,56 @@
       opacity: 1; pointer-events: all;
       transform: translateY(0) scale(1);
     }
+    /* MC + X-Coin data sections in detail panel */
+    .detail-mc-section {
+      margin-top: 12px; padding: 10px 14px;
+      background: rgba(0,212,255,0.04);
+      border: 1px solid rgba(0,212,255,0.12);
+      border-radius: 6px;
+    }
+    .detail-mc-section h4 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px; font-weight: 600;
+      color: rgba(0,212,255,0.7); letter-spacing: 2px;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .detail-mc-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; padding: 3px 0;
+      color: rgba(255,255,255,0.7);
+    }
+    .detail-mc-row .mc-label { opacity: 0.6; }
+    .detail-mc-row .mc-value { font-weight: 600; color: var(--accent); }
+    .detail-mc-tasks { margin-top: 6px; }
+    .detail-mc-task {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 8px; margin: 3px 0;
+      background: rgba(0,0,0,0.3); border-radius: 4px;
+      font-size: 12px;
+    }
+    .detail-mc-task .task-status {
+      width: 8px; height: 8px; border-radius: 50; flex-shrink: 0;
+    }
+    .detail-mc-task .task-status.pending { background: #f59e0b; }
+    .detail-mc-task .task-status.in_progress { background: #3b82f6; }
+    .detail-mc-task .task-status.completed { background: #22c55e; }
+    .detail-mc-task .task-title { flex: 1; color: rgba(255,255,255,0.8); }
+    .detail-mc-task .task-xc { color: #a78bfa; font-weight: 600; font-size: 11px; }
+    .detail-xc-stats {
+      display: flex; gap: 16px; margin-top: 6px;
+    }
+    .detail-xc-stat {
+      text-align: center; flex: 1;
+    }
+    .detail-xc-stat .xc-val {
+      font-family: 'Orbitron'; font-size: 16px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .detail-xc-stat .xc-label {
+      font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+      opacity: 0.5; margin-top: 2px;
+    }
     .detail-title-graphic {
       width: 100%; aspect-ratio: 16/9;
       background: rgba(0,212,255,0.03);
@@ -1441,6 +1491,7 @@
         </div>
         <div class="detail-desc" id="detailDesc"></div>
         <div class="detail-requires" id="detailRequires"></div>
+        <div id="detailMCData"></div>
         <button class="launch-btn" id="launchBtn"></button>
       </div>
     </div>
@@ -2483,6 +2534,9 @@ function showDetail(n) {
   reqEl.innerHTML = reqHTML;
   reqEl.style.display = reqHTML ? 'block' : 'none';
 
+  // Render MC + X-Coin data section
+  renderDetailMCData(n);
+
   // Launch button
   const btn = document.getElementById('launchBtn');
   btn.onclick = null;
@@ -2951,6 +3005,247 @@ function getNextRank(totalXcoin) {
     }
   } catch(e) { console.warn('[PFLX] X-Coin sync error:', e); }
 })();
+
+// ==================== MC + X-COIN DATA INTEGRATION ====================
+// Global data store for Mission Control + X-Coin data.
+// Loaded from shared Supabase backend on init; updated live via postMessage.
+const pflxData = {
+  checkpoints: [],
+  tasks: [],
+  projects: [],
+  jobs: [],
+  pitches: [],
+  cohortGroups: [],
+  seasons: [],
+  users: [],       // Full user list (from X-Coin/MC)
+  badges: [],
+  transactions: [],
+  loaded: false,
+  lastUpdate: 0,
+};
+
+// ─── Fetch all MC + X-Coin data from Supabase ───
+async function loadAllPflxData() {
+  const keys = [
+    'checkpoints', 'tasks', 'projects', 'jobs',
+    'projectPitches', 'cohortGroups', 'seasons',
+    'users', 'badges', 'transactions'
+  ];
+  try {
+    const results = await Promise.all(
+      keys.map(key =>
+        _supabase.from('app_data').select('data').eq('key', key).single()
+          .then(r => ({ key, data: (r.data && r.data.data) || [] }))
+          .catch(() => ({ key, data: [] }))
+      )
+    );
+    results.forEach(r => {
+      const storeKey = r.key === 'projectPitches' ? 'pitches' : r.key;
+      if (pflxData.hasOwnProperty(storeKey) && Array.isArray(r.data)) {
+        pflxData[storeKey] = r.data;
+      }
+    });
+    pflxData.loaded = true;
+    pflxData.lastUpdate = Date.now();
+    console.log('[PFLX] All MC + X-Coin data loaded:',
+      'checkpoints=' + pflxData.checkpoints.length,
+      'tasks=' + pflxData.tasks.length,
+      'projects=' + pflxData.projects.length,
+      'jobs=' + pflxData.jobs.length,
+      'users=' + pflxData.users.length,
+      'badges=' + pflxData.badges.length,
+      'seasons=' + pflxData.seasons.length,
+      'cohortGroups=' + pflxData.cohortGroups.length
+    );
+  } catch (err) {
+    console.warn('[PFLX] Failed to load MC + X-Coin data:', err);
+  }
+}
+
+// ─── Live update listener: MC broadcasts pflx_mc_* events ───
+window.addEventListener('message', function pflxLiveDataListener(event) {
+  try {
+    var msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (!msg || !msg.type) return;
+
+    // MC broadcast events: pflx_mc_<collection>
+    if (msg.type.startsWith('pflx_mc_')) {
+      var eventKey = msg.type.replace('pflx_mc_', '').replace('_updated', '');
+      // Map MC key names to our store keys
+      var keyMap = {
+        'players': 'users', 'checkpoints': 'checkpoints', 'tasks': 'tasks',
+        'projects': 'projects', 'jobs': 'jobs', 'pitches': 'pitches',
+        'cohortgroups': 'cohortGroups', 'seasons': 'seasons', 'badges': 'badges',
+        'announcements': null, 'studios': null, 'approvals': null,
+        'modifiers': null, 'gameconfig': null, 'onboarding': null,
+      };
+      var storeKey = keyMap[eventKey] || eventKey;
+      if (pflxData.hasOwnProperty(storeKey) && msg.data) {
+        pflxData[storeKey] = Array.isArray(msg.data) ? msg.data : [msg.data];
+        pflxData.lastUpdate = Date.now();
+        console.log('[PFLX] Live update received:', storeKey, pflxData[storeKey].length, 'items');
+        // If detail panel is open, refresh its MC data section
+        if (selectedNode) {
+          renderDetailMCData(selectedNode);
+        }
+      }
+    }
+
+    // X-Coin PflxBridge cloud data responses
+    if (msg.type === 'pflx_cloud_data' && msg.key && msg.data) {
+      var cloudKeyMap = {
+        'users': 'users', 'checkpoints': 'checkpoints', 'tasks': 'tasks',
+        'projects': 'projects', 'jobs': 'jobs', 'badges': 'badges',
+        'cohortGroups': 'cohortGroups', 'seasons': 'seasons',
+        'transactions': 'transactions',
+      };
+      var sk = cloudKeyMap[msg.key];
+      if (sk && pflxData.hasOwnProperty(sk) && Array.isArray(msg.data)) {
+        pflxData[sk] = msg.data;
+        pflxData.lastUpdate = Date.now();
+        console.log('[PFLX] Cloud data received:', sk, pflxData[sk].length, 'items');
+        if (selectedNode) renderDetailMCData(selectedNode);
+      }
+    }
+  } catch(e) {
+    // Ignore non-JSON messages
+  }
+});
+
+// ─── Request fresh data from parent shell (if embedded) ───
+function requestParentData() {
+  if (window.parent !== window) {
+    var keys = ['users', 'checkpoints', 'tasks', 'projects', 'jobs', 'badges', 'cohortGroups', 'seasons'];
+    keys.forEach(function(key) {
+      window.parent.postMessage(JSON.stringify({ type: 'pflx_data_request', key: key }), '*');
+    });
+  }
+}
+
+// ─── Render MC + X-Coin data section inside the detail panel ───
+function renderDetailMCData(node) {
+  var container = document.getElementById('detailMCData');
+  if (!container) return;
+  if (!pflxData.loaded) { container.innerHTML = ''; return; }
+
+  var html = '';
+
+  // 1. Find associated project(s) for this node
+  var nodeProjects = pflxData.projects.filter(function(p) {
+    return p.pathway === pathwaySlug ||
+      (p.tasks && p.tasks.includes && p.tasks.includes(node.id)) ||
+      p.pathwayNodeId === node.id;
+  });
+
+  // 2. Find tasks linked to this node (by courseId or node id match)
+  var nodeTasks = pflxData.tasks.filter(function(t) {
+    return t.courseId === node.id ||
+      (t.pathwayNodeId && t.pathwayNodeId === node.id) ||
+      (nodeProjects.length > 0 && nodeProjects.some(function(p) {
+        return t.projectId === p.id;
+      }));
+  });
+
+  // 3. Find jobs linked to the projects
+  var nodeJobs = pflxData.jobs.filter(function(j) {
+    return nodeProjects.some(function(p) { return j.projectId === p.id; });
+  });
+
+  // 4. Find the current checkpoint/season context
+  var activeSeason = pflxData.seasons.find(function(s) { return s.status === 'active' || s.status === 'current'; }) || pflxData.seasons[0];
+  var activeCheckpoint = pflxData.checkpoints.find(function(c) { return c.status === 'active' || c.status === 'current'; }) || pflxData.checkpoints[0];
+
+  // 5. Current player's XC data
+  var stored = localStorage.getItem('pflx_pathway_user');
+  var currentPlayer = null;
+  if (stored) { try { currentPlayer = JSON.parse(stored); } catch(e) {} }
+  var xcUser = currentPlayer ? pflxData.users.find(function(u) { return u.id === currentPlayer.id || u.email === currentPlayer.email; }) : null;
+
+  // ─── Season & Checkpoint Context ───
+  if (activeSeason || activeCheckpoint) {
+    html += '<div class="detail-mc-section">';
+    html += '<h4>Current Season</h4>';
+    if (activeSeason) {
+      html += '<div class="detail-mc-row"><span class="mc-label">Season</span><span class="mc-value">' + (activeSeason.title || activeSeason.name || 'Season') + '</span></div>';
+    }
+    if (activeCheckpoint) {
+      html += '<div class="detail-mc-row"><span class="mc-label">Checkpoint</span><span class="mc-value">' + (activeCheckpoint.title || activeCheckpoint.name || 'Checkpoint') + '</span></div>';
+      if (activeCheckpoint.endDate) {
+        var daysLeft = Math.ceil((new Date(activeCheckpoint.endDate) - Date.now()) / 86400000);
+        if (daysLeft > 0) {
+          html += '<div class="detail-mc-row"><span class="mc-label">Days Left</span><span class="mc-value">' + daysLeft + '</span></div>';
+        }
+      }
+    }
+    html += '</div>';
+  }
+
+  // ─── Player XC Stats (if logged in) ───
+  if (xcUser) {
+    html += '<div class="detail-mc-section">';
+    html += '<h4>Your Economy</h4>';
+    html += '<div class="detail-xc-stats">';
+    html += '<div class="detail-xc-stat"><div class="xc-val">' + ((xcUser.xcoin || 0).toLocaleString()) + '</div><div class="xc-label">XC Balance</div></div>';
+    html += '<div class="detail-xc-stat"><div class="xc-val">' + ((xcUser.totalXcoin || 0).toLocaleString()) + '</div><div class="xc-label">Total Earned</div></div>';
+    html += '<div class="detail-xc-stat"><div class="xc-val">' + ((xcUser.digitalBadges || 0)) + '</div><div class="xc-label">Badges</div></div>';
+    html += '<div class="detail-xc-stat"><div class="xc-val">' + ((xcUser.level || 1)) + '</div><div class="xc-label">Level</div></div>';
+    html += '</div></div>';
+  }
+
+  // ─── Linked Tasks ───
+  if (nodeTasks.length > 0) {
+    html += '<div class="detail-mc-section">';
+    html += '<h4>Linked Tasks (' + nodeTasks.length + ')</h4>';
+    html += '<div class="detail-mc-tasks">';
+    nodeTasks.forEach(function(t) {
+      var statusClass = t.status || 'pending';
+      var xcReward = t.xcReward ? '<span class="task-xc">⚡' + t.xcReward + ' XC</span>' : '';
+      html += '<div class="detail-mc-task">';
+      html += '<div class="task-status ' + statusClass + '"></div>';
+      html += '<span class="task-title">' + (t.title || 'Task') + '</span>';
+      html += xcReward;
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ─── Linked Projects ───
+  if (nodeProjects.length > 0) {
+    html += '<div class="detail-mc-section">';
+    html += '<h4>Projects (' + nodeProjects.length + ')</h4>';
+    nodeProjects.forEach(function(p) {
+      html += '<div class="detail-mc-row"><span class="mc-label">' + (p.title || 'Project') + '</span><span class="mc-value">' + (p.status || 'active') + '</span></div>';
+      if (p.xcBudget) {
+        html += '<div class="detail-mc-row"><span class="mc-label">XC Budget</span><span class="mc-value">⚡' + p.xcBudget + '</span></div>';
+      }
+    });
+    html += '</div>';
+  }
+
+  // ─── Available Jobs ───
+  if (nodeJobs.length > 0) {
+    html += '<div class="detail-mc-section">';
+    html += '<h4>Available Jobs (' + nodeJobs.length + ')</h4>';
+    nodeJobs.forEach(function(j) {
+      var xcReward = j.xcReward ? '<span class="mc-value">⚡' + j.xcReward + ' XC</span>' : '<span class="mc-value">' + (j.status || 'open') + '</span>';
+      html += '<div class="detail-mc-row"><span class="mc-label">' + (j.title || 'Job') + '</span>' + xcReward + '</div>';
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// ─── Initialize: load all data and request parent updates ───
+loadAllPflxData().then(function() {
+  // Also request live data from parent shell (if embedded in Platform)
+  requestParentData();
+});
+
+// Periodic refresh (every 60s) to stay current
+setInterval(function() {
+  loadAllPflxData();
+}, 60000);
 
 // ==================== HOST EDIT MODE ====================
 const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
