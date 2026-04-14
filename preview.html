@@ -886,6 +886,64 @@
   <!-- HOST: Settings Button -->
   <button id="settingsBtn" title="Settings">⚙</button>
 
+  <!-- HOST: Add Pathway Button (host-only, hidden by default) -->
+  <button id="addPathwayBtn" title="Add New Pathway" style="
+    position:absolute; bottom:18px; right:72px; z-index:70;
+    font-size:13px; padding:8px 14px; display:none;
+    background:rgba(6,10,18,0.9); border:1px solid rgba(251,146,60,0.4);
+    color:rgba(251,146,60,0.85); cursor:pointer; transition:all .3s;
+    font-family:inherit; letter-spacing:0.08em;
+  ">+ ADD PATHWAY</button>
+
+  <!-- HOST: Add Pathway Modal -->
+  <div id="addPathwayOverlay" class="settings-overlay">
+    <div class="settings-panel" style="width:480px;">
+      <div class="sp-header">
+        <span class="sp-title">Add Core Pathway</span>
+        <button class="sp-close" id="addPathwayClose">&times;</button>
+      </div>
+      <div class="sp-body" style="padding:20px;">
+        <div class="sp-section">
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Title
+              <input id="apTitle" type="text" placeholder="e.g. Fashion Designer"
+                style="background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.25); color:#fff; padding:8px 10px; font-family:inherit;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Slug (lowercase, dashes)
+              <input id="apSlug" type="text" placeholder="e.g. fashion-designer"
+                style="background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.25); color:#fff; padding:8px 10px; font-family:inherit;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Subtitle
+              <input id="apSubtitle" type="text" placeholder="Short tagline"
+                style="background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.25); color:#fff; padding:8px 10px; font-family:inherit;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Description
+              <textarea id="apDescription" rows="2" placeholder="One-paragraph overview"
+                style="background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.25); color:#fff; padding:8px 10px; font-family:inherit; resize:vertical;"></textarea>
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Accent Color
+              <input id="apAccent" type="color" value="#60a5fa"
+                style="background:rgba(0,0,0,0.4); border:1px solid rgba(0,212,255,0.25); padding:4px; width:80px; height:34px;">
+            </label>
+            <label style="display:flex; flex-direction:column; gap:4px; font-size:12px; color:#a0b0c8;">
+              Icon (upload PNG)
+              <input id="apIcon" type="file" accept="image/png,image/jpeg,image/svg+xml"
+                style="color:#fff; font-size:12px;">
+              <span id="apIconPreview" style="color:#5c7090; font-size:11px;">No icon chosen — default logo will be used.</span>
+            </label>
+          </div>
+        </div>
+        <div id="apCustomList" style="margin-top:12px; font-size:11px; color:#5c7090;"></div>
+        <button class="sp-save" id="apSave" style="margin-top:16px;">Create Pathway</button>
+      </div>
+    </div>
+  </div>
+
   <!-- HOST: Settings Panel -->
   <div class="settings-overlay" id="settingsOverlay">
     <div class="settings-panel">
@@ -981,15 +1039,41 @@
     // Middle right: Digital Artist, CS/AI Specialist
     // Bottom left: Sound Designer
     // Bottom right: Game Designer
-    const nodes = [
-      { title: 'Professional Entrepreneur', slug: 'professional-entrepreneur', icon: 'public/icons/professional-entrepreneur.png', accent: '#00d4ff',  x: '35%', y: '24%', side: 'left', projects: 8 },
-      { title: 'Content Creator',           slug: 'content-creator',           icon: 'public/icons/content-creator.png',           accent: '#ff6ec7',  x: '12%', y: '40%', side: 'left',  projects: 7 },
-      { title: 'Digital Artist',            slug: 'digital-artist',            icon: 'public/icons/digital-artist.png',            accent: '#c084fc',  x: '58%', y: '40%', side: 'right', projects: 10 },
-      { title: '3D Modeler',                slug: '3d-modeler',                icon: 'public/icons/3d-modeler.png',                accent: '#22d3ee',  x: '10%', y: '60%', side: 'left',  projects: 9 },
-      { title: 'CS/AI Specialist',          slug: 'cs-ai-specialist',          icon: 'public/icons/cs-ai-specialist.png',          accent: '#a78bfa',  x: '60%', y: '60%', side: 'right', projects: 7 },
-      { title: 'Sound Designer',            slug: 'sound-designer',            icon: 'public/icons/sound-designer.png',            accent: '#f472b6',  x: '15%', y: '80%', side: 'left',  projects: 7 },
-      { title: 'Game Designer',             slug: 'game-designer',             icon: 'public/icons/game-designer.png',             accent: '#34d399',  x: '55%', y: '80%', side: 'right', projects: 9 },
+    const baseNodes = [
+      { title: 'Professional Entrepreneur', slug: 'professional-entrepreneur', icon: 'public/icons/professional-entrepreneur.png', accent: '#00d4ff',  x: '35%', y: '20%', side: 'left', projects: 8 },
+      { title: 'Content Creator',           slug: 'content-creator',           icon: 'public/icons/content-creator.png',           accent: '#ff6ec7',  x: '12%', y: '36%', side: 'left',  projects: 7 },
+      { title: 'Digital Artist',            slug: 'digital-artist',            icon: 'public/icons/digital-artist.png',            accent: '#c084fc',  x: '58%', y: '36%', side: 'right', projects: 10 },
+      { title: '3D Modeler',                slug: '3d-modeler',                icon: 'public/icons/3d-modeler.png',                accent: '#22d3ee',  x: '10%', y: '54%', side: 'left',  projects: 9 },
+      { title: 'CS/AI Specialist',          slug: 'cs-ai-specialist',          icon: 'public/icons/cs-ai-specialist.png',          accent: '#a78bfa',  x: '60%', y: '54%', side: 'right', projects: 7 },
+      { title: 'Sound Designer',            slug: 'sound-designer',            icon: 'public/icons/sound-designer.png',            accent: '#f472b6',  x: '15%', y: '72%', side: 'left',  projects: 7 },
+      { title: 'Game Designer',             slug: 'game-designer',             icon: 'public/icons/game-designer.png',             accent: '#34d399',  x: '55%', y: '72%', side: 'right', projects: 9 },
+      { title: 'Industrial Designer',       slug: 'industrial-designer',       icon: 'public/icons/industrial-designer.png',       accent: '#fb923c',  x: '35%', y: '88%', side: 'left',  projects: 9 },
     ];
+
+    // Load host-added custom pathways from localStorage
+    function loadCustomPathways() {
+      try {
+        const raw = localStorage.getItem('pflx_custom_pathways');
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    }
+    function saveCustomPathways(list) {
+      localStorage.setItem('pflx_custom_pathways', JSON.stringify(list));
+    }
+    const customNodes = loadCustomPathways().map((p, i) => ({
+      title: p.title,
+      slug: p.slug,
+      icon: p.icon || 'public/icons/core-pathway-logo.png',
+      accent: p.accent || '#60a5fa',
+      x: p.x || ((i % 2 === 0 ? 20 : 60) + '%'),
+      y: p.y || (100 + i * 18) + '%',
+      side: i % 2 === 0 ? 'left' : 'right',
+      projects: p.projects || 0,
+      custom: true,
+    }));
+    const nodes = [...baseNodes, ...customNodes];
 
     const map = document.getElementById('pathwayMap');
     nodes.forEach(n => {
@@ -1310,6 +1394,102 @@
       settingsOverlay.classList.remove('show');
     });
 
+    // ═══════════════════════════════════════════════════════════════════
+    // ADD PATHWAY MODAL (host-only)
+    // ═══════════════════════════════════════════════════════════════════
+    const apOverlay = document.getElementById('addPathwayOverlay');
+    const apBtn = document.getElementById('addPathwayBtn');
+    const apTitle = document.getElementById('apTitle');
+    const apSlug = document.getElementById('apSlug');
+    const apSubtitle = document.getElementById('apSubtitle');
+    const apDescription = document.getElementById('apDescription');
+    const apAccent = document.getElementById('apAccent');
+    const apIcon = document.getElementById('apIcon');
+    const apIconPreview = document.getElementById('apIconPreview');
+    const apCustomList = document.getElementById('apCustomList');
+    let apIconDataUrl = null;
+
+    function slugify(s) {
+      return (s || '').toLowerCase().trim()
+        .replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
+    }
+    function renderCustomList() {
+      const list = loadCustomPathways();
+      if (!list.length) { apCustomList.innerHTML = ''; return; }
+      apCustomList.innerHTML = '<div style="margin-bottom:6px; color:#a0b0c8;">Custom pathways:</div>' +
+        list.map((p, i) => `
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border:1px solid rgba(0,212,255,0.12); margin-bottom:4px;">
+            <span style="color:#cfd8e8;">${p.title} <span style="color:#5c7090;">(${p.slug})</span></span>
+            <button data-remove="${i}" style="background:transparent; border:1px solid rgba(255,80,80,0.35); color:#ff8080; padding:2px 8px; cursor:pointer; font-family:inherit; font-size:10px;">REMOVE</button>
+          </div>`).join('');
+      apCustomList.querySelectorAll('button[data-remove]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-remove'));
+          const list2 = loadCustomPathways();
+          list2.splice(idx, 1);
+          saveCustomPathways(list2);
+          renderCustomList();
+        });
+      });
+    }
+
+    apBtn.addEventListener('click', () => {
+      SFX.open && SFX.open();
+      apTitle.value = ''; apSlug.value = ''; apSubtitle.value = '';
+      apDescription.value = ''; apAccent.value = '#60a5fa';
+      apIcon.value = ''; apIconDataUrl = null;
+      apIconPreview.textContent = 'No icon chosen — default logo will be used.';
+      renderCustomList();
+      apOverlay.classList.add('show');
+    });
+    document.getElementById('addPathwayClose').addEventListener('click', () => {
+      SFX.close && SFX.close();
+      apOverlay.classList.remove('show');
+    });
+    apOverlay.addEventListener('click', e => {
+      if (e.target === apOverlay) apOverlay.classList.remove('show');
+    });
+    apTitle.addEventListener('input', () => {
+      if (!apSlug.dataset.touched) apSlug.value = slugify(apTitle.value);
+    });
+    apSlug.addEventListener('input', () => { apSlug.dataset.touched = '1'; });
+    apIcon.addEventListener('change', e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) { apIconDataUrl = null; apIconPreview.textContent = 'No icon chosen — default logo will be used.'; return; }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        apIconDataUrl = ev.target.result;
+        apIconPreview.innerHTML = `<img src="${apIconDataUrl}" style="width:36px;height:36px;object-fit:contain;vertical-align:middle;border:1px solid rgba(0,212,255,0.2);padding:2px;"> ${file.name}`;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('apSave').addEventListener('click', () => {
+      const title = apTitle.value.trim();
+      const slug = slugify(apSlug.value || apTitle.value);
+      if (!title || !slug) { alert('Title and slug are required.'); return; }
+      const list = loadCustomPathways();
+      const baseSlugs = baseNodes.map(n => n.slug);
+      if (baseSlugs.includes(slug) || list.some(p => p.slug === slug)) {
+        alert('A pathway with that slug already exists.'); return;
+      }
+      list.push({
+        title,
+        slug,
+        subtitle: apSubtitle.value.trim(),
+        description: apDescription.value.trim(),
+        accent: apAccent.value,
+        icon: apIconDataUrl || 'public/icons/core-pathway-logo.png',
+        projects: 0,
+        createdAt: Date.now(),
+      });
+      saveCustomPathways(list);
+      SFX.nodeSave && SFX.nodeSave();
+      apOverlay.classList.remove('show');
+      // Reload to re-render the pathway map with the new node
+      location.reload();
+    });
+
     // Apply saved display settings on load
     (function applySettings() {
       const s = JSON.parse(localStorage.getItem('pflx_pathway_settings') || '{}');
@@ -1346,6 +1526,7 @@
         // Show settings button for hosts
         if (isHost) {
           document.getElementById('settingsBtn').style.display = 'block';
+          document.getElementById('addPathwayBtn').style.display = 'block';
         }
 
         // Avatar
