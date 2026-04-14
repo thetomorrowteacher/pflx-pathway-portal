@@ -31,12 +31,14 @@
       --accent: #00d4ff;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
+    /* Reserve bottom space for the Platform shell ticker (~48px). */
+    :root, html { --pflx-ticker-offset: 48px; }
+    html, body {
       font-family: 'Rajdhani', sans-serif;
       background: #050810;
       color: #e0e0e0;
       width: 100vw;
-      height: 100vh;
+      height: calc(100vh - var(--pflx-ticker-offset));
       overflow: hidden;
       position: relative;
       user-select: none;
@@ -73,7 +75,7 @@
 
     /* Powered by PFLX */
     .powered-by {
-      position: fixed; bottom: 14px; left: 50%;
+      position: fixed; bottom: calc(14px + var(--pflx-ticker-offset)); left: 50%;
       transform: translateX(-50%);
       display: flex; align-items: center; gap: 10px;
       z-index: 55; pointer-events: none;
@@ -1865,8 +1867,45 @@ const PATHWAYS = {
       { id: 'gd-beta', title: 'Beta Testers Network', emoji: '🧪', x: 68, y: 56, status: 'locked', requires: ['gd-gimkit'], desc: 'Join the beta testing community and provide gameplay feedback.' },
       { id: 'gd-project-bac', title: 'Project BAC', emoji: '🏗️', x: 72, y: 30, status: 'locked', requires: ['gd-beta'], desc: 'Build and present your capstone game project.' },
     ]
+  },
+  'industrial-designer': {
+    title: 'Industrial Designer',
+    subtitle: 'Welcome to the Universe of Industrial Design',
+    icon: 'public/icons/industrial-designer.png',
+    accent: '#fb923c',
+    nodes: [
+      { id: 'id-intro', title: 'Intro to Industrial Design', emoji: '🛠️', x: 50, y: 85, status: 'unlocked', desc: 'Begin your journey into industrial design — the intersection of form, function, and human experience.' },
+      { id: 'id-sketching', title: 'Product Sketching', emoji: '✏️', x: 28, y: 72, status: 'locked', requires: ['id-intro'], desc: 'Master ideation sketching, perspective drawing, and visual communication for product design.' },
+      { id: 'id-materials', title: 'Materials & Manufacturing', emoji: '🧱', x: 70, y: 72, status: 'locked', requires: ['id-intro'], desc: 'Understand materials, manufacturing processes, and design for production.' },
+      { id: 'id-cad', title: 'CAD Modeling', emoji: '📐', x: 22, y: 56, status: 'locked', requires: ['id-sketching'], desc: 'Build precision 3D models using CAD tools like Fusion 360 and SolidWorks.' },
+      { id: 'id-ergonomics', title: 'Ergonomics & Human Factors', emoji: '👤', x: 50, y: 58, status: 'locked', requires: ['id-sketching', 'id-materials'], desc: 'Design for the human body — posture, reach, comfort, and accessibility.' },
+      { id: 'id-prototype', title: 'Prototyping', emoji: '🧰', x: 75, y: 56, status: 'locked', requires: ['id-materials'], desc: 'Rapid prototyping, 3D printing, and iterative testing.' },
+      { id: 'id-product', title: 'Product Development', emoji: '📦', x: 38, y: 42, status: 'locked', requires: ['id-cad', 'id-ergonomics'], desc: 'Take a product from concept to market-ready — design sprints, user testing, and refinement.' },
+      { id: 'id-render', title: 'Rendering & Presentation', emoji: '🖼️', x: 65, y: 42, status: 'locked', requires: ['id-prototype'], desc: 'Photorealistic product rendering, presentation decks, and client storytelling.' },
+      { id: 'id-showcase', title: 'Portfolio Showcase', emoji: '🏆', x: 50, y: 26, status: 'locked', requires: ['id-product', 'id-render'], desc: 'Build a professional industrial design portfolio and present your capstone product.' },
+    ]
   }
 };
+
+// Merge host-added custom pathways from localStorage
+try {
+  const custom = JSON.parse(localStorage.getItem('pflx_custom_pathways') || '[]');
+  if (Array.isArray(custom)) {
+    custom.forEach(p => {
+      if (p && p.slug && !PATHWAYS[p.slug]) {
+        PATHWAYS[p.slug] = {
+          title: p.title || 'Custom Pathway',
+          subtitle: p.subtitle || p.description || 'Welcome to your custom pathway',
+          icon: p.icon || 'public/icons/core-pathway-logo.png',
+          accent: p.accent || '#60a5fa',
+          nodes: p.nodes && p.nodes.length ? p.nodes : [
+            { id: (p.slug + '-intro'), title: 'Intro', emoji: '🌟', x: 50, y: 70, status: 'unlocked', desc: p.description || 'Begin your custom pathway journey.' }
+          ],
+        };
+      }
+    });
+  }
+} catch(e) {}
 
 // ==================== INITIALIZATION ====================
 const params = new URLSearchParams(window.location.search);
@@ -3864,7 +3903,7 @@ function showSaveToast(msg) {
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'pflxSaveToast';
-    toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;padding:10px 28px;border-radius:6px;font-family:Orbitron;font-size:11px;letter-spacing:2px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;text-transform:uppercase;';
+    toast.style.cssText = 'position:fixed;bottom:calc(30px + var(--pflx-ticker-offset));left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;padding:10px 28px;border-radius:6px;font-family:Orbitron;font-size:11px;letter-spacing:2px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;text-transform:uppercase;';
     document.body.appendChild(toast);
   }
   toast.textContent = msg;

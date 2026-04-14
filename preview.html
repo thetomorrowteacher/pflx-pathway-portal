@@ -15,12 +15,15 @@
       --pflx-purple: #8b5cf6;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
+    /* Reserve bottom space for the Platform shell ticker (~48px).
+       All absolute/fixed children inside body respect this reduced viewport. */
+    :root { --pflx-ticker-offset: 48px; }
+    html, body {
       font-family: 'Rajdhani', sans-serif;
       background: #050810;
       color: #e0e0e0;
       width: 100vw;
-      height: 100vh;
+      height: calc(100vh - var(--pflx-ticker-offset));
       overflow: hidden;
       position: relative;
     }
@@ -85,7 +88,7 @@
 
     /* Powered by PFLX */
     .powered-by {
-      position: fixed; bottom: 14px; left: 50%;
+      position: fixed; bottom: calc(14px + var(--pflx-ticker-offset)); left: 50%;
       transform: translateX(-50%);
       display: flex; align-items: center; gap: 10px;
       z-index: 55; pointer-events: none;
@@ -1597,7 +1600,7 @@
 
   <!-- Fullscreen Toggle -->
   <button id="fullscreenBtn" title="Toggle Fullscreen" style="
-    position: fixed; bottom: 20px; left: 20px; z-index: 300;
+    position: fixed; bottom: calc(20px + var(--pflx-ticker-offset)); left: 20px; z-index: 300;
     width: 36px; height: 36px; border-radius: 6px;
     background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.25);
     color: rgba(0,212,255,0.7); font-size: 16px; cursor: pointer;
