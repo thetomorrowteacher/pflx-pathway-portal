@@ -175,4 +175,51 @@ export const pathways: Pathway[] = [
       { id: 'gd-project-bac', title: 'Project BAC', position: { x: 72, y: 35 }, status: 'locked', unlockRequires: ['gd-beta'] },
     ],
   },
+  {
+    id: 'industrial-designer',
+    slug: 'industrial-designer',
+    title: 'Industrial Designer',
+    subtitle: 'Welcome to the Universe of Industrial Design',
+    description:
+      "Step into the Industrial Designer Pathway — a studio where form meets function. You'll prototype real-world products, sketch and render concepts, learn materials and manufacturing fundamentals, and carry ideas from napkin sketch to working prototype using CAD, 3D printing, and hands-on fabrication.",
+    icon: '🛠️',
+    accentColor: '#fb923c',
+    backgroundTheme: 'from-orange-900/40 via-amber-900/20 to-transparent',
+    nodes: [
+      { id: 'id-intro', title: 'Intro to Industrial Design', position: { x: 55, y: 90 }, status: 'unlocked' },
+      { id: 'id-sketching', title: 'Concept Sketching', position: { x: 30, y: 78 }, status: 'locked', unlockRequires: ['id-intro'] },
+      { id: 'id-materials', title: 'Materials & Manufacturing', position: { x: 22, y: 62 }, status: 'locked', unlockRequires: ['id-sketching'] },
+      { id: 'id-cad', title: 'CAD Fundamentals', position: { x: 70, y: 65 }, status: 'locked', unlockRequires: ['id-intro'] },
+      { id: 'id-ergonomics', title: 'Ergonomics & Human Factors', position: { x: 45, y: 55 }, status: 'locked', unlockRequires: ['id-sketching'] },
+      { id: 'id-prototype', title: 'Rapid Prototyping', position: { x: 65, y: 48 }, status: 'locked', unlockRequires: ['id-cad'] },
+      { id: 'id-product', title: 'Product Design Studio', position: { x: 40, y: 40 }, status: 'locked', unlockRequires: ['id-materials', 'id-ergonomics'] },
+      { id: 'id-render', title: 'Rendering & Presentation', position: { x: 60, y: 32 }, status: 'locked', unlockRequires: ['id-prototype'] },
+      { id: 'id-showcase', title: 'Design Showcase', position: { x: 35, y: 25 }, status: 'locked', unlockRequires: ['id-product', 'id-render'] },
+    ],
+  },
 ];
+
+// ── Dynamic pathways (host-added via admin panel) ──────────────────────────
+// Stored in localStorage `pflx_custom_pathways` and merged into the list above
+// by getAllPathways() at render time. Supabase sync is handled by the portal
+// store layer when available.
+export function getCustomPathways(): Pathway[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('pflx_custom_pathways');
+    return raw ? (JSON.parse(raw) as Pathway[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomPathways(list: Pathway[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('pflx_custom_pathways', JSON.stringify(list));
+  } catch {}
+}
+
+export function getAllPathways(): Pathway[] {
+  return [...pathways, ...getCustomPathways()];
+}
