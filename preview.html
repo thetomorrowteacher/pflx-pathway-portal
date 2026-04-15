@@ -321,7 +321,9 @@
     /* ========== PATHWAY NODES ========== */
     .pathway-map {
       position: absolute;
-      inset: 0;
+      /* reserve bottom space so nodes don't overlap the "Powered by" strip
+         and season ticker (node y% is relative to this box) */
+      inset: 0 0 80px 0;
       z-index: 30;
       pointer-events: none;
     }
@@ -1042,15 +1044,17 @@
     // Middle right: Digital Artist, CS/AI Specialist
     // Bottom left: Sound Designer
     // Bottom right: Game Designer
+    // Redistributed vertically to fit 8 pathways without overlapping the
+    // bottom "Powered by X-Coin" strip + season ticker.
     const baseNodes = [
-      { title: 'Professional Entrepreneur', slug: 'professional-entrepreneur', icon: 'public/icons/professional-entrepreneur.png', accent: '#00d4ff',  x: '35%', y: '20%', side: 'left', projects: 8 },
-      { title: 'Content Creator',           slug: 'content-creator',           icon: 'public/icons/content-creator.png',           accent: '#ff6ec7',  x: '12%', y: '36%', side: 'left',  projects: 7 },
-      { title: 'Digital Artist',            slug: 'digital-artist',            icon: 'public/icons/digital-artist.png',            accent: '#c084fc',  x: '58%', y: '36%', side: 'right', projects: 10 },
-      { title: '3D Modeler',                slug: '3d-modeler',                icon: 'public/icons/3d-modeler.png',                accent: '#22d3ee',  x: '10%', y: '54%', side: 'left',  projects: 9 },
-      { title: 'CS/AI Specialist',          slug: 'cs-ai-specialist',          icon: 'public/icons/cs-ai-specialist.png',          accent: '#a78bfa',  x: '60%', y: '54%', side: 'right', projects: 7 },
-      { title: 'Sound Designer',            slug: 'sound-designer',            icon: 'public/icons/sound-designer.png',            accent: '#f472b6',  x: '15%', y: '72%', side: 'left',  projects: 7 },
-      { title: 'Game Designer',             slug: 'game-designer',             icon: 'public/icons/game-designer.png',             accent: '#34d399',  x: '55%', y: '72%', side: 'right', projects: 9 },
-      { title: 'Industrial Designer',       slug: 'industrial-designer',       icon: 'public/icons/industrial-designer.png',       accent: '#fb923c',  x: '35%', y: '88%', side: 'left',  projects: 9 },
+      { title: 'Professional Entrepreneur', slug: 'professional-entrepreneur', icon: 'public/icons/professional-entrepreneur.png', accent: '#00d4ff',  x: '35%', y: '14%', side: 'left', projects: 8 },
+      { title: 'Content Creator',           slug: 'content-creator',           icon: 'public/icons/content-creator.png',           accent: '#ff6ec7',  x: '12%', y: '30%', side: 'left',  projects: 7 },
+      { title: 'Digital Artist',            slug: 'digital-artist',            icon: 'public/icons/digital-artist.png',            accent: '#c084fc',  x: '58%', y: '30%', side: 'right', projects: 10 },
+      { title: '3D Modeler',                slug: '3d-modeler',                icon: 'public/icons/3d-modeler.png',                accent: '#22d3ee',  x: '10%', y: '46%', side: 'left',  projects: 9 },
+      { title: 'CS/AI Specialist',          slug: 'cs-ai-specialist',          icon: 'public/icons/cs-ai-specialist.png',          accent: '#a78bfa',  x: '60%', y: '46%', side: 'right', projects: 7 },
+      { title: 'Sound Designer',            slug: 'sound-designer',            icon: 'public/icons/sound-designer.png',            accent: '#f472b6',  x: '15%', y: '62%', side: 'left',  projects: 7 },
+      { title: 'Game Designer',             slug: 'game-designer',             icon: 'public/icons/game-designer.png',             accent: '#34d399',  x: '55%', y: '62%', side: 'right', projects: 9 },
+      { title: 'Industrial Designer',       slug: 'industrial-designer',       icon: 'public/icons/industrial-designer.png',       accent: '#fb923c',  x: '35%', y: '76%', side: 'left',  projects: 9 },
     ];
 
     // Load host-added custom pathways from localStorage
