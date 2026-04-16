@@ -86,11 +86,12 @@
     .frame-side.left { left: 7px; background: linear-gradient(180deg, transparent, rgba(0,212,255,0.2), transparent); }
     .frame-side.right { right: 7px; background: linear-gradient(180deg, transparent, rgba(0,212,255,0.2), transparent); }
 
-    /* Powered by PFLX */
+    /* Powered by PFLX — hidden to reclaim bottom space */
     .powered-by {
+      display: none !important;
       position: fixed; bottom: calc(14px + var(--pflx-ticker-offset)); left: 50%;
       transform: translateX(-50%);
-      display: flex; align-items: center; gap: 10px;
+      align-items: center; gap: 10px;
       z-index: 55; pointer-events: none;
     }
     .powered-by-text {
@@ -321,9 +322,10 @@
     /* ========== PATHWAY NODES ========== */
     .pathway-map {
       position: absolute;
-      /* reserve bottom space so nodes don't overlap the "Powered by" strip
-         and season ticker (node y% is relative to this box) */
-      inset: 0 0 80px 0;
+      /* Reserve top space so nodes clear the title (top:80px + ~70px height)
+         and bottom space so nodes don't collide with add-pathway / settings /
+         season ticker. Node y% is relative to this box. */
+      inset: 170px 0 120px 0;
       z-index: 30;
       pointer-events: none;
     }
@@ -668,7 +670,7 @@
 
     /* ========== SETTINGS BUTTON ========== */
     #settingsBtn {
-      position: absolute; bottom: 18px; right: 20px; z-index: 70;
+      position: fixed; bottom: calc(18px + var(--pflx-ticker-offset)); right: 20px; z-index: 70;
       font-size: 16px; padding: 8px 12px;
       background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.3);
       color: rgba(0,212,255,0.6); cursor: pointer; transition: all 0.3s;
@@ -893,7 +895,7 @@
 
   <!-- HOST: Add Pathway Button (host-only, hidden by default) -->
   <button id="addPathwayBtn" title="Add New Pathway" style="
-    position:absolute; bottom:18px; right:72px; z-index:70;
+    position:fixed; bottom:calc(18px + var(--pflx-ticker-offset)); right:72px; z-index:70;
     font-size:13px; padding:8px 14px; display:none;
     background:rgba(6,10,18,0.9); border:1px solid rgba(251,146,60,0.4);
     color:rgba(251,146,60,0.85); cursor:pointer; transition:all .3s;
