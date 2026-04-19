@@ -2854,9 +2854,49 @@
           <label class="ne-label">Description</label>
           <textarea class="ne-textarea" id="neDesc" placeholder="What will players learn or do?"></textarea>
         </div>
+        <div class="ne-row">
+          <div class="ne-field">
+            <label class="ne-label">Node Type</label>
+            <select class="ne-select" id="neNodeType">
+              <option value="">— None —</option>
+              <option value="course">Course — Skill Building</option>
+              <option value="project">Project — Build & Submit</option>
+              <option value="program">Program — Outreach/Service</option>
+              <option value="quest">Quest — Sequential Tasks</option>
+              <option value="challenge">Challenge — Competitive/Timed</option>
+            </select>
+          </div>
+        </div>
+        <div class="ne-row">
+          <div class="ne-field">
+            <label class="ne-label">XC Reward (earned on completion)</label>
+            <input class="ne-input" id="neXcReward" type="number" min="0" step="10" placeholder="0">
+          </div>
+          <div class="ne-field">
+            <label class="ne-label">XC Entry Fee (one-time cost)</label>
+            <input class="ne-input" id="neXcCost" type="number" min="0" step="10" placeholder="0">
+          </div>
+        </div>
         <div class="ne-field">
-          <label class="ne-label">External URL (opens on Start)</label>
+          <label class="ne-label">HTML Content File (embeds after warp scene)</label>
+          <input class="ne-input" id="neContentUrl" placeholder="https://yoursite.com/course-content.html">
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">URL to an HTML file that loads inside the node when the player clicks Start</span>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">External URL (opens in new tab on Start)</label>
           <input class="ne-input" id="neUrl" placeholder="https://classroom.google.com/...">
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">MC Task/Project Tag</label>
+          <div class="ne-row">
+            <select class="ne-select" id="neMcTagType" style="max-width:130px;">
+              <option value="">— None —</option>
+              <option value="task">Task</option>
+              <option value="project">Project</option>
+            </select>
+            <input class="ne-input" id="neMcTagName" placeholder="Task or Project name to create in MC..." style="flex:1;">
+          </div>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Creates a linked task or project in Mission Control when this node is started</span>
         </div>
         <div class="ne-row">
           <div class="ne-field">
@@ -2869,7 +2909,7 @@
             </select>
           </div>
           <div class="ne-field">
-            <label class="ne-label">Completion Badge</label>
+            <label class="ne-label">Primary Completion Badge</label>
             <select class="ne-select" id="neBadge">
               <option value="">— None —</option>
               <optgroup label="🏅 Signature Badges (Skill Mastery)">
@@ -2923,9 +2963,45 @@
           </div>
         </div>
         <div class="ne-field">
-          <label class="ne-label" style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" id="neComingSoon" style="width:14px;height:14px;"> Coming Soon
-          </label>
+          <label class="ne-label">Additional Tagged Badges</label>
+          <div id="neTaggedBadgesContainer" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-height:24px;"></div>
+          <div style="display:flex;gap:6px;">
+            <select class="ne-select" id="neTaggedBadgeSelect" style="flex:1;">
+              <option value="">— Add Badge —</option>
+            </select>
+            <button type="button" id="neAddTaggedBadge" style="background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-family:'Rajdhani';font-size:12px;font-weight:700;">+ Add</button>
+          </div>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Extra badges earned alongside the primary completion badge</span>
+        </div>
+        <div class="ne-field" style="border:1px solid rgba(0,212,255,0.15);border-radius:6px;padding:12px;background:rgba(0,212,255,0.03);">
+          <label class="ne-label" style="color:#00d4ff;margin-bottom:8px;">Submission Requirements</label>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);cursor:pointer;">
+              <input type="checkbox" id="neSubLink" style="width:14px;height:14px;"> Accept Link Submission
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);cursor:pointer;">
+              <input type="checkbox" id="neSubScreenshot" style="width:14px;height:14px;"> Accept Screenshot Upload
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);cursor:pointer;">
+              <input type="checkbox" id="neSubHtml" style="width:14px;height:14px;"> Accept HTML File Upload
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);cursor:pointer;">
+              <input type="checkbox" id="neSubDesc" style="width:14px;height:14px;"> Require Description
+            </label>
+          </div>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:6px;display:block;">Player submissions go to X-Coin Approvals. On approval, player earns badges + XC reward.</span>
+        </div>
+        <div class="ne-row" style="gap:12px;">
+          <div class="ne-field">
+            <label class="ne-label" style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="neComingSoon" style="width:14px;height:14px;"> Coming Soon
+            </label>
+          </div>
+          <div class="ne-field">
+            <label class="ne-label" style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="neHasProgressBar" style="width:14px;height:14px;"> Show Progress Bar
+            </label>
+          </div>
         </div>
         <button class="ne-save" id="neSave" type="button">Save Node</button>
       </div>
@@ -5118,6 +5194,40 @@ ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
 const editorOverlay = document.getElementById('nodeEditorOverlay');
 let editorNode = null;
 
+// ─── TAGGED BADGES HELPERS ───
+let _neTaggedBadges = [];
+function _neRenderTaggedBadges() {
+  const container = document.getElementById('neTaggedBadgesContainer');
+  if (!container) return;
+  container.innerHTML = '';
+  _neTaggedBadges.forEach((badge, i) => {
+    const chip = document.createElement('div');
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.25);color:rgba(255,255,255,0.8);padding:3px 8px 3px 10px;border-radius:12px;font-size:11px;font-family:Rajdhani;';
+    chip.innerHTML = `<span>${badge}</span><button type="button" data-idx="${i}" style="background:none;border:none;color:rgba(255,60,60,0.7);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;">&times;</button>`;
+    chip.querySelector('button').addEventListener('click', function() {
+      _neTaggedBadges.splice(parseInt(this.dataset.idx), 1);
+      _neRenderTaggedBadges();
+    });
+    container.appendChild(chip);
+  });
+}
+// Wire up add tagged badge button
+document.addEventListener('DOMContentLoaded', function() {
+  var addBtn = document.getElementById('neAddTaggedBadge');
+  if (addBtn) {
+    addBtn.addEventListener('click', function() {
+      var sel = document.getElementById('neTaggedBadgeSelect');
+      if (sel.value && !_neTaggedBadges.includes(sel.value)) {
+        _neTaggedBadges.push(sel.value);
+        _neRenderTaggedBadges();
+        // Remove from dropdown
+        sel.remove(sel.selectedIndex);
+        sel.value = '';
+      }
+    });
+  }
+});
+
 function openNodeEditor(node, isNew) {
   // Close detail panel if open (it has z-index 500, would block editor)
   if (detailOverlay.classList.contains('active')) {
@@ -5135,6 +5245,30 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neBadge').value = node.requiredBadge || '';
   document.getElementById('neComingSoon').checked = node.comingSoon || false;
   document.getElementById('neImageFit').value = node.imageFit || 'cover';
+  // New fields
+  document.getElementById('neNodeType').value = node.nodeType || '';
+  document.getElementById('neXcReward').value = node.xcReward || '';
+  document.getElementById('neXcCost').value = node.xcCost || '';
+  document.getElementById('neContentUrl').value = node.contentUrl || '';
+  document.getElementById('neMcTagType').value = (node.mcTag && node.mcTag.type) ? node.mcTag.type : '';
+  document.getElementById('neMcTagName').value = (node.mcTag && node.mcTag.name) ? node.mcTag.name : '';
+  document.getElementById('neSubLink').checked = node.submission ? !!node.submission.link : false;
+  document.getElementById('neSubScreenshot').checked = node.submission ? !!node.submission.screenshot : false;
+  document.getElementById('neSubHtml').checked = node.submission ? !!node.submission.html : false;
+  document.getElementById('neSubDesc').checked = node.submission ? !!node.submission.description : false;
+  document.getElementById('neHasProgressBar').checked = node.hasProgressBar || false;
+  // Tagged badges
+  _neTaggedBadges = node.taggedBadges ? [...node.taggedBadges] : [];
+  _neRenderTaggedBadges();
+  // Populate tagged badge dropdown from primary badge select options
+  const taggedSelect = document.getElementById('neTaggedBadgeSelect');
+  const primarySelect = document.getElementById('neBadge');
+  taggedSelect.innerHTML = '<option value="">— Add Badge —</option>';
+  Array.from(primarySelect.options).forEach(opt => {
+    if (opt.value && !_neTaggedBadges.includes(opt.value)) {
+      taggedSelect.add(new Option(opt.text, opt.value));
+    }
+  });
 
   // Image preview
   const preview = document.getElementById('neImagePreview');
@@ -5174,7 +5308,23 @@ function _doSaveNode() {
     editorNode.requiredBadge = document.getElementById('neBadge').value || '';
     editorNode.comingSoon = document.getElementById('neComingSoon').checked;
     editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
-    console.log('[PFLX] Node updated:', editorNode.title, 'url:', editorNode.url);
+    // New fields
+    editorNode.nodeType = document.getElementById('neNodeType').value || '';
+    editorNode.xcReward = parseInt(document.getElementById('neXcReward').value) || 0;
+    editorNode.xcCost = parseInt(document.getElementById('neXcCost').value) || 0;
+    editorNode.contentUrl = document.getElementById('neContentUrl').value || '';
+    var mcType = document.getElementById('neMcTagType').value;
+    var mcName = document.getElementById('neMcTagName').value;
+    editorNode.mcTag = mcType && mcName ? { type: mcType, name: mcName } : null;
+    editorNode.submission = {
+      link: document.getElementById('neSubLink').checked,
+      screenshot: document.getElementById('neSubScreenshot').checked,
+      html: document.getElementById('neSubHtml').checked,
+      description: document.getElementById('neSubDesc').checked
+    };
+    editorNode.hasProgressBar = document.getElementById('neHasProgressBar').checked;
+    editorNode.taggedBadges = _neTaggedBadges.length > 0 ? [..._neTaggedBadges] : [];
+    console.log('[PFLX] Node updated:', editorNode.title, 'type:', editorNode.nodeType, 'url:', editorNode.url);
 
     // ── Residual XC income: when a pitched node is marked completed ──
     if (editorNode.isPitchedNode && editorNode.status === 'completed' && oldStatus !== 'completed') {
