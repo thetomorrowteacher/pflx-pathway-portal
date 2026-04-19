@@ -5705,5 +5705,100 @@ document.addEventListener('keydown', e => {
 </div>
 
 <script src="pflx-ai-chat.js"></script>
+
+<!-- ═══ PFLX Ticker Relay — Core Pathways → Console ═══ -->
+<script>
+(function() {
+  'use strict';
+  if (window.parent === window) return; // Not in iframe
+
+  function buildPathwayTickerEvents() {
+    var events = [];
+    var now = new Date().toISOString();
+    var pathwayName = document.title || 'Core Pathway';
+
+    // Current pathway name from page header
+    var headerEl = document.querySelector('.pathway-title, h1, .header-title');
+    if (headerEl) pathwayName = headerEl.textContent.trim();
+
+    // Node completion progress
+    var allNodes = document.querySelectorAll('.node');
+    var completedNodes = document.querySelectorAll('.node.completed, .node[data-status="completed"]');
+    if (allNodes.length > 0) {
+      var pct = Math.round((completedNodes.length / allNodes.length) * 100);
+      events.push({
+        icon: '🗺️', color: '#00f0ff', source: 'pathways',
+        text: 'PATHWAY — ' + pathwayName + ': ' + completedNodes.length + '/' + allNodes.length + ' nodes complete (' + pct + '%)',
+        date: now
+      });
+    }
+
+    // Ship position / last active node
+    try {
+      var shipState = JSON.parse(localStorage.getItem('pflx_ship_state') || '{}');
+      if (shipState.lastNode) {
+        events.push({
+          icon: '🚀', color: '#a78bfa', source: 'pathways',
+          text: 'SHIP LOCATION — Docked at "' + shipState.lastNode + '" on ' + pathwayName,
+          date: shipState.timestamp || now
+        });
+      }
+    } catch(e) {}
+
+    // Recent node unlocks
+    try {
+      var unlocks = JSON.parse(localStorage.getItem('pflx_node_unlocks') || '[]');
+      var today = new Date(); today.setHours(0,0,0,0);
+      unlocks.forEach(function(u) {
+        if (new Date(u.date).getTime() >= today.getTime()) {
+          events.push({
+            icon: '🔓', color: '#4ade80', source: 'pathways',
+            text: 'NODE UNLOCKED — "' + (u.name || u.nodeId) + '" on ' + pathwayName,
+            date: u.date
+          });
+        }
+      });
+    } catch(e) {}
+
+    // Ship upgrades purchased
+    try {
+      var upgrades = JSON.parse(localStorage.getItem('pflx_ship_upgrades') || '[]');
+      if (upgrades.length > 0) {
+        var latest = upgrades[upgrades.length - 1];
+        events.push({
+          icon: '⚡', color: '#f5c842', source: 'pathways',
+          text: 'SHIP UPGRADE — "' + (latest.name || latest.id) + '" installed',
+          date: latest.date || now
+        });
+      }
+    } catch(e) {}
+
+    return events.slice(0, 15);
+  }
+
+  function sendTickerToParent() {
+    var events = buildPathwayTickerEvents();
+    if (events.length > 0) {
+      window.parent.postMessage(JSON.stringify({
+        type: 'pflx_ticker_events',
+        source: 'pathways',
+        events: events
+      }), '*');
+    }
+  }
+
+  // Send after page loads + every 60s
+  setTimeout(sendTickerToParent, 3000);
+  setInterval(sendTickerToParent, 60000);
+
+  // Respond to explicit requests
+  window.addEventListener('message', function(e) {
+    try {
+      var msg = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      if (msg.type === 'pflx_ticker_request') sendTickerToParent();
+    } catch(ex) {}
+  });
+})();
+</script>
 </body>
 </html>
