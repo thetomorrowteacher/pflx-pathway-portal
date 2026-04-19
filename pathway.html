@@ -806,49 +806,51 @@
     .player-card {
       position: fixed;
       top: 220px; right: 20px;
-      width: 270px;
-      border: 1px solid rgba(0,212,255,0.25);
-      background: rgba(6,10,18,0.92);
-      backdrop-filter: blur(10px);
+      width: 280px;
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 8px;
+      background: rgba(6,10,18,0.94);
+      backdrop-filter: blur(14px);
       z-index: 200;
       display: none;
       overflow: hidden;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.5), 0 0 40px rgba(0,212,255,0.06);
     }
     .player-card::before, .player-card::after {
       content: ''; position: absolute;
-      width: 16px; height: 16px;
-      border-color: rgba(0,212,255,0.5); border-style: solid;
+      width: 14px; height: 14px;
+      border-color: rgba(0,212,255,0.45); border-style: solid;
     }
-    .player-card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-    .player-card::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+    .player-card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; border-radius: 8px 0 0 0; }
+    .player-card::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; border-radius: 0 0 8px 0; }
 
     .pc-header {
       display: flex; align-items: center; gap: 10px;
       padding: 14px 14px 10px;
-      border-bottom: 1px solid rgba(0,212,255,0.1);
+      border-bottom: 1px solid rgba(0,212,255,0.08);
     }
     .pc-avatar {
-      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
       overflow: hidden;
-      border: 2px solid rgba(0,212,255,0.4);
-      box-shadow: 0 0 12px rgba(0,212,255,0.25);
+      border: 2px solid rgba(0,212,255,0.35);
+      box-shadow: 0 0 14px rgba(0,212,255,0.2);
       display: flex; align-items: center; justify-content: center;
       background: linear-gradient(135deg, #00d4ff, #7c3aed);
-      font-family: 'Orbitron'; font-size: 14px; font-weight: 800; color: #fff;
+      font-family: 'Orbitron'; font-size: 13px; font-weight: 800; color: #fff;
     }
     .pc-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .pc-info { flex: 1; overflow: hidden; }
     .pc-brand {
-      font-family: 'Orbitron'; font-weight: 700; font-size: 12px;
+      font-family: 'Orbitron'; font-weight: 700; font-size: 11px;
       color: #ffffff; letter-spacing: 1px; text-transform: uppercase;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .pc-designer-type {
       font-family: 'Rajdhani'; font-size: 11px;
-      color: rgba(0,212,255,0.7); letter-spacing: 1px; margin-top: 2px;
+      color: rgba(0,212,255,0.65); letter-spacing: 0.8px; margin-top: 1px;
     }
     .pc-role-badge {
-      font-family: 'Orbitron'; font-size: 8px; font-weight: 600;
+      font-family: 'Orbitron'; font-size: 7px; font-weight: 600;
       padding: 2px 6px; border-radius: 3px; letter-spacing: 1.5px; text-transform: uppercase;
       flex-shrink: 0;
     }
@@ -864,7 +866,6 @@
     }
     .pc-toggle:hover { background: rgba(0,212,255,0.25); color: #fff; }
 
-    /* Floating restore button when player card is hidden */
     .pc-restore {
       position: fixed; top: 220px; right: 20px;
       width: 36px; height: 36px; border-radius: 6px;
@@ -874,6 +875,67 @@
       z-index: 200; transition: all 0.2s; backdrop-filter: blur(8px);
     }
     .pc-restore:hover { background: rgba(0,212,255,0.15); color: #fff; }
+
+    /* Rank Section */
+    .pc-rank-section { padding: 10px 14px 8px; }
+    .pc-rank-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .pc-rank-label { font-family: 'Orbitron'; font-size: 7px; letter-spacing: 2px; color: rgba(255,255,255,0.3); text-transform: uppercase; }
+    .pc-rank-name { font-family: 'Orbitron'; font-size: 10px; font-weight: 700; color: #a78bfa; letter-spacing: 1px; }
+    .pc-rank-bar-track { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; border: 1px solid rgba(139,92,246,0.1); }
+    .pc-rank-bar-fill { height: 100%; background: linear-gradient(90deg, #7c3aed, #a78bfa); border-radius: 2px; transition: width 0.8s ease; }
+    .pc-rank-progress-text { font-family: 'Rajdhani'; font-size: 10px; color: rgba(255,255,255,0.3); text-align: right; margin-top: 3px; }
+
+    /* Stats Grid */
+    .pc-stats-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      padding: 6px 10px;
+      border-top: 1px solid rgba(0,212,255,0.06);
+    }
+    .pc-stats-grid.secondary { grid-template-columns: repeat(4, 1fr); padding: 4px 10px 6px; }
+    .pc-stat-cell {
+      text-align: center; padding: 6px 2px;
+    }
+    .pc-stat-value {
+      font-family: 'Orbitron'; font-size: 16px; font-weight: 800;
+      color: #fff; line-height: 1.2;
+    }
+    .pc-stat-value.xc-glow { color: #00d4ff; text-shadow: 0 0 8px rgba(0,212,255,0.3); }
+    .pc-stat-value.badge-glow { color: #a78bfa; text-shadow: 0 0 8px rgba(139,92,246,0.3); }
+    .pc-stat-value.level-glow { color: #f59e0b; text-shadow: 0 0 8px rgba(245,158,11,0.3); }
+    .pc-stat-value.mini-val { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.8); }
+    .pc-stat-label {
+      font-family: 'Orbitron'; font-size: 6px; font-weight: 600;
+      letter-spacing: 1.5px; color: rgba(255,255,255,0.25);
+      text-transform: uppercase; margin-top: 2px;
+    }
+
+    /* Pathway Progress */
+    .pc-pathway-section { padding: 6px 14px 8px; }
+    .pc-section-label { font-family: 'Orbitron'; font-size: 7px; letter-spacing: 2px; color: rgba(0,212,255,0.4); text-transform: uppercase; margin-bottom: 5px; }
+    .pc-pathway-bar-track { height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; border: 1px solid rgba(0,212,255,0.1); }
+    .pc-pathway-bar-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #7c3aed); border-radius: 3px; transition: width 0.8s ease; width: 0%; }
+    .pc-pathway-stats { font-family: 'Rajdhani'; font-size: 10px; color: rgba(255,255,255,0.35); text-align: right; margin-top: 3px; }
+
+    /* Badges Preview */
+    .pc-badges-preview { padding: 4px 14px 8px; }
+    .pc-badges-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .pc-badge-chip {
+      font-family: 'Rajdhani'; font-size: 9px; font-weight: 700;
+      background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2);
+      color: #a78bfa; padding: 2px 8px; border-radius: 10px;
+      letter-spacing: 0.5px; white-space: nowrap;
+    }
+
+    /* Logout */
+    .pc-logout {
+      display: block; width: calc(100% - 24px); margin: 6px 12px 10px;
+      padding: 8px; border: 1px solid rgba(0,212,255,0.15);
+      background: rgba(0,212,255,0.05); color: rgba(0,212,255,0.6);
+      font-family: 'Orbitron'; font-size: 9px; letter-spacing: 2px;
+      text-transform: uppercase; cursor: pointer; border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .pc-logout:hover { background: rgba(0,212,255,0.12); color: #00d4ff; border-color: rgba(0,212,255,0.3); }
 
     /* ========== WELCOME MESSAGE PANEL ========== */
     .welcome-panel {
@@ -2446,6 +2508,7 @@
   <!-- Player Card (shown for logged-in players) -->
   <div class="player-card" id="playerCard">
     <button class="pc-toggle" id="pcToggle" title="Hide Player Card">✕</button>
+    <!-- Header: Avatar + Identity -->
     <div class="pc-header">
       <div class="pc-avatar" id="pcAvatar"></div>
       <div class="pc-info">
@@ -2454,31 +2517,68 @@
       </div>
       <span class="pc-role-badge" id="pcRoleBadge"></span>
     </div>
-    <div class="pc-body">
+    <!-- Rank Section -->
+    <div class="pc-rank-section">
       <div class="pc-rank-row">
-        <span class="pc-rank-label">Evolution Rank</span>
+        <span class="pc-rank-label">EVOLUTION RANK</span>
         <span class="pc-rank-name" id="pcRankName"></span>
       </div>
       <div class="pc-rank-bar-track">
         <div class="pc-rank-bar-fill" id="pcRankFill"></div>
       </div>
       <div class="pc-rank-progress-text" id="pcRankProgress"></div>
-      <div class="pc-stats">
-        <div class="pc-stat">
-          <div class="pc-stat-value xc-color" id="pcXC"></div>
-          <div class="pc-stat-label">X-Coin</div>
-        </div>
-        <div class="pc-stat">
-          <div class="pc-stat-value badge-color" id="pcBadges"></div>
-          <div class="pc-stat-label">Badges</div>
-        </div>
-        <div class="pc-stat">
-          <div class="pc-stat-value" id="pcLevel"></div>
-          <div class="pc-stat-label">Level</div>
-        </div>
-      </div>
-      <button class="pc-logout" id="pcLogout">Sign Out</button>
     </div>
+    <!-- Primary Stats Row -->
+    <div class="pc-stats-grid">
+      <div class="pc-stat-cell">
+        <div class="pc-stat-value xc-glow" id="pcXC">0</div>
+        <div class="pc-stat-label">X-COIN</div>
+      </div>
+      <div class="pc-stat-cell">
+        <div class="pc-stat-value badge-glow" id="pcBadges">0</div>
+        <div class="pc-stat-label">BADGES</div>
+      </div>
+      <div class="pc-stat-cell">
+        <div class="pc-stat-value level-glow" id="pcLevel">1</div>
+        <div class="pc-stat-label">LEVEL</div>
+      </div>
+    </div>
+    <!-- Pathway Progress -->
+    <div class="pc-pathway-section">
+      <div class="pc-section-label">PATHWAY PROGRESS</div>
+      <div class="pc-pathway-bar-track">
+        <div class="pc-pathway-bar-fill" id="pcPathwayFill"></div>
+      </div>
+      <div class="pc-pathway-stats">
+        <span id="pcNodesCompleted">0</span> / <span id="pcNodesTotal">0</span> nodes
+      </div>
+    </div>
+    <!-- Secondary Stats Grid -->
+    <div class="pc-stats-grid secondary">
+      <div class="pc-stat-cell mini">
+        <div class="pc-stat-value mini-val" id="pcShipTier">—</div>
+        <div class="pc-stat-label">SHIP</div>
+      </div>
+      <div class="pc-stat-cell mini">
+        <div class="pc-stat-value mini-val" id="pcSubmissions">0</div>
+        <div class="pc-stat-label">SUBMITTED</div>
+      </div>
+      <div class="pc-stat-cell mini">
+        <div class="pc-stat-value mini-val" id="pcStreak">0</div>
+        <div class="pc-stat-label">STREAK</div>
+      </div>
+      <div class="pc-stat-cell mini">
+        <div class="pc-stat-value mini-val" id="pcTotalXC">0</div>
+        <div class="pc-stat-label">LIFETIME XC</div>
+      </div>
+    </div>
+    <!-- Active Badges Preview -->
+    <div class="pc-badges-preview" id="pcBadgesPreview" style="display:none;">
+      <div class="pc-section-label">RECENT BADGES</div>
+      <div class="pc-badges-row" id="pcBadgesRow"></div>
+    </div>
+    <!-- Sign Out -->
+    <button class="pc-logout" id="pcLogout">Sign Out</button>
   </div>
   <button class="pc-restore" id="pcRestore" title="Show Player Card">👤</button>
 
@@ -4274,158 +4374,165 @@ function getNextRank(totalXcoin) {
   return nextIdx < RANK_TABLE.length ? RANK_TABLE[nextIdx] : null;
 }
 
-(function initPlayerCard() {
-  const stored = localStorage.getItem('pflx_pathway_user');
-  // PFLX Platform writes `pflx_user` on shell sign-in. It's the canonical
-  // source of truth for the signed-in identity (including `image`) — so
-  // if `pflx_pathway_user` is stale or missing an `image` field, we fall
-  // back to / merge with `pflx_user` before rendering the card.
-  const platformStored = localStorage.getItem('pflx_user');
+(async function initPlayerCard() {
   const playerCard = document.getElementById('playerCard');
   if (!playerCard) { console.error('[PFLX] playerCard element not found'); return; }
 
-  // Default / guest user if no session
+  // ── Gather user identity from localStorage ──
   const defaultUser = {
-    name: 'Explorer',
-    brandName: 'Guest Player',
-    avatar: '??',
-    role: 'player',
-    pathway: pathway.title || '',
-    xcoin: 0,
-    totalXcoin: 0,
-    digitalBadges: 0,
-    level: 1
+    name: 'Explorer', brandName: 'Guest Player', avatar: '??',
+    role: 'player', pathway: pathway.title || '',
+    xcoin: 0, totalXcoin: 0, digitalBadges: 0, level: 1
   };
-
   let user = defaultUser;
   let isGuest = true;
-  if (stored) {
-    try {
-      user = JSON.parse(stored);
-      isGuest = false;
-    } catch(e) {
-      console.error('[PFLX] Failed to parse pflx_pathway_user:', e);
-    }
-  }
 
-  // ── Merge fresh identity from PFLX Platform (`pflx_user`) ──
-  // Ensures Platform profile-pic updates reach the pathway player card
-  // immediately, without waiting for the X-Coin Supabase sync below.
+  // Merge pflx_pathway_user + pflx_user (Platform canonical source)
+  const stored = localStorage.getItem('pflx_pathway_user');
+  const platformStored = localStorage.getItem('pflx_user');
+  if (stored) {
+    try { user = JSON.parse(stored); isGuest = false; } catch(e) {}
+  }
   if (platformStored) {
     try {
-      const platformUser = JSON.parse(platformStored);
-      if (platformUser && typeof platformUser === 'object') {
-        // If we had no pathway session at all, adopt the platform identity
-        if (isGuest) {
-          user = { ...defaultUser, ...platformUser };
-          isGuest = false;
-        } else {
-          // Otherwise, backfill fields that the pathway copy is missing
-          // (image is the main one we care about, but cover the others
-          // so hosts/stats stay consistent).
-          const fillIfMissing = (k) => {
-            if ((user[k] === undefined || user[k] === null || user[k] === '') && platformUser[k] !== undefined) {
-              user[k] = platformUser[k];
-            }
-          };
+      const pu = JSON.parse(platformStored);
+      if (pu && typeof pu === 'object') {
+        if (isGuest) { user = { ...defaultUser, ...pu }; isGuest = false; }
+        else {
           ['image','avatar','brandName','name','role','isHost','xcoin','totalXcoin','digitalBadges','level','rank','cohort','pathway','email','id']
-            .forEach(fillIfMissing);
+            .forEach(k => { if ((user[k] === undefined || user[k] === null || user[k] === '') && pu[k] !== undefined) user[k] = pu[k]; });
         }
-        // Persist the merged copy so subsequent reads see `image`.
-        try { localStorage.setItem('pflx_pathway_user', JSON.stringify(user)); } catch {}
       }
-    } catch (e) {
-      console.warn('[PFLX] Failed to parse pflx_user for merge:', e);
-    }
+    } catch(e) {}
+  }
+
+  // ── Fetch LIVE data from Supabase before rendering ──
+  // This fixes stale rank/XC/badge data
+  if (!isGuest && (user.id || user.email)) {
+    try {
+      const { data, error } = await _supabase
+        .from('app_data').select('data').eq('key', 'users').single();
+      if (!error && data && data.data) {
+        const xcUser = data.data.find(u => u.id === user.id || u.email === user.email);
+        if (xcUser) {
+          // Overwrite stats with authoritative X-Coin values
+          if (xcUser.xcoin !== undefined) user.xcoin = xcUser.xcoin;
+          if (xcUser.totalXcoin !== undefined) user.totalXcoin = xcUser.totalXcoin;
+          if (xcUser.digitalBadges !== undefined) user.digitalBadges = xcUser.digitalBadges;
+          if (xcUser.level !== undefined) user.level = xcUser.level;
+          if (xcUser.rank !== undefined) user.rank = xcUser.rank;
+          if (xcUser.image) user.image = xcUser.image;
+          if (xcUser.brandName) user.brandName = xcUser.brandName;
+          if (xcUser.name) user.name = xcUser.name;
+          if (xcUser.isHost !== undefined) user.isHost = xcUser.isHost;
+          if (xcUser.role) user.role = xcUser.role;
+          if (xcUser.earnedBadges) user.earnedBadges = xcUser.earnedBadges;
+          if (xcUser.streak !== undefined) user.streak = xcUser.streak;
+          if (xcUser.shipTier !== undefined) user.shipTier = xcUser.shipTier;
+          // Persist merged data
+          try { localStorage.setItem('pflx_pathway_user', JSON.stringify(user)); } catch {}
+          console.log('[PFLX] Player card: synced live data from Supabase — XC:', user.xcoin, 'totalXC:', user.totalXcoin, 'badges:', user.digitalBadges);
+        }
+      }
+    } catch(e) { console.warn('[PFLX] Player card live sync error:', e); }
   }
 
   const isHost = !isGuest && (user.role === 'admin' || user.isHost === true);
 
-  // Always show player card
+  // ── Compute pathway-specific stats ──
+  const allNodes = pathway.nodes || [];
+  const totalNodes = allNodes.length;
+  const completedNodes = allNodes.filter(n => n.status === 'completed').length;
+  const pathwayPct = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
+  const submissions = allNodes.reduce((sum, n) => sum + (n.submissions ? n.submissions.length : 0), 0);
+
+  // Ship tier
+  const shipData = typeof pflxShip !== 'undefined' ? pflxShip : {};
+  const SHIP_NAMES = ['Scout MK-I', 'Viper II', 'Phantom III', 'Nova IV', 'Titan V', 'FX-824'];
+  const shipTierIdx = user.shipTier || shipData.tier || 0;
+  const shipName = SHIP_NAMES[shipTierIdx] || SHIP_NAMES[0];
+
+  // ── Render card ──
   playerCard.style.display = 'block';
 
   // Avatar
   const avatarEl = document.getElementById('pcAvatar');
-  if (user.image) {
-    avatarEl.innerHTML = `<img src="${user.image}" alt="">`;
-  } else {
-    avatarEl.textContent = user.avatar || user.name?.slice(0,2).toUpperCase() || '??';
-  }
+  if (user.image) avatarEl.innerHTML = '<img src="' + user.image + '" alt="">';
+  else avatarEl.textContent = user.avatar || (user.name ? user.name.slice(0,2).toUpperCase() : '??');
 
-  // Brand name
+  // Identity
   document.getElementById('pcBrand').textContent = user.brandName || user.name;
-
-  // Designer type
-  const designerType = PATHWAY_DESIGNER_MAP[user.pathway] || user.pathway || 'Explorer';
-  document.getElementById('pcDesignerType').textContent = designerType;
+  document.getElementById('pcDesignerType').textContent = PATHWAY_DESIGNER_MAP[user.pathway] || user.pathway || 'Explorer';
 
   // Role badge
   const roleBadge = document.getElementById('pcRoleBadge');
-  if (isHost) {
-    roleBadge.textContent = 'HOST';
-    roleBadge.className = 'pc-role-badge host';
-  } else if (isGuest) {
-    roleBadge.textContent = 'GUEST';
-    roleBadge.className = 'pc-role-badge player';
-  } else {
-    roleBadge.textContent = 'PLAYER';
-    roleBadge.className = 'pc-role-badge player';
-  }
+  if (isHost) { roleBadge.textContent = 'HOST'; roleBadge.className = 'pc-role-badge host'; }
+  else if (isGuest) { roleBadge.textContent = 'GUEST'; roleBadge.className = 'pc-role-badge player'; }
+  else { roleBadge.textContent = 'PLAYER'; roleBadge.className = 'pc-role-badge player'; }
 
-  // Rank
+  // Rank — use totalXcoin from LIVE data
   const totalXC = user.totalXcoin || 0;
   const rank = getCurrentRank(totalXC);
   const progress = getRankProgress(totalXC);
   const nextRank = getNextRank(totalXC);
-  document.getElementById('pcRankName').textContent = `${rank.name} (Rank ${rank.level})`;
-  document.getElementById('pcRankFill').style.width = `${Math.min(100, progress)}%`;
+  document.getElementById('pcRankName').textContent = rank.name + ' (Rank ' + rank.level + ')';
+  document.getElementById('pcRankFill').style.width = Math.min(100, progress) + '%';
   document.getElementById('pcRankProgress').textContent = nextRank
-    ? `${totalXC.toLocaleString()} / ${nextRank.xc.toLocaleString()} XC`
+    ? totalXC.toLocaleString() + ' / ' + nextRank.xc.toLocaleString() + ' XC'
     : 'MAX RANK';
 
-  // Stats
+  // Primary stats
   document.getElementById('pcXC').textContent = (user.xcoin || 0).toLocaleString();
   document.getElementById('pcBadges').textContent = (user.digitalBadges || 0).toLocaleString();
   document.getElementById('pcLevel').textContent = user.level || 1;
 
-  // Logout / Sign In button
+  // Pathway progress
+  document.getElementById('pcPathwayFill').style.width = pathwayPct + '%';
+  document.getElementById('pcNodesCompleted').textContent = completedNodes;
+  document.getElementById('pcNodesTotal').textContent = totalNodes;
+
+  // Secondary stats
+  document.getElementById('pcShipTier').textContent = shipName;
+  document.getElementById('pcSubmissions').textContent = submissions;
+  document.getElementById('pcStreak').textContent = user.streak || 0;
+  document.getElementById('pcTotalXC').textContent = totalXC > 999 ? Math.round(totalXC / 1000) + 'K' : totalXC;
+
+  // Recent badges
+  const earnedBadges = user.earnedBadges || [];
+  if (earnedBadges.length > 0) {
+    document.getElementById('pcBadgesPreview').style.display = 'block';
+    const row = document.getElementById('pcBadgesRow');
+    row.innerHTML = '';
+    earnedBadges.slice(-5).reverse().forEach(function(b) {
+      var chip = document.createElement('span');
+      chip.className = 'pc-badge-chip';
+      chip.textContent = typeof b === 'string' ? b : (b.name || b);
+      row.appendChild(chip);
+    });
+  }
+
+  // Logout / Sign In
   const logoutBtn = document.getElementById('pcLogout');
   if (isGuest) {
     logoutBtn.textContent = 'Sign In';
-    logoutBtn.addEventListener('click', () => {
-      window.location.href = 'login.html';
-    });
+    logoutBtn.addEventListener('click', function() { window.location.href = 'login.html'; });
   } else {
-    logoutBtn.addEventListener('click', () => {
+    logoutBtn.addEventListener('click', function() {
       localStorage.removeItem('pflx_pathway_user');
       localStorage.removeItem('pflx_pathway_keep_signed_in');
       window.location.href = 'login.html';
     });
   }
 
-  // ── Player Card show / hide toggle ──
+  // ── Show / hide toggle ──
   const pcToggleBtn = document.getElementById('pcToggle');
   const pcCard = document.getElementById('playerCard');
   const pcRestore = document.getElementById('pcRestore');
-
-  function hidePlayerCard() {
-    pcCard.style.display = 'none';
-    pcRestore.style.display = 'flex';
-    sessionStorage.setItem('pflx_pc_hidden', '1');
-  }
-  function showPlayerCard() {
-    pcCard.style.display = 'block';
-    pcRestore.style.display = 'none';
-    sessionStorage.removeItem('pflx_pc_hidden');
-  }
-
-  // Restore hidden state from previous page
-  if (sessionStorage.getItem('pflx_pc_hidden') === '1') {
-    hidePlayerCard();
-  }
-
-  pcToggleBtn.addEventListener('click', () => { hidePlayerCard(); });
-  pcRestore.addEventListener('click', () => { showPlayerCard(); });
+  function hidePlayerCard() { pcCard.style.display = 'none'; pcRestore.style.display = 'flex'; sessionStorage.setItem('pflx_pc_hidden', '1'); }
+  function showPlayerCard() { pcCard.style.display = 'block'; pcRestore.style.display = 'none'; sessionStorage.removeItem('pflx_pc_hidden'); }
+  if (sessionStorage.getItem('pflx_pc_hidden') === '1') hidePlayerCard();
+  pcToggleBtn.addEventListener('click', function() { hidePlayerCard(); });
+  pcRestore.addEventListener('click', function() { showPlayerCard(); });
 })();
 
 // ─── WELCOME PANEL ───
@@ -4480,57 +4587,43 @@ function getNextRank(totalXcoin) {
   wpRestore.addEventListener('click', () => { showWelcome(); });
 })();
 
-// ─── SYNC WITH X-COIN APP (profile pics, stats, badges) ───
-(async function syncXCoinData() {
-  const stored = localStorage.getItem('pflx_pathway_user');
-  if (!stored) return;
-  try {
-    const localUser = JSON.parse(stored);
-    if (!localUser.id) return;
-    // Pull users array from shared Supabase app_data
-    const { data, error } = await _supabase
-      .from('app_data')
-      .select('data')
-      .eq('key', 'users')
-      .single();
-    if (error || !data || !data.data) return;
-    const xcUsers = data.data;
-    const xcUser = xcUsers.find(u => u.id === localUser.id || u.email === localUser.email);
-    if (!xcUser) return;
-    // Update local user with fresh X-Coin data
-    const updated = { ...localUser };
-    let changed = false;
-    if (xcUser.image && xcUser.image !== localUser.image) { updated.image = xcUser.image; changed = true; }
-    if (xcUser.xcoin !== undefined && xcUser.xcoin !== localUser.xcoin) { updated.xcoin = xcUser.xcoin; changed = true; }
-    if (xcUser.totalXcoin !== undefined && xcUser.totalXcoin !== localUser.totalXcoin) { updated.totalXcoin = xcUser.totalXcoin; changed = true; }
-    if (xcUser.digitalBadges !== undefined && xcUser.digitalBadges !== localUser.digitalBadges) { updated.digitalBadges = xcUser.digitalBadges; changed = true; }
-    if (xcUser.level !== undefined && xcUser.level !== localUser.level) { updated.level = xcUser.level; changed = true; }
-    if (xcUser.brandName && xcUser.brandName !== localUser.brandName) { updated.brandName = xcUser.brandName; changed = true; }
-    if (xcUser.name && xcUser.name !== localUser.name) { updated.name = xcUser.name; changed = true; }
-    if (xcUser.rank !== undefined) { updated.rank = xcUser.rank; changed = true; }
-    if (xcUser.isHost !== undefined) { updated.isHost = xcUser.isHost; changed = true; }
-    if (xcUser.role) { updated.role = xcUser.role; changed = true; }
-    if (changed) {
-      localStorage.setItem('pflx_pathway_user', JSON.stringify(updated));
-      // Update player card UI
-      const avatarEl = document.getElementById('pcAvatar');
-      if (updated.image) avatarEl.innerHTML = '<img src="' + updated.image + '" alt="">';
-      document.getElementById('pcBrand').textContent = updated.brandName || updated.name;
-      document.getElementById('pcXC').textContent = (updated.xcoin || 0).toLocaleString();
-      document.getElementById('pcBadges').textContent = (updated.digitalBadges || 0).toLocaleString();
-      document.getElementById('pcLevel').textContent = updated.level || 1;
-      const totalXC = updated.totalXcoin || 0;
-      const rank = getCurrentRank(totalXC);
-      const progress = getRankProgress(totalXC);
-      const nextRank = getNextRank(totalXC);
-      document.getElementById('pcRankName').textContent = rank.name + ' (Rank ' + rank.level + ')';
-      document.getElementById('pcRankFill').style.width = Math.min(100, progress) + '%';
-      document.getElementById('pcRankProgress').textContent = nextRank
-        ? totalXC.toLocaleString() + ' / ' + nextRank.xc.toLocaleString() + ' XC'
-        : 'MAX RANK';
-      console.log('[PFLX] Synced player data from X-Coin app');
-    }
-  } catch(e) { console.warn('[PFLX] X-Coin sync error:', e); }
+// ─── PERIODIC SYNC WITH X-COIN (keeps card fresh during session) ───
+// Initial sync already happened in initPlayerCard above.
+// This handles live updates via postMessage from other PFLX apps.
+(function setupLiveCardSync() {
+  window.addEventListener('message', function(event) {
+    try {
+      if (event.data && event.data.type === 'pflx-user-update') {
+        var u = event.data.user;
+        if (!u) return;
+        if (u.xcoin !== undefined) document.getElementById('pcXC').textContent = (u.xcoin || 0).toLocaleString();
+        if (u.digitalBadges !== undefined) document.getElementById('pcBadges').textContent = (u.digitalBadges || 0).toLocaleString();
+        if (u.level !== undefined) document.getElementById('pcLevel').textContent = u.level || 1;
+        if (u.totalXcoin !== undefined) {
+          var totalXC = u.totalXcoin || 0;
+          var rank = getCurrentRank(totalXC);
+          var progress = getRankProgress(totalXC);
+          var nextRank = getNextRank(totalXC);
+          document.getElementById('pcRankName').textContent = rank.name + ' (Rank ' + rank.level + ')';
+          document.getElementById('pcRankFill').style.width = Math.min(100, progress) + '%';
+          document.getElementById('pcRankProgress').textContent = nextRank
+            ? totalXC.toLocaleString() + ' / ' + nextRank.xc.toLocaleString() + ' XC'
+            : 'MAX RANK';
+          if (u.totalXcoin > 999) document.getElementById('pcTotalXC').textContent = Math.round(u.totalXcoin / 1000) + 'K';
+          else document.getElementById('pcTotalXC').textContent = u.totalXcoin || 0;
+        }
+        if (u.image) document.getElementById('pcAvatar').innerHTML = '<img src="' + u.image + '" alt="">';
+        if (u.brandName || u.name) document.getElementById('pcBrand').textContent = u.brandName || u.name;
+        // Persist
+        try {
+          var local = JSON.parse(localStorage.getItem('pflx_pathway_user') || '{}');
+          Object.assign(local, u);
+          localStorage.setItem('pflx_pathway_user', JSON.stringify(local));
+        } catch(e2) {}
+        console.log('[PFLX] Player card updated via live sync');
+      }
+    } catch(e) {}
+  });
 })();
 
 // ==================== MC + X-COIN DATA INTEGRATION ====================
