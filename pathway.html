@@ -3037,57 +3037,12 @@
             </select>
           </div>
           <div class="ne-field">
-            <label class="ne-label">Primary Completion Badge</label>
+            <label class="ne-label">Signature Completion Badge</label>
             <select class="ne-select" id="neBadge">
               <option value="">— None —</option>
-              <optgroup label="🏅 Signature Badges (Skill Mastery)">
-                <option value="Cert: Photoshop">Cert: Photoshop</option>
-                <option value="Cert: Premiere">Cert: Premiere</option>
-                <option value="Master Builder">Master Builder</option>
-              </optgroup>
-              <optgroup label="💎 Premium Badges (Achievement)">
-                <option value="Beacon of Knowledge">Beacon of Knowledge</option>
-                <option value="Beacon of Creativity">Beacon of Creativity</option>
-                <option value="Beacon of X-Cellence">Beacon of X-Cellence</option>
-                <option value="Beacon of Collaboration">Beacon of Collaboration</option>
-              </optgroup>
-              <optgroup label="💼 Executive Badges (Jobs)">
-                <option value="Executive Producer">Executive Producer</option>
-                <option value="Creative Director">Creative Director</option>
-                <option value="Director of Photography">Director of Photography</option>
-                <option value="Project Manager">Project Manager</option>
-                <option value="Lead Editor">Lead Editor</option>
-                <option value="Technical Director">Technical Director</option>
-                <option value="Stage Manager">Stage Manager</option>
-                <option value="Video Editor">Video Editor</option>
-                <option value="Studio Director">Studio Director</option>
-                <option value="Lighting Technician">Lighting Technician</option>
-                <option value="Host/Anchor/Actor">Host/Anchor/Actor</option>
-                <option value="Camera Operator">Camera Operator</option>
-              </optgroup>
-              <optgroup label="⭐ Primary Badges (Behavior)">
-                <option value="Battle Arena Champion">Battle Arena Champion</option>
-                <option value="Self Directed Player">Self Directed Player</option>
-                <option value="Strategic Organizer">Strategic Organizer</option>
-                <option value="Entrepreneurial Spirit">Entrepreneurial Spirit</option>
-                <option value="Self Advocate">Self Advocate</option>
-                <option value="Focus Optimizer">Focus Optimizer</option>
-                <option value="Gamification Guru">Gamification Guru</option>
-                <option value="Professional Communicator">Professional Communicator</option>
-                <option value="Critical Thinker">Critical Thinker</option>
-                <option value="Master Collaborator">Master Collaborator</option>
-                <option value="Innovative Creator">Innovative Creator</option>
-                <option value="Digital Tool Master">Digital Tool Master</option>
-                <option value="Resilient Learner">Resilient Learner</option>
-                <option value="Growth Mindset">Growth Mindset</option>
-                <option value="Goal Setter">Goal Setter</option>
-                <option value="Time Manager">Time Manager</option>
-                <option value="Peer Supporter">Peer Supporter</option>
-                <option value="Positive Participant">Positive Participant</option>
-                <option value="Digital Citizen">Digital Citizen</option>
-                <option value="Emerging Leader">Emerging Leader</option>
-              </optgroup>
+              <!-- Populated dynamically from X-Coin Supabase badges -->
             </select>
+            <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Live badges from X-Coin</span>
           </div>
         </div>
         <div class="ne-field">
@@ -3147,15 +3102,24 @@
     </div>
     <!-- Embedded Course Content Container -->
     <div id="courseContentContainer" style="display:none;position:absolute;inset:0;z-index:10;background:#050810;">
-      <div id="courseContentHeader" style="position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(135deg,rgba(5,8,16,0.95),rgba(10,15,30,0.95));border-bottom:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;padding:0 16px;gap:12px;z-index:11;">
+      <!-- Top Header Bar -->
+      <div id="courseContentHeader" style="position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(135deg,rgba(5,8,16,0.97),rgba(10,15,30,0.97));border-bottom:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;padding:0 16px;gap:12px;z-index:11;">
         <button id="courseContentClose" style="background:none;border:1px solid rgba(255,60,60,0.4);color:rgba(255,60,60,0.8);width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:Rajdhani;">✕</button>
-        <span id="courseContentTitle" style="font-family:Orbitron;font-size:12px;letter-spacing:2px;color:#00d4ff;text-transform:uppercase;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <span id="courseContentTitle" style="font-family:Orbitron;font-size:11px;letter-spacing:2px;color:#00d4ff;text-transform:uppercase;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button id="courseTaskToggle" title="Toggle Task Checklist" style="background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);color:rgba(0,212,255,0.7);width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:Rajdhani;transition:all 0.2s;">☑</button>
         <div id="courseProgressBar" style="width:120px;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;border:1px solid rgba(0,212,255,0.15);">
           <div id="courseProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,#00d4ff,#7c3aed);border-radius:3px;transition:width 0.5s;"></div>
         </div>
-        <span id="courseProgressLabel" style="font-family:Rajdhani;font-size:11px;color:rgba(255,255,255,0.4);min-width:30px;text-align:right;">0%</span>
+        <span id="courseProgressLabel" style="font-family:Rajdhani;font-size:11px;color:rgba(255,255,255,0.4);min-width:45px;text-align:right;">0 / 0</span>
       </div>
-      <iframe id="courseContentFrame" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:#fff;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
+      <!-- Task Checklist Sidebar -->
+      <div id="courseTaskPanel" style="display:none;position:absolute;top:44px;right:0;width:280px;bottom:0;background:rgba(6,10,18,0.97);border-left:1px solid rgba(0,212,255,0.15);z-index:12;overflow-y:auto;padding:12px;">
+        <div style="font-family:Orbitron;font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.5);text-transform:uppercase;margin-bottom:10px;">Task Checklist</div>
+        <div id="courseTaskList" style="display:flex;flex-direction:column;gap:4px;"></div>
+        <div id="courseTaskEmpty" style="text-align:center;padding:20px;color:rgba(255,255,255,0.2);font-family:Rajdhani;font-size:12px;">Waiting for course to report tasks...</div>
+      </div>
+      <!-- Course iframe -->
+      <iframe id="courseContentFrame" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:#fff;transition:width 0.3s;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
     </div>
   </div>
 
@@ -5433,6 +5397,17 @@ function _neRenderTaggedBadges() {
     container.appendChild(chip);
   });
 }
+function _nePopulateTaggedBadgeSelect() {
+  var taggedSelect = document.getElementById('neTaggedBadgeSelect');
+  var primarySelect = document.getElementById('neBadge');
+  if (!taggedSelect || !primarySelect) return;
+  taggedSelect.innerHTML = '<option value="">— Add Badge —</option>';
+  Array.from(primarySelect.options).forEach(function(opt) {
+    if (opt.value && !_neTaggedBadges.includes(opt.value)) {
+      taggedSelect.add(new Option(opt.text, opt.value));
+    }
+  });
+}
 // Wire up add tagged badge button
 document.addEventListener('DOMContentLoaded', function() {
   var addBtn = document.getElementById('neAddTaggedBadge');
@@ -5464,7 +5439,61 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neDesc').value = node.desc || '';
   document.getElementById('neUrl').value = node.url || '';
   document.getElementById('neStatus').value = node.status || 'locked';
-  document.getElementById('neBadge').value = node.requiredBadge || '';
+  // ── Populate badge dropdowns from LIVE X-Coin Supabase data ──
+  const badgeSelect = document.getElementById('neBadge');
+  badgeSelect.innerHTML = '<option value="">— None —</option>';
+  const liveBadges = (pflxData && pflxData.badges) ? pflxData.badges : [];
+  if (liveBadges.length > 0) {
+    // Group badges by category if they have one, else lump into "All Badges"
+    const grouped = {};
+    liveBadges.forEach(function(b) {
+      var name = typeof b === 'string' ? b : (b.name || b.title || '');
+      var cat = (typeof b === 'object' && b.category) ? b.category : 'All Badges';
+      if (!name) return;
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(name);
+    });
+    Object.keys(grouped).sort().forEach(function(cat) {
+      var group = document.createElement('optgroup');
+      group.label = cat;
+      grouped[cat].sort().forEach(function(bName) {
+        group.appendChild(new Option(bName, bName));
+      });
+      badgeSelect.appendChild(group);
+    });
+  } else {
+    // Fallback: if pflxData hasn't loaded yet, try a direct Supabase fetch
+    (async function() {
+      try {
+        var res = await _supabase.from('app_data').select('data').eq('key', 'badges').single();
+        if (res.data && res.data.data && Array.isArray(res.data.data)) {
+          pflxData.badges = res.data.data;
+          var sel = document.getElementById('neBadge');
+          sel.innerHTML = '<option value="">— None —</option>';
+          var grouped2 = {};
+          res.data.data.forEach(function(b2) {
+            var nm = typeof b2 === 'string' ? b2 : (b2.name || b2.title || '');
+            var ct = (typeof b2 === 'object' && b2.category) ? b2.category : 'All Badges';
+            if (!nm) return;
+            if (!grouped2[ct]) grouped2[ct] = [];
+            grouped2[ct].push(nm);
+          });
+          Object.keys(grouped2).sort().forEach(function(ct2) {
+            var grp = document.createElement('optgroup');
+            grp.label = ct2;
+            grouped2[ct2].sort().forEach(function(bn) { grp.appendChild(new Option(bn, bn)); });
+            sel.appendChild(grp);
+          });
+          // Re-set value after populating
+          if (editorNode && editorNode.requiredBadge) sel.value = editorNode.requiredBadge;
+          // Also repopulate tagged dropdown
+          _nePopulateTaggedBadgeSelect();
+        }
+      } catch(e) { console.warn('[PFLX] Badge fetch fallback error:', e); }
+    })();
+  }
+  badgeSelect.value = node.requiredBadge || '';
+
   document.getElementById('neComingSoon').checked = node.comingSoon || false;
   document.getElementById('neImageFit').value = node.imageFit || 'cover';
   // New fields
@@ -5482,15 +5511,7 @@ function openNodeEditor(node, isNew) {
   // Tagged badges
   _neTaggedBadges = node.taggedBadges ? [...node.taggedBadges] : [];
   _neRenderTaggedBadges();
-  // Populate tagged badge dropdown from primary badge select options
-  const taggedSelect = document.getElementById('neTaggedBadgeSelect');
-  const primarySelect = document.getElementById('neBadge');
-  taggedSelect.innerHTML = '<option value="">— Add Badge —</option>';
-  Array.from(primarySelect.options).forEach(opt => {
-    if (opt.value && !_neTaggedBadges.includes(opt.value)) {
-      taggedSelect.add(new Option(opt.text, opt.value));
-    }
-  });
+  _nePopulateTaggedBadgeSelect();
 
   // Image preview
   const preview = document.getElementById('neImagePreview');
@@ -6583,28 +6604,168 @@ function showLaunchOverlay(node) {
         document.getElementById('launchOverlayClose').style.display = 'none';
         const courseContainer = document.getElementById('courseContentContainer');
         const courseFrame = document.getElementById('courseContentFrame');
+        const taskPanel = document.getElementById('courseTaskPanel');
+        const taskList = document.getElementById('courseTaskList');
+        const taskEmpty = document.getElementById('courseTaskEmpty');
         document.getElementById('courseContentTitle').textContent = node.title;
         document.getElementById('courseProgressFill').style.width = '0%';
-        document.getElementById('courseProgressLabel').textContent = '0%';
+        document.getElementById('courseProgressLabel').textContent = '0 / 0';
+        taskPanel.style.display = 'none';
+        taskList.innerHTML = '';
+        taskEmpty.style.display = 'block';
+        courseFrame.style.width = '100%';
+
+        // Task tracking state
+        var courseTasks = []; // { id, label, completed }
+        var taskPanelOpen = false;
+
+        // Load saved progress for this node+player
+        var savedKey = 'pflx_course_tasks_' + node.id;
+        try {
+          var saved = JSON.parse(localStorage.getItem(savedKey) || '[]');
+          if (Array.isArray(saved) && saved.length > 0) courseTasks = saved;
+        } catch(e) {}
+
+        function updateTaskUI() {
+          var total = courseTasks.length;
+          var done = courseTasks.filter(function(t) { return t.completed; }).length;
+          var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+          document.getElementById('courseProgressFill').style.width = pct + '%';
+          document.getElementById('courseProgressLabel').textContent = done + ' / ' + total;
+          // Render checklist
+          taskList.innerHTML = '';
+          taskEmpty.style.display = total > 0 ? 'none' : 'block';
+          courseTasks.forEach(function(t, idx) {
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:4px;background:' + (t.completed ? 'rgba(0,212,255,0.06)' : 'rgba(255,255,255,0.02)') + ';border:1px solid ' + (t.completed ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.04)') + ';cursor:pointer;transition:all 0.2s;';
+            var checkbox = document.createElement('div');
+            checkbox.style.cssText = 'width:16px;height:16px;border-radius:3px;border:1px solid ' + (t.completed ? '#00d4ff' : 'rgba(255,255,255,0.2)') + ';background:' + (t.completed ? 'rgba(0,212,255,0.15)' : 'transparent') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:10px;color:#00d4ff;';
+            checkbox.textContent = t.completed ? '✓' : '';
+            var label = document.createElement('span');
+            label.style.cssText = 'font-family:Rajdhani;font-size:12px;color:' + (t.completed ? 'rgba(0,212,255,0.8)' : 'rgba(255,255,255,0.6)') + ';line-height:1.3;' + (t.completed ? 'text-decoration:line-through;opacity:0.7;' : '');
+            label.textContent = t.label;
+            row.appendChild(checkbox);
+            row.appendChild(label);
+            row.onclick = function() {
+              // Toggle from Core Pathways side — tell iframe
+              t.completed = !t.completed;
+              try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
+              updateTaskUI();
+              // Notify iframe
+              try {
+                courseFrame.contentWindow.postMessage({
+                  type: 'pflx-task-toggle',
+                  taskId: t.id,
+                  completed: t.completed
+                }, '*');
+              } catch(e3) {}
+            };
+            taskList.appendChild(row);
+          });
+          // Save progress on node
+          if (total > 0) {
+            node._courseProgress = { total: total, completed: done, pct: pct, tasks: courseTasks };
+          }
+          // Check full completion
+          if (total > 0 && done === total) {
+            document.getElementById('courseContentTitle').textContent = node.title + ' — COMPLETE';
+          }
+        }
+
+        // Task panel toggle
+        var toggleBtn = document.getElementById('courseTaskToggle');
+        toggleBtn.onclick = function() {
+          taskPanelOpen = !taskPanelOpen;
+          taskPanel.style.display = taskPanelOpen ? 'block' : 'none';
+          courseFrame.style.width = taskPanelOpen ? 'calc(100% - 280px)' : '100%';
+          toggleBtn.style.background = taskPanelOpen ? 'rgba(0,212,255,0.2)' : 'rgba(0,212,255,0.08)';
+          toggleBtn.style.color = taskPanelOpen ? '#00d4ff' : 'rgba(0,212,255,0.7)';
+        };
+
         courseFrame.src = node.contentUrl;
         courseContainer.style.display = 'block';
         warpActive = false;
-        // Listen for progress messages from embedded content
+
+        // After iframe loads, request its task checklist
+        courseFrame.onload = function() {
+          try {
+            courseFrame.contentWindow.postMessage({
+              type: 'pflx-request-tasks'
+            }, '*');
+            // Also send any saved progress back so the iframe can restore state
+            if (courseTasks.length > 0) {
+              courseFrame.contentWindow.postMessage({
+                type: 'pflx-restore-progress',
+                tasks: courseTasks
+              }, '*');
+            }
+          } catch(e) {}
+        };
+
+        // Listen for messages from embedded content
         window._pflxCourseProgressHandler = function(event) {
           try {
-            if (event.data && event.data.type === 'pflx-course-progress') {
-              var pct = Math.min(100, Math.max(0, parseInt(event.data.progress) || 0));
-              document.getElementById('courseProgressFill').style.width = pct + '%';
-              document.getElementById('courseProgressLabel').textContent = pct + '%';
+            var d = event.data;
+            if (!d || !d.type) return;
+
+            // Course sends its full task checklist
+            if (d.type === 'pflx-course-tasks') {
+              // d.tasks = [{ id: 'task-1', label: 'Complete intro video' }, ...]
+              if (Array.isArray(d.tasks)) {
+                // Merge with saved progress
+                var savedMap = {};
+                courseTasks.forEach(function(st) { savedMap[st.id] = st.completed; });
+                courseTasks = d.tasks.map(function(t) {
+                  return { id: t.id, label: t.label || t.name || t.id, completed: savedMap[t.id] || false };
+                });
+                try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
+                updateTaskUI();
+                // Auto-open panel if tasks exist
+                if (courseTasks.length > 0 && !taskPanelOpen) {
+                  toggleBtn.click();
+                }
+              }
             }
-            if (event.data && event.data.type === 'pflx-course-complete') {
+
+            // Course reports individual task completion
+            if (d.type === 'pflx-task-complete' && d.taskId) {
+              var t = courseTasks.find(function(ct) { return ct.id === d.taskId; });
+              if (t) { t.completed = true; }
+              try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
+              updateTaskUI();
+            }
+
+            // Course reports individual task uncomplete
+            if (d.type === 'pflx-task-uncomplete' && d.taskId) {
+              var t2 = courseTasks.find(function(ct) { return ct.id === d.taskId; });
+              if (t2) { t2.completed = false; }
+              try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
+              updateTaskUI();
+            }
+
+            // Legacy: simple progress percentage
+            if (d.type === 'pflx-course-progress') {
+              var pct = Math.min(100, Math.max(0, parseInt(d.progress) || 0));
+              document.getElementById('courseProgressFill').style.width = pct + '%';
+              if (courseTasks.length === 0) {
+                document.getElementById('courseProgressLabel').textContent = pct + '%';
+              }
+            }
+
+            // Legacy: course complete signal
+            if (d.type === 'pflx-course-complete') {
               document.getElementById('courseProgressFill').style.width = '100%';
-              document.getElementById('courseProgressLabel').textContent = '100%';
               document.getElementById('courseContentTitle').textContent = node.title + ' — COMPLETE';
+              courseTasks.forEach(function(ct) { ct.completed = true; });
+              try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
+              updateTaskUI();
             }
           } catch(err) { /* cross-origin safety */ }
         };
         window.addEventListener('message', window._pflxCourseProgressHandler);
+
+        // Render any saved progress immediately
+        if (courseTasks.length > 0) updateTaskUI();
       }, 600);
     } else {
       // External URL: open in new tab
@@ -6619,8 +6780,10 @@ function showLaunchOverlay(node) {
     // Clean up course content
     var courseContainer = document.getElementById('courseContentContainer');
     var courseFrame = document.getElementById('courseContentFrame');
+    var taskPanel = document.getElementById('courseTaskPanel');
     if (courseContainer) courseContainer.style.display = 'none';
-    if (courseFrame) courseFrame.src = '';
+    if (courseFrame) { courseFrame.src = ''; courseFrame.style.width = '100%'; }
+    if (taskPanel) taskPanel.style.display = 'none';
     if (window._pflxCourseProgressHandler) {
       window.removeEventListener('message', window._pflxCourseProgressHandler);
       window._pflxCourseProgressHandler = null;
