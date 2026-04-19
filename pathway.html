@@ -1475,6 +1475,309 @@
       100% { opacity: 0.8; transform: scale(1.15); }
     }
 
+    /* ========== OPEN-WORLD EXPLORATION SYSTEM ========== */
+
+    /* ── Space Sectors — named regions with faint boundaries ── */
+    .space-sector {
+      position: absolute;
+      border: 1px solid rgba(0,212,255,0.06);
+      border-radius: 40px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .space-sector .sector-label {
+      position: absolute;
+      top: 20px; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron';
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.08);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .space-sector .sector-label.visible {
+      color: rgba(255,255,255,0.2);
+      text-shadow: 0 0 20px rgba(0,212,255,0.15);
+      transition: color 1.5s, text-shadow 1.5s;
+    }
+
+    /* ── Discoverable Items — hidden until ship proximity ── */
+    .discovery-item {
+      position: absolute;
+      z-index: 45;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.3);
+      transition: opacity 1.2s ease-out, transform 0.8s ease-out;
+      cursor: pointer;
+    }
+    .discovery-item.revealed {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+    .discovery-item.collected {
+      opacity: 0;
+      transform: scale(1.8);
+      transition: opacity 0.5s, transform 0.5s;
+      pointer-events: none;
+    }
+
+    /* XC Cache — glowing coin floating in space */
+    .discovery-item.xc-cache {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffd700 0%, #b8860b 60%, #8b6914 100%);
+      box-shadow: 0 0 12px rgba(255,215,0,0.6), 0 0 30px rgba(255,215,0,0.2);
+      animation: xcFloat 3s ease-in-out infinite alternate;
+    }
+    .discovery-item.xc-cache::after {
+      content: 'XC';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Orbitron';
+      font-size: 7px;
+      font-weight: 800;
+      color: rgba(0,0,0,0.6);
+    }
+    @keyframes xcFloat {
+      0% { transform: scale(1) translateY(0px); }
+      100% { transform: scale(1.1) translateY(-6px); }
+    }
+
+    /* Lore Fragment — glowing text scroll */
+    .discovery-item.lore-fragment {
+      width: 24px; height: 30px;
+      background: linear-gradient(180deg, rgba(160,120,255,0.8) 0%, rgba(100,60,200,0.6) 100%);
+      border-radius: 4px 4px 2px 2px;
+      box-shadow: 0 0 15px rgba(160,120,255,0.5), 0 0 30px rgba(160,120,255,0.15);
+      animation: loreGlow 4s ease-in-out infinite alternate;
+    }
+    .discovery-item.lore-fragment::before {
+      content: '📜';
+      font-size: 14px;
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    @keyframes loreGlow {
+      0% { box-shadow: 0 0 15px rgba(160,120,255,0.5), 0 0 30px rgba(160,120,255,0.15); }
+      100% { box-shadow: 0 0 25px rgba(160,120,255,0.7), 0 0 50px rgba(160,120,255,0.25); }
+    }
+
+    /* Data Crystal — geometric rotating crystal */
+    .discovery-item.data-crystal {
+      width: 20px; height: 32px;
+      background: linear-gradient(135deg, rgba(0,212,255,0.9) 0%, rgba(0,150,200,0.7) 50%, rgba(0,80,120,0.9) 100%);
+      clip-path: polygon(50% 0%, 100% 30%, 100% 70%, 50% 100%, 0% 70%, 0% 30%);
+      box-shadow: 0 0 20px rgba(0,212,255,0.5);
+      animation: crystalSpin 6s linear infinite;
+    }
+    @keyframes crystalSpin {
+      0% { transform: rotateY(0deg); }
+      100% { transform: rotateY(360deg); }
+    }
+
+    /* Secret Node — hidden skill node that appears */
+    .discovery-item.secret-node {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, rgba(255,0,255,0.6) 0%, rgba(80,0,80,0.8) 100%);
+      border: 2px solid rgba(255,0,255,0.4);
+      box-shadow: 0 0 20px rgba(255,0,255,0.4), 0 0 40px rgba(255,0,255,0.1), inset 0 0 12px rgba(255,0,255,0.2);
+      animation: secretPulse 3s ease-in-out infinite;
+    }
+    .discovery-item.secret-node::after {
+      content: '?';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Orbitron';
+      font-size: 14px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.7);
+    }
+    @keyframes secretPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(255,0,255,0.4), 0 0 40px rgba(255,0,255,0.1); }
+      50% { box-shadow: 0 0 30px rgba(255,0,255,0.6), 0 0 60px rgba(255,0,255,0.2); }
+    }
+
+    /* ── Waypoints — navigation beacons ── */
+    .space-waypoint {
+      position: absolute;
+      width: 16px; height: 16px;
+      z-index: 6;
+      pointer-events: none;
+    }
+    .space-waypoint .wp-beacon {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(0,212,255,0.5);
+      position: absolute;
+      top: 4px; left: 4px;
+      animation: wpBlink 2s ease-in-out infinite;
+    }
+    .space-waypoint .wp-ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 50%;
+      animation: wpExpand 3s ease-out infinite;
+    }
+    .space-waypoint .wp-label {
+      position: absolute;
+      top: 22px; left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron';
+      font-size: 7px;
+      font-weight: 500;
+      color: rgba(0,212,255,0.35);
+      white-space: nowrap;
+      letter-spacing: 1px;
+    }
+    @keyframes wpBlink {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    @keyframes wpExpand {
+      0% { transform: scale(0.5); opacity: 0.6; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    /* ── Ambient Space Events ── */
+    .space-comet {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      z-index: 8;
+      pointer-events: none;
+      box-shadow: 0 0 8px rgba(255,255,255,0.8), 0 0 20px rgba(200,220,255,0.4);
+    }
+    .space-comet::after {
+      content: '';
+      position: absolute;
+      right: 6px; top: 1px;
+      width: 80px; height: 3px;
+      background: linear-gradient(90deg, rgba(200,220,255,0.6), transparent);
+      border-radius: 0 2px 2px 0;
+      transform-origin: right center;
+    }
+    @keyframes cometFly {
+      0% { transform: translate(0, 0); opacity: 0; }
+      5% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translate(var(--comet-dx), var(--comet-dy)); opacity: 0; }
+    }
+
+    .space-energy-pulse {
+      position: absolute;
+      width: 0; height: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.4);
+      z-index: 7;
+      pointer-events: none;
+      animation: energyExpand var(--pulse-speed, 4s) ease-out forwards;
+    }
+    @keyframes energyExpand {
+      0% { width: 0; height: 0; opacity: 0.8; border-width: 3px; }
+      100% { width: 300px; height: 300px; margin-left: -150px; margin-top: -150px; opacity: 0; border-width: 0.5px; }
+    }
+
+    /* ── Discovery Ship Radar ── */
+    .ship-discovery-radar {
+      position: absolute;
+      width: 240px; height: 240px;
+      margin-left: -120px; margin-top: -120px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.08);
+      pointer-events: none;
+      z-index: 98;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .ship-discovery-radar.active {
+      opacity: 1;
+    }
+    .ship-discovery-radar .radar-ping {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.15);
+      animation: radarPing 3s ease-out infinite;
+    }
+    @keyframes radarPing {
+      0% { transform: scale(0.2); opacity: 0.6; }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
+    /* ── Discovery Collection Popup ── */
+    .discovery-popup {
+      position: fixed;
+      top: 80px; right: 30px;
+      background: rgba(6,10,18,0.95);
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 10px;
+      padding: 16px 22px;
+      z-index: 500;
+      font-family: 'Orbitron';
+      min-width: 240px;
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 0 30px rgba(0,212,255,0.15);
+    }
+    .discovery-popup.show {
+      transform: translateX(0);
+    }
+    .discovery-popup .popup-icon {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .discovery-popup .popup-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--pflx-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .discovery-popup .popup-desc {
+      font-family: 'Rajdhani';
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      line-height: 1.4;
+    }
+    .discovery-popup .popup-reward {
+      font-size: 10px;
+      font-weight: 600;
+      color: #ffd700;
+      margin-top: 6px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Discovery HUD — collection counter ── */
+    .discovery-hud {
+      position: fixed;
+      top: 70px; left: 20px;
+      z-index: 60;
+      display: flex; flex-direction: column; gap: 6px;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .discovery-hud.active { opacity: 1; }
+    .discovery-hud .hud-item {
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Orbitron';
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.5);
+    }
+    .discovery-hud .hud-icon { font-size: 14px; }
+    .discovery-hud .hud-count { color: var(--pflx-cyan); }
+
     /* ========== PFLX SPACESHIP AVATAR ========== */
     #pflxShip {
       position: absolute;
@@ -1801,6 +2104,25 @@
   <div class="space-depth-layer deep" id="spaceDeep"></div>
   <div class="space-depth-layer mid" id="spaceMid"></div>
   <div class="space-depth-layer near" id="spaceNear"></div>
+
+  <!-- Discovery Layer — sectors, waypoints, hidden items (moves with nodeLayer) -->
+  <div id="discoveryLayer" style="position:absolute;inset:0;pointer-events:none;z-index:4;"></div>
+
+  <!-- Discovery HUD — shows collection counts -->
+  <div class="discovery-hud" id="discoveryHud">
+    <div class="hud-item"><span class="hud-icon">💰</span> XC Caches: <span class="hud-count" id="hudXC">0</span></div>
+    <div class="hud-item"><span class="hud-icon">📜</span> Lore: <span class="hud-count" id="hudLore">0</span></div>
+    <div class="hud-item"><span class="hud-icon">💎</span> Crystals: <span class="hud-count" id="hudCrystal">0</span></div>
+    <div class="hud-item"><span class="hud-icon">🔮</span> Secrets: <span class="hud-count" id="hudSecret">0</span></div>
+  </div>
+
+  <!-- Discovery Popup — shows on item collection -->
+  <div class="discovery-popup" id="discoveryPopup">
+    <div class="popup-icon" id="popupIcon"></div>
+    <div class="popup-title" id="popupTitle"></div>
+    <div class="popup-desc" id="popupDesc"></div>
+    <div class="popup-reward" id="popupReward"></div>
+  </div>
 
   <!-- Node Canvas (pannable/zoomable) -->
   <div class="node-canvas" id="nodeCanvas">
@@ -2492,21 +2814,20 @@ animateGalaxies();
 const canvas = document.getElementById('nodeCanvas');
 const nodeLayer = document.getElementById('nodeLayer');
 let panX = 0, panY = 0, zoom = 1;
-const MAP_W = 2000, MAP_H = 2000;
+const MAP_W = 5000, MAP_H = 5000;
 
 function applyTransform() {
   nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   updateMinimap();
+  // Discovery layer moves exactly with node layer
+  const discLayer = document.getElementById('discoveryLayer');
+  if (discLayer) discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   // 3D Parallax depth layers — dramatic depth separation
-  // Deep moves very slowly (distant), near moves almost with the camera (close)
   const deep = document.getElementById('spaceDeep');
   const mid = document.getElementById('spaceMid');
   const near = document.getElementById('spaceNear');
-  // Deep: barely moves (5% of pan), scaled small — feels infinitely far
   if (deep) deep.style.transform = `translate3d(${panX * 0.05}px, ${panY * 0.05}px, -400px) scale(${0.6 + zoom * 0.4})`;
-  // Mid: moderate movement (30% of pan) — objects at middle distance
   if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
-  // Near: moves fast (80% of pan) — particles feel close to the camera
   if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
 }
 
@@ -2530,7 +2851,7 @@ function centerView() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   zoom = Math.min(vw / bw, vh / bh, 1.2);
-  zoom = Math.max(0.25, Math.min(1.2, zoom));
+  zoom = Math.max(0.15, Math.min(1.5, zoom));
   panX = vw / 2 - cx * zoom;
   panY = vh / 2 - cy * zoom;
   applyTransform();
@@ -2568,13 +2889,13 @@ canvas.addEventListener('wheel', e => {
   const delta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 60);
   const factor = 1 - delta * 0.0015;  // ~3-4% per tick instead of 10%
   zoom *= factor;
-  zoom = Math.max(0.3, Math.min(2, zoom));
+  zoom = Math.max(0.12, Math.min(2.5, zoom));
   panX = mx - (mx - panX) * zoom / oldZoom;
   panY = my - (my - panY) * zoom / oldZoom;
   applyTransform();
 }, { passive: false });
 
-document.getElementById('zoomIn').onclick = () => { zoom = Math.min(2, zoom * 1.08); applyTransform(); };
+document.getElementById('zoomIn').onclick = () => { zoom = Math.min(2.5, zoom * 1.08); applyTransform(); };
 document.getElementById('zoomOut').onclick = () => { zoom = Math.max(0.3, zoom / 1.08); applyTransform(); };
 document.getElementById('zoomFit').onclick = centerView;
 
@@ -5504,6 +5825,363 @@ setTimeout(() => {
   console.log('[Space] ✓ 3D universe rendered — deep: ' + deepLayer.children.length + ', mid: ' + midLayer.children.length + ', near: ' + nearLayer.children.length + ' elements');
 })();
 
+// ==================== OPEN-WORLD EXPLORATION SYSTEM ====================
+// Generates discoverable content across the 5000x5000 canvas:
+// - Space sectors with named regions
+// - Hidden XC caches, lore fragments, data crystals, secret nodes
+// - Waypoint navigation beacons
+// - Ambient space events (comets, energy pulses)
+// - Proximity-based discovery radar on the ship
+(function initExplorationSystem() {
+  const discLayer = document.getElementById('discoveryLayer');
+  if (!discLayer) return;
+
+  function rng(min, max) { return Math.random() * (max - min) + min; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // ─── Storage key per pathway ───
+  const exKey = 'pflx_exploration_' + (typeof pathwaySlug !== 'undefined' ? pathwaySlug : 'default');
+
+  // ─── Load collected items from localStorage ───
+  let collected = {};
+  try { collected = JSON.parse(localStorage.getItem(exKey) || '{}'); } catch(e) {}
+
+  function saveCollected() {
+    localStorage.setItem(exKey, JSON.stringify(collected));
+  }
+
+  // ─── SECTOR DEFINITIONS ───
+  // 9 named sectors in a 3x3 grid across the 5000x5000 canvas
+  const sectorNames = [
+    ['GENESIS CLUSTER',    'NEXUS CORRIDOR',    'QUANTUM REACH'],
+    ['VOID EXPANSE',       'CORE NEXUS',        'ASTRAL DRIFT'],
+    ['DEEP FRONTIER',      'SHADOW BELT',       'OMEGA TERMINUS']
+  ];
+  const sectorW = Math.floor(5000 / 3);
+  const sectorH = Math.floor(5000 / 3);
+
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const sec = document.createElement('div');
+      sec.className = 'space-sector';
+      sec.style.cssText = `left:${col * sectorW + 40}px;top:${row * sectorH + 40}px;width:${sectorW - 80}px;height:${sectorH - 80}px;`;
+      const lbl = document.createElement('div');
+      lbl.className = 'sector-label';
+      lbl.textContent = sectorNames[row][col];
+      lbl.dataset.sectorRow = row;
+      lbl.dataset.sectorCol = col;
+      sec.appendChild(lbl);
+      discLayer.appendChild(sec);
+    }
+  }
+
+  // ─── DISCOVERABLE ITEMS ───
+  // Scatter items across the canvas, avoiding the center cluster where nodes live
+  const items = [];
+  const DISCOVERY_RADIUS = 200; // px — how close ship must be to reveal
+
+  // XC Caches — 25 scattered golden coins worth 5-50 XC each
+  const xcValues = [5, 10, 10, 15, 15, 20, 20, 25, 25, 30, 30, 35, 40, 50];
+  for (let i = 0; i < 25; i++) {
+    const id = 'xc_' + i;
+    if (collected[id]) continue;
+    const el = document.createElement('div');
+    el.className = 'discovery-item xc-cache';
+    const x = rng(100, 4900);
+    const y = rng(100, 4900);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.dataset.itemId = id;
+    el.dataset.itemType = 'xc';
+    el.dataset.value = pick(xcValues);
+    discLayer.appendChild(el);
+    items.push({ id, el, x, y, type: 'xc', value: parseInt(el.dataset.value) });
+  }
+
+  // Lore Fragments — 15 scrolls with pathway lore
+  const loreTexts = [
+    'The first designers shaped worlds from nothing but imagination and pixel dust.',
+    'In the age before X-Coin, knowledge was the only currency that mattered.',
+    'Every pathway begins with a single node — the courage to start.',
+    'The ancient coders built the first networks from copper wire and conviction.',
+    'Sound designers learned to hear the music between the silence.',
+    'The entrepreneurs of old knew: every empire starts with a single pitch.',
+    'Motion capture was once called "the art of stealing movement from life."',
+    'The first game designers played with dice carved from asteroid stone.',
+    'Data crystals hold the compressed wisdom of a thousand missions.',
+    'Industrial designers shaped atoms the way coders shaped bits.',
+    'The Dark Campus servers hum with the voices of a billion conversations.',
+    'To unlock a node is to unlock a piece of yourself.',
+    'The Battle Arena was forged in the competitive fire of creative ambition.',
+    'Every studio in PFLX was born from a spark of impossible ideas.',
+    'The ship that explores farthest carries the lightest expectations.',
+  ];
+  for (let i = 0; i < 15; i++) {
+    const id = 'lore_' + i;
+    if (collected[id]) continue;
+    const el = document.createElement('div');
+    el.className = 'discovery-item lore-fragment';
+    const x = rng(150, 4850);
+    const y = rng(150, 4850);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.dataset.itemId = id;
+    el.dataset.itemType = 'lore';
+    el.dataset.loreText = loreTexts[i];
+    discLayer.appendChild(el);
+    items.push({ id, el, x, y, type: 'lore', text: loreTexts[i] });
+  }
+
+  // Data Crystals — 12 rare crystals with bonus XP/info
+  const crystalNames = [
+    'Quantum Memory Shard', 'Neural Link Crystal', 'Encrypted Codex',
+    'Prismatic Core', 'Temporal Fragment', 'Singularity Seed',
+    'Void Resonator', 'Photonic Lattice', 'Chromatic Prism',
+    'Dark Matter Cell', 'Fusion Catalyst', 'Infinity Lens'
+  ];
+  for (let i = 0; i < 12; i++) {
+    const id = 'crystal_' + i;
+    if (collected[id]) continue;
+    const el = document.createElement('div');
+    el.className = 'discovery-item data-crystal';
+    const x = rng(200, 4800);
+    const y = rng(200, 4800);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.dataset.itemId = id;
+    el.dataset.itemType = 'crystal';
+    el.dataset.crystalName = crystalNames[i];
+    discLayer.appendChild(el);
+    items.push({ id, el, x, y, type: 'crystal', name: crystalNames[i] });
+  }
+
+  // Secret Nodes — 8 hidden nodes with mystery rewards
+  const secretNames = [
+    'Hidden Protocol', 'Ghost Node', 'Shadow Skill',
+    'Void Mastery', 'Phantom Link', 'Dark Pattern',
+    'Lost Archive', 'Forbidden Knowledge'
+  ];
+  for (let i = 0; i < 8; i++) {
+    const id = 'secret_' + i;
+    if (collected[id]) continue;
+    const el = document.createElement('div');
+    el.className = 'discovery-item secret-node';
+    const x = rng(300, 4700);
+    const y = rng(300, 4700);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.dataset.itemId = id;
+    el.dataset.itemType = 'secret';
+    el.dataset.secretName = secretNames[i];
+    discLayer.appendChild(el);
+    items.push({ id, el, x, y, type: 'secret', name: secretNames[i] });
+  }
+
+  // ─── WAYPOINTS — 12 navigation beacons scattered for orientation ───
+  const wpNames = [
+    'Alpha Gate', 'Beta Relay', 'Gamma Station', 'Delta Beacon',
+    'Epsilon Dock', 'Zeta Array', 'Eta Marker', 'Theta Buoy',
+    'Iota Signal', 'Kappa Anchor', 'Lambda Post', 'Mu Transponder'
+  ];
+  for (let i = 0; i < 12; i++) {
+    const wp = document.createElement('div');
+    wp.className = 'space-waypoint';
+    const x = rng(200, 4800);
+    const y = rng(200, 4800);
+    wp.style.left = x + 'px';
+    wp.style.top = y + 'px';
+    wp.innerHTML = '<div class="wp-beacon"></div><div class="wp-ring"></div><div class="wp-label">' + wpNames[i] + '</div>';
+    discLayer.appendChild(wp);
+  }
+
+  // ─── DISCOVERY RADAR (follows ship) ───
+  const radarEl = document.createElement('div');
+  radarEl.className = 'ship-discovery-radar';
+  radarEl.id = 'shipDiscRadar';
+  radarEl.innerHTML = '<div class="radar-ping"></div><div class="radar-ping" style="animation-delay:1s"></div>';
+  // Radar is added to the nodeLayer so it follows ship coordinates
+  const nodeLayerEl = document.getElementById('nodeLayer');
+  if (nodeLayerEl) nodeLayerEl.appendChild(radarEl);
+
+  // ─── PROXIMITY CHECK — reveals hidden items near the ship ───
+  function checkProximity(shipX, shipY) {
+    items.forEach(item => {
+      if (collected[item.id]) return;
+      const dx = item.x - shipX;
+      const dy = item.y - shipY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < DISCOVERY_RADIUS) {
+        if (!item.el.classList.contains('revealed')) {
+          item.el.classList.add('revealed');
+        }
+      } else if (dist > DISCOVERY_RADIUS * 1.5) {
+        // Hide again if ship moves far away
+        if (item.el.classList.contains('revealed') && !item.el.classList.contains('collected')) {
+          item.el.classList.remove('revealed');
+        }
+      }
+    });
+
+    // Update radar position
+    if (radarEl) {
+      radarEl.style.left = shipX + 'px';
+      radarEl.style.top = shipY + 'px';
+    }
+
+    // Update sector labels — show label for sector the ship is in
+    const shipCol = Math.min(2, Math.floor(shipX / sectorW));
+    const shipRow = Math.min(2, Math.floor(shipY / sectorH));
+    document.querySelectorAll('.sector-label').forEach(lbl => {
+      const r = parseInt(lbl.dataset.sectorRow);
+      const c = parseInt(lbl.dataset.sectorCol);
+      lbl.classList.toggle('visible', r === shipRow && c === shipCol);
+    });
+  }
+
+  // ─── ITEM COLLECTION — click to collect revealed items ───
+  discLayer.addEventListener('click', function(e) {
+    const itemEl = e.target.closest('.discovery-item.revealed');
+    if (!itemEl || itemEl.classList.contains('collected')) return;
+
+    const itemId = itemEl.dataset.itemId;
+    const itemType = itemEl.dataset.itemType;
+
+    // Mark collected
+    itemEl.classList.add('collected');
+    collected[itemId] = { type: itemType, time: new Date().toISOString() };
+    saveCollected();
+
+    // Show popup
+    const popup = document.getElementById('discoveryPopup');
+    const popIcon = document.getElementById('popupIcon');
+    const popTitle = document.getElementById('popupTitle');
+    const popDesc = document.getElementById('popupDesc');
+    const popReward = document.getElementById('popupReward');
+
+    if (itemType === 'xc') {
+      const val = itemEl.dataset.value;
+      popIcon.textContent = '💰';
+      popTitle.textContent = 'XC CACHE FOUND';
+      popDesc.textContent = 'You discovered a hidden cache of X-Coin floating in the void!';
+      popReward.textContent = '+' + val + ' XC';
+    } else if (itemType === 'lore') {
+      popIcon.textContent = '📜';
+      popTitle.textContent = 'LORE FRAGMENT';
+      popDesc.textContent = itemEl.dataset.loreText;
+      popReward.textContent = '+5 XC · LORE COLLECTED';
+    } else if (itemType === 'crystal') {
+      popIcon.textContent = '💎';
+      popTitle.textContent = 'DATA CRYSTAL';
+      popDesc.textContent = 'Recovered: ' + itemEl.dataset.crystalName;
+      popReward.textContent = '+25 XC · CRYSTAL ARCHIVED';
+    } else if (itemType === 'secret') {
+      popIcon.textContent = '🔮';
+      popTitle.textContent = 'SECRET NODE DISCOVERED';
+      popDesc.textContent = 'You unlocked: ' + itemEl.dataset.secretName;
+      popReward.textContent = '+50 XC · NODE UNLOCKED';
+    }
+
+    popup.classList.add('show');
+    setTimeout(() => popup.classList.remove('show'), 4000);
+
+    // Remove element after animation
+    setTimeout(() => { if (itemEl.parentNode) itemEl.parentNode.removeChild(itemEl); }, 600);
+
+    // Update HUD counts
+    updateDiscoveryHUD();
+
+    // Sound effect if available
+    if (typeof SFX !== 'undefined' && SFX.play) SFX.play('unlock');
+  });
+
+  // ─── HUD UPDATE ───
+  function updateDiscoveryHUD() {
+    const counts = { xc: 0, lore: 0, crystal: 0, secret: 0 };
+    Object.values(collected).forEach(c => {
+      if (c.type && counts[c.type] !== undefined) counts[c.type]++;
+    });
+    const hudXC = document.getElementById('hudXC');
+    const hudLore = document.getElementById('hudLore');
+    const hudCrystal = document.getElementById('hudCrystal');
+    const hudSecret = document.getElementById('hudSecret');
+    if (hudXC) hudXC.textContent = counts.xc + '/25';
+    if (hudLore) hudLore.textContent = counts.lore + '/15';
+    if (hudCrystal) hudCrystal.textContent = counts.crystal + '/12';
+    if (hudSecret) hudSecret.textContent = counts.secret + '/8';
+
+    // Show HUD if player has discovered anything or is in free mode
+    const hud = document.getElementById('discoveryHud');
+    if (hud) {
+      const total = counts.xc + counts.lore + counts.crystal + counts.secret;
+      hud.classList.toggle('active', total > 0 || (typeof pflxShip !== 'undefined' && pflxShip.mode === 'free'));
+    }
+  }
+  // Initial HUD update
+  setTimeout(updateDiscoveryHUD, 1000);
+
+  // ─── AMBIENT SPACE EVENTS — comets and energy pulses ───
+  function spawnComet() {
+    const comet = document.createElement('div');
+    comet.className = 'space-comet';
+    // Random start position on the edge of the viewport
+    const side = Math.floor(Math.random() * 4);
+    let sx, sy, dx, dy;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (side === 0) { sx = -50; sy = rng(0, vh); dx = vw + 200; dy = rng(-100, 100); } // from left
+    else if (side === 1) { sx = vw + 50; sy = rng(0, vh); dx = -(vw + 200); dy = rng(-100, 100); } // from right
+    else if (side === 2) { sx = rng(0, vw); sy = -50; dx = rng(-200, 200); dy = vh + 200; } // from top
+    else { sx = rng(0, vw); sy = vh + 50; dx = rng(-200, 200); dy = -(vh + 200); } // from bottom
+
+    // Rotation angle for the tail
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 180;
+    comet.style.cssText = `left:${sx}px;top:${sy}px;--comet-dx:${dx}px;--comet-dy:${dy}px;transform:rotate(${angle}deg);animation:cometFly ${rng(3,6)}s linear forwards;position:fixed;z-index:200;`;
+    document.body.appendChild(comet);
+    setTimeout(() => { if (comet.parentNode) comet.parentNode.removeChild(comet); }, 7000);
+  }
+
+  function spawnEnergyPulse() {
+    const pulse = document.createElement('div');
+    pulse.className = 'space-energy-pulse';
+    // Random position within the current view
+    pulse.style.left = rng(10, 90) + '%';
+    pulse.style.top = rng(10, 90) + '%';
+    pulse.style.setProperty('--pulse-speed', rng(3, 6) + 's');
+    pulse.style.position = 'fixed';
+    document.body.appendChild(pulse);
+    setTimeout(() => { if (pulse.parentNode) pulse.parentNode.removeChild(pulse); }, 7000);
+  }
+
+  // Schedule ambient events at random intervals
+  function scheduleComet() {
+    setTimeout(() => {
+      spawnComet();
+      scheduleComet();
+    }, rng(15000, 45000)); // Every 15-45 seconds
+  }
+  function schedulePulse() {
+    setTimeout(() => {
+      spawnEnergyPulse();
+      schedulePulse();
+    }, rng(20000, 60000)); // Every 20-60 seconds
+  }
+  scheduleComet();
+  schedulePulse();
+
+  // ─── EXPOSE checkProximity globally for the ship engine to call ───
+  window._pflxCheckProximity = checkProximity;
+  window._pflxShowDiscoveryHUD = updateDiscoveryHUD;
+
+  // ─── Activate radar when ship is in free mode ───
+  window._pflxSetRadarActive = function(active) {
+    if (radarEl) radarEl.classList.toggle('active', active);
+    const hud = document.getElementById('discoveryHud');
+    if (hud && active) hud.classList.add('active');
+  };
+
+  console.log('[Exploration] ✓ Open-world system initialized — ' + items.length + ' discoverable items, 9 sectors, 12 waypoints');
+})();
+
 // ==================== PFLX SPACESHIP ENGINE ====================
 const pflxShip = {
   x: 1000, y: 1000,
@@ -5567,6 +6245,8 @@ function pflxShipSetMode(mode) {
   pflxShip.mode = mode;
   document.getElementById('shipModeGuided').classList.toggle('active', mode === 'guided');
   document.getElementById('shipModeFree').classList.toggle('active', mode === 'free');
+  // Activate discovery radar in free exploration mode
+  if (typeof window._pflxSetRadarActive === 'function') window._pflxSetRadarActive(mode === 'free');
   if (typeof SFX !== 'undefined') SFX.play && SFX.play('click');
 }
 
@@ -5609,6 +6289,7 @@ function pflxShipFlyTo(tx, ty, callback) {
     panX = (window.innerWidth / 2) - tx * zoom;
     panY = (window.innerHeight / 2) - ty * zoom;
     applyTransform();
+    if (typeof window._pflxCheckProximity === 'function') window._pflxCheckProximity(tx, ty);
     shipEl.classList.remove('flying');
     pflxShip.flying = false;
     setTimeout(() => document.body.classList.remove('warp-active'), 400);
@@ -5639,6 +6320,9 @@ function pflxShipFlyTo(tx, ty, callback) {
     panY = (window.innerHeight / 2) - cy * zoom;
     applyTransform();
 
+    // Discovery proximity check during flight
+    if (typeof window._pflxCheckProximity === 'function') window._pflxCheckProximity(cx, cy);
+
     // Trail particles every ~30ms
     trailTimer += (now - (startTime + (elapsed - 16)));
     if (elapsed - trailTimer > 0 || t < 1) {
@@ -5653,6 +6337,8 @@ function pflxShipFlyTo(tx, ty, callback) {
       shipEl.classList.remove('flying');
       pflxShip.flying = false;
       document.body.classList.remove('warp-active');
+      // Final proximity check at destination
+      if (typeof window._pflxCheckProximity === 'function') window._pflxCheckProximity(tx, ty);
       if (callback) callback();
     }
   }
@@ -6033,6 +6719,20 @@ document.addEventListener('keydown', e => {
           icon: '⚡', color: '#f5c842', source: 'pathways',
           text: 'SHIP UPGRADE — "' + (latest.name || latest.id) + '" installed',
           date: latest.date || now
+        });
+      }
+    } catch(e) {}
+
+    // Exploration discoveries
+    try {
+      var exKey = 'pflx_exploration_' + pathwaySlug;
+      var discoveries = JSON.parse(localStorage.getItem(exKey) || '{}');
+      var discCount = Object.keys(discoveries).length;
+      if (discCount > 0) {
+        events.push({
+          icon: '🔍', color: '#f5c842', source: 'pathways',
+          text: 'EXPLORER — ' + discCount + ' discoveries made on ' + pathwayName + ' (XC caches, lore, crystals, secret nodes)',
+          date: now
         });
       }
     } catch(e) {}
