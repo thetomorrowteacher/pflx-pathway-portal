@@ -1781,7 +1781,7 @@
     /* ========== PFLX SPACESHIP AVATAR ========== */
     #pflxShip {
       position: absolute;
-      width: 48px; height: 48px;
+      width: 56px; height: 56px;
       z-index: 100;
       pointer-events: none;
       transition: none;
@@ -1789,6 +1789,24 @@
     }
     #pflxShip.flying {
       filter: drop-shadow(0 0 20px rgba(0,212,255,0.9)) drop-shadow(0 0 40px rgba(0,212,255,0.5));
+    }
+    #pflxShip.banking-left { animation: shipBankLeft 0.3s ease-out forwards; }
+    #pflxShip.banking-right { animation: shipBankRight 0.3s ease-out forwards; }
+    #pflxShip.boosting { animation: shipBoost 0.4s ease-out; }
+    @keyframes shipBankLeft {
+      0% { transform: var(--ship-rotate, rotate(0deg)) scaleX(1); }
+      50% { transform: var(--ship-rotate, rotate(0deg)) scaleX(0.85) skewY(-8deg); }
+      100% { transform: var(--ship-rotate, rotate(0deg)) scaleX(0.92) skewY(-3deg); }
+    }
+    @keyframes shipBankRight {
+      0% { transform: var(--ship-rotate, rotate(0deg)) scaleX(1); }
+      50% { transform: var(--ship-rotate, rotate(0deg)) scaleX(0.85) skewY(8deg); }
+      100% { transform: var(--ship-rotate, rotate(0deg)) scaleX(0.92) skewY(3deg); }
+    }
+    @keyframes shipBoost {
+      0% { filter: drop-shadow(0 0 20px rgba(0,212,255,0.9)) drop-shadow(0 0 40px rgba(0,212,255,0.5)); }
+      50% { filter: drop-shadow(0 0 35px rgba(0,212,255,1)) drop-shadow(0 0 60px rgba(124,58,237,0.8)); }
+      100% { filter: drop-shadow(0 0 20px rgba(0,212,255,0.9)) drop-shadow(0 0 40px rgba(0,212,255,0.5)); }
     }
     .ship-trail {
       position: absolute;
@@ -1813,6 +1831,94 @@
     }
     .ship-mode-btn:hover { background: rgba(0,212,255,0.15); color: #fff; }
     .ship-mode-btn.active { background: rgba(0,212,255,0.2); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+
+    /* ========== CAMERA MODE SYSTEM ========== */
+    .camera-toggle {
+      position: fixed; bottom: 120px; left: 20px;
+      z-index: 70;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .camera-toggle .cam-label {
+      font-family: 'Orbitron'; font-size: 7px; font-weight: 600;
+      color: rgba(0,212,255,0.4); letter-spacing: 2px; text-transform: uppercase;
+      text-align: center; margin-bottom: 2px;
+    }
+    .cam-btn {
+      background: rgba(6,10,18,0.9);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: rgba(0,212,255,0.7);
+      font-family: 'Orbitron'; font-size: 8px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 6px 10px; cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cam-btn:hover { background: rgba(0,212,255,0.15); color: #fff; }
+    .cam-btn.active { background: rgba(0,212,255,0.2); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+    .cam-btn .cam-icon { font-size: 11px; }
+
+    /* ── Chase Cam Mode ── */
+    body.cam-chase .node-canvas { transition: transform 0.3s ease-out; }
+
+    /* ── Cockpit View Mode ── */
+    .cockpit-hud {
+      position: fixed; inset: 0; z-index: 90;
+      pointer-events: none; display: none;
+    }
+    body.cam-cockpit .cockpit-hud { display: block; }
+    .cockpit-frame {
+      position: absolute; inset: 0;
+      border: 3px solid rgba(0,212,255,0.15);
+      border-radius: 50% / 30%;
+      box-shadow: inset 0 0 80px rgba(0,20,40,0.6), inset 0 0 200px rgba(0,0,0,0.4);
+    }
+    .cockpit-dash {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 120px;
+      background: linear-gradient(180deg, transparent 0%, rgba(6,10,20,0.85) 40%, rgba(6,10,20,0.95) 100%);
+      border-top: 1px solid rgba(0,212,255,0.15);
+    }
+    .cockpit-gauge {
+      position: absolute; bottom: 20px;
+      font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      color: rgba(0,212,255,0.7); letter-spacing: 1px;
+    }
+    .cockpit-gauge.speed { left: 30px; }
+    .cockpit-gauge.coords { right: 30px; }
+    .cockpit-gauge.heading { left: 50%; transform: translateX(-50%); }
+    .cockpit-gauge .gauge-val {
+      font-size: 16px; color: var(--pflx-cyan);
+      text-shadow: 0 0 10px rgba(0,212,255,0.5);
+    }
+    .cockpit-gauge .gauge-label {
+      font-size: 7px; color: rgba(0,212,255,0.4);
+      letter-spacing: 2px; text-transform: uppercase;
+    }
+    .cockpit-crosshair {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 40px; height: 40px;
+    }
+    .cockpit-crosshair::before, .cockpit-crosshair::after {
+      content: ''; position: absolute;
+      background: rgba(0,212,255,0.3);
+    }
+    .cockpit-crosshair::before { width: 1px; height: 100%; left: 50%; top: 0; }
+    .cockpit-crosshair::after { height: 1px; width: 100%; top: 50%; left: 0; }
+    .cockpit-scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.02) 2px, rgba(0,212,255,0.02) 4px);
+      pointer-events: none;
+    }
+    body.cam-cockpit #pflxShip { display: none; }
+    body.cam-cockpit { cursor: crosshair; }
+    /* Arrow key hint */
+    .arrow-key-hint {
+      position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+      z-index: 71; font-family: 'Orbitron'; font-size: 8px;
+      color: rgba(0,212,255,0.35); letter-spacing: 2px;
+      text-transform: uppercase; pointer-events: none;
+      transition: opacity 0.5s;
+    }
 
     /* ========== WARP SPEED EFFECT ========== */
     body.warp-active::after {
@@ -2129,30 +2235,80 @@
     <div class="node-layer" id="nodeLayer">
       <svg class="connector-svg" id="connectorSvg"></svg>
       <!-- PFLX Spaceship Avatar -->
-      <svg id="pflxShip" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <svg id="pflxShip" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="shipHull" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#00e5ff"/>
+            <stop offset="40%" stop-color="#1a3a5c"/>
             <stop offset="100%" stop-color="#0a1628"/>
           </linearGradient>
           <linearGradient id="shipEngine" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.9"/>
             <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6"/>
           </linearGradient>
+          <linearGradient id="shipWing" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0d2a4a"/>
+            <stop offset="100%" stop-color="#061320"/>
+          </linearGradient>
+          <linearGradient id="cockpitGlass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#80efff" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#00b8d4" stop-opacity="0.4"/>
+          </linearGradient>
           <filter id="shipGlow">
-            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
             <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
+          <filter id="engineFlare">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
         </defs>
-        <path d="M24 4 L32 20 L28 22 L28 36 L24 40 L20 36 L20 22 L16 20 Z" fill="url(#shipHull)" stroke="rgba(0,212,255,0.6)" stroke-width="0.5" filter="url(#shipGlow)"/>
-        <path d="M20 22 L8 32 L12 28 L20 26 Z" fill="rgba(0,180,220,0.4)" stroke="rgba(0,212,255,0.3)" stroke-width="0.3"/>
-        <path d="M28 22 L40 32 L36 28 L28 26 Z" fill="rgba(0,180,220,0.4)" stroke="rgba(0,212,255,0.3)" stroke-width="0.3"/>
-        <ellipse cx="24" cy="40" rx="4" ry="3" fill="url(#shipEngine)" opacity="0.8">
-          <animate attributeName="ry" values="3;5;3" dur="0.6s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.8;1;0.8" dur="0.6s" repeatCount="indefinite"/>
+        <!-- Main fuselage — rounded spacecraft body -->
+        <path d="M32 6 C34 6 38 14 39 20 L40 30 L38 38 L34 42 L32 44 L30 42 L26 38 L24 30 L25 20 C26 14 30 6 32 6 Z" fill="url(#shipHull)" stroke="rgba(0,212,255,0.5)" stroke-width="0.6" filter="url(#shipGlow)"/>
+        <!-- Left wing — swept-back delta -->
+        <path d="M25 24 L8 40 L10 36 L18 30 L24 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.4)" stroke-width="0.4"/>
+        <!-- Right wing — swept-back delta -->
+        <path d="M39 24 L56 40 L54 36 L46 30 L40 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.4)" stroke-width="0.4"/>
+        <!-- Left wing tip light -->
+        <circle cx="9" cy="39" r="1.5" fill="#ff3366" opacity="0.9">
+          <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite"/>
+        </circle>
+        <!-- Right wing tip light -->
+        <circle cx="55" cy="39" r="1.5" fill="#33ff66" opacity="0.9">
+          <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite"/>
+        </circle>
+        <!-- Hull panel lines -->
+        <line x1="32" y1="10" x2="32" y2="40" stroke="rgba(0,212,255,0.12)" stroke-width="0.4"/>
+        <path d="M28 18 L32 12 L36 18" fill="none" stroke="rgba(0,212,255,0.15)" stroke-width="0.3"/>
+        <line x1="26" y1="30" x2="38" y2="30" stroke="rgba(0,212,255,0.1)" stroke-width="0.3"/>
+        <!-- Cockpit canopy — glowing dome -->
+        <ellipse cx="32" cy="16" rx="4" ry="5" fill="url(#cockpitGlass)" stroke="rgba(0,229,255,0.6)" stroke-width="0.5">
+          <animate attributeName="opacity" values="0.85;1;0.85" dur="2s" repeatCount="indefinite"/>
         </ellipse>
-        <ellipse cx="24" cy="14" rx="3" ry="4" fill="rgba(0,229,255,0.3)" stroke="rgba(0,229,255,0.5)" stroke-width="0.3"/>
-        <line x1="24" y1="8" x2="24" y2="36" stroke="rgba(0,212,255,0.15)" stroke-width="0.5"/>
+        <!-- Cockpit highlight -->
+        <ellipse cx="31" cy="14" rx="1.5" ry="2" fill="rgba(255,255,255,0.25)"/>
+        <!-- Engine nacelle left -->
+        <rect x="22" y="34" width="4" height="8" rx="2" fill="#0a1628" stroke="rgba(0,180,220,0.3)" stroke-width="0.3"/>
+        <!-- Engine nacelle right -->
+        <rect x="38" y="34" width="4" height="8" rx="2" fill="#0a1628" stroke="rgba(0,180,220,0.3)" stroke-width="0.3"/>
+        <!-- Main engine exhaust -->
+        <ellipse cx="32" cy="46" rx="5" ry="4" fill="url(#shipEngine)" opacity="0.85" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="4;7;4" dur="0.5s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.85;1;0.85" dur="0.5s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- Left engine exhaust -->
+        <ellipse cx="24" cy="43" rx="2" ry="2.5" fill="#7c3aed" opacity="0.6" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="2.5;4;2.5" dur="0.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- Right engine exhaust -->
+        <ellipse cx="40" cy="43" rx="2" ry="2.5" fill="#7c3aed" opacity="0.6" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="2.5;4;2.5" dur="0.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <!-- Dorsal antenna -->
+        <line x1="32" y1="6" x2="32" y2="2" stroke="rgba(0,212,255,0.4)" stroke-width="0.5"/>
+        <circle cx="32" cy="2" r="0.8" fill="#00e5ff" opacity="0.7">
+          <animate attributeName="opacity" values="0.7;1;0.7" dur="0.8s" repeatCount="indefinite"/>
+        </circle>
       </svg>
     </div>
   </div>
@@ -6226,8 +6382,8 @@ const pflxShip = {
 
   const shipEl = document.getElementById('pflxShip');
   if (shipEl) {
-    shipEl.style.left = (pflxShip.x - 24) + 'px';
-    shipEl.style.top = (pflxShip.y - 24) + 'px';
+    shipEl.style.left = (pflxShip.x - 28) + 'px';
+    shipEl.style.top = (pflxShip.y - 28) + 'px';
   }
 
   // Apply visual upgrades
@@ -6269,7 +6425,7 @@ function pflxShipFlyTo(tx, ty, callback) {
 
   // Rotation: atan2 direction, offset by -90deg (ship points "up")
   const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-  shipEl.style.transformOrigin = '24px 24px';
+  shipEl.style.transformOrigin = '28px 28px';
   shipEl.style.transform = `rotate(${angle}deg)`;
 
   // Warp effect for long distances
@@ -6284,8 +6440,8 @@ function pflxShipFlyTo(tx, ty, callback) {
   // Warp Drive = instant teleport
   if (pflxShip.upgrades.warpDrive && dist > 300) {
     pflxShip.x = tx; pflxShip.y = ty;
-    shipEl.style.left = (tx - 24) + 'px';
-    shipEl.style.top = (ty - 24) + 'px';
+    shipEl.style.left = (tx - 28) + 'px';
+    shipEl.style.top = (ty - 28) + 'px';
     panX = (window.innerWidth / 2) - tx * zoom;
     panY = (window.innerHeight / 2) - ty * zoom;
     applyTransform();
@@ -6312,8 +6468,8 @@ function pflxShipFlyTo(tx, ty, callback) {
     pflxShip.x = cx;
     pflxShip.y = cy;
 
-    shipEl.style.left = (cx - 24) + 'px';
-    shipEl.style.top = (cy - 24) + 'px';
+    shipEl.style.left = (cx - 28) + 'px';
+    shipEl.style.top = (cy - 28) + 'px';
 
     // Camera follow
     panX = (window.innerWidth / 2) - cx * zoom;
@@ -6416,7 +6572,7 @@ function pflxShipApplyUpgrades() {
     if (!shield) {
       shield = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       shield.setAttribute('class', 'shield-aura');
-      shield.setAttribute('cx', '24'); shield.setAttribute('cy', '24'); shield.setAttribute('r', '22');
+      shield.setAttribute('cx', '32'); shield.setAttribute('cy', '32'); shield.setAttribute('r', '30');
       shield.setAttribute('fill', 'none'); shield.setAttribute('stroke', 'rgba(0,212,255,0.25)');
       shield.setAttribute('stroke-width', '1.5');
       const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
@@ -6494,6 +6650,265 @@ function pflxShipOpenUpgrades() {
   alert('Ship upgrades are available in the X-Coin Marketplace → Ship Bay tab.');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ██  CAMERA MODE SYSTEM — Bird's Eye / Chase Cam / Cockpit  ██
+// ═══════════════════════════════════════════════════════════════
+
+const pflxCamera = {
+  mode: 'birdseye',     // 'birdseye' | 'chase' | 'cockpit'
+  chaseZoom: 1.4,       // zoom level for chase cam
+  cockpitZoom: 2.0,     // zoom level for cockpit
+  savedBirdseyeZoom: 1, // remember zoom when switching back
+  savedPanX: 0,
+  savedPanY: 0,
+};
+
+function pflxSetCamera(mode) {
+  const prev = pflxCamera.mode;
+  pflxCamera.mode = mode;
+
+  // Update button states
+  document.getElementById('camBirdseye').classList.toggle('active', mode === 'birdseye');
+  document.getElementById('camChase').classList.toggle('active', mode === 'chase');
+  document.getElementById('camCockpit').classList.toggle('active', mode === 'cockpit');
+
+  // Remove previous camera classes
+  document.body.classList.remove('cam-birdseye', 'cam-chase', 'cam-cockpit');
+  document.body.classList.add('cam-' + mode);
+
+  // Arrow key hint
+  const hint = document.getElementById('arrowKeyHint');
+  if (hint) {
+    hint.style.opacity = (mode === 'chase' || mode === 'cockpit') ? '1' : '0';
+    setTimeout(() => { if (hint.style.opacity === '1') hint.style.opacity = '0'; }, 4000);
+  }
+
+  if (mode === 'birdseye') {
+    // Restore saved bird's eye view
+    if (prev !== 'birdseye') {
+      zoom = pflxCamera.savedBirdseyeZoom;
+      panX = pflxCamera.savedPanX;
+      panY = pflxCamera.savedPanY;
+      applyTransform();
+    }
+  } else {
+    // Save bird's eye state before switching
+    if (prev === 'birdseye') {
+      pflxCamera.savedBirdseyeZoom = zoom;
+      pflxCamera.savedPanX = panX;
+      pflxCamera.savedPanY = panY;
+    }
+    // Center on ship with appropriate zoom
+    const camZoom = mode === 'cockpit' ? pflxCamera.cockpitZoom : pflxCamera.chaseZoom;
+    zoom = camZoom;
+    panX = (window.innerWidth / 2) - pflxShip.x * zoom;
+    panY = (window.innerHeight / 2) - pflxShip.y * zoom;
+    applyTransform();
+  }
+
+  // Auto-enable free roam in chase/cockpit
+  if (mode === 'chase' || mode === 'cockpit') {
+    pflxShipSetMode('free');
+  }
+
+  if (typeof SFX !== 'undefined' && SFX.play) SFX.play('click');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ██  ARROW KEY SHIP CONTROLS — continuous movement        ██
+// ═══════════════════════════════════════════════════════════
+
+const pflxKeys = { up: false, down: false, left: false, right: false, shift: false };
+let pflxKeyAnimFrame = null;
+let pflxShipAngle = 0;      // current heading in degrees (0 = up)
+let pflxShipSpeed = 0;       // current speed for cockpit gauge
+const SHIP_ACCEL = 3.5;     // px per frame acceleration
+const SHIP_MAX_SPEED = 8;   // max px per frame
+const SHIP_BOOST_MAX = 14;  // max with shift held
+const SHIP_FRICTION = 0.92; // deceleration factor
+let pflxShipVx = 0, pflxShipVy = 0;
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (pflxCamera.mode === 'birdseye') return; // keys only in chase/cockpit
+
+  let handled = false;
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { pflxKeys.up = true; handled = true; }
+  if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { pflxKeys.down = true; handled = true; }
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { pflxKeys.left = true; handled = true; }
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { pflxKeys.right = true; handled = true; }
+  if (e.key === 'Shift') { pflxKeys.shift = true; handled = true; }
+  if (handled) {
+    e.preventDefault();
+    if (!pflxKeyAnimFrame) pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+  }
+});
+
+document.addEventListener('keyup', function(e) {
+  if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') pflxKeys.up = false;
+  if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') pflxKeys.down = false;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') pflxKeys.left = false;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') pflxKeys.right = false;
+  if (e.key === 'Shift') pflxKeys.shift = false;
+});
+
+function pflxKeyLoop() {
+  if (pflxCamera.mode === 'birdseye') { pflxKeyAnimFrame = null; return; }
+  if (pflxShip.flying) { pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop); return; }
+
+  const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
+  let ax = 0, ay = 0;
+  if (pflxKeys.up)    ay -= SHIP_ACCEL;
+  if (pflxKeys.down)  ay += SHIP_ACCEL;
+  if (pflxKeys.left)  ax -= SHIP_ACCEL;
+  if (pflxKeys.right) ax += SHIP_ACCEL;
+
+  // Apply speed multiplier from ship tier
+  const tierMult = pflxShip.upgrades._speedMult || 1;
+  ax *= tierMult;
+  ay *= tierMult;
+
+  pflxShipVx += ax;
+  pflxShipVy += ay;
+
+  // Clamp speed
+  const spd = Math.sqrt(pflxShipVx * pflxShipVx + pflxShipVy * pflxShipVy);
+  if (spd > maxSpd * tierMult) {
+    pflxShipVx = (pflxShipVx / spd) * maxSpd * tierMult;
+    pflxShipVy = (pflxShipVy / spd) * maxSpd * tierMult;
+  }
+
+  // Friction when no keys pressed
+  if (!pflxKeys.up && !pflxKeys.down) pflxShipVy *= SHIP_FRICTION;
+  if (!pflxKeys.left && !pflxKeys.right) pflxShipVx *= SHIP_FRICTION;
+
+  // Stop if very slow
+  pflxShipSpeed = Math.sqrt(pflxShipVx * pflxShipVx + pflxShipVy * pflxShipVy);
+  if (pflxShipSpeed < 0.15 && ax === 0 && ay === 0) {
+    pflxShipVx = 0; pflxShipVy = 0; pflxShipSpeed = 0;
+    // Remove banking classes when stopped
+    const shipEl = document.getElementById('pflxShip');
+    if (shipEl) { shipEl.classList.remove('banking-left', 'banking-right'); }
+    pflxKeyAnimFrame = null;
+    // Continue loop to check for new key presses
+    if (pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right) {
+      pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+    }
+    return;
+  }
+
+  // Move ship
+  pflxShip.x += pflxShipVx;
+  pflxShip.y += pflxShipVy;
+
+  // Clamp to map bounds
+  pflxShip.x = Math.max(0, Math.min(MAP_W, pflxShip.x));
+  pflxShip.y = Math.max(0, Math.min(MAP_H, pflxShip.y));
+
+  // Update ship rotation to face movement direction
+  if (pflxShipSpeed > 0.5) {
+    pflxShipAngle = Math.atan2(pflxShipVy, pflxShipVx) * (180 / Math.PI) + 90;
+  }
+
+  const shipEl = document.getElementById('pflxShip');
+  if (shipEl) {
+    shipEl.style.left = (pflxShip.x - 28) + 'px';
+    shipEl.style.top = (pflxShip.y - 28) + 'px';
+    shipEl.style.transformOrigin = '28px 28px';
+    shipEl.style.transform = 'rotate(' + pflxShipAngle + 'deg)';
+
+    // Banking animation on lateral movement
+    if (pflxKeys.left && !shipEl.classList.contains('banking-left')) {
+      shipEl.classList.remove('banking-right');
+      shipEl.classList.add('banking-left');
+    } else if (pflxKeys.right && !shipEl.classList.contains('banking-right')) {
+      shipEl.classList.remove('banking-left');
+      shipEl.classList.add('banking-right');
+    } else if (!pflxKeys.left && !pflxKeys.right) {
+      shipEl.classList.remove('banking-left', 'banking-right');
+    }
+
+    // Boost glow when shift is held
+    if (pflxKeys.shift && pflxShipSpeed > 2) {
+      if (!shipEl.classList.contains('boosting')) shipEl.classList.add('boosting');
+      shipEl.classList.add('flying');
+    } else {
+      shipEl.classList.remove('boosting');
+      if (pflxShipSpeed < 2) shipEl.classList.remove('flying');
+      else shipEl.classList.add('flying');
+    }
+  }
+
+  // Camera follow for chase/cockpit
+  panX = (window.innerWidth / 2) - pflxShip.x * zoom;
+  panY = (window.innerHeight / 2) - pflxShip.y * zoom;
+  applyTransform();
+
+  // Spawn trail particles while moving
+  if (pflxShipSpeed > 1.5) {
+    pflxShipSpawnTrail(pflxShip.x, pflxShip.y, pflxShipAngle);
+  }
+
+  // Discovery proximity check
+  if (typeof window._pflxCheckProximity === 'function') {
+    window._pflxCheckProximity(pflxShip.x, pflxShip.y);
+  }
+
+  // Check node snapping
+  if (pflxShipSpeed < 3) {
+    Object.values(nodeElements).forEach(function(ne) {
+      var nx = parseFloat(ne.el.style.left) || 0;
+      var ny = parseFloat(ne.el.style.top) || 0;
+      var d = Math.sqrt((pflxShip.x - nx) ** 2 + (pflxShip.y - ny) ** 2);
+      if (d < 60) {
+        pflxShip.currentNodeId = ne.node.id;
+        pflxShipSavePosition();
+      }
+    });
+  }
+
+  // Update cockpit HUD gauges
+  pflxUpdateCockpitHud();
+
+  // Update discovery radar position
+  var radar = document.getElementById('shipDiscRadar');
+  if (radar) {
+    radar.style.left = pflxShip.x + 'px';
+    radar.style.top = pflxShip.y + 'px';
+  }
+
+  pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+}
+
+// ═══════════════════════════════════════════════════════
+// ██  COCKPIT HUD UPDATES                              ██
+// ═══════════════════════════════════════════════════════
+
+function pflxUpdateCockpitHud() {
+  if (pflxCamera.mode !== 'cockpit') return;
+  var speedEl = document.getElementById('cockpitSpeed');
+  var headingEl = document.getElementById('cockpitHeading');
+  var coordsEl = document.getElementById('cockpitCoords');
+
+  if (speedEl) speedEl.textContent = Math.round(pflxShipSpeed * 10);
+  if (headingEl) {
+    var h = ((pflxShipAngle % 360) + 360) % 360;
+    headingEl.textContent = String(Math.round(h)).padStart(3, '0') + '\u00B0';
+  }
+  if (coordsEl) {
+    coordsEl.textContent = Math.round(pflxShip.x) + ', ' + Math.round(pflxShip.y);
+  }
+}
+
+// Keep arrow key loop alive when any arrow is pressed
+document.addEventListener('keydown', function(e) {
+  if (pflxCamera.mode !== 'birdseye' && !pflxKeyAnimFrame) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].indexOf(e.key) !== -1) {
+      pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+    }
+  }
+});
+
 </script>
 <!-- Ship Mode Toggle -->
 <div class="ship-mode-toggle">
@@ -6501,6 +6916,38 @@ function pflxShipOpenUpgrades() {
   <button class="ship-mode-btn" id="shipModeFree" onclick="pflxShipSetMode('free')">Free</button>
   <button class="ship-mode-btn" id="shipUpgradeBtn" onclick="pflxShipOpenUpgrades()" style="margin-top:4px;color:#f5c842;border-color:rgba(245,200,66,0.3);">Ship Bay</button>
 </div>
+
+<!-- Camera Mode Toggle -->
+<div class="camera-toggle" id="cameraToggle">
+  <div class="cam-label">Camera</div>
+  <button class="cam-btn active" id="camBirdseye" onclick="pflxSetCamera('birdseye')"><span class="cam-icon">🛰</span> Bird's Eye</button>
+  <button class="cam-btn" id="camChase" onclick="pflxSetCamera('chase')"><span class="cam-icon">🎥</span> Chase Cam</button>
+  <button class="cam-btn" id="camCockpit" onclick="pflxSetCamera('cockpit')"><span class="cam-icon">🚀</span> Cockpit</button>
+</div>
+
+<!-- Cockpit HUD Overlay -->
+<div class="cockpit-hud" id="cockpitHud">
+  <div class="cockpit-frame"></div>
+  <div class="cockpit-scanlines"></div>
+  <div class="cockpit-crosshair"></div>
+  <div class="cockpit-dash">
+    <div class="cockpit-gauge speed">
+      <div class="gauge-label">Speed</div>
+      <div class="gauge-val" id="cockpitSpeed">0</div>
+    </div>
+    <div class="cockpit-gauge heading">
+      <div class="gauge-label">Heading</div>
+      <div class="gauge-val" id="cockpitHeading">000°</div>
+    </div>
+    <div class="cockpit-gauge coords">
+      <div class="gauge-label">Position</div>
+      <div class="gauge-val" id="cockpitCoords">0, 0</div>
+    </div>
+  </div>
+</div>
+
+<!-- Arrow Key Hint -->
+<div class="arrow-key-hint" id="arrowKeyHint">Use arrow keys to pilot your ship</div>
 
 <script src="pflx-ai-chat.js"></script>
 
