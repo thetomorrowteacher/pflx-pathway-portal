@@ -2689,6 +2689,34 @@
         <div class="detail-desc" id="detailDesc"></div>
         <div class="detail-requires" id="detailRequires"></div>
         <div id="detailMCData"></div>
+        <!-- Player Submission Section -->
+        <div id="detailSubmission" style="display:none;margin-top:12px;padding:12px;border:1px solid rgba(0,212,255,0.15);border-radius:8px;background:rgba(0,212,255,0.03);">
+          <div style="font-family:Orbitron;font-size:10px;letter-spacing:2px;color:#00d4ff;margin-bottom:10px;text-transform:uppercase;">Submit Your Work</div>
+          <div id="subLinkField" style="display:none;margin-bottom:8px;">
+            <label style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Rajdhani;display:block;margin-bottom:3px;">Link URL</label>
+            <input id="subLinkInput" type="url" placeholder="https://your-project-link.com" style="width:100%;padding:8px 10px;background:rgba(5,8,16,0.6);border:1px solid rgba(0,212,255,0.2);border-radius:4px;color:#fff;font-family:Rajdhani;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div id="subScreenshotField" style="display:none;margin-bottom:8px;">
+            <label style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Rajdhani;display:block;margin-bottom:3px;">Screenshot</label>
+            <div id="subScreenshotPreview" style="width:100%;min-height:60px;border:1px dashed rgba(0,212,255,0.2);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(5,8,16,0.4);padding:8px;box-sizing:border-box;">
+              <span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:Rajdhani;">Click to upload screenshot</span>
+            </div>
+            <input id="subScreenshotInput" type="file" accept="image/*" style="display:none;">
+          </div>
+          <div id="subHtmlField" style="display:none;margin-bottom:8px;">
+            <label style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Rajdhani;display:block;margin-bottom:3px;">HTML File</label>
+            <div id="subHtmlPreview" style="width:100%;min-height:40px;border:1px dashed rgba(0,212,255,0.2);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(5,8,16,0.4);padding:8px;box-sizing:border-box;">
+              <span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:Rajdhani;">Click to upload .html file</span>
+            </div>
+            <input id="subHtmlInput" type="file" accept=".html,.htm" style="display:none;">
+          </div>
+          <div id="subDescField" style="display:none;margin-bottom:8px;">
+            <label style="font-size:11px;color:rgba(255,255,255,0.5);font-family:Rajdhani;display:block;margin-bottom:3px;">Description</label>
+            <textarea id="subDescInput" rows="3" placeholder="Describe what you did..." style="width:100%;padding:8px 10px;background:rgba(5,8,16,0.6);border:1px solid rgba(0,212,255,0.2);border-radius:4px;color:#fff;font-family:Rajdhani;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+          </div>
+          <button id="subSubmitBtn" type="button" style="width:100%;padding:10px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:Orbitron;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Submit for Approval</button>
+          <div id="subPendingMsg" style="display:none;text-align:center;padding:10px;color:#f59e0b;font-family:Rajdhani;font-size:13px;">⏳ Submission pending approval</div>
+        </div>
         <button class="launch-btn" id="launchBtn"></button>
       </div>
     </div>
@@ -3946,6 +3974,92 @@ function showDetail(n) {
 
   // Render MC + X-Coin data section
   renderDetailMCData(n);
+
+  // ── Submission section ──
+  const subSection = document.getElementById('detailSubmission');
+  const sub = n.submission || {};
+  const hasSubmission = sub.link || sub.screenshot || sub.html || sub.description;
+  if (hasSubmission && !editMode && n.status !== 'locked' && !n.comingSoon) {
+    subSection.style.display = 'block';
+    document.getElementById('subLinkField').style.display = sub.link ? 'block' : 'none';
+    document.getElementById('subScreenshotField').style.display = sub.screenshot ? 'block' : 'none';
+    document.getElementById('subHtmlField').style.display = sub.html ? 'block' : 'none';
+    document.getElementById('subDescField').style.display = sub.description ? 'block' : 'none';
+    // Reset inputs
+    document.getElementById('subLinkInput').value = '';
+    document.getElementById('subDescInput').value = '';
+    document.getElementById('subScreenshotPreview').innerHTML = '<span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:Rajdhani;">Click to upload screenshot</span>';
+    document.getElementById('subHtmlPreview').innerHTML = '<span style="font-size:11px;color:rgba(255,255,255,0.3);font-family:Rajdhani;">Click to upload .html file</span>';
+    document.getElementById('subScreenshotInput').value = '';
+    document.getElementById('subHtmlInput').value = '';
+    // Check for pending submission
+    const pending = n.submissions && n.submissions.find(s => s.status === 'pending');
+    const submitBtn = document.getElementById('subSubmitBtn');
+    const pendingMsg = document.getElementById('subPendingMsg');
+    if (pending) {
+      submitBtn.style.display = 'none';
+      pendingMsg.style.display = 'block';
+    } else {
+      submitBtn.style.display = 'block';
+      pendingMsg.style.display = 'none';
+    }
+    // Wire screenshot upload
+    var ssPreview = document.getElementById('subScreenshotPreview');
+    var ssInput = document.getElementById('subScreenshotInput');
+    ssPreview.onclick = function() { ssInput.click(); };
+    ssInput.onchange = function() {
+      if (ssInput.files && ssInput.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          ssPreview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:120px;border-radius:4px;">';
+          ssPreview._dataUrl = e.target.result;
+        };
+        reader.readAsDataURL(ssInput.files[0]);
+      }
+    };
+    // Wire HTML upload
+    var htmlPreview = document.getElementById('subHtmlPreview');
+    var htmlInput = document.getElementById('subHtmlInput');
+    htmlPreview.onclick = function() { htmlInput.click(); };
+    htmlInput.onchange = function() {
+      if (htmlInput.files && htmlInput.files[0]) {
+        htmlPreview.innerHTML = '<span style="font-size:12px;color:#00d4ff;font-family:Rajdhani;">📄 ' + htmlInput.files[0].name + '</span>';
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          htmlPreview._dataUrl = e.target.result;
+        };
+        reader.readAsDataURL(htmlInput.files[0]);
+      }
+    };
+    // Wire submit button
+    document.getElementById('subSubmitBtn').onclick = function() {
+      var submissionData = {
+        nodeId: n.id,
+        nodeTitle: n.title,
+        pathwayId: pathway.id || currentPathway,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      };
+      if (sub.link) submissionData.link = document.getElementById('subLinkInput').value;
+      if (sub.screenshot) submissionData.screenshot = ssPreview._dataUrl || '';
+      if (sub.html) submissionData.htmlFile = htmlPreview._dataUrl || '';
+      if (sub.description) submissionData.description = document.getElementById('subDescInput').value;
+      // Store submission on node
+      if (!n.submissions) n.submissions = [];
+      n.submissions.push(submissionData);
+      savePathwayEdits();
+      // Send to X-Coin approvals via syncBus
+      if (typeof pflxSyncBus !== 'undefined') {
+        pflxSyncBus.emit('node-submission', submissionData);
+      }
+      // Update UI
+      document.getElementById('subSubmitBtn').style.display = 'none';
+      document.getElementById('subPendingMsg').style.display = 'block';
+      showSaveToast('Submission sent for approval!');
+    };
+  } else {
+    subSection.style.display = 'none';
+  }
 
   // Launch button
   const btn = document.getElementById('launchBtn');
