@@ -1305,6 +1305,191 @@
       animation: spinLaunch 1s linear infinite;
     }
     @keyframes spinLaunch { to { transform: rotate(360deg); } }
+    /* ========== 3D SPACE DEPTH LAYERS ========== */
+    .space-depth-layer {
+      position: absolute; inset: -200px;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .space-depth-layer.deep { z-index: 2; }
+    .space-depth-layer.mid { z-index: 4; }
+    .space-depth-layer.near { z-index: 6; }
+    .space-depth-layer .nebula-blob {
+      position: absolute; border-radius: 50%;
+      filter: blur(60px); opacity: 0.35;
+    }
+    .space-depth-layer .depth-star {
+      position: absolute; border-radius: 50%; background: white;
+    }
+    .space-depth-layer .depth-dust {
+      position: absolute; border-radius: 50%;
+      background: rgba(0,212,255,0.4);
+      filter: blur(1px);
+    }
+
+    /* ========== PFLX SPACESHIP AVATAR ========== */
+    #pflxShip {
+      position: absolute;
+      width: 48px; height: 48px;
+      z-index: 100;
+      pointer-events: none;
+      transition: none;
+      filter: drop-shadow(0 0 12px rgba(0,212,255,0.6)) drop-shadow(0 0 24px rgba(0,212,255,0.3));
+    }
+    #pflxShip.flying {
+      filter: drop-shadow(0 0 20px rgba(0,212,255,0.9)) drop-shadow(0 0 40px rgba(0,212,255,0.5));
+    }
+    .ship-trail {
+      position: absolute;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99;
+    }
+    .ship-mode-toggle {
+      position: fixed; bottom: 120px; right: 20px;
+      z-index: 70;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ship-mode-btn {
+      background: rgba(6,10,18,0.9);
+      border: 1px solid rgba(0,212,255,0.3);
+      color: rgba(0,212,255,0.7);
+      font-family: 'Orbitron'; font-size: 8px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 6px 10px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ship-mode-btn:hover { background: rgba(0,212,255,0.15); color: #fff; }
+    .ship-mode-btn.active { background: rgba(0,212,255,0.2); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+
+    /* ========== WARP SPEED EFFECT ========== */
+    body.warp-active::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 200;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0,20,40,0.4) 100%);
+      pointer-events: none;
+      animation: warpVignette 0.8s ease-out forwards;
+    }
+    @keyframes warpVignette {
+      0% { opacity: 0; }
+      30% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* ========== SHIP UPGRADE STORE MODAL ========== */
+    .ship-upgrade-overlay {
+      position: fixed; inset: 0; z-index: 600;
+      background: rgba(3,5,12,0.9);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+    }
+    .ship-upgrade-overlay.show { display: flex; }
+    .ship-upgrade-panel {
+      width: 520px; max-width: 94vw; max-height: 85vh;
+      background: rgba(8,12,24,0.98);
+      border: 1px solid rgba(0,212,255,0.3);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .su-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,212,255,0.15);
+      background: rgba(0,212,255,0.04);
+    }
+    .su-title {
+      font-family: 'Orbitron'; font-weight: 700; font-size: 14px;
+      color: var(--pflx-cyan); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .su-balance {
+      font-family: 'Orbitron'; font-size: 12px; font-weight: 700;
+      color: #f5c842; letter-spacing: 1px;
+    }
+    .su-close {
+      background: none; border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.5); width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 14px; transition: all 0.2s;
+      border-radius: 50%;
+    }
+    .su-close:hover { color: #ff6b6b; border-color: rgba(255,80,80,0.4); }
+    .su-tabs {
+      display: flex; border-bottom: 1px solid rgba(0,212,255,0.1);
+    }
+    .su-tab {
+      flex: 1; padding: 10px;
+      font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: rgba(255,255,255,0.4); text-align: center;
+      cursor: pointer; background: none; border: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .su-tab:hover { color: rgba(255,255,255,0.7); }
+    .su-tab.active { color: var(--pflx-cyan); border-bottom-color: var(--pflx-cyan); }
+    .su-body {
+      flex: 1; overflow-y: auto; padding: 16px 20px;
+    }
+    .su-category-title {
+      font-family: 'Orbitron'; font-size: 10px; font-weight: 600;
+      color: rgba(0,212,255,0.6); letter-spacing: 2px; text-transform: uppercase;
+      margin: 16px 0 10px; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(0,212,255,0.1);
+    }
+    .su-category-title:first-child { margin-top: 0; }
+    .su-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; margin-bottom: 6px;
+      background: rgba(0,212,255,0.03);
+      border: 1px solid rgba(0,212,255,0.08);
+      border-radius: 4px; transition: all 0.2s;
+    }
+    .su-item:hover { border-color: rgba(0,212,255,0.2); background: rgba(0,212,255,0.06); }
+    .su-swatch {
+      width: 32px; height: 32px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .su-item-info { flex: 1; }
+    .su-item-name {
+      font-family: 'Rajdhani'; font-size: 14px; font-weight: 600;
+      color: rgba(255,255,255,0.85);
+    }
+    .su-item-meta {
+      font-family: 'Rajdhani'; font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+    .su-item-cost {
+      font-family: 'Orbitron'; font-size: 11px; font-weight: 700;
+      color: #f5c842; letter-spacing: 1px;
+    }
+    .su-item-cost.free { color: rgba(0,255,120,0.7); }
+    .su-buy-btn {
+      font-family: 'Orbitron'; font-size: 8px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      padding: 5px 10px; cursor: pointer; transition: all 0.2s;
+      border-radius: 3px; flex-shrink: 0;
+    }
+    .su-buy-btn.buy {
+      background: rgba(245,200,66,0.15); border: 1px solid rgba(245,200,66,0.4);
+      color: #f5c842;
+    }
+    .su-buy-btn.buy:hover { background: rgba(245,200,66,0.3); }
+    .su-buy-btn.equipped {
+      background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4);
+      color: var(--pflx-cyan);
+    }
+    .su-buy-btn.equip {
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+      color: rgba(0,212,255,0.6);
+    }
+    .su-buy-btn.equip:hover { background: rgba(0,212,255,0.15); color: var(--pflx-cyan); }
+    .su-buy-btn.locked-rank {
+      background: rgba(100,110,130,0.1); border: 1px solid rgba(100,110,130,0.3);
+      color: rgba(255,255,255,0.3); cursor: not-allowed;
+    }
+
   </style>
 </head>
 <body>
@@ -1464,10 +1649,41 @@
   </div>
   <button class="welcome-restore" id="welcomeRestore" title="Show Welcome">📋</button>
 
+  <!-- 3D Space Depth Layers (parallax) -->
+  <div class="space-depth-layer deep" id="spaceDeep"></div>
+  <div class="space-depth-layer mid" id="spaceMid"></div>
+  <div class="space-depth-layer near" id="spaceNear"></div>
+
   <!-- Node Canvas (pannable/zoomable) -->
   <div class="node-canvas" id="nodeCanvas">
     <div class="node-layer" id="nodeLayer">
       <svg class="connector-svg" id="connectorSvg"></svg>
+      <!-- PFLX Spaceship Avatar -->
+      <svg id="pflxShip" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="shipHull" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00e5ff"/>
+            <stop offset="100%" stop-color="#0a1628"/>
+          </linearGradient>
+          <linearGradient id="shipEngine" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6"/>
+          </linearGradient>
+          <filter id="shipGlow">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path d="M24 4 L32 20 L28 22 L28 36 L24 40 L20 36 L20 22 L16 20 Z" fill="url(#shipHull)" stroke="rgba(0,212,255,0.6)" stroke-width="0.5" filter="url(#shipGlow)"/>
+        <path d="M20 22 L8 32 L12 28 L20 26 Z" fill="rgba(0,180,220,0.4)" stroke="rgba(0,212,255,0.3)" stroke-width="0.3"/>
+        <path d="M28 22 L40 32 L36 28 L28 26 Z" fill="rgba(0,180,220,0.4)" stroke="rgba(0,212,255,0.3)" stroke-width="0.3"/>
+        <ellipse cx="24" cy="40" rx="4" ry="3" fill="url(#shipEngine)" opacity="0.8">
+          <animate attributeName="ry" values="3;5;3" dur="0.6s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.8;1;0.8" dur="0.6s" repeatCount="indefinite"/>
+        </ellipse>
+        <ellipse cx="24" cy="14" rx="3" ry="4" fill="rgba(0,229,255,0.3)" stroke="rgba(0,229,255,0.5)" stroke-width="0.3"/>
+        <line x1="24" y1="8" x2="24" y2="36" stroke="rgba(0,212,255,0.15)" stroke-width="0.5"/>
+      </svg>
     </div>
   </div>
 
@@ -2133,6 +2349,13 @@ const MAP_W = 2000, MAP_H = 2000;
 function applyTransform() {
   nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   updateMinimap();
+  // Parallax depth layers
+  const deep = document.getElementById('spaceDeep');
+  const mid = document.getElementById('spaceMid');
+  const near = document.getElementById('spaceNear');
+  if (deep) deep.style.transform = `translate(${panX * 0.1}px, ${panY * 0.1}px) scale(${0.8 + zoom * 0.2})`;
+  if (mid) mid.style.transform = `translate(${panX * 0.4}px, ${panY * 0.4}px) scale(${0.9 + zoom * 0.1})`;
+  if (near) near.style.transform = `translate(${panX * 0.7}px, ${panY * 0.7}px) scale(${zoom})`;
 }
 
 // Center on nodes initially
@@ -2299,11 +2522,23 @@ pathway.nodes.forEach(n => {
     <div class="conn-handle" title="Drag to connect"></div>
   `;
 
-  // Click to show detail
+  // Click to show detail (ship intercept)
   el.addEventListener('click', e => {
     e.stopPropagation();
     if (document.body.classList.contains('connect-mode')) return; // handled by connect logic
-    showDetail(n);
+    if (typeof pflxShip !== 'undefined' && pflxShip.mode === 'guided' && !pflxShip.flying) {
+      const nx = parseFloat(el.style.left) || 0;
+      const ny = parseFloat(el.style.top) || 0;
+      pflxShipFlyTo(nx, ny, () => {
+        pflxShip.currentNodeId = n.id;
+        pflxShipSavePosition();
+        showDetail(n);
+      });
+    } else if (typeof pflxShip !== 'undefined' && pflxShip.flying) {
+      // ignore clicks while flying
+    } else {
+      showDetail(n);
+    }
   });
 
   // Right-click for edit mode context menu
@@ -3701,7 +3936,19 @@ function rebuildNodes() {
         handleConnectTarget(n);
         return;
       }
-      showDetail(n);
+      if (typeof pflxShip !== 'undefined' && pflxShip.mode === 'guided' && !pflxShip.flying) {
+        const nx = parseFloat(el.style.left) || 0;
+        const ny = parseFloat(el.style.top) || 0;
+        pflxShipFlyTo(nx, ny, () => {
+          pflxShip.currentNodeId = n.id;
+          pflxShipSavePosition();
+          showDetail(n);
+        });
+      } else if (typeof pflxShip !== 'undefined' && pflxShip.flying) {
+        // ignore clicks while flying
+      } else {
+        showDetail(n);
+      }
     });
 
     el.addEventListener('contextmenu', e => {
@@ -4942,7 +5189,521 @@ setTimeout(() => {
     centerView();
   }
 }, 300);
+
+// ==================== 3D SPACE DEPTH RENDERER ====================
+(function initSpaceDepthLayers() {
+  const deepLayer = document.getElementById('spaceDeep');
+  const midLayer = document.getElementById('spaceMid');
+  const nearLayer = document.getElementById('spaceNear');
+  if (!deepLayer || !midLayer || !nearLayer) return;
+
+  // Deep layer: ~30 tiny dim stars + 2-3 nebula blobs
+  for (let i = 0; i < 30; i++) {
+    const s = document.createElement('div');
+    s.className = 'depth-star';
+    const size = Math.random() * 1.5 + 0.5;
+    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.3+0.1};`;
+    deepLayer.appendChild(s);
+  }
+  const nebulaColors = ['rgba(0,100,180,0.15)','rgba(80,40,160,0.12)','rgba(0,180,200,0.1)'];
+  for (let i = 0; i < 3; i++) {
+    const nb = document.createElement('div');
+    nb.className = 'nebula-blob';
+    const sz = Math.random() * 300 + 200;
+    nb.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*80+10}%;top:${Math.random()*80+10}%;background:${nebulaColors[i]};`;
+    deepLayer.appendChild(nb);
+  }
+
+  // Mid layer: ~20 medium stars + drifting dust
+  for (let i = 0; i < 20; i++) {
+    const s = document.createElement('div');
+    s.className = 'depth-star';
+    const size = Math.random() * 2 + 1;
+    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.4+0.15};`;
+    midLayer.appendChild(s);
+  }
+  for (let i = 0; i < 8; i++) {
+    const d = document.createElement('div');
+    d.className = 'depth-dust';
+    const size = Math.random() * 3 + 1;
+    d.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.3+0.1};`;
+    midLayer.appendChild(d);
+  }
+
+  // Near layer: ~10 larger particles with glow
+  for (let i = 0; i < 10; i++) {
+    const p = document.createElement('div');
+    p.className = 'depth-dust';
+    const size = Math.random() * 4 + 2;
+    p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.5+0.2};box-shadow:0 0 ${size*2}px rgba(0,212,255,0.3);`;
+    nearLayer.appendChild(p);
+  }
+})();
+
+// ==================== PFLX SPACESHIP ENGINE ====================
+const pflxShip = {
+  x: 1000, y: 1000,
+  targetX: 1000, targetY: 1000,
+  currentNodeId: null,
+  mode: 'guided', // 'guided' or 'free'
+  flying: false,
+  trail: [],
+  upgrades: {},
+  animFrame: null
+};
+
+// Load saved position + upgrades
+(function pflxShipInit() {
+  const savedPos = localStorage.getItem('pflx_ship_position_' + pathwaySlug);
+  if (savedPos) {
+    try {
+      const sp = JSON.parse(savedPos);
+      pflxShip.currentNodeId = sp.nodeId || null;
+      if (sp.x != null) { pflxShip.x = sp.x; pflxShip.y = sp.y; }
+    } catch(e) {}
+  }
+  const savedUpgrades = localStorage.getItem('pflx_ship_upgrades');
+  if (savedUpgrades) {
+    try { pflxShip.upgrades = JSON.parse(savedUpgrades); } catch(e) {}
+  }
+
+  // Position ship at saved node if possible
+  if (pflxShip.currentNodeId && nodeElements[pflxShip.currentNodeId]) {
+    const ne = nodeElements[pflxShip.currentNodeId];
+    pflxShip.x = parseFloat(ne.el.style.left) || pflxShip.x;
+    pflxShip.y = parseFloat(ne.el.style.top) || pflxShip.y;
+  } else {
+    // Default to first unlocked node
+    const firstNode = Object.values(nodeElements).find(ne => ne.node && ne.node.status !== 'locked');
+    if (firstNode) {
+      pflxShip.x = parseFloat(firstNode.el.style.left) || 1000;
+      pflxShip.y = parseFloat(firstNode.el.style.top) || 1000;
+      pflxShip.currentNodeId = firstNode.node.id;
+    }
+  }
+
+  const shipEl = document.getElementById('pflxShip');
+  if (shipEl) {
+    shipEl.style.left = (pflxShip.x - 24) + 'px';
+    shipEl.style.top = (pflxShip.y - 24) + 'px';
+  }
+
+  // Apply visual upgrades
+  pflxShipApplyUpgrades();
+})();
+
+function pflxShipSavePosition() {
+  localStorage.setItem('pflx_ship_position_' + pathwaySlug, JSON.stringify({
+    nodeId: pflxShip.currentNodeId,
+    x: pflxShip.x, y: pflxShip.y
+  }));
+}
+
+function pflxShipSetMode(mode) {
+  pflxShip.mode = mode;
+  document.getElementById('shipModeGuided').classList.toggle('active', mode === 'guided');
+  document.getElementById('shipModeFree').classList.toggle('active', mode === 'free');
+  if (typeof SFX !== 'undefined') SFX.play && SFX.play('click');
+}
+
+function pflxShipFlyTo(tx, ty, callback) {
+  if (pflxShip.flying) return;
+  pflxShip.flying = true;
+  pflxShip.targetX = tx;
+  pflxShip.targetY = ty;
+
+  const shipEl = document.getElementById('pflxShip');
+  if (!shipEl) { pflxShip.flying = false; if (callback) callback(); return; }
+
+  shipEl.classList.add('flying');
+
+  const startX = pflxShip.x;
+  const startY = pflxShip.y;
+  const dx = tx - startX;
+  const dy = ty - startY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // Rotation: atan2 direction, offset by -90deg (ship points "up")
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+  shipEl.style.transformOrigin = '24px 24px';
+  shipEl.style.transform = `rotate(${angle}deg)`;
+
+  // Warp effect for long distances
+  const isWarp = dist > 400;
+  if (isWarp) document.body.classList.add('warp-active');
+
+  // Speed based on upgrades
+  let speedMult = 1;
+  if (pflxShip.upgrades.speedBoost2) speedMult = 2.5;
+  else if (pflxShip.upgrades.speedBoost1) speedMult = 1.7;
+
+  // Warp Drive = instant teleport
+  if (pflxShip.upgrades.warpDrive && dist > 300) {
+    pflxShip.x = tx; pflxShip.y = ty;
+    shipEl.style.left = (tx - 24) + 'px';
+    shipEl.style.top = (ty - 24) + 'px';
+    panX = (window.innerWidth / 2) - tx * zoom;
+    panY = (window.innerHeight / 2) - ty * zoom;
+    applyTransform();
+    shipEl.classList.remove('flying');
+    pflxShip.flying = false;
+    setTimeout(() => document.body.classList.remove('warp-active'), 400);
+    if (callback) callback();
+    return;
+  }
+
+  const duration = Math.min(1200, Math.max(400, dist * 1.2)) / speedMult;
+  const startTime = performance.now();
+  let trailTimer = 0;
+
+  function animateShip(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    // Ease in-out cubic
+    const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const cx = startX + dx * ease;
+    const cy = startY + dy * ease;
+    pflxShip.x = cx;
+    pflxShip.y = cy;
+
+    shipEl.style.left = (cx - 24) + 'px';
+    shipEl.style.top = (cy - 24) + 'px';
+
+    // Camera follow
+    panX = (window.innerWidth / 2) - cx * zoom;
+    panY = (window.innerHeight / 2) - cy * zoom;
+    applyTransform();
+
+    // Trail particles every ~30ms
+    trailTimer += (now - (startTime + (elapsed - 16)));
+    if (elapsed - trailTimer > 0 || t < 1) {
+      pflxShipSpawnTrail(cx, cy, angle);
+      trailTimer = elapsed;
+    }
+
+    if (t < 1) {
+      pflxShip.animFrame = requestAnimationFrame(animateShip);
+    } else {
+      // Arrived
+      shipEl.classList.remove('flying');
+      pflxShip.flying = false;
+      document.body.classList.remove('warp-active');
+      if (callback) callback();
+    }
+  }
+
+  pflxShip.animFrame = requestAnimationFrame(animateShip);
+}
+
+// Trail system
+let trailSpawnCounter = 0;
+function pflxShipSpawnTrail(x, y, angle) {
+  trailSpawnCounter++;
+  if (trailSpawnCounter % 2 !== 0) return; // spawn every other frame
+
+  const nodeLayerEl = document.getElementById('nodeLayer');
+  if (!nodeLayerEl) return;
+
+  const trail = document.createElement('div');
+  trail.className = 'ship-trail';
+  const size = Math.random() * 3 + 2;
+  // Trail color: cyan to purple gradient
+  const hue = Math.random() > 0.5 ? '0,212,255' : '124,58,237';
+  trail.style.cssText = `left:${x - size/2}px;top:${y + 16 - size/2}px;width:${size}px;height:${size}px;background:rgba(${hue},0.8);box-shadow:0 0 ${size}px rgba(${hue},0.5);opacity:0.8;transition:opacity 1.5s ease-out;`;
+  nodeLayerEl.appendChild(trail);
+
+  // Fade out and remove
+  requestAnimationFrame(() => { trail.style.opacity = '0'; });
+  setTimeout(() => { trail.remove(); }, 1600);
+}
+
+// Free roam: click canvas to fly there
+document.getElementById('nodeCanvas').addEventListener('click', e => {
+  if (pflxShip.mode !== 'free' || pflxShip.flying) return;
+  if (e.target.closest('.skill-node')) return; // node clicks handled separately
+
+  const rect = document.getElementById('nodeCanvas').getBoundingClientRect();
+  const cx = (e.clientX - rect.left - panX) / zoom;
+  const cy = (e.clientY - rect.top - panY) / zoom;
+  pflxShipFlyTo(cx, cy, () => {
+    // Check proximity to nodes
+    Object.values(nodeElements).forEach(ne => {
+      const nx = parseFloat(ne.el.style.left) || 0;
+      const ny = parseFloat(ne.el.style.top) || 0;
+      const d = Math.sqrt((cx - nx) ** 2 + (cy - ny) ** 2);
+      if (d < 80) {
+        pflxShip.currentNodeId = ne.node.id;
+        pflxShipSavePosition();
+      }
+    });
+  });
+});
+
+// Apply visual upgrades to ship SVG
+function pflxShipApplyUpgrades() {
+  const shipEl = document.getElementById('pflxShip');
+  if (!shipEl) return;
+  const u = pflxShip.upgrades;
+
+  // Hull color
+  const hullGrad = shipEl.querySelector('#shipHull stop:first-child');
+  if (hullGrad && u.equippedHull) {
+    const hullColors = { cyan: '#00e5ff', crimson: '#ff2040', nebula: '#a855f7', gold: '#f5c842', stealth: '#1a1e2e' };
+    hullGrad.setAttribute('stop-color', hullColors[u.equippedHull] || '#00e5ff');
+  }
+
+  // Engine glow
+  const engineGrad = shipEl.querySelector('#shipEngine stop:first-child');
+  if (engineGrad && u.equippedEngine) {
+    const engineColors = { standard: '#00d4ff', plasma: '#00aaff', void: '#8b00ff', solar: '#ff6600' };
+    engineGrad.setAttribute('stop-color', engineColors[u.equippedEngine] || '#00d4ff');
+  }
+
+  // Shield aura
+  if (u.shieldAura) {
+    let shield = shipEl.querySelector('.shield-aura');
+    if (!shield) {
+      shield = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      shield.setAttribute('class', 'shield-aura');
+      shield.setAttribute('cx', '24'); shield.setAttribute('cy', '24'); shield.setAttribute('r', '22');
+      shield.setAttribute('fill', 'none'); shield.setAttribute('stroke', 'rgba(0,212,255,0.25)');
+      shield.setAttribute('stroke-width', '1.5');
+      const anim = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+      anim.setAttribute('attributeName', 'opacity'); anim.setAttribute('values', '0.3;0.7;0.3');
+      anim.setAttribute('dur', '2s'); anim.setAttribute('repeatCount', 'indefinite');
+      shield.appendChild(anim);
+      shipEl.appendChild(shield);
+    }
+  }
+}
+
+// ==================== SHIP UPGRADE STORE ====================
+const SHIP_UPGRADES = {
+  aesthetic: {
+    hullColors: {
+      title: 'Hull Colors',
+      items: [
+        { id: 'hull_cyan', name: 'Cyan', key: 'equippedHull', val: 'cyan', cost: 0, swatch: '#00e5ff', free: true },
+        { id: 'hull_crimson', name: 'Crimson', key: 'equippedHull', val: 'crimson', cost: 200, swatch: '#ff2040' },
+        { id: 'hull_nebula', name: 'Nebula Purple', key: 'equippedHull', val: 'nebula', cost: 300, swatch: '#a855f7' },
+        { id: 'hull_gold', name: 'Solar Gold', key: 'equippedHull', val: 'gold', cost: 500, swatch: '#f5c842' },
+        { id: 'hull_stealth', name: 'Stealth Black', key: 'equippedHull', val: 'stealth', cost: 400, swatch: '#1a1e2e' },
+      ]
+    },
+    engineGlow: {
+      title: 'Engine Glow',
+      items: [
+        { id: 'engine_standard', name: 'Standard', key: 'equippedEngine', val: 'standard', cost: 0, swatch: '#00d4ff', free: true },
+        { id: 'engine_plasma', name: 'Plasma Blue', key: 'equippedEngine', val: 'plasma', cost: 150, swatch: '#00aaff' },
+        { id: 'engine_void', name: 'Void Purple', key: 'equippedEngine', val: 'void', cost: 250, swatch: '#8b00ff' },
+        { id: 'engine_solar', name: 'Solar Flare', key: 'equippedEngine', val: 'solar', cost: 350, swatch: '#ff6600' },
+      ]
+    },
+    trailEffects: {
+      title: 'Trail Effects',
+      items: [
+        { id: 'trail_basic', name: 'Basic Streak', key: 'equippedTrail', val: 'basic', cost: 0, emoji: '✦', free: true },
+        { id: 'trail_comet', name: 'Comet Trail', key: 'equippedTrail', val: 'comet', cost: 200, emoji: '☄️' },
+        { id: 'trail_quantum', name: 'Quantum Wake', key: 'equippedTrail', val: 'quantum', cost: 400, emoji: '⚡' },
+        { id: 'trail_rainbow', name: 'Rainbow Nova', key: 'equippedTrail', val: 'rainbow', cost: 600, emoji: '🌈' },
+      ]
+    },
+    wingStyle: {
+      title: 'Wing Style',
+      items: [
+        { id: 'wing_standard', name: 'Standard', key: 'equippedWing', val: 'standard', cost: 0, emoji: '◇', free: true },
+        { id: 'wing_swept', name: 'Swept', key: 'equippedWing', val: 'swept', cost: 300, emoji: '◁' },
+        { id: 'wing_delta', name: 'Delta', key: 'equippedWing', val: 'delta', cost: 400, emoji: '△' },
+        { id: 'wing_phantom', name: 'Phantom', key: 'equippedWing', val: 'phantom', cost: 500, emoji: '◈' },
+      ]
+    }
+  },
+  technical: {
+    speed: {
+      title: 'Speed Enhancements',
+      items: [
+        { id: 'speed1', name: 'Speed Boost Lv1', key: 'speedBoost1', val: true, cost: 200, emoji: '🚀', rankReq: 2, desc: 'Faster travel between nodes' },
+        { id: 'speed2', name: 'Speed Boost Lv2', key: 'speedBoost2', val: true, cost: 500, emoji: '⚡', rankReq: 4, desc: 'Even faster travel', requires: 'speedBoost1' },
+      ]
+    },
+    abilities: {
+      title: 'Special Abilities',
+      items: [
+        { id: 'radar', name: 'Radar Scanner', key: 'radarScanner', val: true, cost: 300, emoji: '📡', rankReq: 3, desc: 'Reveals hidden nodes on minimap' },
+        { id: 'shield', name: 'Shield Aura', key: 'shieldAura', val: true, cost: 400, emoji: '🛡️', rankReq: 3, desc: 'Glowing protective ring around ship' },
+        { id: 'warp', name: 'Warp Drive', key: 'warpDrive', val: true, cost: 800, emoji: '🌀', rankReq: 5, desc: 'Instant teleport to any unlocked node' },
+      ]
+    }
+  }
+};
+
+function pflxShipGetXCBalance() {
+  try {
+    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
+    return session.xc || session.xcBalance || 500; // demo default
+  } catch(e) { return 500; }
+}
+
+function pflxShipGetRank() {
+  try {
+    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
+    return session.rank || session.evolutionRank || 1;
+  } catch(e) { return 1; }
+}
+
+let currentUpgradeTab = 'aesthetic';
+
+function pflxShipOpenUpgrades() {
+  const overlay = document.getElementById('shipUpgradeOverlay');
+  overlay.classList.add('show');
+  document.getElementById('suBalance').textContent = pflxShipGetXCBalance() + ' XC';
+  pflxShipRenderUpgradeTab(currentUpgradeTab);
+}
+
+function pflxShipCloseUpgrades() {
+  document.getElementById('shipUpgradeOverlay').classList.remove('show');
+}
+
+function pflxShipSwitchTab(tab, btn) {
+  currentUpgradeTab = tab;
+  document.querySelectorAll('.su-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  pflxShipRenderUpgradeTab(tab);
+}
+
+function pflxShipRenderUpgradeTab(tab) {
+  const body = document.getElementById('suBody');
+  const categories = SHIP_UPGRADES[tab];
+  const xc = pflxShipGetXCBalance();
+  const rank = pflxShipGetRank();
+  const u = pflxShip.upgrades;
+  let html = '';
+
+  Object.keys(categories).forEach(catKey => {
+    const cat = categories[catKey];
+    html += `<div class="su-category-title">${cat.title}</div>`;
+    cat.items.forEach(item => {
+      const owned = item.free || u['owned_' + item.id];
+      const equipped = u[item.key] === item.val;
+      const rankLocked = item.rankReq && rank < item.rankReq;
+      const requiresMissing = item.requires && !u[item.requires];
+      const canBuy = !owned && !rankLocked && !requiresMissing && xc >= item.cost;
+
+      let btnClass, btnText;
+      if (equipped) { btnClass = 'equipped'; btnText = 'Equipped'; }
+      else if (owned || item.free) { btnClass = 'equip'; btnText = 'Equip'; }
+      else if (rankLocked) { btnClass = 'locked-rank'; btnText = `Rank ${item.rankReq}+`; }
+      else if (requiresMissing) { btnClass = 'locked-rank'; btnText = 'Requires Prev'; }
+      else if (xc < item.cost) { btnClass = 'locked-rank'; btnText = 'Not Enough XC'; }
+      else { btnClass = 'buy'; btnText = 'Buy'; }
+
+      const swatchContent = item.swatch
+        ? `<div class="su-swatch" style="background:${item.swatch}"></div>`
+        : `<div class="su-swatch">${item.emoji || '?'}</div>`;
+
+      const costDisplay = item.free ? '<span class="su-item-cost free">FREE</span>' : `<span class="su-item-cost">${item.cost} XC</span>`;
+      const metaText = item.desc || (item.rankReq ? `Rank ${item.rankReq}+ required` : '');
+
+      html += `
+        <div class="su-item">
+          ${swatchContent}
+          <div class="su-item-info">
+            <div class="su-item-name">${item.name}</div>
+            ${metaText ? `<div class="su-item-meta">${metaText}</div>` : ''}
+          </div>
+          ${costDisplay}
+          <button class="su-buy-btn ${btnClass}" onclick="pflxShipBuyOrEquip('${item.id}','${catKey}','${tab}')" ${(rankLocked || requiresMissing || (!canBuy && !owned && !item.free)) ? 'disabled' : ''}>${btnText}</button>
+        </div>`;
+    });
+  });
+
+  body.innerHTML = html;
+}
+
+function pflxShipBuyOrEquip(itemId, catKey, tab) {
+  const categories = SHIP_UPGRADES[tab];
+  let item = null;
+  Object.values(categories).forEach(cat => {
+    cat.items.forEach(it => { if (it.id === itemId) item = it; });
+  });
+  if (!item) return;
+
+  const u = pflxShip.upgrades;
+  const owned = item.free || u['owned_' + item.id];
+
+  if (owned || item.free) {
+    // Equip it
+    u[item.key] = item.val;
+    pflxShipSaveUpgrades();
+    pflxShipApplyUpgrades();
+    pflxShipRenderUpgradeTab(tab);
+    return;
+  }
+
+  // Buy
+  let xc = pflxShipGetXCBalance();
+  if (xc < item.cost) return;
+  xc -= item.cost;
+
+  // Save XC
+  try {
+    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
+    session.xc = xc; session.xcBalance = xc;
+    localStorage.setItem('pflx_session', JSON.stringify(session));
+  } catch(e) {}
+
+  u['owned_' + item.id] = true;
+  u[item.key] = item.val;
+  pflxShipSaveUpgrades();
+  pflxShipApplyUpgrades();
+  document.getElementById('suBalance').textContent = xc + ' XC';
+  pflxShipRenderUpgradeTab(tab);
+
+  // Notify platform via postMessage
+  try {
+    window.parent.postMessage({ type: 'pflx-ship-upgrade', upgrade: item.id, cost: item.cost }, '*');
+  } catch(e) {}
+}
+
+function pflxShipSaveUpgrades() {
+  localStorage.setItem('pflx_ship_upgrades', JSON.stringify(pflxShip.upgrades));
+}
+
+// Close upgrade overlay on click outside or Escape
+document.getElementById('shipUpgradeOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('shipUpgradeOverlay')) pflxShipCloseUpgrades();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('shipUpgradeOverlay').classList.contains('show')) {
+    pflxShipCloseUpgrades();
+  }
+});
+
 </script>
+<!-- Ship Mode Toggle -->
+<div class="ship-mode-toggle">
+  <button class="ship-mode-btn active" id="shipModeGuided" onclick="pflxShipSetMode('guided')">Guided</button>
+  <button class="ship-mode-btn" id="shipModeFree" onclick="pflxShipSetMode('free')">Free</button>
+  <button class="ship-mode-btn" id="shipUpgradeBtn" onclick="pflxShipOpenUpgrades()" style="margin-top:4px;color:#f5c842;border-color:rgba(245,200,66,0.3);">Upgrades</button>
+</div>
+
+<!-- Ship Upgrade Store Modal -->
+<div class="ship-upgrade-overlay" id="shipUpgradeOverlay">
+  <div class="ship-upgrade-panel">
+    <div class="su-header">
+      <span class="su-title">Ship Upgrades</span>
+      <span class="su-balance" id="suBalance">0 XC</span>
+      <button class="su-close" onclick="pflxShipCloseUpgrades()">✕</button>
+    </div>
+    <div class="su-tabs">
+      <button class="su-tab active" data-tab="aesthetic" onclick="pflxShipSwitchTab('aesthetic',this)">Aesthetic</button>
+      <button class="su-tab" data-tab="technical" onclick="pflxShipSwitchTab('technical',this)">Technical</button>
+    </div>
+    <div class="su-body" id="suBody"></div>
+  </div>
+</div>
+
 <script src="pflx-ai-chat.js"></script>
 </body>
 </html>
