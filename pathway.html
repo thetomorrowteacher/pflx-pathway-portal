@@ -4005,6 +4005,13 @@ function showDetail(n) {
   if (n.requiredBadge) {
     reqHTML += (reqHTML ? '<br>' : '') + 'Completion Badge: <span>' + n.requiredBadge + '</span>';
   }
+  // Show XC Reward and Entry Fee for ALL nodes (from node editor fields)
+  if (n.xcReward && n.xcReward > 0) {
+    reqHTML += (reqHTML ? '<br>' : '') + '⚡ XC Reward: <span style="color:#a78bfa;font-weight:700;">' + n.xcReward + ' XC</span>';
+  }
+  if (n.xcCost && n.xcCost > 0) {
+    reqHTML += (reqHTML ? '<br>' : '') + '🎟️ Entry Fee: <span style="color:#22c55e;font-weight:700;">' + n.xcCost + ' XC</span>';
+  }
   // Add pitched-node info (XC value, creator credit, entry fee, NFT value, sponsor)
   if (n.isPitchedNode) {
     reqHTML += (reqHTML ? '<br>' : '') + '💡 <span style="color:#f59e0b;font-weight:700;">Player-Pitched Course</span>';
@@ -4130,7 +4137,9 @@ function showDetail(n) {
   // Launch button
   const btn = document.getElementById('launchBtn');
   btn.onclick = null;
-  const hasEntryFee = n.isPitchedNode && n.entryFeeXC && n.entryFeeXC > 0 && n.status !== 'in_progress' && n.status !== 'completed';
+  // Entry fee: support both legacy entryFeeXC (pitched nodes) and xcCost (node editor field)
+  const entryFeeAmount = (n.xcCost && n.xcCost > 0) ? n.xcCost : ((n.isPitchedNode && n.entryFeeXC && n.entryFeeXC > 0) ? n.entryFeeXC : 0);
+  const hasEntryFee = entryFeeAmount > 0 && n.status !== 'in_progress' && n.status !== 'completed';
   if (n.comingSoon) {
     btn.className = 'launch-btn locked-btn';
     btn.textContent = '// COMING SOON //';
@@ -4143,14 +4152,43 @@ function showDetail(n) {
   } else {
     btn.className = 'launch-btn ready';
     if (hasEntryFee) {
-      btn.textContent = '🎟️ PAY ' + n.entryFeeXC + ' XC & START ▶';
+      btn.textContent = '🎟️ PAY ' + entryFeeAmount + ' XC TO ENTER ▶';
     } else {
       btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
     }
     if (n.url || n.contentUrl) {
       btn.onclick = () => {
         if (hasEntryFee) {
-          if (!confirm('This course requires a ' + n.entryFeeXC + ' XC entry fee. Proceed?')) return;
+          // Get player's current XC balance
+          var playerXC = 0;
+          try {
+            var storedUser = JSON.parse(localStorage.getItem('pflxUser') || '{}');
+            if (storedUser && typeof storedUser.xc === 'number') playerXC = storedUser.xc;
+            // Also check pflxData for more up-to-date value
+            if (pflxData && pflxData.users && storedUser.id) {
+              var liveUser = pflxData.users.find(function(u) { return u.id === storedUser.id; });
+              if (liveUser && typeof liveUser.xc === 'number') playerXC = liveUser.xc;
+            }
+          } catch(e) {}
+
+          if (playerXC < entryFeeAmount) {
+            showSaveToast('⚠️ Not enough XC! You need ' + entryFeeAmount + ' XC but only have ' + playerXC + ' XC.');
+            return;
+          }
+          if (!confirm('This node requires ' + entryFeeAmount + ' XC entry fee.\n\nYour balance: ' + playerXC + ' XC\nAfter entry: ' + (playerXC - entryFeeAmount) + ' XC\n\nProceed?')) return;
+
+          // Deduct XC via pflxSyncBus
+          if (typeof pflxSyncBus !== 'undefined') {
+            pflxSyncBus.emit('xc-deduct', { amount: entryFeeAmount, reason: 'Node entry fee: ' + n.title, nodeId: n.id });
+          }
+          // Also update local user data
+          try {
+            var u = JSON.parse(localStorage.getItem('pflxUser') || '{}');
+            if (u && typeof u.xc === 'number') {
+              u.xc = Math.max(0, u.xc - entryFeeAmount);
+              localStorage.setItem('pflxUser', JSON.stringify(u));
+            }
+          } catch(e) {}
         }
         // Close detail panel before launching
         detailPanel.classList.remove('active');
