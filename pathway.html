@@ -3022,9 +3022,11 @@
               <option value="task">Task</option>
               <option value="project">Project</option>
             </select>
-            <input class="ne-input" id="neMcTagName" placeholder="Task or Project name to create in MC..." style="flex:1;">
+            <select class="ne-select" id="neMcTagName" style="flex:1;">
+              <option value="">— Select —</option>
+            </select>
           </div>
-          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Creates a linked task or project in Mission Control when this node is started</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Links this node to an existing Mission Control task or project</span>
         </div>
         <div class="ne-row">
           <div class="ne-field">
@@ -4613,7 +4615,7 @@ async function loadAllPflxData() {
   const keys = [
     'checkpoints', 'tasks', 'projects', 'jobs',
     'projectPitches', 'cohortGroups', 'seasons',
-    'users', 'badges', 'transactions'
+    'users', 'coinCategories', 'transactions'
   ];
   try {
     const results = await Promise.all(
@@ -4624,7 +4626,7 @@ async function loadAllPflxData() {
       )
     );
     results.forEach(r => {
-      const storeKey = r.key === 'projectPitches' ? 'pitches' : r.key;
+      const storeKey = r.key === 'projectPitches' ? 'pitches' : r.key === 'coinCategories' ? 'badges' : r.key;
       if (pflxData.hasOwnProperty(storeKey) && Array.isArray(r.data)) {
         pflxData[storeKey] = r.data;
       }
@@ -5440,53 +5442,38 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neUrl').value = node.url || '';
   document.getElementById('neStatus').value = node.status || 'locked';
   // ── Populate badge dropdowns from LIVE X-Coin Supabase data ──
+  // X-Coin stores badges as coinCategories: [{ name: "Category Name", coins: [{ name, description, xc }, ...] }]
   const badgeSelect = document.getElementById('neBadge');
   badgeSelect.innerHTML = '<option value="">— None —</option>';
+
+  function _populateBadgeSelect(categories, sel) {
+    sel.innerHTML = '<option value="">— None —</option>';
+    if (!Array.isArray(categories)) return;
+    categories.forEach(function(cat) {
+      if (!cat || !cat.name || !Array.isArray(cat.coins) || cat.coins.length === 0) return;
+      var group = document.createElement('optgroup');
+      group.label = cat.name;
+      cat.coins.forEach(function(coin) {
+        if (!coin || !coin.name) return;
+        var label = coin.name + (coin.xc ? ' (' + coin.xc + ' XC)' : '');
+        group.appendChild(new Option(label, coin.name));
+      });
+      sel.appendChild(group);
+    });
+  }
+
   const liveBadges = (pflxData && pflxData.badges) ? pflxData.badges : [];
   if (liveBadges.length > 0) {
-    // Group badges by category if they have one, else lump into "All Badges"
-    const grouped = {};
-    liveBadges.forEach(function(b) {
-      var name = typeof b === 'string' ? b : (b.name || b.title || '');
-      var cat = (typeof b === 'object' && b.category) ? b.category : 'All Badges';
-      if (!name) return;
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(name);
-    });
-    Object.keys(grouped).sort().forEach(function(cat) {
-      var group = document.createElement('optgroup');
-      group.label = cat;
-      grouped[cat].sort().forEach(function(bName) {
-        group.appendChild(new Option(bName, bName));
-      });
-      badgeSelect.appendChild(group);
-    });
+    _populateBadgeSelect(liveBadges, badgeSelect);
   } else {
-    // Fallback: if pflxData hasn't loaded yet, try a direct Supabase fetch
+    // Fallback: direct Supabase fetch using correct key coinCategories
     (async function() {
       try {
-        var res = await _supabase.from('app_data').select('data').eq('key', 'badges').single();
+        var res = await _supabase.from('app_data').select('data').eq('key', 'coinCategories').single();
         if (res.data && res.data.data && Array.isArray(res.data.data)) {
           pflxData.badges = res.data.data;
-          var sel = document.getElementById('neBadge');
-          sel.innerHTML = '<option value="">— None —</option>';
-          var grouped2 = {};
-          res.data.data.forEach(function(b2) {
-            var nm = typeof b2 === 'string' ? b2 : (b2.name || b2.title || '');
-            var ct = (typeof b2 === 'object' && b2.category) ? b2.category : 'All Badges';
-            if (!nm) return;
-            if (!grouped2[ct]) grouped2[ct] = [];
-            grouped2[ct].push(nm);
-          });
-          Object.keys(grouped2).sort().forEach(function(ct2) {
-            var grp = document.createElement('optgroup');
-            grp.label = ct2;
-            grouped2[ct2].sort().forEach(function(bn) { grp.appendChild(new Option(bn, bn)); });
-            sel.appendChild(grp);
-          });
-          // Re-set value after populating
-          if (editorNode && editorNode.requiredBadge) sel.value = editorNode.requiredBadge;
-          // Also repopulate tagged dropdown
+          _populateBadgeSelect(res.data.data, badgeSelect);
+          if (editorNode && editorNode.requiredBadge) badgeSelect.value = editorNode.requiredBadge;
           _nePopulateTaggedBadgeSelect();
         }
       } catch(e) { console.warn('[PFLX] Badge fetch fallback error:', e); }
@@ -5501,8 +5488,27 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neXcReward').value = node.xcReward || '';
   document.getElementById('neXcCost').value = node.xcCost || '';
   document.getElementById('neContentUrl').value = node.contentUrl || '';
-  document.getElementById('neMcTagType').value = (node.mcTag && node.mcTag.type) ? node.mcTag.type : '';
-  document.getElementById('neMcTagName').value = (node.mcTag && node.mcTag.name) ? node.mcTag.name : '';
+  // ── Populate MC Task/Project dropdown from pflxData ──
+  var mcTypeEl = document.getElementById('neMcTagType');
+  var mcNameEl = document.getElementById('neMcTagName');
+  function _populateMcTagDropdown() {
+    var type = mcTypeEl.value;
+    mcNameEl.innerHTML = '<option value="">— Select —</option>';
+    if (!type) return;
+    var items = type === 'task' ? (pflxData.tasks || []) : (pflxData.projects || []);
+    items.forEach(function(item) {
+      var name = item.name || item.title || '';
+      if (!name) return;
+      var opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      mcNameEl.appendChild(opt);
+    });
+  }
+  mcTypeEl.onchange = _populateMcTagDropdown;
+  mcTypeEl.value = (node.mcTag && node.mcTag.type) ? node.mcTag.type : '';
+  _populateMcTagDropdown();
+  mcNameEl.value = (node.mcTag && node.mcTag.name) ? node.mcTag.name : '';
   document.getElementById('neSubLink').checked = node.submission ? !!node.submission.link : false;
   document.getElementById('neSubScreenshot').checked = node.submission ? !!node.submission.screenshot : false;
   document.getElementById('neSubHtml').checked = node.submission ? !!node.submission.html : false;
