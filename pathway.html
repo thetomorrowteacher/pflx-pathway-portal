@@ -267,11 +267,13 @@
     .node-canvas {
       position: absolute; inset: 0; z-index: 10;
       cursor: grab;
+      transform-style: preserve-3d;
     }
     .node-canvas.dragging-canvas { cursor: grabbing; }
 
     .node-layer {
       position: absolute;
+      transform-style: preserve-3d;
       width: 2000px; height: 2000px;
       top: 0; left: 0;
       transform-origin: 0 0;
@@ -1857,27 +1859,45 @@
     .cam-btn.active { background: rgba(0,212,255,0.2); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
     .cam-btn .cam-icon { font-size: 11px; }
 
-    /* ── Chase Cam Mode — slight 3D tilt ── */
+    /* ── Chase Cam Mode — 3D tilt ── */
+    body.cam-chase {
+      perspective: 1400px;
+      perspective-origin: 50% 60%;
+    }
     body.cam-chase .node-canvas {
       transition: transform 0.3s ease-out;
       transform-style: preserve-3d;
-    }
-    body.cam-chase {
-      perspective: 1200px;
-      perspective-origin: 50% 40%;
-    }
-    body.cam-chase .node-canvas {
       transform-origin: 50% 50%;
     }
+    /* Billboard nodes so they face camera in chase cam */
+    body.cam-chase .skill-node {
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+    body.cam-chase .node-layer {
+      transform-style: preserve-3d;
+    }
+    body.cam-chase #pflxShip {
+      /* Counter-rotate ship to face camera */
+      backface-visibility: hidden;
+    }
 
-    /* ── Cockpit Mode — deep 3D perspective (flying INTO the map) ── */
+    /* ── Cockpit Mode — deep 3D perspective ── */
     body.cam-cockpit {
-      perspective: 600px;
-      perspective-origin: 50% 85%;
+      perspective: 900px;
+      perspective-origin: 50% 75%;
     }
     body.cam-cockpit .node-canvas {
       transform-style: preserve-3d;
       transform-origin: 50% 50%;
+    }
+    body.cam-cockpit .node-layer {
+      transform-style: preserve-3d;
+    }
+    /* Billboard nodes in cockpit — counter-rotate to face camera */
+    body.cam-cockpit .skill-node {
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
     }
 
     /* ── Cockpit View Mode — Full Immersive Interior ── */
@@ -3226,9 +3246,9 @@ function applyTransform() {
   let tiltX = 0; // rotateX for 3D depth
 
   if (camMode === 'chase') {
-    tiltX = 25; // slight forward tilt — looking ahead
+    tiltX = 18; // moderate forward tilt
   } else if (camMode === 'cockpit') {
-    tiltX = 55; // deep tilt — looking down the flight path into Z
+    tiltX = 40; // deep tilt — flying into the map
   }
 
   if (tiltX > 0) {
@@ -3237,6 +3257,29 @@ function applyTransform() {
     nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   }
   updateMinimap();
+
+  // Billboard: counter-rotate nodes so they face the camera
+  if (tiltX > 0) {
+    if (!applyTransform._lastTilt || applyTransform._lastTilt !== tiltX) {
+      applyTransform._lastTilt = tiltX;
+      // Apply counter-rotation to all skill nodes
+      const allNodes = document.querySelectorAll('.skill-node');
+      const counterTilt = -tiltX;
+      const nodeScale = camMode === 'cockpit' ? 1.3 : 1;
+      allNodes.forEach(function(n) {
+        n.style.transform = 'rotateX(' + counterTilt + 'deg) scale(' + nodeScale + ')';
+        n.style.transformStyle = 'preserve-3d';
+      });
+    }
+  } else if (applyTransform._lastTilt) {
+    applyTransform._lastTilt = 0;
+    // Reset node transforms back to normal
+    const allNodes = document.querySelectorAll('.skill-node');
+    allNodes.forEach(function(n) {
+      n.style.transform = '';
+      n.style.transformStyle = '';
+    });
+  }
 
   // Discovery layer matches node layer
   const discLayer = document.getElementById('discoveryLayer');
@@ -3248,19 +3291,18 @@ function applyTransform() {
     }
   }
 
-  // 3D Parallax depth layers — dramatic depth separation
+  // 3D Parallax depth layers
   const deep = document.getElementById('spaceDeep');
   const mid = document.getElementById('spaceMid');
   const near = document.getElementById('spaceNear');
   if (camMode === 'cockpit') {
-    // Cockpit: space layers tilt with stronger parallax for depth illusion
-    if (deep) deep.style.transform = `translate3d(${panX * 0.08}px, ${panY * 0.08}px, -600px) rotateX(${tiltX * 0.3}deg) scale(${0.5 + zoom * 0.5})`;
-    if (mid) mid.style.transform = `translate3d(${panX * 0.35}px, ${panY * 0.35}px, -250px) rotateX(${tiltX * 0.5}deg) scale(${0.7 + zoom * 0.3})`;
-    if (near) near.style.transform = `translate3d(${panX * 0.75}px, ${panY * 0.75}px, -50px) rotateX(${tiltX * 0.7}deg) scale(${0.9 + zoom * 0.1})`;
+    if (deep) deep.style.transform = `translate3d(${panX * 0.08}px, ${panY * 0.08}px, -600px) rotateX(${tiltX * 0.25}deg) scale(${0.5 + zoom * 0.5})`;
+    if (mid) mid.style.transform = `translate3d(${panX * 0.35}px, ${panY * 0.35}px, -250px) rotateX(${tiltX * 0.4}deg) scale(${0.7 + zoom * 0.3})`;
+    if (near) near.style.transform = `translate3d(${panX * 0.75}px, ${panY * 0.75}px, -50px) rotateX(${tiltX * 0.6}deg) scale(${0.9 + zoom * 0.1})`;
   } else if (camMode === 'chase') {
-    if (deep) deep.style.transform = `translate3d(${panX * 0.06}px, ${panY * 0.06}px, -500px) rotateX(${tiltX * 0.2}deg) scale(${0.55 + zoom * 0.45})`;
-    if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -180px) rotateX(${tiltX * 0.3}deg) scale(${0.8 + zoom * 0.2})`;
-    if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) rotateX(${tiltX * 0.4}deg) scale(${0.95 + zoom * 0.05})`;
+    if (deep) deep.style.transform = `translate3d(${panX * 0.06}px, ${panY * 0.06}px, -500px) rotateX(${tiltX * 0.15}deg) scale(${0.55 + zoom * 0.45})`;
+    if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -180px) rotateX(${tiltX * 0.25}deg) scale(${0.8 + zoom * 0.2})`;
+    if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) rotateX(${tiltX * 0.35}deg) scale(${0.95 + zoom * 0.05})`;
   } else {
     if (deep) deep.style.transform = `translate3d(${panX * 0.05}px, ${panY * 0.05}px, -400px) scale(${0.6 + zoom * 0.4})`;
     if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
@@ -6707,7 +6749,14 @@ function pflxShipFlyTo(tx, ty, callback) {
   // Rotation: atan2 direction, offset by -90deg (ship points "up")
   const angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
   shipEl.style.transformOrigin = '28px 28px';
-  shipEl.style.transform = `rotate(${angle}deg)`;
+  // Apply billboard counter-rotation in 3D camera modes
+  const flyTilt = (typeof pflxCamera !== 'undefined' && pflxCamera.mode === 'chase') ? -18 :
+                  (typeof pflxCamera !== 'undefined' && pflxCamera.mode === 'cockpit') ? -40 : 0;
+  if (flyTilt) {
+    shipEl.style.transform = `rotateX(${flyTilt}deg) rotate(${angle}deg)`;
+  } else {
+    shipEl.style.transform = `rotate(${angle}deg)`;
+  }
 
   // Warp effect for long distances
   const isWarp = dist > 400;
@@ -6948,6 +6997,9 @@ function pflxSetCamera(mode) {
   const prev = pflxCamera.mode;
   pflxCamera.mode = mode;
 
+  // Force billboard recalculation on next applyTransform
+  applyTransform._lastTilt = null;
+
   // Update button states
   document.getElementById('camBirdseye').classList.toggle('active', mode === 'birdseye');
   document.getElementById('camChase').classList.toggle('active', mode === 'chase');
@@ -7096,7 +7148,17 @@ function pflxKeyLoop() {
     shipEl.style.left = (pflxShip.x - 28) + 'px';
     shipEl.style.top = (pflxShip.y - 28) + 'px';
     shipEl.style.transformOrigin = '28px 28px';
-    shipEl.style.transform = 'rotate(' + pflxShipAngle + 'deg)';
+
+    // Apply rotation + billboard counter-rotation in 3D camera modes
+    var camTilt = 0;
+    if (pflxCamera.mode === 'chase') camTilt = -18;
+    else if (pflxCamera.mode === 'cockpit') camTilt = -40;
+
+    if (camTilt !== 0) {
+      shipEl.style.transform = 'rotateX(' + camTilt + 'deg) rotate(' + pflxShipAngle + 'deg)';
+    } else {
+      shipEl.style.transform = 'rotate(' + pflxShipAngle + 'deg)';
+    }
 
     // Banking animation on lateral movement
     if (pflxKeys.left && !shipEl.classList.contains('banking-left')) {
