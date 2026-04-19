@@ -1857,64 +1857,263 @@
     .cam-btn.active { background: rgba(0,212,255,0.2); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
     .cam-btn .cam-icon { font-size: 11px; }
 
-    /* ── Chase Cam Mode ── */
-    body.cam-chase .node-canvas { transition: transform 0.3s ease-out; }
+    /* ── Chase Cam Mode — slight 3D tilt ── */
+    body.cam-chase .node-canvas {
+      transition: transform 0.3s ease-out;
+      transform-style: preserve-3d;
+    }
+    body.cam-chase {
+      perspective: 1200px;
+      perspective-origin: 50% 40%;
+    }
+    body.cam-chase .node-canvas {
+      transform-origin: 50% 50%;
+    }
 
-    /* ── Cockpit View Mode ── */
+    /* ── Cockpit Mode — deep 3D perspective (flying INTO the map) ── */
+    body.cam-cockpit {
+      perspective: 600px;
+      perspective-origin: 50% 85%;
+    }
+    body.cam-cockpit .node-canvas {
+      transform-style: preserve-3d;
+      transform-origin: 50% 50%;
+    }
+
+    /* ── Cockpit View Mode — Full Immersive Interior ── */
     .cockpit-hud {
       position: fixed; inset: 0; z-index: 90;
       pointer-events: none; display: none;
+      perspective: 800px;
     }
     body.cam-cockpit .cockpit-hud { display: block; }
-    .cockpit-frame {
+
+    /* Windshield frame — the curved cockpit canopy border */
+    .cockpit-canopy {
       position: absolute; inset: 0;
-      border: 3px solid rgba(0,212,255,0.15);
-      border-radius: 50% / 30%;
-      box-shadow: inset 0 0 80px rgba(0,20,40,0.6), inset 0 0 200px rgba(0,0,0,0.4);
+      border: 4px solid rgba(20,35,60,0.9);
+      border-radius: 8% / 12%;
+      box-shadow:
+        inset 0 0 60px rgba(0,0,0,0.7),
+        inset 0 0 150px rgba(0,10,30,0.5),
+        0 0 30px rgba(0,0,0,0.6);
     }
+    /* Canopy struts — vertical windshield dividers */
+    .canopy-strut {
+      position: absolute; top: 0; bottom: 0; width: 3px;
+      background: linear-gradient(180deg, rgba(30,50,80,0.8), rgba(15,25,45,0.6), rgba(30,50,80,0.8));
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+    .canopy-strut.left { left: 28%; }
+    .canopy-strut.right { right: 28%; }
+    .canopy-strut.center { left: 50%; transform: translateX(-50%); width: 2px; opacity: 0.4; }
+    /* Horizontal strut */
+    .canopy-strut-h {
+      position: absolute; left: 0; right: 0; height: 2px; top: 35%;
+      background: linear-gradient(90deg, rgba(30,50,80,0.6), transparent 20%, transparent 80%, rgba(30,50,80,0.6));
+    }
+
+    /* ── Dashboard — full instrument panel ── */
     .cockpit-dash {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 120px;
-      background: linear-gradient(180deg, transparent 0%, rgba(6,10,20,0.85) 40%, rgba(6,10,20,0.95) 100%);
-      border-top: 1px solid rgba(0,212,255,0.15);
+      position: absolute; bottom: 0; left: 0; right: 0; height: 220px;
+      background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(8,14,28,0.7) 15%,
+        rgba(8,14,28,0.92) 35%,
+        rgba(6,10,20,0.98) 60%,
+        #060a14 100%);
+      border-top: 1px solid rgba(0,212,255,0.12);
     }
+    /* Center console ridge */
+    .dash-center-console {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 400px; height: 200px;
+      background: linear-gradient(180deg, transparent, rgba(10,18,35,0.95) 40%);
+      clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
+    }
+
+    /* ── Instrument screens ── */
+    .cockpit-screen {
+      position: absolute;
+      background: rgba(0,8,20,0.9);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: inset 0 0 20px rgba(0,10,30,0.8), 0 0 6px rgba(0,0,0,0.5);
+    }
+    .cockpit-screen::before {
+      content: ''; position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,212,255,0.015) 1px, rgba(0,212,255,0.015) 2px);
+    }
+    .cockpit-screen .screen-label {
+      position: absolute; top: 4px; left: 6px;
+      font-family: 'Orbitron'; font-size: 6px; font-weight: 600;
+      color: rgba(0,212,255,0.35); letter-spacing: 2px; text-transform: uppercase;
+    }
+    /* Left screen — nav/radar */
+    .cockpit-screen.screen-left {
+      left: 40px; bottom: 60px; width: 160px; height: 110px;
+      transform: perspective(400px) rotateY(15deg);
+    }
+    /* Right screen — systems */
+    .cockpit-screen.screen-right {
+      right: 40px; bottom: 60px; width: 160px; height: 110px;
+      transform: perspective(400px) rotateY(-15deg);
+    }
+    /* Center screen — main HUD */
+    .cockpit-screen.screen-center {
+      left: 50%; bottom: 80px; width: 200px; height: 90px;
+      transform: translateX(-50%) perspective(400px) rotateX(8deg);
+      border-color: rgba(0,212,255,0.3);
+    }
+    /* Mini radar display inside left screen */
+    .mini-radar {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      width: 70px; height: 70px; border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.2);
+      background: radial-gradient(circle, rgba(0,20,40,0.8), rgba(0,5,15,0.9));
+      overflow: hidden;
+    }
+    .mini-radar::after {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      width: 50%; height: 1px;
+      background: linear-gradient(90deg, rgba(0,212,255,0.6), transparent);
+      transform-origin: left center;
+      animation: radarSweep 3s linear infinite;
+    }
+    @keyframes radarSweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .mini-radar .radar-dot {
+      position: absolute; width: 3px; height: 3px; border-radius: 50%;
+      background: #00d4ff;
+      box-shadow: 0 0 4px #00d4ff;
+    }
+
+    /* ── Gauges on the dashboard ── */
     .cockpit-gauge {
-      position: absolute; bottom: 20px;
+      position: absolute;
       font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
       color: rgba(0,212,255,0.7); letter-spacing: 1px;
     }
-    .cockpit-gauge.speed { left: 30px; }
-    .cockpit-gauge.coords { right: 30px; }
-    .cockpit-gauge.heading { left: 50%; transform: translateX(-50%); }
+    .cockpit-gauge.speed { left: 220px; bottom: 30px; }
+    .cockpit-gauge.coords { right: 220px; bottom: 30px; }
+    .cockpit-gauge.heading { left: 50%; bottom: 30px; transform: translateX(-50%); }
     .cockpit-gauge .gauge-val {
-      font-size: 16px; color: var(--pflx-cyan);
-      text-shadow: 0 0 10px rgba(0,212,255,0.5);
+      font-size: 18px; color: var(--pflx-cyan);
+      text-shadow: 0 0 12px rgba(0,212,255,0.6);
     }
     .cockpit-gauge .gauge-label {
-      font-size: 7px; color: rgba(0,212,255,0.4);
-      letter-spacing: 2px; text-transform: uppercase;
+      font-size: 6px; color: rgba(0,212,255,0.35);
+      letter-spacing: 3px; text-transform: uppercase;
     }
-    .cockpit-crosshair {
+
+    /* ── Side panels — cockpit walls ── */
+    .cockpit-side {
+      position: absolute; top: 0; bottom: 0; width: 80px;
+      background: linear-gradient(180deg, rgba(10,18,35,0.3), rgba(10,18,35,0.85) 60%, rgba(6,10,20,0.95));
+    }
+    .cockpit-side.left-wall {
+      left: 0;
+      background: linear-gradient(90deg, rgba(6,10,20,0.95), transparent);
+    }
+    .cockpit-side.right-wall {
+      right: 0;
+      background: linear-gradient(-90deg, rgba(6,10,20,0.95), transparent);
+    }
+    /* Side panel indicator lights */
+    .side-indicator {
+      position: absolute; width: 4px; height: 4px; border-radius: 50%;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    /* ── Crosshair / aiming reticle ── */
+    .cockpit-reticle {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%,-50%);
-      width: 40px; height: 40px;
+      width: 60px; height: 60px;
     }
-    .cockpit-crosshair::before, .cockpit-crosshair::after {
-      content: ''; position: absolute;
-      background: rgba(0,212,255,0.3);
-    }
-    .cockpit-crosshair::before { width: 1px; height: 100%; left: 50%; top: 0; }
-    .cockpit-crosshair::after { height: 1px; width: 100%; top: 50%; left: 0; }
-    .cockpit-scanlines {
+    .reticle-ring {
       position: absolute; inset: 0;
-      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.02) 2px, rgba(0,212,255,0.02) 4px);
+      border: 1px solid rgba(0,212,255,0.25);
+      border-radius: 50%;
+    }
+    .reticle-ring.inner {
+      inset: 12px;
+      border-color: rgba(0,212,255,0.15);
+    }
+    .reticle-tick {
+      position: absolute; background: rgba(0,212,255,0.35);
+    }
+    .reticle-tick.top { width: 1px; height: 8px; top: -2px; left: 50%; }
+    .reticle-tick.bottom { width: 1px; height: 8px; bottom: -2px; left: 50%; }
+    .reticle-tick.left { height: 1px; width: 8px; left: -2px; top: 50%; }
+    .reticle-tick.right { height: 1px; width: 8px; right: -2px; top: 50%; }
+    .reticle-center {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: 3px; height: 3px; border-radius: 50%;
+      background: rgba(0,212,255,0.5);
+      box-shadow: 0 0 6px rgba(0,212,255,0.4);
+    }
+
+    /* ── Warp tunnel effect (hyperspace lines) ── */
+    .warp-tunnel {
+      position: fixed; inset: 0; z-index: 89;
+      pointer-events: none; display: none;
+      overflow: hidden;
+    }
+    body.cam-cockpit .warp-tunnel { display: block; }
+    .warp-line {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, rgba(0,180,255,0.6), rgba(255,255,255,0.8), rgba(0,180,255,0.6), transparent);
+      height: 1px;
+      transform-origin: center center;
+      opacity: 0;
+    }
+    body.cam-cockpit.warp-boosting .warp-line {
+      animation: warpStreak 0.6s linear infinite;
+    }
+    @keyframes warpStreak {
+      0% { opacity: 0; transform: scaleX(0.1) translateZ(0); }
+      30% { opacity: 0.8; }
+      100% { opacity: 0; transform: scaleX(3) translateZ(100px); }
+    }
+
+    /* ── Ambient cockpit lighting ── */
+    .cockpit-ambient {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 90%, rgba(0,212,255,0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 90%, rgba(0,212,255,0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 100%, rgba(0,100,180,0.06) 0%, transparent 50%);
       pointer-events: none;
     }
+
+    .cockpit-scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,212,255,0.012) 3px, rgba(0,212,255,0.012) 4px);
+      pointer-events: none;
+    }
+
     body.cam-cockpit #pflxShip { display: none; }
     body.cam-cockpit { cursor: crosshair; }
+
+    /* Cockpit top bar — status readouts */
+    .cockpit-top-bar {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 30px; align-items: center;
+    }
+    .top-readout {
+      font-family: 'Orbitron'; font-size: 8px; font-weight: 500;
+      color: rgba(0,212,255,0.4); letter-spacing: 2px; text-transform: uppercase;
+    }
+    .top-readout .readout-val {
+      color: rgba(0,212,255,0.7); font-weight: 700;
+    }
+
     /* Arrow key hint */
     .arrow-key-hint {
-      position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
-      z-index: 71; font-family: 'Orbitron'; font-size: 8px;
+      position: fixed; bottom: 240px; left: 50%; transform: translateX(-50%);
+      z-index: 91; font-family: 'Orbitron'; font-size: 8px;
       color: rgba(0,212,255,0.35); letter-spacing: 2px;
       text-transform: uppercase; pointer-events: none;
       transition: opacity 0.5s;
@@ -2235,27 +2434,32 @@
     <div class="node-layer" id="nodeLayer">
       <svg class="connector-svg" id="connectorSvg"></svg>
       <!-- PFLX Spaceship Avatar -->
-      <svg id="pflxShip" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+      <svg id="pflxShip" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="shipHull" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#00e5ff"/>
-            <stop offset="40%" stop-color="#1a3a5c"/>
-            <stop offset="100%" stop-color="#0a1628"/>
+            <stop offset="25%" stop-color="#1a4a6c"/>
+            <stop offset="60%" stop-color="#0d2640"/>
+            <stop offset="100%" stop-color="#061420"/>
           </linearGradient>
           <linearGradient id="shipEngine" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.9"/>
             <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.6"/>
           </linearGradient>
           <linearGradient id="shipWing" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0d2a4a"/>
-            <stop offset="100%" stop-color="#061320"/>
+            <stop offset="0%" stop-color="#0f2e4e"/>
+            <stop offset="100%" stop-color="#061525"/>
           </linearGradient>
           <linearGradient id="cockpitGlass" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#80efff" stop-opacity="0.9"/>
-            <stop offset="100%" stop-color="#00b8d4" stop-opacity="0.4"/>
+            <stop offset="0%" stop-color="#80efff" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#005a80" stop-opacity="0.4"/>
+          </linearGradient>
+          <linearGradient id="nacelleGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1a3050"/>
+            <stop offset="100%" stop-color="#0a1628"/>
           </linearGradient>
           <filter id="shipGlow">
-            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feGaussianBlur stdDeviation="1.2" result="blur"/>
             <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
           <filter id="engineFlare">
@@ -2263,51 +2467,95 @@
             <feMerge><feMergeNode in="blur"/><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        <!-- Main fuselage — rounded spacecraft body -->
-        <path d="M32 6 C34 6 38 14 39 20 L40 30 L38 38 L34 42 L32 44 L30 42 L26 38 L24 30 L25 20 C26 14 30 6 32 6 Z" fill="url(#shipHull)" stroke="rgba(0,212,255,0.5)" stroke-width="0.6" filter="url(#shipGlow)"/>
-        <!-- Left wing — swept-back delta -->
-        <path d="M25 24 L8 40 L10 36 L18 30 L24 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.4)" stroke-width="0.4"/>
-        <!-- Right wing — swept-back delta -->
-        <path d="M39 24 L56 40 L54 36 L46 30 L40 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.4)" stroke-width="0.4"/>
-        <!-- Left wing tip light -->
-        <circle cx="9" cy="39" r="1.5" fill="#ff3366" opacity="0.9">
-          <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite"/>
+
+        <!-- ── Main fuselage — sleek elongated hull ── -->
+        <path d="M40 4 C42 4 46 12 47 20 L48 28 L48 40 L46 50 L44 54 L40 58 L36 54 L34 50 L32 40 L32 28 L33 20 C34 12 38 4 40 4 Z" fill="url(#shipHull)" stroke="rgba(0,212,255,0.4)" stroke-width="0.5" filter="url(#shipGlow)"/>
+
+        <!-- ── Dorsal spine ridge ── -->
+        <path d="M40 8 L41 20 L40.5 45 L40 52 L39.5 45 L39 20 Z" fill="rgba(0,212,255,0.08)" stroke="rgba(0,212,255,0.12)" stroke-width="0.3"/>
+
+        <!-- ── Left primary wing — angular swept-back ── -->
+        <path d="M33 26 L14 44 L10 48 L12 42 L20 34 L28 28 L32 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.3)" stroke-width="0.4"/>
+        <!-- Left wing surface detail -->
+        <path d="M28 30 L16 42" fill="none" stroke="rgba(0,212,255,0.1)" stroke-width="0.3"/>
+        <path d="M30 28 L22 36" fill="none" stroke="rgba(0,212,255,0.08)" stroke-width="0.3"/>
+
+        <!-- ── Right primary wing — angular swept-back ── -->
+        <path d="M47 26 L66 44 L70 48 L68 42 L60 34 L52 28 L48 26 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.3)" stroke-width="0.4"/>
+        <!-- Right wing surface detail -->
+        <path d="M52 30 L64 42" fill="none" stroke="rgba(0,212,255,0.1)" stroke-width="0.3"/>
+        <path d="M50 28 L58 36" fill="none" stroke="rgba(0,212,255,0.08)" stroke-width="0.3"/>
+
+        <!-- ── Left secondary canard wing ── -->
+        <path d="M34 18 L22 26 L24 24 L32 19 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.2)" stroke-width="0.3" opacity="0.7"/>
+        <!-- ── Right secondary canard wing ── -->
+        <path d="M46 18 L58 26 L56 24 L48 19 Z" fill="url(#shipWing)" stroke="rgba(0,180,220,0.2)" stroke-width="0.3" opacity="0.7"/>
+
+        <!-- ── Wing tip lights ── -->
+        <circle cx="11" cy="47" r="1.8" fill="#ff3366" opacity="0.9">
+          <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
         </circle>
-        <!-- Right wing tip light -->
-        <circle cx="55" cy="39" r="1.5" fill="#33ff66" opacity="0.9">
-          <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.2s" repeatCount="indefinite"/>
+        <circle cx="69" cy="47" r="1.8" fill="#33ff66" opacity="0.9">
+          <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
         </circle>
-        <!-- Hull panel lines -->
-        <line x1="32" y1="10" x2="32" y2="40" stroke="rgba(0,212,255,0.12)" stroke-width="0.4"/>
-        <path d="M28 18 L32 12 L36 18" fill="none" stroke="rgba(0,212,255,0.15)" stroke-width="0.3"/>
-        <line x1="26" y1="30" x2="38" y2="30" stroke="rgba(0,212,255,0.1)" stroke-width="0.3"/>
-        <!-- Cockpit canopy — glowing dome -->
-        <ellipse cx="32" cy="16" rx="4" ry="5" fill="url(#cockpitGlass)" stroke="rgba(0,229,255,0.6)" stroke-width="0.5">
-          <animate attributeName="opacity" values="0.85;1;0.85" dur="2s" repeatCount="indefinite"/>
+
+        <!-- ── Hull panel lines — mechanical detail ── -->
+        <path d="M36 14 L40 8 L44 14" fill="none" stroke="rgba(0,212,255,0.12)" stroke-width="0.3"/>
+        <line x1="34" y1="32" x2="46" y2="32" stroke="rgba(0,212,255,0.08)" stroke-width="0.3"/>
+        <line x1="35" y1="38" x2="45" y2="38" stroke="rgba(0,212,255,0.06)" stroke-width="0.3"/>
+        <path d="M36 44 L40 46 L44 44" fill="none" stroke="rgba(0,212,255,0.08)" stroke-width="0.3"/>
+
+        <!-- ── Cockpit canopy — elongated dome ── -->
+        <ellipse cx="40" cy="16" rx="5" ry="7" fill="url(#cockpitGlass)" stroke="rgba(0,229,255,0.6)" stroke-width="0.5">
+          <animate attributeName="opacity" values="0.8;1;0.8" dur="2.5s" repeatCount="indefinite"/>
         </ellipse>
-        <!-- Cockpit highlight -->
-        <ellipse cx="31" cy="14" rx="1.5" ry="2" fill="rgba(255,255,255,0.25)"/>
-        <!-- Engine nacelle left -->
-        <rect x="22" y="34" width="4" height="8" rx="2" fill="#0a1628" stroke="rgba(0,180,220,0.3)" stroke-width="0.3"/>
-        <!-- Engine nacelle right -->
-        <rect x="38" y="34" width="4" height="8" rx="2" fill="#0a1628" stroke="rgba(0,180,220,0.3)" stroke-width="0.3"/>
-        <!-- Main engine exhaust -->
-        <ellipse cx="32" cy="46" rx="5" ry="4" fill="url(#shipEngine)" opacity="0.85" filter="url(#engineFlare)">
-          <animate attributeName="ry" values="4;7;4" dur="0.5s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.85;1;0.85" dur="0.5s" repeatCount="indefinite"/>
+        <!-- Canopy highlight reflection -->
+        <ellipse cx="38.5" cy="13" rx="2" ry="3" fill="rgba(255,255,255,0.2)"/>
+        <!-- Canopy interior glow -->
+        <ellipse cx="40" cy="17" rx="3" ry="4" fill="rgba(0,180,255,0.08)"/>
+
+        <!-- ── Left engine nacelle pod ── -->
+        <path d="M28 36 L26 38 L25 48 L27 50 L30 50 L31 48 L31 38 L29 36 Z" fill="url(#nacelleGrad)" stroke="rgba(0,180,220,0.25)" stroke-width="0.3"/>
+        <!-- Nacelle intake glow -->
+        <ellipse cx="28.5" cy="37" rx="1.5" ry="0.8" fill="rgba(0,212,255,0.3)"/>
+
+        <!-- ── Right engine nacelle pod ── -->
+        <path d="M52 36 L50 38 L49 48 L51 50 L54 50 L55 48 L55 38 L53 36 Z" fill="url(#nacelleGrad)" stroke="rgba(0,180,220,0.25)" stroke-width="0.3"/>
+        <!-- Nacelle intake glow -->
+        <ellipse cx="52.5" cy="37" rx="1.5" ry="0.8" fill="rgba(0,212,255,0.3)"/>
+
+        <!-- ── Main engine exhaust — triple thrust ── -->
+        <ellipse cx="40" cy="60" rx="6" ry="5" fill="url(#shipEngine)" opacity="0.85" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="5;9;5" dur="0.4s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.8;1;0.8" dur="0.4s" repeatCount="indefinite"/>
         </ellipse>
-        <!-- Left engine exhaust -->
-        <ellipse cx="24" cy="43" rx="2" ry="2.5" fill="#7c3aed" opacity="0.6" filter="url(#engineFlare)">
-          <animate attributeName="ry" values="2.5;4;2.5" dur="0.6s" repeatCount="indefinite"/>
+        <!-- Left nacelle exhaust -->
+        <ellipse cx="28.5" cy="52" rx="2.5" ry="3" fill="#7c3aed" opacity="0.7" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="3;5;3" dur="0.5s" repeatCount="indefinite"/>
         </ellipse>
-        <!-- Right engine exhaust -->
-        <ellipse cx="40" cy="43" rx="2" ry="2.5" fill="#7c3aed" opacity="0.6" filter="url(#engineFlare)">
-          <animate attributeName="ry" values="2.5;4;2.5" dur="0.6s" repeatCount="indefinite"/>
+        <!-- Right nacelle exhaust -->
+        <ellipse cx="52.5" cy="52" rx="2.5" ry="3" fill="#7c3aed" opacity="0.7" filter="url(#engineFlare)">
+          <animate attributeName="ry" values="3;5;3" dur="0.5s" repeatCount="indefinite"/>
         </ellipse>
-        <!-- Dorsal antenna -->
-        <line x1="32" y1="6" x2="32" y2="2" stroke="rgba(0,212,255,0.4)" stroke-width="0.5"/>
-        <circle cx="32" cy="2" r="0.8" fill="#00e5ff" opacity="0.7">
-          <animate attributeName="opacity" values="0.7;1;0.7" dur="0.8s" repeatCount="indefinite"/>
+
+        <!-- ── Dorsal antenna + beacon ── -->
+        <line x1="40" y1="4" x2="40" y2="0" stroke="rgba(0,212,255,0.4)" stroke-width="0.5"/>
+        <circle cx="40" cy="0" r="1" fill="#00e5ff" opacity="0.8">
+          <animate attributeName="opacity" values="0.5;1;0.5" dur="0.8s" repeatCount="indefinite"/>
+        </circle>
+
+        <!-- ── Running lights along hull ── -->
+        <circle cx="36" cy="24" r="0.6" fill="#00d4ff" opacity="0.5">
+          <animate attributeName="opacity" values="0.5;0.9;0.5" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="44" cy="24" r="0.6" fill="#00d4ff" opacity="0.5">
+          <animate attributeName="opacity" values="0.5;0.9;0.5" dur="1.5s" begin="0.3s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="37" cy="42" r="0.5" fill="#f5c842" opacity="0.4">
+          <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="43" cy="42" r="0.5" fill="#f5c842" opacity="0.4">
+          <animate attributeName="opacity" values="0.3;0.7;0.3" dur="2s" begin="0.5s" repeatCount="indefinite"/>
         </circle>
       </svg>
     </div>
@@ -2973,18 +3221,51 @@ let panX = 0, panY = 0, zoom = 1;
 const MAP_W = 5000, MAP_H = 5000;
 
 function applyTransform() {
-  nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  // Determine camera mode for 3D perspective
+  const camMode = (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye';
+  let tiltX = 0; // rotateX for 3D depth
+
+  if (camMode === 'chase') {
+    tiltX = 25; // slight forward tilt — looking ahead
+  } else if (camMode === 'cockpit') {
+    tiltX = 55; // deep tilt — looking down the flight path into Z
+  }
+
+  if (tiltX > 0) {
+    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotateX(${tiltX}deg)`;
+  } else {
+    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  }
   updateMinimap();
-  // Discovery layer moves exactly with node layer
+
+  // Discovery layer matches node layer
   const discLayer = document.getElementById('discoveryLayer');
-  if (discLayer) discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  if (discLayer) {
+    if (tiltX > 0) {
+      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotateX(${tiltX}deg)`;
+    } else {
+      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    }
+  }
+
   // 3D Parallax depth layers — dramatic depth separation
   const deep = document.getElementById('spaceDeep');
   const mid = document.getElementById('spaceMid');
   const near = document.getElementById('spaceNear');
-  if (deep) deep.style.transform = `translate3d(${panX * 0.05}px, ${panY * 0.05}px, -400px) scale(${0.6 + zoom * 0.4})`;
-  if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
-  if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
+  if (camMode === 'cockpit') {
+    // Cockpit: space layers tilt with stronger parallax for depth illusion
+    if (deep) deep.style.transform = `translate3d(${panX * 0.08}px, ${panY * 0.08}px, -600px) rotateX(${tiltX * 0.3}deg) scale(${0.5 + zoom * 0.5})`;
+    if (mid) mid.style.transform = `translate3d(${panX * 0.35}px, ${panY * 0.35}px, -250px) rotateX(${tiltX * 0.5}deg) scale(${0.7 + zoom * 0.3})`;
+    if (near) near.style.transform = `translate3d(${panX * 0.75}px, ${panY * 0.75}px, -50px) rotateX(${tiltX * 0.7}deg) scale(${0.9 + zoom * 0.1})`;
+  } else if (camMode === 'chase') {
+    if (deep) deep.style.transform = `translate3d(${panX * 0.06}px, ${panY * 0.06}px, -500px) rotateX(${tiltX * 0.2}deg) scale(${0.55 + zoom * 0.45})`;
+    if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -180px) rotateX(${tiltX * 0.3}deg) scale(${0.8 + zoom * 0.2})`;
+    if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) rotateX(${tiltX * 0.4}deg) scale(${0.95 + zoom * 0.05})`;
+  } else {
+    if (deep) deep.style.transform = `translate3d(${panX * 0.05}px, ${panY * 0.05}px, -400px) scale(${0.6 + zoom * 0.4})`;
+    if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
+    if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
+  }
 }
 
 // Center on nodes initially
@@ -6881,24 +7162,157 @@ function pflxKeyLoop() {
 }
 
 // ═══════════════════════════════════════════════════════
-// ██  COCKPIT HUD UPDATES                              ██
+// ██  COCKPIT HUD UPDATES — Full Instrument Panel      ██
 // ═══════════════════════════════════════════════════════
+
+// Sector names based on position (3x3 grid across 5000x5000 map)
+var SECTOR_NAMES = [
+  ['GENESIS','NEXUS','FRONTIER'],
+  ['DEEP CORE','CENTRAL','OUTER RIM'],
+  ['VOID','SHADOW','TERMINUS']
+];
+
+function pflxGetSectorName(x, y) {
+  var col = Math.min(2, Math.floor(x / (MAP_W / 3)));
+  var row = Math.min(2, Math.floor(y / (MAP_H / 3)));
+  return SECTOR_NAMES[row] ? (SECTOR_NAMES[row][col] || 'UNKNOWN') : 'UNKNOWN';
+}
 
 function pflxUpdateCockpitHud() {
   if (pflxCamera.mode !== 'cockpit') return;
+
   var speedEl = document.getElementById('cockpitSpeed');
   var headingEl = document.getElementById('cockpitHeading');
   var coordsEl = document.getElementById('cockpitCoords');
+  var throttleEl = document.getElementById('cockpitThrottle');
+  var sectorEl = document.getElementById('cockpitSector');
+  var altEl = document.getElementById('cockpitAlt');
+  var engineBar = document.getElementById('cockpitEngineBar');
+  var engineStatus = document.getElementById('cockpitEngineStatus');
+  var warpStatus = document.getElementById('cockpitWarpStatus');
 
-  if (speedEl) speedEl.textContent = Math.round(pflxShipSpeed * 10);
+  var displaySpeed = Math.round(pflxShipSpeed * 10);
+  if (speedEl) speedEl.textContent = displaySpeed;
+
   if (headingEl) {
     var h = ((pflxShipAngle % 360) + 360) % 360;
     headingEl.textContent = String(Math.round(h)).padStart(3, '0') + '\u00B0';
   }
-  if (coordsEl) {
-    coordsEl.textContent = Math.round(pflxShip.x) + ', ' + Math.round(pflxShip.y);
+
+  if (coordsEl) coordsEl.textContent = Math.round(pflxShip.x) + ', ' + Math.round(pflxShip.y);
+
+  // Throttle percentage
+  var maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
+  var tierMult = pflxShip.upgrades._speedMult || 1;
+  var throttlePct = Math.min(100, Math.round((pflxShipSpeed / (maxSpd * tierMult)) * 100));
+  if (throttleEl) throttleEl.textContent = throttlePct + '%';
+
+  // Sector name
+  if (sectorEl) sectorEl.textContent = pflxGetSectorName(pflxShip.x, pflxShip.y);
+
+  // Altitude (simulated from zoom)
+  if (altEl) altEl.textContent = Math.round(1000 / zoom);
+
+  // Engine status bar
+  if (engineBar) {
+    var enginePct = Math.min(100, 60 + throttlePct * 0.4);
+    engineBar.style.width = enginePct + '%';
+    if (throttlePct > 80) {
+      engineBar.style.background = 'linear-gradient(90deg,#f5c842,#ff6b35)';
+    } else {
+      engineBar.style.background = 'linear-gradient(90deg,#00d4ff,#4ade80)';
+    }
   }
+  if (engineStatus) {
+    if (pflxKeys.shift && pflxShipSpeed > 2) {
+      engineStatus.textContent = 'OVERDRIVE';
+      engineStatus.style.color = '#ff6b35';
+    } else if (pflxShipSpeed > 1) {
+      engineStatus.textContent = 'ACTIVE';
+      engineStatus.style.color = '#4ade80';
+    } else {
+      engineStatus.textContent = 'IDLE';
+      engineStatus.style.color = '#f5c842';
+    }
+  }
+
+  // Warp status
+  if (warpStatus) {
+    if (pflxKeys.shift && pflxShipSpeed > 5) {
+      warpStatus.textContent = 'ENGAGED';
+      warpStatus.style.color = '#a78bfa';
+    } else {
+      warpStatus.textContent = 'STANDBY';
+      warpStatus.style.color = '#f5c842';
+    }
+  }
+
+  // Warp tunnel boost visual
+  if (pflxKeys.shift && pflxShipSpeed > 4) {
+    document.body.classList.add('warp-boosting');
+  } else {
+    document.body.classList.remove('warp-boosting');
+  }
+
+  // Update radar dots (show nearby nodes)
+  pflxUpdateCockpitRadar();
 }
+
+function pflxUpdateCockpitRadar() {
+  var radar = document.getElementById('cockpitRadar');
+  if (!radar) return;
+  // Remove old dots
+  var oldDots = radar.querySelectorAll('.radar-dot-live');
+  oldDots.forEach(function(d) { d.remove(); });
+
+  var range = 600;
+  Object.values(nodeElements).forEach(function(ne) {
+    var nx = parseFloat(ne.el.style.left) || 0;
+    var ny = parseFloat(ne.el.style.top) || 0;
+    var dx = nx - pflxShip.x;
+    var dy = ny - pflxShip.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < range && dist > 10) {
+      var dot = document.createElement('div');
+      dot.className = 'radar-dot radar-dot-live';
+      var rx = 50 + (dx / range) * 45;
+      var ry = 50 + (dy / range) * 45;
+      dot.style.cssText = 'position:absolute;left:' + rx + '%;top:' + ry + '%;width:3px;height:3px;border-radius:50%;background:#00d4ff;box-shadow:0 0 4px #00d4ff;transform:translate(-50%,-50%);';
+      if (dist < 100) {
+        dot.style.background = '#4ade80';
+        dot.style.boxShadow = '0 0 6px #4ade80';
+        dot.style.width = '4px';
+        dot.style.height = '4px';
+      }
+      radar.appendChild(dot);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// ██  WARP TUNNEL — Hyperspace streaking lines         ██
+// ═══════════════════════════════════════════════════════
+
+(function pflxInitWarpTunnel() {
+  var tunnel = document.getElementById('warpTunnel');
+  if (!tunnel) return;
+  // Create 40 warp lines radiating from center
+  for (var i = 0; i < 40; i++) {
+    var line = document.createElement('div');
+    line.className = 'warp-line';
+    var angle = (i / 40) * 360;
+    var dist = 30 + Math.random() * 30; // % from center
+    var length = 60 + Math.random() * 120;
+    var cx = 50 + Math.cos(angle * Math.PI / 180) * dist;
+    var cy = 50 + Math.sin(angle * Math.PI / 180) * dist;
+    line.style.cssText =
+      'left:' + cx + '%;top:' + cy + '%;width:' + length + 'px;' +
+      'transform:rotate(' + angle + 'deg);' +
+      'animation-delay:' + (Math.random() * 0.6).toFixed(2) + 's;' +
+      'animation-duration:' + (0.3 + Math.random() * 0.5).toFixed(2) + 's;';
+    tunnel.appendChild(line);
+  }
+})();
 
 // Keep arrow key loop alive when any arrow is pressed
 document.addEventListener('keydown', function(e) {
@@ -6925,22 +7339,125 @@ document.addEventListener('keydown', function(e) {
   <button class="cam-btn" id="camCockpit" onclick="pflxSetCamera('cockpit')"><span class="cam-icon">🚀</span> Cockpit</button>
 </div>
 
-<!-- Cockpit HUD Overlay -->
+<!-- Warp Tunnel (hyperspace lines behind cockpit) -->
+<div class="warp-tunnel" id="warpTunnel"></div>
+
+<!-- Cockpit HUD Overlay — Full Interior -->
 <div class="cockpit-hud" id="cockpitHud">
-  <div class="cockpit-frame"></div>
+  <!-- Ambient cockpit lighting -->
+  <div class="cockpit-ambient"></div>
+
+  <!-- Windshield canopy frame -->
+  <div class="cockpit-canopy"></div>
+  <div class="canopy-strut left"></div>
+  <div class="canopy-strut right"></div>
+  <div class="canopy-strut center"></div>
+  <div class="canopy-strut-h"></div>
+
+  <!-- Side walls -->
+  <div class="cockpit-side left-wall">
+    <div class="side-indicator" style="left:20px;top:30%;color:#00d4ff;"></div>
+    <div class="side-indicator" style="left:30px;top:40%;color:#4ade80;"></div>
+    <div class="side-indicator" style="left:15px;top:50%;color:#f5c842;"></div>
+    <div class="side-indicator" style="left:25px;top:60%;color:#00d4ff;"></div>
+  </div>
+  <div class="cockpit-side right-wall">
+    <div class="side-indicator" style="right:20px;top:30%;color:#ff3366;"></div>
+    <div class="side-indicator" style="right:30px;top:42%;color:#00d4ff;"></div>
+    <div class="side-indicator" style="right:15px;top:55%;color:#4ade80;"></div>
+    <div class="side-indicator" style="right:25px;top:65%;color:#00d4ff;"></div>
+  </div>
+
+  <!-- Top bar status readouts -->
+  <div class="cockpit-top-bar">
+    <div class="top-readout">SYS <span class="readout-val" style="color:#4ade80;">ONLINE</span></div>
+    <div class="top-readout">SHIELD <span class="readout-val" id="cockpitShield">100%</span></div>
+    <div class="top-readout">FUEL <span class="readout-val" id="cockpitFuel" style="color:#f5c842;">NOMINAL</span></div>
+    <div class="top-readout">NAV <span class="readout-val" style="color:#4ade80;">ACTIVE</span></div>
+  </div>
+
+  <!-- Aiming reticle -->
+  <div class="cockpit-reticle">
+    <div class="reticle-ring"></div>
+    <div class="reticle-ring inner"></div>
+    <div class="reticle-tick top"></div>
+    <div class="reticle-tick bottom"></div>
+    <div class="reticle-tick left"></div>
+    <div class="reticle-tick right"></div>
+    <div class="reticle-center"></div>
+  </div>
+
+  <!-- Scanlines over everything -->
   <div class="cockpit-scanlines"></div>
-  <div class="cockpit-crosshair"></div>
+
+  <!-- ── Full Dashboard ── -->
   <div class="cockpit-dash">
+    <div class="dash-center-console"></div>
+
+    <!-- Left screen — Navigation / Radar -->
+    <div class="cockpit-screen screen-left">
+      <div class="screen-label">NAV RADAR</div>
+      <div class="mini-radar" id="cockpitRadar">
+        <div class="radar-dot" style="top:30%;left:60%;"></div>
+        <div class="radar-dot" style="top:55%;left:35%;opacity:0.5;"></div>
+      </div>
+    </div>
+
+    <!-- Center screen — Main flight data -->
+    <div class="cockpit-screen screen-center">
+      <div class="screen-label">FLIGHT DATA</div>
+      <div style="position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:space-around;padding:0 12px;">
+        <div style="text-align:center;">
+          <div style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:2px;">SPEED</div>
+          <div style="font-family:Orbitron;font-size:14px;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.5);" id="cockpitSpeed">0</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:2px;">HEADING</div>
+          <div style="font-family:Orbitron;font-size:14px;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.5);" id="cockpitHeading">000°</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:2px;">ALT</div>
+          <div style="font-family:Orbitron;font-size:14px;color:#00d4ff;text-shadow:0 0 8px rgba(0,212,255,0.5);" id="cockpitAlt">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right screen — Systems -->
+    <div class="cockpit-screen screen-right">
+      <div class="screen-label">SYSTEMS</div>
+      <div style="position:absolute;bottom:8px;left:8px;right:8px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:1px;">ENGINE</span>
+          <span style="font-family:Orbitron;font-size:5px;color:#4ade80;" id="cockpitEngineStatus">NOMINAL</span>
+        </div>
+        <div style="height:3px;background:rgba(0,212,255,0.1);border-radius:2px;overflow:hidden;margin-bottom:6px;">
+          <div style="height:100%;width:85%;background:linear-gradient(90deg,#00d4ff,#4ade80);border-radius:2px;" id="cockpitEngineBar"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:1px;">SHIELDS</span>
+          <span style="font-family:Orbitron;font-size:5px;color:#4ade80;">ACTIVE</span>
+        </div>
+        <div style="height:3px;background:rgba(0,212,255,0.1);border-radius:2px;overflow:hidden;margin-bottom:6px;">
+          <div style="height:100%;width:100%;background:linear-gradient(90deg,#00d4ff,#a78bfa);border-radius:2px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-family:Orbitron;font-size:5px;color:rgba(0,212,255,0.35);letter-spacing:1px;">WARP</span>
+          <span style="font-family:Orbitron;font-size:5px;color:#f5c842;" id="cockpitWarpStatus">STANDBY</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom gauges -->
     <div class="cockpit-gauge speed">
-      <div class="gauge-label">Speed</div>
-      <div class="gauge-val" id="cockpitSpeed">0</div>
+      <div class="gauge-label">THROTTLE</div>
+      <div class="gauge-val" id="cockpitThrottle">0%</div>
     </div>
     <div class="cockpit-gauge heading">
-      <div class="gauge-label">Heading</div>
-      <div class="gauge-val" id="cockpitHeading">000°</div>
+      <div class="gauge-label">SECTOR</div>
+      <div class="gauge-val" id="cockpitSector">GENESIS</div>
     </div>
     <div class="cockpit-gauge coords">
-      <div class="gauge-label">Position</div>
+      <div class="gauge-label">COORDINATES</div>
       <div class="gauge-val" id="cockpitCoords">0, 0</div>
     </div>
   </div>
