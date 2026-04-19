@@ -35,7 +35,12 @@
     :root, html { --pflx-ticker-offset: 48px; }
     html, body {
       font-family: 'Rajdhani', sans-serif;
-      background: #050810;
+      background: #020408;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(10,30,80,0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(40,10,60,0.3) 0%, transparent 45%),
+        radial-gradient(ellipse at 50% 80%, rgba(0,40,60,0.25) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, rgba(30,5,40,0.2) 0%, transparent 40%);
       color: #e0e0e0;
       width: 100vw;
       height: calc(100vh - var(--pflx-ticker-offset));
@@ -284,14 +289,31 @@
       overflow: visible;
     }
     .connector-line {
-      stroke-width: 2.5; fill: none;
-      stroke-dasharray: 10 6;
+      stroke-width: 2; fill: none;
+      stroke-dasharray: 8 12;
       vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 3px rgba(0,212,255,0.2));
     }
-    .connector-line.locked { stroke: rgba(100,140,180,0.35); stroke-dasharray: 5 7; }
-    .connector-line.unlocked { stroke: rgba(0,212,255,0.65); animation: connectorPulse 2.5s ease-in-out infinite; }
-    .connector-line.completed { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; filter: drop-shadow(0 0 8px var(--accent)); }
-    @keyframes connectorPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    .connector-line.locked {
+      stroke: rgba(60,80,120,0.25);
+      stroke-dasharray: 4 10;
+      filter: none;
+    }
+    .connector-line.unlocked {
+      stroke: rgba(0,212,255,0.55);
+      stroke-width: 2.5;
+      stroke-dasharray: 12 8;
+      filter: drop-shadow(0 0 6px rgba(0,212,255,0.4)) drop-shadow(0 0 12px rgba(0,212,255,0.15));
+      animation: connectorPulse 3s ease-in-out infinite, connectorFlow 8s linear infinite;
+    }
+    .connector-line.completed {
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-dasharray: none;
+      filter: drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 20px color-mix(in srgb, var(--accent), transparent 60%));
+    }
+    @keyframes connectorPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+    @keyframes connectorFlow { to { stroke-dashoffset: -40; } }
 
     /* ========== SKILL NODES ========== */
     .skill-node {
@@ -1305,26 +1327,152 @@
       animation: spinLaunch 1s linear infinite;
     }
     @keyframes spinLaunch { to { transform: rotate(360deg); } }
-    /* ========== 3D SPACE DEPTH LAYERS ========== */
+    /* ========== 3D SPACE UNIVERSE — TRUE DEPTH SYSTEM ========== */
+    /* CSS 3D perspective on the map container for real depth */
+    #mapContainer {
+      perspective: 1200px;
+      perspective-origin: 50% 50%;
+    }
+
     .space-depth-layer {
-      position: absolute; inset: -200px;
+      position: absolute;
       pointer-events: none;
       will-change: transform;
+      transform-style: preserve-3d;
     }
-    .space-depth-layer.deep { z-index: 2; }
-    .space-depth-layer.mid { z-index: 4; }
-    .space-depth-layer.near { z-index: 6; }
-    .space-depth-layer .nebula-blob {
-      position: absolute; border-radius: 50%;
-      filter: blur(60px); opacity: 0.35;
+    /* DEEP — far distant background: tiny stars, large nebulae, blur for depth-of-field */
+    .space-depth-layer.deep {
+      inset: -600px;
+      z-index: 1;
+      filter: blur(1.2px);
+      opacity: 0.85;
     }
-    .space-depth-layer .depth-star {
-      position: absolute; border-radius: 50%; background: white;
+    /* MID — middle distance: medium stars, gas clouds, small planets */
+    .space-depth-layer.mid {
+      inset: -400px;
+      z-index: 3;
+      filter: blur(0.4px);
+      opacity: 0.92;
     }
-    .space-depth-layer .depth-dust {
-      position: absolute; border-radius: 50%;
-      background: rgba(0,212,255,0.4);
-      filter: blur(1px);
+    /* NEAR — foreground: bright particles, dust motes, lens flares */
+    .space-depth-layer.near {
+      inset: -200px;
+      z-index: 6;
+    }
+
+    /* ── Nebula clouds — large volumetric gas formations ── */
+    .space-nebula {
+      position: absolute;
+      border-radius: 50%;
+      mix-blend-mode: screen;
+    }
+    .space-nebula.glow {
+      animation: nebulaGlow 12s ease-in-out infinite alternate;
+    }
+    @keyframes nebulaGlow {
+      0% { opacity: 0.18; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(1.08); }
+      100% { opacity: 0.22; transform: scale(0.96); }
+    }
+
+    /* ── Stars — realistic twinkling ── */
+    .space-star {
+      position: absolute;
+      border-radius: 50%;
+      background: white;
+    }
+    .space-star.twinkle {
+      animation: starTwinkle var(--twinkle-dur, 4s) ease-in-out infinite alternate;
+      animation-delay: var(--twinkle-delay, 0s);
+    }
+    @keyframes starTwinkle {
+      0% { opacity: var(--star-min, 0.2); transform: scale(0.8); }
+      100% { opacity: var(--star-max, 0.7); transform: scale(1.2); }
+    }
+    .space-star.bright {
+      box-shadow: 0 0 var(--star-glow, 4px) var(--star-color, rgba(255,255,255,0.6));
+    }
+
+    /* ── Star clusters — dense groups with glow ── */
+    .space-cluster {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    }
+
+    /* ── Distant planets / celestial bodies ── */
+    .space-planet {
+      position: absolute;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .space-planet::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, transparent 30%, rgba(0,0,0,0.7) 100%);
+    }
+    .space-planet.ringed::before {
+      content: '';
+      position: absolute;
+      top: 40%; left: -30%;
+      width: 160%; height: 20%;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      transform: rotate(-15deg);
+    }
+
+    /* ── Cosmic dust / particles ── */
+    .space-dust {
+      position: absolute;
+      border-radius: 50%;
+    }
+    .space-dust.drift {
+      animation: dustDrift var(--drift-dur, 20s) linear infinite;
+    }
+    @keyframes dustDrift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(var(--dx1, 8px), var(--dy1, -6px)); }
+      50% { transform: translate(var(--dx2, -4px), var(--dy2, 10px)); }
+      75% { transform: translate(var(--dx3, 12px), var(--dy3, 4px)); }
+      100% { transform: translate(0, 0); }
+    }
+
+    /* ── Asteroid belt fragments ── */
+    .space-asteroid {
+      position: absolute;
+      background: rgba(100,90,80,0.6);
+      clip-path: polygon(30% 0%, 70% 10%, 100% 40%, 80% 90%, 20% 100%, 0% 60%);
+    }
+    .space-asteroid.spin {
+      animation: asteroidSpin var(--spin-dur, 30s) linear infinite;
+    }
+    @keyframes asteroidSpin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── Energy grid lines (behind node connections) ── */
+    .space-grid-line {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.04), transparent);
+      height: 1px;
+      transform-origin: left center;
+    }
+
+    /* ── Ambient glow spots (volumetric light) ── */
+    .space-glow {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--glow-color, rgba(0,212,255,0.08)) 0%, transparent 70%);
+      mix-blend-mode: screen;
+    }
+    .space-glow.pulse {
+      animation: glowPulse var(--pulse-dur, 8s) ease-in-out infinite alternate;
+    }
+    @keyframes glowPulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      100% { opacity: 0.8; transform: scale(1.15); }
     }
 
     /* ========== PFLX SPACESHIP AVATAR ========== */
@@ -2349,13 +2497,17 @@ const MAP_W = 2000, MAP_H = 2000;
 function applyTransform() {
   nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   updateMinimap();
-  // Parallax depth layers
+  // 3D Parallax depth layers — dramatic depth separation
+  // Deep moves very slowly (distant), near moves almost with the camera (close)
   const deep = document.getElementById('spaceDeep');
   const mid = document.getElementById('spaceMid');
   const near = document.getElementById('spaceNear');
-  if (deep) deep.style.transform = `translate(${panX * 0.1}px, ${panY * 0.1}px) scale(${0.8 + zoom * 0.2})`;
-  if (mid) mid.style.transform = `translate(${panX * 0.4}px, ${panY * 0.4}px) scale(${0.9 + zoom * 0.1})`;
-  if (near) near.style.transform = `translate(${panX * 0.7}px, ${panY * 0.7}px) scale(${zoom})`;
+  // Deep: barely moves (5% of pan), scaled small — feels infinitely far
+  if (deep) deep.style.transform = `translate3d(${panX * 0.05}px, ${panY * 0.05}px, -400px) scale(${0.6 + zoom * 0.4})`;
+  // Mid: moderate movement (30% of pan) — objects at middle distance
+  if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
+  // Near: moves fast (80% of pan) — particles feel close to the camera
+  if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
 }
 
 // Center on nodes initially
@@ -5190,54 +5342,166 @@ setTimeout(() => {
   }
 }, 300);
 
-// ==================== 3D SPACE DEPTH RENDERER ====================
-(function initSpaceDepthLayers() {
+// ==================== 3D SPACE UNIVERSE RENDERER ====================
+// Generates a rich, immersive space environment with real depth perception
+(function initSpaceUniverse() {
   const deepLayer = document.getElementById('spaceDeep');
   const midLayer = document.getElementById('spaceMid');
   const nearLayer = document.getElementById('spaceNear');
   if (!deepLayer || !midLayer || !nearLayer) return;
 
-  // Deep layer: ~30 tiny dim stars + 2-3 nebula blobs
-  for (let i = 0; i < 30; i++) {
-    const s = document.createElement('div');
-    s.className = 'depth-star';
-    const size = Math.random() * 1.5 + 0.5;
-    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.3+0.1};`;
-    deepLayer.appendChild(s);
-  }
-  const nebulaColors = ['rgba(0,100,180,0.15)','rgba(80,40,160,0.12)','rgba(0,180,200,0.1)'];
-  for (let i = 0; i < 3; i++) {
-    const nb = document.createElement('div');
-    nb.className = 'nebula-blob';
-    const sz = Math.random() * 300 + 200;
-    nb.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*80+10}%;top:${Math.random()*80+10}%;background:${nebulaColors[i]};`;
-    deepLayer.appendChild(nb);
-  }
+  function rng(min, max) { return Math.random() * (max - min) + min; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-  // Mid layer: ~20 medium stars + drifting dust
-  for (let i = 0; i < 20; i++) {
-    const s = document.createElement('div');
-    s.className = 'depth-star';
-    const size = Math.random() * 2 + 1;
-    s.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.4+0.15};`;
-    midLayer.appendChild(s);
-  }
+  // ═══ DEEP LAYER — Far space background ═══
+  // Large nebulae — the key visual that makes it feel like space
+  const nebulaConfigs = [
+    { color: 'rgba(20,60,180,0.25)',  size: [500,900], blur: [80,140] },
+    { color: 'rgba(120,30,160,0.2)',  size: [400,800], blur: [60,120] },
+    { color: 'rgba(0,160,200,0.15)',  size: [450,700], blur: [70,110] },
+    { color: 'rgba(200,40,100,0.12)', size: [350,650], blur: [60,100] },
+    { color: 'rgba(60,180,120,0.1)',  size: [300,550], blur: [50,90] },
+    { color: 'rgba(255,120,40,0.08)', size: [250,500], blur: [50,80] },
+  ];
   for (let i = 0; i < 8; i++) {
-    const d = document.createElement('div');
-    d.className = 'depth-dust';
-    const size = Math.random() * 3 + 1;
-    d.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.3+0.1};`;
-    midLayer.appendChild(d);
+    const cfg = pick(nebulaConfigs);
+    const el = document.createElement('div');
+    el.className = 'space-nebula glow';
+    const sz = rng(cfg.size[0], cfg.size[1]);
+    const blur = rng(cfg.blur[0], cfg.blur[1]);
+    el.style.cssText = `width:${sz}px;height:${sz * rng(0.6,1.3)}px;left:${rng(-10,90)}%;top:${rng(-10,90)}%;background:radial-gradient(ellipse,${cfg.color},transparent 70%);filter:blur(${blur}px);animation-duration:${rng(10,25)}s;animation-delay:${rng(0,8)}s;`;
+    deepLayer.appendChild(el);
   }
 
-  // Near layer: ~10 larger particles with glow
-  for (let i = 0; i < 10; i++) {
-    const p = document.createElement('div');
-    p.className = 'depth-dust';
-    const size = Math.random() * 4 + 2;
-    p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*120-10}%;top:${Math.random()*120-10}%;opacity:${Math.random()*0.5+0.2};box-shadow:0 0 ${size*2}px rgba(0,212,255,0.3);`;
-    nearLayer.appendChild(p);
+  // Dense star field — hundreds of tiny far stars
+  for (let i = 0; i < 200; i++) {
+    const el = document.createElement('div');
+    const size = rng(0.3, 1.8);
+    const bright = Math.random() < 0.15; // 15% are brighter
+    const twinkle = Math.random() < 0.4; // 40% twinkle
+    el.className = 'space-star' + (twinkle ? ' twinkle' : '') + (bright ? ' bright' : '');
+    const starColors = ['rgba(255,255,255,0.7)', 'rgba(180,200,255,0.6)', 'rgba(255,220,180,0.5)', 'rgba(200,180,255,0.5)'];
+    const color = pick(starColors);
+    el.style.cssText = `width:${size}px;height:${size}px;left:${rng(-5,105)}%;top:${rng(-5,105)}%;opacity:${rng(0.15, bright ? 0.8 : 0.45)};background:${color};--twinkle-dur:${rng(3,8)}s;--twinkle-delay:${rng(0,5)}s;--star-min:${rng(0.1,0.3)};--star-max:${rng(0.5,0.9)};--star-glow:${bright ? rng(3,8) : 0}px;--star-color:${color};`;
+    deepLayer.appendChild(el);
   }
+
+  // Star clusters — dense glowing patches
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-cluster';
+    const sz = rng(150, 400);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(5,85)}%;top:${rng(5,85)}%;opacity:${rng(0.3,0.6)};`;
+    deepLayer.appendChild(el);
+    // Add concentrated stars inside each cluster
+    for (let j = 0; j < 30; j++) {
+      const s = document.createElement('div');
+      s.className = 'space-star twinkle';
+      const ss = rng(0.5, 2);
+      s.style.cssText = `width:${ss}px;height:${ss}px;left:${rng(20,80)}%;top:${rng(20,80)}%;opacity:${rng(0.3,0.8)};--twinkle-dur:${rng(2,6)}s;--twinkle-delay:${rng(0,4)}s;`;
+      el.appendChild(s);
+    }
+  }
+
+  // Distant planets (2-3 barely visible)
+  const planetColors = [
+    'radial-gradient(circle at 35% 35%, #4a6fa5 0%, #1a2a4a 60%, #080c1a 100%)',
+    'radial-gradient(circle at 35% 35%, #8a5a3a 0%, #3a2010 60%, #0a0805 100%)',
+    'radial-gradient(circle at 30% 30%, #3a6a5a 0%, #1a3a2a 60%, #050a08 100%)',
+  ];
+  for (let i = 0; i < 2; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-planet' + (Math.random() > 0.5 ? ' ringed' : '');
+    const sz = rng(40, 90);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(5,85)}%;top:${rng(5,85)}%;background:${planetColors[i]};opacity:${rng(0.2,0.4)};`;
+    deepLayer.appendChild(el);
+  }
+
+  // ═══ MID LAYER — Middle distance ═══
+  // Medium stars with more prominent twinkling
+  for (let i = 0; i < 80; i++) {
+    const el = document.createElement('div');
+    const size = rng(1, 3);
+    const bright = Math.random() < 0.25;
+    el.className = 'space-star twinkle' + (bright ? ' bright' : '');
+    const color = pick(['white', 'rgba(180,220,255,0.9)', 'rgba(255,200,150,0.8)', 'rgba(200,150,255,0.8)']);
+    el.style.cssText = `width:${size}px;height:${size}px;left:${rng(-5,105)}%;top:${rng(-5,105)}%;opacity:${rng(0.2, bright ? 0.9 : 0.6)};background:${color};--twinkle-dur:${rng(2,7)}s;--twinkle-delay:${rng(0,6)}s;--star-min:${rng(0.15,0.3)};--star-max:${rng(0.6,1)};--star-glow:${bright ? rng(4,10) : 2}px;--star-color:${color};`;
+    midLayer.appendChild(el);
+  }
+
+  // Gas clouds — smaller, more defined than deep nebulae
+  const gasColors = [
+    'rgba(0,180,255,0.12)', 'rgba(140,80,220,0.1)', 'rgba(0,220,180,0.08)',
+    'rgba(220,100,60,0.07)', 'rgba(80,200,120,0.08)'
+  ];
+  for (let i = 0; i < 5; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-nebula glow';
+    const sz = rng(150, 350);
+    el.style.cssText = `width:${sz}px;height:${sz * rng(0.7,1.2)}px;left:${rng(0,90)}%;top:${rng(0,90)}%;background:radial-gradient(ellipse,${pick(gasColors)},transparent 65%);filter:blur(${rng(30,60)}px);animation-duration:${rng(8,18)}s;`;
+    midLayer.appendChild(el);
+  }
+
+  // Drifting cosmic dust particles
+  for (let i = 0; i < 25; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-dust drift';
+    const sz = rng(1.5, 4);
+    const dustColor = pick(['rgba(0,212,255,0.5)', 'rgba(160,120,255,0.4)', 'rgba(255,200,100,0.3)', 'rgba(100,255,200,0.3)']);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(-5,105)}%;top:${rng(-5,105)}%;background:${dustColor};box-shadow:0 0 ${sz*3}px ${dustColor};opacity:${rng(0.3,0.7)};--drift-dur:${rng(15,40)}s;--dx1:${rng(-15,15)}px;--dy1:${rng(-15,15)}px;--dx2:${rng(-15,15)}px;--dy2:${rng(-15,15)}px;--dx3:${rng(-15,15)}px;--dy3:${rng(-15,15)}px;`;
+    midLayer.appendChild(el);
+  }
+
+  // Small asteroids
+  for (let i = 0; i < 6; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-asteroid spin';
+    const sz = rng(3, 10);
+    el.style.cssText = `width:${sz}px;height:${sz * rng(0.6,1)}px;left:${rng(0,100)}%;top:${rng(0,100)}%;opacity:${rng(0.2,0.5)};--spin-dur:${rng(20,60)}s;`;
+    midLayer.appendChild(el);
+  }
+
+  // Ambient volumetric glow spots
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-glow pulse';
+    const sz = rng(200, 500);
+    const glowColor = pick(['rgba(0,212,255,0.06)', 'rgba(120,60,200,0.05)', 'rgba(0,200,150,0.04)', 'rgba(200,80,40,0.03)']);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(0,80)}%;top:${rng(0,80)}%;--glow-color:${glowColor};--pulse-dur:${rng(6,15)}s;`;
+    midLayer.appendChild(el);
+  }
+
+  // ═══ NEAR LAYER — Foreground particles ═══
+  // Bright foreground particles with strong glow (lens-flare effect)
+  for (let i = 0; i < 15; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-dust drift';
+    const sz = rng(2, 6);
+    const color = pick(['rgba(0,220,255,0.6)', 'rgba(180,140,255,0.5)', 'rgba(255,180,80,0.4)']);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(0,100)}%;top:${rng(0,100)}%;background:${color};box-shadow:0 0 ${sz*4}px ${color}, 0 0 ${sz*8}px ${color.replace(/[\d.]+\)$/, '0.2)')};border-radius:50%;opacity:${rng(0.4,0.9)};--drift-dur:${rng(12,30)}s;--dx1:${rng(-20,20)}px;--dy1:${rng(-20,20)}px;--dx2:${rng(-20,20)}px;--dy2:${rng(-20,20)}px;--dx3:${rng(-20,20)}px;--dy3:${rng(-20,20)}px;`;
+    nearLayer.appendChild(el);
+  }
+
+  // Larger bright stars (very close, out-of-focus look)
+  for (let i = 0; i < 8; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-star bright twinkle';
+    const sz = rng(3, 6);
+    const color = pick(['rgba(255,255,255,0.8)', 'rgba(180,220,255,0.7)', 'rgba(255,200,140,0.6)']);
+    el.style.cssText = `width:${sz}px;height:${sz}px;left:${rng(0,100)}%;top:${rng(0,100)}%;background:${color};--star-glow:${rng(8,20)}px;--star-color:${color};--twinkle-dur:${rng(2,5)}s;--twinkle-delay:${rng(0,3)}s;--star-min:0.3;--star-max:1;`;
+    nearLayer.appendChild(el);
+  }
+
+  // Micro-asteroids / space debris foreground
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div');
+    el.className = 'space-asteroid spin';
+    const sz = rng(4, 12);
+    el.style.cssText = `width:${sz}px;height:${sz * rng(0.5,0.9)}px;left:${rng(0,100)}%;top:${rng(0,100)}%;opacity:${rng(0.3,0.6)};--spin-dur:${rng(15,40)}s;`;
+    nearLayer.appendChild(el);
+  }
+
+  console.log('[Space] ✓ 3D universe rendered — deep: ' + deepLayer.children.length + ', mid: ' + midLayer.children.length + ', near: ' + nearLayer.children.length + ' elements');
 })();
 
 // ==================== PFLX SPACESHIP ENGINE ====================
