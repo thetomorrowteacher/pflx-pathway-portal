@@ -3017,6 +3017,18 @@
       <div class="launch-subtitle" id="launchSubtitle">Preparing mission environment...</div>
       <div class="launch-spinner"></div>
     </div>
+    <!-- Embedded Course Content Container -->
+    <div id="courseContentContainer" style="display:none;position:absolute;inset:0;z-index:10;background:#050810;">
+      <div id="courseContentHeader" style="position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(135deg,rgba(5,8,16,0.95),rgba(10,15,30,0.95));border-bottom:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;padding:0 16px;gap:12px;z-index:11;">
+        <button id="courseContentClose" style="background:none;border:1px solid rgba(255,60,60,0.4);color:rgba(255,60,60,0.8);width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:Rajdhani;">✕</button>
+        <span id="courseContentTitle" style="font-family:Orbitron;font-size:12px;letter-spacing:2px;color:#00d4ff;text-transform:uppercase;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <div id="courseProgressBar" style="width:120px;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;border:1px solid rgba(0,212,255,0.15);">
+          <div id="courseProgressFill" style="height:100%;width:0%;background:linear-gradient(90deg,#00d4ff,#7c3aed);border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+        <span id="courseProgressLabel" style="font-family:Rajdhani;font-size:11px;color:rgba(255,255,255,0.4);min-width:30px;text-align:right;">0%</span>
+      </div>
+      <iframe id="courseContentFrame" style="position:absolute;top:44px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 44px);border:none;background:#fff;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allowfullscreen></iframe>
+    </div>
   </div>
 
 <script>
@@ -3955,12 +3967,15 @@ function showDetail(n) {
     } else {
       btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
     }
-    if (n.url) {
+    if (n.url || n.contentUrl) {
       btn.onclick = () => {
         if (hasEntryFee) {
           if (!confirm('This course requires a ' + n.entryFeeXC + ' XC entry fee. Proceed?')) return;
-          // Entry fee will be processed by the X-Coin app on completion
         }
+        // Close detail panel before launching
+        detailPanel.classList.remove('active');
+        detailOverlay.classList.remove('active');
+        detailOverlay.style.display = 'none';
         showLaunchOverlay(n);
       };
     }
@@ -6347,14 +6362,66 @@ function showLaunchOverlay(node) {
   }
   drawWarp();
 
+  const hasEmbeddedContent = !!node.contentUrl;
+
   setTimeout(() => {
-    document.getElementById('launchTitle').textContent = 'Warp Complete';
-    document.getElementById('launchSubtitle').textContent = 'Mission launched — ' + node.title;
-    window.open(node.url, '_blank');
+    if (hasEmbeddedContent) {
+      // Embedded content: show iframe after warp
+      document.getElementById('launchTitle').textContent = 'Warp Complete';
+      document.getElementById('launchSubtitle').textContent = 'Loading course content...';
+      setTimeout(() => {
+        // Hide warp elements, show course container
+        warpCanvas.style.display = 'none';
+        document.querySelector('.launch-message').style.display = 'none';
+        document.getElementById('launchOverlayClose').style.display = 'none';
+        const courseContainer = document.getElementById('courseContentContainer');
+        const courseFrame = document.getElementById('courseContentFrame');
+        document.getElementById('courseContentTitle').textContent = node.title;
+        document.getElementById('courseProgressFill').style.width = '0%';
+        document.getElementById('courseProgressLabel').textContent = '0%';
+        courseFrame.src = node.contentUrl;
+        courseContainer.style.display = 'block';
+        warpActive = false;
+        // Listen for progress messages from embedded content
+        window._pflxCourseProgressHandler = function(event) {
+          try {
+            if (event.data && event.data.type === 'pflx-course-progress') {
+              var pct = Math.min(100, Math.max(0, parseInt(event.data.progress) || 0));
+              document.getElementById('courseProgressFill').style.width = pct + '%';
+              document.getElementById('courseProgressLabel').textContent = pct + '%';
+            }
+            if (event.data && event.data.type === 'pflx-course-complete') {
+              document.getElementById('courseProgressFill').style.width = '100%';
+              document.getElementById('courseProgressLabel').textContent = '100%';
+              document.getElementById('courseContentTitle').textContent = node.title + ' — COMPLETE';
+            }
+          } catch(err) { /* cross-origin safety */ }
+        };
+        window.addEventListener('message', window._pflxCourseProgressHandler);
+      }, 600);
+    } else {
+      // External URL: open in new tab
+      document.getElementById('launchTitle').textContent = 'Warp Complete';
+      document.getElementById('launchSubtitle').textContent = 'Mission launched — ' + node.title;
+      if (node.url) window.open(node.url, '_blank');
+    }
   }, 1500);
 
   function closeLaunch() {
     warpActive = false;
+    // Clean up course content
+    var courseContainer = document.getElementById('courseContentContainer');
+    var courseFrame = document.getElementById('courseContentFrame');
+    if (courseContainer) courseContainer.style.display = 'none';
+    if (courseFrame) courseFrame.src = '';
+    if (window._pflxCourseProgressHandler) {
+      window.removeEventListener('message', window._pflxCourseProgressHandler);
+      window._pflxCourseProgressHandler = null;
+    }
+    // Restore warp elements for next launch
+    warpCanvas.style.display = '';
+    document.querySelector('.launch-message').style.display = '';
+    document.getElementById('launchOverlayClose').style.display = '';
     overlay.classList.remove('active');
     setTimeout(() => {
       overlay.style.display = 'none';
@@ -6363,6 +6430,7 @@ function showLaunchOverlay(node) {
   }
 
   document.getElementById('launchOverlayClose').onclick = closeLaunch;
+  document.getElementById('courseContentClose').onclick = closeLaunch;
   const escHandler = e => {
     if (e.key === 'Escape') {
       closeLaunch();
