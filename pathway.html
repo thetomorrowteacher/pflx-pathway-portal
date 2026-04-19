@@ -6428,230 +6428,78 @@ function pflxShipApplyUpgrades() {
   }
 }
 
-// ==================== SHIP UPGRADE STORE ====================
-const SHIP_UPGRADES = {
-  aesthetic: {
-    hullColors: {
-      title: 'Hull Colors',
-      items: [
-        { id: 'hull_cyan', name: 'Cyan', key: 'equippedHull', val: 'cyan', cost: 0, swatch: '#00e5ff', free: true },
-        { id: 'hull_crimson', name: 'Crimson', key: 'equippedHull', val: 'crimson', cost: 200, swatch: '#ff2040' },
-        { id: 'hull_nebula', name: 'Nebula Purple', key: 'equippedHull', val: 'nebula', cost: 300, swatch: '#a855f7' },
-        { id: 'hull_gold', name: 'Solar Gold', key: 'equippedHull', val: 'gold', cost: 500, swatch: '#f5c842' },
-        { id: 'hull_stealth', name: 'Stealth Black', key: 'equippedHull', val: 'stealth', cost: 400, swatch: '#1a1e2e' },
-      ]
-    },
-    engineGlow: {
-      title: 'Engine Glow',
-      items: [
-        { id: 'engine_standard', name: 'Standard', key: 'equippedEngine', val: 'standard', cost: 0, swatch: '#00d4ff', free: true },
-        { id: 'engine_plasma', name: 'Plasma Blue', key: 'equippedEngine', val: 'plasma', cost: 150, swatch: '#00aaff' },
-        { id: 'engine_void', name: 'Void Purple', key: 'equippedEngine', val: 'void', cost: 250, swatch: '#8b00ff' },
-        { id: 'engine_solar', name: 'Solar Flare', key: 'equippedEngine', val: 'solar', cost: 350, swatch: '#ff6600' },
-      ]
-    },
-    trailEffects: {
-      title: 'Trail Effects',
-      items: [
-        { id: 'trail_basic', name: 'Basic Streak', key: 'equippedTrail', val: 'basic', cost: 0, emoji: '✦', free: true },
-        { id: 'trail_comet', name: 'Comet Trail', key: 'equippedTrail', val: 'comet', cost: 200, emoji: '☄️' },
-        { id: 'trail_quantum', name: 'Quantum Wake', key: 'equippedTrail', val: 'quantum', cost: 400, emoji: '⚡' },
-        { id: 'trail_rainbow', name: 'Rainbow Nova', key: 'equippedTrail', val: 'rainbow', cost: 600, emoji: '🌈' },
-      ]
-    },
-    wingStyle: {
-      title: 'Wing Style',
-      items: [
-        { id: 'wing_standard', name: 'Standard', key: 'equippedWing', val: 'standard', cost: 0, emoji: '◇', free: true },
-        { id: 'wing_swept', name: 'Swept', key: 'equippedWing', val: 'swept', cost: 300, emoji: '◁' },
-        { id: 'wing_delta', name: 'Delta', key: 'equippedWing', val: 'delta', cost: 400, emoji: '△' },
-        { id: 'wing_phantom', name: 'Phantom', key: 'equippedWing', val: 'phantom', cost: 500, emoji: '◈' },
-      ]
-    }
-  },
-  technical: {
-    speed: {
-      title: 'Speed Enhancements',
-      items: [
-        { id: 'speed1', name: 'Speed Boost Lv1', key: 'speedBoost1', val: true, cost: 200, emoji: '🚀', rankReq: 2, desc: 'Faster travel between nodes' },
-        { id: 'speed2', name: 'Speed Boost Lv2', key: 'speedBoost2', val: true, cost: 500, emoji: '⚡', rankReq: 4, desc: 'Even faster travel', requires: 'speedBoost1' },
-      ]
-    },
-    abilities: {
-      title: 'Special Abilities',
-      items: [
-        { id: 'radar', name: 'Radar Scanner', key: 'radarScanner', val: true, cost: 300, emoji: '📡', rankReq: 3, desc: 'Reveals hidden nodes on minimap' },
-        { id: 'shield', name: 'Shield Aura', key: 'shieldAura', val: true, cost: 400, emoji: '🛡️', rankReq: 3, desc: 'Glowing protective ring around ship' },
-        { id: 'warp', name: 'Warp Drive', key: 'warpDrive', val: true, cost: 800, emoji: '🌀', rankReq: 5, desc: 'Instant teleport to any unlocked node' },
-      ]
-    }
-  }
+// ==================== SHIP STATE LOADER ====================
+// Ship upgrades now live in X-Coin Marketplace — this reads equipped state only.
+// Ship tier data is canonical in X-Coin app's data.ts (SHIP_TIERS).
+const SHIP_TIER_FEATURES = {
+  'ship-t1-scout':    { speedMult: 1, radarRange: 200, hasWarp: false, hasFreeRoam: false, hasShield: false },
+  'ship-t2-xcaliber': { speedMult: 1.7, radarRange: 250, hasWarp: false, hasFreeRoam: true, hasShield: false },
+  'ship-t3-poseidon': { speedMult: 2.5, radarRange: 350, hasWarp: false, hasFreeRoam: true, hasShield: true },
+  'ship-t4-xodus':    { speedMult: 2.5, radarRange: 500, hasWarp: true, hasFreeRoam: true, hasShield: true },
+  'ship-t5-xr-cruiser': { speedMult: 3, radarRange: 600, hasWarp: true, hasFreeRoam: true, hasShield: true },
+  'ship-t6-fx824':    { speedMult: 3.5, radarRange: 800, hasWarp: true, hasFreeRoam: true, hasShield: true },
 };
 
-function pflxShipGetXCBalance() {
+function pflxLoadShipState() {
   try {
-    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
-    return session.xc || session.xcBalance || 500; // demo default
-  } catch(e) { return 500; }
-}
+    const saved = localStorage.getItem('pflx_ship_state');
+    if (saved) {
+      const state = JSON.parse(saved);
+      const tierId = state.equippedTier || 'ship-t1-scout';
+      const features = SHIP_TIER_FEATURES[tierId] || SHIP_TIER_FEATURES['ship-t1-scout'];
 
-function pflxShipGetRank() {
-  try {
-    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
-    return session.rank || session.evolutionRank || 1;
-  } catch(e) { return 1; }
-}
+      // Map features to pflxShip.upgrades format for backward compatibility
+      pflxShip.upgrades = {
+        ...pflxShip.upgrades,
+        equippedTier: tierId,
+        speedBoost1: features.speedMult >= 1.7,
+        speedBoost2: features.speedMult >= 2.5,
+        warpDrive: features.hasWarp,
+        shieldAura: features.hasShield,
+        radarScanner: features.radarRange >= 250,
+        _radarRange: features.radarRange,
+        _speedMult: features.speedMult,
+      };
 
-let currentUpgradeTab = 'aesthetic';
+      // Apply cosmetics from ship state
+      if (state.equippedHull) pflxShip.upgrades._hullId = state.equippedHull;
+      if (state.equippedEngine) pflxShip.upgrades._engineId = state.equippedEngine;
+      if (state.equippedTrail) pflxShip.upgrades._trailId = state.equippedTrail;
+    }
+  } catch(e) { console.warn('[Ship] Could not load ship state:', e); }
 
-function pflxShipOpenUpgrades() {
-  const overlay = document.getElementById('shipUpgradeOverlay');
-  overlay.classList.add('show');
-  document.getElementById('suBalance').textContent = pflxShipGetXCBalance() + ' XC';
-  pflxShipRenderUpgradeTab(currentUpgradeTab);
-}
-
-function pflxShipCloseUpgrades() {
-  document.getElementById('shipUpgradeOverlay').classList.remove('show');
-}
-
-function pflxShipSwitchTab(tab, btn) {
-  currentUpgradeTab = tab;
-  document.querySelectorAll('.su-tab').forEach(t => t.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  pflxShipRenderUpgradeTab(tab);
-}
-
-function pflxShipRenderUpgradeTab(tab) {
-  const body = document.getElementById('suBody');
-  const categories = SHIP_UPGRADES[tab];
-  const xc = pflxShipGetXCBalance();
-  const rank = pflxShipGetRank();
-  const u = pflxShip.upgrades;
-  let html = '';
-
-  Object.keys(categories).forEach(catKey => {
-    const cat = categories[catKey];
-    html += `<div class="su-category-title">${cat.title}</div>`;
-    cat.items.forEach(item => {
-      const owned = item.free || u['owned_' + item.id];
-      const equipped = u[item.key] === item.val;
-      const rankLocked = item.rankReq && rank < item.rankReq;
-      const requiresMissing = item.requires && !u[item.requires];
-      const canBuy = !owned && !rankLocked && !requiresMissing && xc >= item.cost;
-
-      let btnClass, btnText;
-      if (equipped) { btnClass = 'equipped'; btnText = 'Equipped'; }
-      else if (owned || item.free) { btnClass = 'equip'; btnText = 'Equip'; }
-      else if (rankLocked) { btnClass = 'locked-rank'; btnText = `Rank ${item.rankReq}+`; }
-      else if (requiresMissing) { btnClass = 'locked-rank'; btnText = 'Requires Prev'; }
-      else if (xc < item.cost) { btnClass = 'locked-rank'; btnText = 'Not Enough XC'; }
-      else { btnClass = 'buy'; btnText = 'Buy'; }
-
-      const swatchContent = item.swatch
-        ? `<div class="su-swatch" style="background:${item.swatch}"></div>`
-        : `<div class="su-swatch">${item.emoji || '?'}</div>`;
-
-      const costDisplay = item.free ? '<span class="su-item-cost free">FREE</span>' : `<span class="su-item-cost">${item.cost} XC</span>`;
-      const metaText = item.desc || (item.rankReq ? `Rank ${item.rankReq}+ required` : '');
-
-      html += `
-        <div class="su-item">
-          ${swatchContent}
-          <div class="su-item-info">
-            <div class="su-item-name">${item.name}</div>
-            ${metaText ? `<div class="su-item-meta">${metaText}</div>` : ''}
-          </div>
-          ${costDisplay}
-          <button class="su-buy-btn ${btnClass}" onclick="pflxShipBuyOrEquip('${item.id}','${catKey}','${tab}')" ${(rankLocked || requiresMissing || (!canBuy && !owned && !item.free)) ? 'disabled' : ''}>${btnText}</button>
-        </div>`;
-    });
-  });
-
-  body.innerHTML = html;
-}
-
-function pflxShipBuyOrEquip(itemId, catKey, tab) {
-  const categories = SHIP_UPGRADES[tab];
-  let item = null;
-  Object.values(categories).forEach(cat => {
-    cat.items.forEach(it => { if (it.id === itemId) item = it; });
-  });
-  if (!item) return;
-
-  const u = pflxShip.upgrades;
-  const owned = item.free || u['owned_' + item.id];
-
-  if (owned || item.free) {
-    // Equip it
-    u[item.key] = item.val;
-    pflxShipSaveUpgrades();
-    pflxShipApplyUpgrades();
-    pflxShipRenderUpgradeTab(tab);
-    return;
-  }
-
-  // Buy
-  let xc = pflxShipGetXCBalance();
-  if (xc < item.cost) return;
-  xc -= item.cost;
-
-  // Save XC
-  try {
-    const session = JSON.parse(localStorage.getItem('pflx_session') || '{}');
-    session.xc = xc; session.xcBalance = xc;
-    localStorage.setItem('pflx_session', JSON.stringify(session));
-  } catch(e) {}
-
-  u['owned_' + item.id] = true;
-  u[item.key] = item.val;
-  pflxShipSaveUpgrades();
   pflxShipApplyUpgrades();
-  document.getElementById('suBalance').textContent = xc + ' XC';
-  pflxShipRenderUpgradeTab(tab);
+}
 
-  // Notify platform via postMessage
+// Load on init
+pflxLoadShipState();
+
+// Listen for ship state updates from X-Coin marketplace
+window.addEventListener('message', function(e) {
   try {
-    window.parent.postMessage({ type: 'pflx-ship-upgrade', upgrade: item.id, cost: item.cost }, '*');
+    const msg = typeof e.data === 'object' ? e.data : JSON.parse(e.data);
+    if (msg.type === 'pflx_ship_state_update' && msg.state) {
+      localStorage.setItem('pflx_ship_state', JSON.stringify(msg.state));
+      pflxLoadShipState();
+    }
+  } catch(ex) {}
+});
+
+// Open marketplace redirect
+function pflxShipOpenUpgrades() {
+  // Navigate to X-Coin marketplace Ship Bay
+  try {
+    window.parent.postMessage({ type: 'pflx_navigate', target: 'xcoin', path: '/player/marketplace' }, '*');
   } catch(e) {}
+  alert('Ship upgrades are available in the X-Coin Marketplace → Ship Bay tab.');
 }
-
-function pflxShipSaveUpgrades() {
-  localStorage.setItem('pflx_ship_upgrades', JSON.stringify(pflxShip.upgrades));
-}
-
-// Close upgrade overlay on click outside or Escape
-document.getElementById('shipUpgradeOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('shipUpgradeOverlay')) pflxShipCloseUpgrades();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('shipUpgradeOverlay').classList.contains('show')) {
-    pflxShipCloseUpgrades();
-  }
-});
 
 </script>
 <!-- Ship Mode Toggle -->
 <div class="ship-mode-toggle">
   <button class="ship-mode-btn active" id="shipModeGuided" onclick="pflxShipSetMode('guided')">Guided</button>
   <button class="ship-mode-btn" id="shipModeFree" onclick="pflxShipSetMode('free')">Free</button>
-  <button class="ship-mode-btn" id="shipUpgradeBtn" onclick="pflxShipOpenUpgrades()" style="margin-top:4px;color:#f5c842;border-color:rgba(245,200,66,0.3);">Upgrades</button>
-</div>
-
-<!-- Ship Upgrade Store Modal -->
-<div class="ship-upgrade-overlay" id="shipUpgradeOverlay">
-  <div class="ship-upgrade-panel">
-    <div class="su-header">
-      <span class="su-title">Ship Upgrades</span>
-      <span class="su-balance" id="suBalance">0 XC</span>
-      <button class="su-close" onclick="pflxShipCloseUpgrades()">✕</button>
-    </div>
-    <div class="su-tabs">
-      <button class="su-tab active" data-tab="aesthetic" onclick="pflxShipSwitchTab('aesthetic',this)">Aesthetic</button>
-      <button class="su-tab" data-tab="technical" onclick="pflxShipSwitchTab('technical',this)">Technical</button>
-    </div>
-    <div class="su-body" id="suBody"></div>
-  </div>
+  <button class="ship-mode-btn" id="shipUpgradeBtn" onclick="pflxShipOpenUpgrades()" style="margin-top:4px;color:#f5c842;border-color:rgba(245,200,66,0.3);">Ship Bay</button>
 </div>
 
 <script src="pflx-ai-chat.js"></script>
