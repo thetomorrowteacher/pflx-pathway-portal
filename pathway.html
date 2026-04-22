@@ -8603,27 +8603,36 @@ document.addEventListener('keydown', function(e) {
 
   async function installBundle(slug, bundle) {
     setStatus(`Installing <strong>${slug}</strong> (${bundle.length} files)…`, 'info');
-    try {
-      await writeTreeToCourses(slug, bundle);
-      const input = document.getElementById('neCoursePackage');
-      if (input) input.value = slug;
-      setStatus(`✓ Installed at <code>courses/${slug}/</code> — click <strong>Save Node</strong> to attach.`, 'ok');
-    } catch(e) {
-      if (e.message === 'NO_FS_API') {
-        setStatus(
-          `ℹ Your browser doesn't support direct filesystem writes. Downloading <code>${slug}.zip</code> — ` +
-          `unzip it into <code>pflx-pathway-portal/courses/</code>.`,
-          'warn'
-        );
-        await downloadBundle(slug, bundle);
+
+    // Try direct filesystem write first (Chrome/Edge + same-origin top-level only)
+    if (window.showDirectoryPicker) {
+      try {
+        await writeTreeToCourses(slug, bundle);
         const input = document.getElementById('neCoursePackage');
         if (input) input.value = slug;
-      } else if (e.name === 'AbortError') {
-        setStatus('Directory access canceled.', 'warn');
-      } else {
-        setStatus('⚠ Install failed: ' + e.message, 'err');
+        setStatus(`✓ Installed at <code>courses/${slug}/</code> — click <strong>Save Node</strong> to attach.`, 'ok');
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          setStatus('Directory access canceled.', 'warn');
+          return;
+        }
+        // Any other failure (cross-origin iframe, permission denied, unsupported) → fall through to zip
+        console.warn('[pflx-uploader] Direct write unavailable, falling back to zip:', e.message);
       }
     }
+
+    // Zip download fallback — always works, in any browser, any iframe context.
+    // For a deployed portal, this is actually the correct flow: hosts unzip the
+    // package into their local /courses/, commit, push, and Vercel redeploys.
+    await downloadBundle(slug, bundle);
+    const input = document.getElementById('neCoursePackage');
+    if (input) input.value = slug;
+    setStatus(
+      `✓ Downloaded <code>${slug}.zip</code>. Unzip into <code>pflx-pathway-portal/courses/</code>, ` +
+      `commit, and push — Vercel will redeploy. (Direct filesystem write is blocked when the portal is embedded in the Platform shell.)`,
+      'ok'
+    );
   }
 
   function wireUploader() {
