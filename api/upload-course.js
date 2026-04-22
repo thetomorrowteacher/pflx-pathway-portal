@@ -83,8 +83,26 @@ export default async function handler(req, res) {
     res.status(204).end();
     return;
   }
+
+  // Health check — hit GET /api/upload-course in a browser to verify the
+  // function is deployed and env vars are wired.
+  if (req.method === 'GET') {
+    res.status(200).json({
+      status: 'ok',
+      function: 'upload-course',
+      version: '2',
+      env: {
+        BLOB_READ_WRITE_TOKEN: process.env.BLOB_READ_WRITE_TOKEN ? 'set' : 'MISSING',
+        UPLOAD_TOKEN: process.env.UPLOAD_TOKEN ? 'set' : 'unset (optional)',
+      },
+      node: process.version,
+      time: new Date().toISOString(),
+    });
+    return;
+  }
+
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    res.status(405).json({ error: 'Method not allowed. Use POST (or GET for health check).' });
     return;
   }
 
