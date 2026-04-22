@@ -3006,9 +3006,21 @@
           </div>
         </div>
         <div class="ne-field">
-          <label class="ne-label">HTML Content File (embeds after warp scene)</label>
+          <label class="ne-label">Course Package (PFLX course.json folder)</label>
+          <div style="display:flex;gap:8px;align-items:stretch;">
+            <input class="ne-input" id="neCoursePackage" placeholder="graphic-design-concepts" style="flex:1;">
+            <button type="button" id="neUploadCourseBtn" style="padding:10px 14px;background:linear-gradient(135deg,#00b8d4,#00d4ff);color:#050810;border:0;border-radius:6px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;white-space:nowrap;">⬆ Upload Folder</button>
+            <button type="button" id="neUploadCourseZipBtn" style="padding:10px 14px;background:transparent;color:#00d4ff;border:1px solid rgba(0,212,255,0.35);border-radius:6px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;white-space:nowrap;">or .zip</button>
+          </div>
+          <input type="file" id="neUploadCourseInput" webkitdirectory style="display:none;">
+          <input type="file" id="neUploadCourseZipInput" accept=".zip,application/zip,application/x-zip-compressed" style="display:none;">
+          <div id="neUploadCourseStatus" style="font-size:11px;margin-top:6px;color:rgba(255,255,255,0.6);min-height:16px;"></div>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Slug of a folder in <code>/courses/</code> with <code>course.json</code> + <code>viewer.html</code> + <code>host.html</code>. Upload a folder (Chrome/Edge) or <code>.zip</code> — the slug auto-fills from <code>course.json</code>'s <code>courseId</code>. Players see the viewer, hosts see the dashboard (via HOST VIEW toggle).</span>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">HTML Content File (legacy — embeds after warp scene)</label>
           <input class="ne-input" id="neContentUrl" placeholder="https://yoursite.com/course-content.html">
-          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">URL to an HTML file that loads inside the node when the player clicks Start</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">URL to an HTML file that loads inside the node. Used only if Course Package is empty.</span>
         </div>
         <div class="ne-field">
           <label class="ne-label">External URL (opens in new tab on Start)</label>
@@ -5526,6 +5538,7 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neXcReward').value = node.xcReward || '';
   document.getElementById('neXcCost').value = node.xcCost || '';
   document.getElementById('neContentUrl').value = node.contentUrl || '';
+  document.getElementById('neCoursePackage').value = node.coursePackage || '';
   // ── Populate MC Task/Project dropdown from pflxData ──
   var mcTypeEl = document.getElementById('neMcTagType');
   var mcNameEl = document.getElementById('neMcTagName');
@@ -5600,6 +5613,7 @@ function _doSaveNode() {
     editorNode.xcReward = parseInt(document.getElementById('neXcReward').value) || 0;
     editorNode.xcCost = parseInt(document.getElementById('neXcCost').value) || 0;
     editorNode.contentUrl = document.getElementById('neContentUrl').value || '';
+    editorNode.coursePackage = document.getElementById('neCoursePackage').value.trim() || '';
     var mcType = document.getElementById('neMcTagType').value;
     var mcName = document.getElementById('neMcTagName').value;
     editorNode.mcTag = mcType && mcName ? { type: mcType, name: mcName } : null;
@@ -6634,6 +6648,30 @@ function showLaunchOverlay(node) {
   }
   drawWarp();
 
+  // ===== PFLX Course Package resolution =====
+  // When node.coursePackage is set, open the PFLX CourseViewer format
+  // (viewer.html for players, host.html for hosts). HOST VIEW state is
+  // read from the Platform shell's pflxRole. coursePackage takes priority
+  // over legacy contentUrl.
+  function isHostViewActive() {
+    try { if (window.pflxRole === 'host') return true; } catch(e) {}
+    try { if (window.parent && window.parent.pflxRole === 'host') return true; } catch(e) {}
+    try { if (window.top && window.top.pflxRole === 'host') return true; } catch(e) {}
+    try { if (localStorage.getItem('pflx_role') === 'host') return true; } catch(e) {}
+    try { if (new URLSearchParams(window.location.search).get('role') === 'host') return true; } catch(e) {}
+    return false;
+  }
+  function resolvedCourseUrl(n) {
+    if (!n.coursePackage) return null;
+    if (/^https?:\/\//.test(n.coursePackage)) {
+      var base = n.coursePackage.replace(/\/+$/, '');
+      return base + '/' + (isHostViewActive() ? 'host.html' : 'viewer.html');
+    }
+    var viewFile = isHostViewActive() ? 'host.html' : 'viewer.html';
+    return './courses/' + n.coursePackage.replace(/^\/+|\/+$/g, '') + '/' + viewFile;
+  }
+  var _resolvedCourseUrl = resolvedCourseUrl(node);
+  if (_resolvedCourseUrl) node.contentUrl = _resolvedCourseUrl;  // runtime override, not persisted
   const hasEmbeddedContent = !!node.contentUrl;
 
   setTimeout(() => {
@@ -8375,6 +8413,245 @@ document.addEventListener('keydown', function(e) {
       if (msg.type === 'pflx_ticker_request') sendTickerToParent();
     } catch(ex) {}
   });
+})();
+</script>
+
+<!-- ============ PFLX COURSE PACKAGE UPLOADER ============
+     Upload a PFLX course package (folder with course.json + viewer.html +
+     host.html + assets) or a .zip of the same, directly from EDIT NODE.
+     Files land at ./courses/{slug}/ where {slug} is auto-derived from
+     course.json's courseId. Course Package field auto-fills on success.
+
+     Primary path: File System Access API (Chrome, Edge). Fallback: zip
+     download you unzip into the courses folder manually.
+================================================================== -->
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  const DB_NAME = 'pflx_course_uploader';
+  const STORE = 'handles';
+  const HANDLE_KEY = 'courses_dir';
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function saveDirHandle(h) {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(h, HANDLE_KEY);
+      return new Promise(r => tx.oncomplete = r);
+    } catch(e) {}
+  }
+  async function loadDirHandle() {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(HANDLE_KEY);
+      return new Promise((resolve) => {
+        req.onsuccess = async () => {
+          const h = req.result;
+          if (!h) return resolve(null);
+          try {
+            const perm = await h.queryPermission({ mode: 'readwrite' });
+            if (perm === 'granted') return resolve(h);
+            resolve(h);
+          } catch(e) { resolve(null); }
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch(e) { return null; }
+  }
+
+  let coursesDirHandle = null;
+  loadDirHandle().then(h => { if (h) coursesDirHandle = h; });
+
+  const statusEl = () => document.getElementById('neUploadCourseStatus');
+  function setStatus(html, kind) {
+    const el = statusEl(); if (!el) return;
+    const colors = { ok:'#10e090', err:'#ff7590', warn:'#ffa500', info:'rgba(255,255,255,0.6)' };
+    el.style.color = colors[kind || 'info'];
+    el.innerHTML = html;
+  }
+
+  function slugFromCourseJson(manifest) {
+    const raw = (manifest.courseId || manifest.slug || '').toString().trim();
+    return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  function isValidManifest(m) {
+    return m && typeof m === 'object' && (m.courseId || m.slug) && Array.isArray(m.slides);
+  }
+
+  async function ensureCoursesDir() {
+    if (!window.showDirectoryPicker) throw new Error('NO_FS_API');
+    if (coursesDirHandle) {
+      const perm = await coursesDirHandle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') return coursesDirHandle;
+      const req = await coursesDirHandle.requestPermission({ mode: 'readwrite' });
+      if (req === 'granted') return coursesDirHandle;
+    }
+    const h = await window.showDirectoryPicker({
+      id: 'pflx-courses-dir',
+      mode: 'readwrite',
+      startIn: 'documents'
+    });
+    coursesDirHandle = h;
+    saveDirHandle(h);
+    return h;
+  }
+
+  async function writeTreeToCourses(slug, files) {
+    const root = await ensureCoursesDir();
+    const slugDir = await root.getDirectoryHandle(slug, { create: true });
+    for (const f of files) {
+      if (!f.relativePath) continue;
+      const parts = f.relativePath.split('/').filter(Boolean);
+      if (!parts.length) continue;
+      let dir = slugDir;
+      for (let i = 0; i < parts.length - 1; i++) {
+        dir = await dir.getDirectoryHandle(parts[i], { create: true });
+      }
+      const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(f.data);
+      await writable.close();
+    }
+    return slug;
+  }
+
+  async function downloadBundle(slug, files) {
+    const zip = new JSZip();
+    files.forEach(f => zip.file(slug + '/' + f.relativePath, f.data));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = slug + '.zip';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  async function handleFolderUpload(fileList) {
+    setStatus('Reading folder…', 'info');
+    const files = Array.from(fileList);
+    if (!files.length) { setStatus('No files selected.', 'warn'); return; }
+    const courseJsonFile = files.find(f => f.name === 'course.json');
+    if (!courseJsonFile) {
+      setStatus('⚠ No <code>course.json</code> found in the uploaded folder.', 'err'); return;
+    }
+    let manifest;
+    try { manifest = JSON.parse(await courseJsonFile.text()); }
+    catch(e) { setStatus('⚠ <code>course.json</code> is not valid JSON.', 'err'); return; }
+    if (!isValidManifest(manifest)) {
+      setStatus('⚠ <code>course.json</code> missing <code>courseId</code> or <code>slides</code>.', 'err'); return;
+    }
+    const slug = slugFromCourseJson(manifest);
+    if (!slug) { setStatus('⚠ Could not derive slug from courseId.', 'err'); return; }
+
+    const rootPrefix = (() => {
+      const sample = courseJsonFile.webkitRelativePath || '';
+      const parts = sample.split('/');
+      if (parts.length < 2) return '';
+      return parts[0] + '/';
+    })();
+
+    const bundle = await Promise.all(files.map(async f => {
+      const rel = (f.webkitRelativePath || f.name).replace(rootPrefix, '');
+      return { relativePath: rel, data: await f.arrayBuffer() };
+    }));
+
+    await installBundle(slug, bundle);
+  }
+
+  async function handleZipUpload(file) {
+    if (!file) return;
+    if (typeof JSZip === 'undefined') { setStatus('⚠ JSZip failed to load.', 'err'); return; }
+    setStatus('Extracting .zip…', 'info');
+    let zip;
+    try { zip = await JSZip.loadAsync(await file.arrayBuffer()); }
+    catch(e) { setStatus('⚠ Could not read zip: ' + e.message, 'err'); return; }
+
+    const courseJsonEntry = Object.values(zip.files).find(e => !e.dir && /(^|\/)course\.json$/.test(e.name));
+    if (!courseJsonEntry) { setStatus('⚠ No <code>course.json</code> inside the zip.', 'err'); return; }
+
+    let manifest;
+    try { manifest = JSON.parse(await courseJsonEntry.async('string')); }
+    catch(e) { setStatus('⚠ <code>course.json</code> inside zip is invalid.', 'err'); return; }
+    if (!isValidManifest(manifest)) {
+      setStatus('⚠ <code>course.json</code> missing required fields.', 'err'); return;
+    }
+    const slug = slugFromCourseJson(manifest);
+
+    const nonDirEntries = Object.values(zip.files).filter(e => !e.dir);
+    const firstSeg = nonDirEntries[0].name.split('/')[0];
+    const allShareRoot = nonDirEntries.every(e => e.name.startsWith(firstSeg + '/'));
+    const rootPrefix = allShareRoot ? firstSeg + '/' : '';
+
+    const bundle = await Promise.all(nonDirEntries.map(async e => ({
+      relativePath: e.name.replace(rootPrefix, ''),
+      data: await e.async('arraybuffer')
+    })));
+
+    await installBundle(slug, bundle);
+  }
+
+  async function installBundle(slug, bundle) {
+    setStatus(`Installing <strong>${slug}</strong> (${bundle.length} files)…`, 'info');
+    try {
+      await writeTreeToCourses(slug, bundle);
+      const input = document.getElementById('neCoursePackage');
+      if (input) input.value = slug;
+      setStatus(`✓ Installed at <code>courses/${slug}/</code> — click <strong>Save Node</strong> to attach.`, 'ok');
+    } catch(e) {
+      if (e.message === 'NO_FS_API') {
+        setStatus(
+          `ℹ Your browser doesn't support direct filesystem writes. Downloading <code>${slug}.zip</code> — ` +
+          `unzip it into <code>pflx-pathway-portal/courses/</code>.`,
+          'warn'
+        );
+        await downloadBundle(slug, bundle);
+        const input = document.getElementById('neCoursePackage');
+        if (input) input.value = slug;
+      } else if (e.name === 'AbortError') {
+        setStatus('Directory access canceled.', 'warn');
+      } else {
+        setStatus('⚠ Install failed: ' + e.message, 'err');
+      }
+    }
+  }
+
+  function wireUploader() {
+    const folderBtn = document.getElementById('neUploadCourseBtn');
+    const folderInput = document.getElementById('neUploadCourseInput');
+    const zipBtn = document.getElementById('neUploadCourseZipBtn');
+    const zipInput = document.getElementById('neUploadCourseZipInput');
+    if (!folderBtn || folderBtn._pflxWired) return;
+    folderBtn._pflxWired = true;
+    folderBtn.addEventListener('click', () => folderInput.click());
+    folderInput.addEventListener('change', e => {
+      handleFolderUpload(e.target.files);
+      e.target.value = '';
+    });
+    zipBtn.addEventListener('click', () => zipInput.click());
+    zipInput.addEventListener('change', e => {
+      if (e.target.files[0]) handleZipUpload(e.target.files[0]);
+      e.target.value = '';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireUploader);
+  } else {
+    wireUploader();
+  }
+  const obs = new MutationObserver(wireUploader);
+  obs.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
 </body>

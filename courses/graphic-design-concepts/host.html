@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graphic Design Concepts — HOST DASHBOARD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --pflx-cyan: #00d4ff;
+      --pflx-teal: #00b8d4;
+      --pflx-cyan-dim: rgba(0, 212, 255, 0.35);
+      --pflx-cyan-faint: rgba(0, 212, 255, 0.12);
+      --pflx-dark: #0a0e17;
+      --pflx-darker: #050810;
+      --pflx-panel: rgba(10, 14, 23, 0.85);
+      --pflx-panel-solid: #0a0e17;
+      --pflx-magenta: #ff00ff;
+      --pflx-purple: #8b5cf6;
+      --pflx-green: #10e090;
+      --pflx-amber: #ffa500;
+      --pflx-red: #ff4466;
+      --pflx-text: #e0e6ef;
+      --pflx-muted: #7a8ba0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--pflx-darker);
+      color: var(--pflx-text);
+      width: 100vw;
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 15% 10%, rgba(255, 0, 255, 0.05), transparent 50%),
+        radial-gradient(ellipse at 85% 80%, rgba(0, 212, 255, 0.05), transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== TOP BAR ===== */
+    .top-bar {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center;
+      padding: 14px 32px;
+      background: rgba(5, 8, 16, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--pflx-cyan-dim);
+      gap: 18px;
+    }
+    .host-badge {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, var(--pflx-magenta), var(--pflx-purple));
+      color: white;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .course-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.06em;
+      color: var(--pflx-cyan);
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .view-toggle {
+      display: inline-flex;
+      gap: 0;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .view-toggle a {
+      padding: 8px 14px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      color: var(--pflx-muted);
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .view-toggle a.active { background: var(--pflx-cyan-faint); color: var(--pflx-cyan); }
+    .view-toggle a:hover:not(.active) { color: var(--pflx-text); }
+
+    /* ===== LAYOUT ===== */
+    .dashboard {
+      padding: 28px 32px 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== STATS STRIP ===== */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      padding: 18px 20px;
+      background: var(--pflx-panel);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--pflx-cyan), transparent);
+    }
+    .stat-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--pflx-cyan);
+      line-height: 1;
+    }
+    .stat-detail {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--pflx-muted);
+    }
+    .stat-card.alert { border-color: var(--pflx-amber); }
+    .stat-card.alert .stat-value { color: var(--pflx-amber); }
+    .stat-card.alert::before {
+      background: linear-gradient(90deg, transparent, var(--pflx-amber), transparent);
+    }
+    .stat-card.good { border-color: var(--pflx-green); }
+    .stat-card.good .stat-value { color: var(--pflx-green); }
+    .stat-card.good::before {
+      background: linear-gradient(90deg, transparent, var(--pflx-green), transparent);
+    }
+
+    /* ===== FILTERS ===== */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .filter-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .filter-chip {
+      padding: 6px 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-muted);
+      border-radius: 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .filter-chip:hover { color: var(--pflx-text); }
+    .filter-chip.active { background: var(--pflx-cyan-faint); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+
+    /* ===== ROSTER TABLE ===== */
+    .roster {
+      background: var(--pflx-panel);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .roster-header {
+      display: grid;
+      grid-template-columns: 56px 2fr 1fr 1.2fr 120px 2.5fr 110px 110px;
+      gap: 14px;
+      padding: 12px 20px;
+      background: rgba(0, 212, 255, 0.06);
+      border-bottom: 1px solid var(--pflx-cyan-faint);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      align-items: center;
+    }
+    .roster-row {
+      display: grid;
+      grid-template-columns: 56px 2fr 1fr 1.2fr 120px 2.5fr 110px 110px;
+      gap: 14px;
+      padding: 14px 20px;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 212, 255, 0.06);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .roster-row:hover { background: var(--pflx-cyan-faint); }
+    .roster-row.selected { background: rgba(0, 212, 255, 0.1); box-shadow: inset 3px 0 0 var(--pflx-cyan); }
+
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: white;
+      background: linear-gradient(135deg, var(--pflx-cyan), var(--pflx-purple));
+    }
+    .avatar.mindforge { background: linear-gradient(135deg, #ff4466, #ffa500); }
+    .avatar.emagination { background: linear-gradient(135deg, #00d4ff, #8b5cf6); }
+    .avatar.gentech { background: linear-gradient(135deg, #10e090, #00d4ff); }
+    .avatar.innov8 { background: linear-gradient(135deg, #ff00ff, #ffa500); }
+
+    .player-name {
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--pflx-text);
+    }
+    .player-rank {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .studio-tag {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      padding: 3px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+    .studio-tag.mindforge { background: rgba(255, 68, 102, 0.12); color: #ff7590; border: 1px solid rgba(255, 68, 102, 0.3); }
+    .studio-tag.emagination { background: rgba(0, 212, 255, 0.12); color: var(--pflx-cyan); border: 1px solid rgba(0, 212, 255, 0.3); }
+    .studio-tag.gentech { background: rgba(16, 224, 144, 0.12); color: var(--pflx-green); border: 1px solid rgba(16, 224, 144, 0.3); }
+    .studio-tag.innov8 { background: rgba(255, 0, 255, 0.12); color: #ff70ff; border: 1px solid rgba(255, 0, 255, 0.3); }
+
+    .mini-progress {
+      height: 6px;
+      background: rgba(0, 212, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .mini-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--pflx-teal), var(--pflx-cyan));
+      transition: width 0.4s;
+    }
+    .mini-progress-bar.complete { background: linear-gradient(90deg, var(--pflx-green), #0a9e64); }
+    .mini-progress-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-text);
+      margin-top: 4px;
+    }
+
+    .current-slide {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-cyan);
+      letter-spacing: 0.1em;
+    }
+
+    .heatmap {
+      display: grid;
+      grid-template-columns: repeat(15, 1fr);
+      gap: 2px;
+      min-width: 0;
+    }
+    .heat-cell {
+      height: 14px;
+      border-radius: 2px;
+      background: rgba(0, 212, 255, 0.06);
+      position: relative;
+    }
+    .heat-cell.complete { background: var(--pflx-green); }
+    .heat-cell.current {
+      background: var(--pflx-cyan);
+      animation: pulse-heat 1.4s infinite;
+    }
+    .heat-cell.locked { background: rgba(122, 139, 160, 0.08); }
+    @keyframes pulse-heat {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .last-active {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.05em;
+    }
+    .status-chip {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      padding: 4px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      text-align: center;
+      display: inline-block;
+    }
+    .status-chip.in-progress { background: rgba(0, 212, 255, 0.12); color: var(--pflx-cyan); border: 1px solid rgba(0, 212, 255, 0.3); }
+    .status-chip.submitted { background: rgba(255, 165, 0, 0.12); color: var(--pflx-amber); border: 1px solid rgba(255, 165, 0, 0.3); }
+    .status-chip.approved { background: rgba(16, 224, 144, 0.12); color: var(--pflx-green); border: 1px solid rgba(16, 224, 144, 0.3); }
+    .status-chip.stuck { background: rgba(255, 68, 102, 0.12); color: var(--pflx-red); border: 1px solid rgba(255, 68, 102, 0.3); }
+    .status-chip.not-started { background: rgba(122, 139, 160, 0.1); color: var(--pflx-muted); border: 1px solid rgba(122, 139, 160, 0.3); }
+
+    /* ===== PLAYER DETAIL PANEL ===== */
+    .detail-overlay {
+      position: fixed;
+      top: 0; right: 0;
+      width: min(720px, 90vw);
+      height: 100vh;
+      background: var(--pflx-panel-solid);
+      border-left: 1px solid var(--pflx-cyan);
+      z-index: 200;
+      overflow-y: auto;
+      box-shadow: -12px 0 48px rgba(0, 0, 0, 0.7);
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .detail-overlay.visible { transform: translateX(0); }
+    .detail-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(5, 8, 16, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 199;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .detail-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+    .detail-head {
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid var(--pflx-cyan-faint);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 18px;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: var(--pflx-panel-solid);
+      z-index: 10;
+    }
+    .detail-close {
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-muted);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .detail-close:hover { color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+    .detail-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      color: var(--pflx-text);
+      font-weight: 700;
+    }
+    .detail-meta {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+    .detail-big-avatar {
+      width: 64px; height: 64px;
+      font-size: 20px;
+    }
+    .detail-body {
+      padding: 24px 32px 60px;
+    }
+    .detail-quick-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .quick-stat {
+      padding: 12px;
+      background: rgba(0, 212, 255, 0.04);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+    }
+    .quick-stat-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .quick-stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      color: var(--pflx-cyan);
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .action-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-text);
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
+    .action-btn:hover { background: var(--pflx-cyan-faint); color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--pflx-teal), var(--pflx-cyan));
+      color: var(--pflx-darker);
+      border: 0;
+      font-weight: 700;
+    }
+    .action-btn.warn {
+      border-color: var(--pflx-amber);
+      color: var(--pflx-amber);
+    }
+
+    .slide-block {
+      margin-bottom: 20px;
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .slide-block.complete { border-color: rgba(16, 224, 144, 0.35); }
+    .slide-block.current { border-color: var(--pflx-cyan); }
+    .slide-block.pending { opacity: 0.5; }
+    .slide-block-head {
+      padding: 10px 14px;
+      background: rgba(0, 212, 255, 0.04);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .slide-block-number {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.18em;
+    }
+    .slide-block-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      color: var(--pflx-cyan);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      flex: 1;
+      margin-left: 10px;
+    }
+    .slide-block-icon {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--pflx-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+    }
+    .slide-block.complete .slide-block-icon {
+      background: var(--pflx-green);
+      color: var(--pflx-darker);
+      border-color: var(--pflx-green);
+    }
+    .slide-block.complete .slide-block-icon::after { content: '✓'; font-weight: bold; }
+    .slide-block.current .slide-block-icon {
+      background: var(--pflx-cyan-faint);
+      border-color: var(--pflx-cyan);
+    }
+    .slide-block-body {
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--pflx-text);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .response-kv {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px 14px;
+      font-size: 12px;
+    }
+    .response-k {
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--pflx-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-size: 10px;
+      padding-top: 2px;
+    }
+    .response-v {
+      color: var(--pflx-text);
+    }
+    .tier-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 10px;
+      font-size: 11px;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .tier-pill-letter {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 10px;
+    }
+    .tier-pill.S .tier-pill-letter { color: var(--pflx-cyan); }
+    .tier-pill.A .tier-pill-letter { color: var(--pflx-green); }
+    .tier-pill.B .tier-pill-letter { color: var(--pflx-amber); }
+    .tier-pill.C .tier-pill-letter { color: var(--pflx-muted); }
+
+    .signal-preview {
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-left: 2px solid var(--pflx-cyan);
+      border-radius: 4px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+    .waypoint-preview {
+      position: relative;
+      width: 100%;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #0c1220;
+      margin-top: 6px;
+    }
+    .waypoint-preview img { width: 100%; display: block; }
+    .waypoint-preview .mini-pin {
+      position: absolute;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      border: 2px solid white;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 9px;
+      color: white;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+    }
+    .mini-pin.fundamentals { background: var(--pflx-cyan); }
+    .mini-pin.layout { background: var(--pflx-green); }
+    .mini-pin.typography { background: var(--pflx-purple); }
+    .mini-pin.color { background: var(--pflx-magenta); }
+    .mini-pin.images { background: var(--pflx-amber); }
+
+    .reflection-answer {
+      padding: 10px 12px;
+      background: rgba(139, 92, 246, 0.06);
+      border-left: 2px solid var(--pflx-purple);
+      border-radius: 4px;
+      font-style: italic;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    .reflection-answer::before {
+      content: attr(data-focus);
+      display: block;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      color: var(--pflx-purple);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-style: normal;
+      margin-bottom: 4px;
+    }
+
+    .submission-card {
+      padding: 12px;
+      background: rgba(255, 165, 0, 0.06);
+      border: 1px solid rgba(255, 165, 0, 0.3);
+      border-radius: 6px;
+    }
+    .submission-row + .submission-row { margin-top: 10px; }
+    .submission-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-amber);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .submission-body {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .peer-invitations {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .peer-invitation {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(139, 92, 246, 0.08);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 18px;
+      font-size: 12px;
+    }
+    .peer-invitation .mini-avatar {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--pflx-purple), var(--pflx-cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 9px;
+      color: white;
+    }
+
+    .empty-note {
+      color: var(--pflx-muted);
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    .proto-thumb {
+      width: 100%;
+      aspect-ratio: 800/380;
+      background: #0c1220 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 380'><path d='M120 280 Q200 120 320 220 T520 180 T700 240' stroke='%2300d4ff' stroke-width='4' fill='none' opacity='0.7'/><circle cx='600' cy='100' r='30' fill='%23ff00ff' opacity='0.6'/><path d='M80 320 L200 320 L140 220 Z' fill='%2310e090' opacity='0.4'/></svg>");
+      background-size: cover;
+      border-radius: 6px;
+      border: 1px solid var(--pflx-cyan-faint);
+      margin-top: 6px;
+    }
+
+    .pitch-preview {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+      align-items: center;
+    }
+    .pitch-play {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--pflx-red), #c21a3d);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 18px;
+    }
+    .pitch-duration {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--pflx-cyan);
+      margin-top: 4px;
+    }
+
+    .xbot-note {
+      padding: 10px 12px;
+      background: rgba(139, 92, 246, 0.08);
+      border-left: 3px solid var(--pflx-purple);
+      border-radius: 4px;
+      font-size: 12px;
+      color: #c4b5fd;
+      margin-top: 10px;
+      position: relative;
+    }
+    .xbot-note::before {
+      content: 'X-BOT';
+      position: absolute;
+      top: -8px; left: 10px;
+      background: var(--pflx-panel-solid);
+      padding: 0 6px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--pflx-purple);
+    }
+
+    /* Small screens fallback */
+    @media (max-width: 1100px) {
+      .roster-header, .roster-row {
+        grid-template-columns: 44px 1.5fr 1.2fr 100px 2fr 100px;
+      }
+      .col-studio, .col-current { display: none; }
+    }
+    @media (max-width: 720px) {
+      .roster-header, .roster-row {
+        grid-template-columns: 40px 1fr 90px 90px;
+      }
+      .col-heatmap, .col-active { display: none; }
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      background: rgba(16, 224, 144, 0.15);
+      border: 1px solid var(--pflx-green);
+      color: var(--pflx-green);
+      border-radius: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      z-index: 300;
+      text-transform: uppercase;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="application/json" id="course-manifest">{"courseId": "graphic-design-concepts", "title": "Graphic Design Concepts", "subtitle": "A mastercourse on the five foundational concepts every graphic designer needs", "pathway": "digital-artist", "nodeId": "graphic-design-concepts", "estimatedMinutes": 120, "required": true, "bonusXC": 50, "rewards": {"primaryBadgeId": "graphic-design-foundations", "taggedBadgeIds": ["design-fundamentals", "layout-composition", "typography-master", "color-theorist", "visual-storyteller"], "xcReward": 300}, "cohortScope": "all", "settings": {"navigationMode": "sequential", "showSidebar": true, "showProgressBar": true, "backgroundImageUrl": "./background.png", "backgroundMode": "hero"}, "taskCriteria": [{"id": "c1", "label": "Fundamentals of Design — uses line, shape, form, texture, and balance intentionally", "scale": "1-5", "required": true}, {"id": "c2", "label": "Layout & Composition — applies the five principles of layout to guide the viewer's eye", "scale": "1-5", "required": true}, {"id": "c3", "label": "Typography — identifies font type, uses hierarchy, and combines opposing fonts effectively", "scale": "1-5", "required": true}, {"id": "c4", "label": "Color — applies color theory, respects do's/don'ts, and sets appropriate tone", "scale": "1-5", "required": true}, {"id": "c5", "label": "Images — incorporates sharp, clear, distinct, and memorable imagery", "scale": "1-5", "required": true}], "slides": [{"id": "slide-01", "type": "title", "title": "Graphic Design Concepts", "body": [{"kind": "image", "url": "./background.png", "alt": "Graphic Design Concepts hero — two stylized faces in bold color with circular geometric accents"}]}, {"id": "slide-02", "type": "overview", "title": "Overview", "body": [{"kind": "markdown", "content": "### What you'll learn\n- The **Fundamentals of Design** — line, shape, form, texture, balance\n- **Layout & Composition** — arranging elements with intention\n- **Typography** — making text work visually\n- **Color** — theory, tone, readability\n- **Images** — sharp, clear, distinct, memorable"}, {"kind": "markdown", "content": "### Mastercourse objective\nLearn essential concepts of graphic design and how they connect with marketing and advertising. Develop materials to present your creations with quality visuals."}, {"kind": "markdown", "content": "### Essential questions\n- How can I apply key concepts of graphic design into my projects?\n- How can I use these skills to visualize my thoughts and ideas?"}, {"kind": "callout", "tone": "info", "content": "Estimated time: 2 hours • Rewards: Graphic Design Foundations badge + 5 tagged sub-badges + 300 XC (+50 bonus)"}]}, {"id": "slide-03", "type": "diagnostic", "title": "Where are you right now?", "body": [{"kind": "markdown", "content": "Before we dive in, rank these five graphic design concepts by how confident you feel about each one today. There are no wrong answers — this is your starting line, and we'll revisit it at the end to see how far you've traveled."}], "interaction": {"mode": "tierListEngine", "prompt": "Rank the five graphic design concepts by your current confidence.", "tiers": ["S — I've got this", "A — Pretty comfortable", "B — Some idea", "C — New to me"], "items": [{"id": "sub-fundamentals", "label": "Fundamentals (line, shape, form, texture, balance)"}, {"id": "sub-layout", "label": "Layout & Composition"}, {"id": "sub-typography", "label": "Typography"}, {"id": "sub-color", "label": "Color"}, {"id": "sub-images", "label": "Images"}], "savesToPortfolio": true, "cohortConsensusReveal": true, "officialReferenceRanks": ["director", "producer", "partner"], "shareToSignalWall": false, "pairedWithSlideId": "slide-14"}}, {"id": "slide-04", "type": "concept", "title": "What is Graphic Design?", "body": [{"kind": "markdown", "content": "Graphic design is the process of visual communication and problem-solving through the use of typography, photography, iconography, and illustration. The field is considered a subset of visual communication and communication design — the terms are often used synonymously."}], "interaction": {"mode": "broadcast", "videoUrl": "https://www.youtube.com/watch?v=sTi5SNgxE3U", "cues": [{"id": "c1", "atSeconds": 60, "activity": {"mode": "cohortPulse", "prompt": "Which part of graphic design interests you most so far?", "options": [{"id": "a", "label": "Solving visual problems"}, {"id": "b", "label": "Communicating complex ideas simply"}, {"id": "c", "label": "Crafting beauty and feel"}, {"id": "d", "label": "All of the above"}], "xcWeightedVoting": {"enabled": false}, "showResultsAfterVote": true, "xBotMinorityView": true}}, {"id": "c2", "atSeconds": 150, "activity": {"mode": "thoughtNebula", "prompt": "In one or two words, what does graphic design do?", "minWords": 1, "maxWords": 2, "maxCharsPerWord": 20, "cohortVisible": true, "signalBonus": {"enabled": true, "coreThreshold": 3, "xcReward": 2}, "xBotClusterSummary": true}}], "allowAnyActivityAsCue": true, "xBotRecap": true}}, {"id": "slide-05", "type": "connection", "title": "Make it personal — where have you seen this?", "body": [{"kind": "markdown", "content": "Graphic design is everywhere once you start noticing. Post a Signal with a real-world example you've spotted in the wild — a poster, a brand identity, a package, a menu, an app interface. Attach a photo if you have one and add a quick note about why it grabbed you."}], "interaction": {"mode": "signalWall", "prompt": "Share one graphic design piece you've noticed in your own life recently. What is it, and what made you notice it?", "allowText": true, "allowImage": true, "allowVoiceMemo": true, "maxVoiceSeconds": 45, "boosts": {"enabled": true, "costXC": 1, "revenueGoesTo": "poster"}, "xBotClusterThemes": true, "rewards": {"topBoostedBadgeId": "signal-amplified"}, "persistToCohortFeed": true, "optionalPost": false}}, {"id": "slide-06", "type": "why", "title": "Why graphic design matters", "body": [{"kind": "markdown", "content": "Graphic design is where **ideas become visible**. Every brand you trust, every product you pick up, every app you use, every video thumbnail you click — a designer made a decision that changed how you felt about it in a fraction of a second."}, {"kind": "markdown", "content": "Strong graphic design is a career multiplier for every pathway in PFLX — not just Digital Artists. Content Creators need thumbnails and titles that earn the click. Sound Designers need album covers that match their sonic identity. Professional Entrepreneurs need brand systems that make their startup look real. Industrial Designers need packaging and collateral. A player who can design well is a player whose ideas travel farther."}, {"kind": "callout", "tone": "info", "content": "By the end of this course, you'll be able to look at any piece of visual communication and name the five concepts at work inside it — and apply them to your own work."}]}, {"id": "slide-07", "type": "useCases", "title": "Spot the five concepts in the wild", "body": [{"kind": "markdown", "content": "Now you'll see the five concepts one at a time. Each has a short video that defines it, then you'll use **Waypoint** below to tag where each concept shows up in a real design."}, {"kind": "markdown", "content": "### 1 · Fundamentals of Design"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=YqQx75OPRa0", "caption": "Line, shape, form, texture, balance — the vocabulary of visual design."}, {"kind": "markdown", "content": "### 2 · Layout & Composition"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=a5KYlHNKQB8", "caption": "Arranging the parts of a design so the viewer's eye moves with intention."}, {"kind": "markdown", "content": "### 3 · Typography"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=sByzHoiYFX0", "caption": "Making text not just readable but emotive — hierarchy, pairing, tone."}, {"kind": "markdown", "content": "### 4 · Color"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=_2LLXnUdUIc", "caption": "Color theory, readability, do's and don'ts, and the feeling a palette creates."}, {"kind": "markdown", "content": "### 5 · Images"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=MELKuexR3sQ", "caption": "Why images work — sharp, clear, distinct, memorable, and story-carrying."}, {"kind": "markdown", "content": "### Your turn — Waypoint exercise"}, {"kind": "markdown", "content": "Drop five waypoints on the design below — one per concept. Tap the image to drop, then tag which concept that spot demonstrates. You can add a short note explaining what you see."}], "interaction": {"mode": "waypoint", "prompt": "On the design above, drop a Waypoint for each of the five concepts. Tag which concept your Waypoint is for and add a short note on what you see.", "imageUrl": "./background.png", "imageAlt": "A graphic design piece demonstrating multiple concepts", "activityMode": "recon", "minWaypoints": 5, "maxWaypoints": 8, "notesEnabled": true, "cohortOverlay": true, "zones": [{"id": "z-fundamentals", "shape": "polygon", "coords": {"points": [[0.02, 0.1], [0.48, 0.1], [0.48, 0.95], [0.02, 0.95]]}, "correct": true, "xcReward": 2, "label": "Fundamentals", "feedbackOnHit": "Notice the bold geometric shapes, the sweeping diagonal line, and the contrast between textured stipple patterns and flat color — those are fundamentals at work."}, {"id": "z-layout", "shape": "polygon", "coords": {"points": [[0.2, 0.05], [0.85, 0.05], [0.85, 0.95], [0.2, 0.95]]}, "correct": true, "xcReward": 2, "label": "Layout & Composition", "feedbackOnHit": "Layout: the faces are staged as two focal points with a diagonal split — classic asymmetric balance guiding your eye."}, {"id": "z-color", "shape": "polygon", "coords": {"points": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]]}, "correct": true, "xcReward": 2, "label": "Color", "feedbackOnHit": "Color: bold primary palette — cyan, red-orange, yellow — a triadic scheme that creates visual energy."}, {"id": "z-images", "shape": "polygon", "coords": {"points": [[0.15, 0.15], [0.55, 0.15], [0.55, 0.85], [0.15, 0.85]]}, "correct": true, "xcReward": 2, "label": "Images", "feedbackOnHit": "Images: the stylized portrait carries the entire emotional weight. Sharp, distinct, memorable."}], "availableTags": [{"id": "fundamentals", "label": "Fundamentals"}, {"id": "layout", "label": "Layout & Composition"}, {"id": "typography", "label": "Typography"}, {"id": "color", "label": "Color"}, {"id": "images", "label": "Images"}]}}, {"id": "slide-08", "type": "taskIntro", "title": "Your mission", "body": [{"kind": "markdown", "content": "### The task\nCreate a **graphic design project** — a poster, brand identity, album cover, app screen, or packaging — that demonstrates all five concepts you just studied. Record a **screencast video** walking through how you applied each concept in your design."}, {"kind": "markdown", "content": "### Requirements\n- A finished design artifact (static or animated)\n- A screencast video explaining your choices (3–6 minutes)\n- Written description of the design brief and your creative approach"}, {"kind": "callout", "tone": "info", "content": "You'll be graded on all five concepts. Each counts equally. Aim for a design where every concept is visible and intentional — even modest choices count if you can articulate them."}], "interaction": {"mode": "criteriaPreview", "referencesTaskCriteria": true}}, {"id": "slide-09", "type": "toolsTutorials", "title": "Tools & Tutorials", "body": [{"kind": "markdown", "content": "### Choose your weapon\nEvery designer has preferred tools. Explore the deck below — flip through the **Data Cards** to see what each tool does best, then use **Warp Jump** to launch directly into your chosen tool."}, {"kind": "callout", "tone": "info", "content": "There's no single 'right' tool. Canva is great for speed, Photoshop for depth, Affinity for the install-owners-forever crowd, Adobe Express for quick social-ready assets. Pick based on your task."}], "interaction": {"mode": "dataCards", "deck": {"type": "custom", "cards": [{"id": "tool-adobe-express", "front": "Adobe Express", "back": "Web-based. Fastest path to social posts, quick flyers, short videos. No install. Strong template library. Best when you need publish-ready output in minutes.", "launchUrl": "https://express.adobe.com/sp/", "categoryTag": "web-based"}, {"id": "tool-photoshop", "front": "Adobe Photoshop", "back": "Install. The industry-standard raster editor for photo, illustration, and complex composites. Steep learning curve but extremely deep. Part of Creative Cloud.", "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop", "categoryTag": "install"}, {"id": "tool-indesign", "front": "Adobe InDesign", "back": "Install. The layout tool for multi-page documents — magazines, books, brochures, portfolios. Pair with Photoshop and Illustrator for a complete pro workflow.", "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop", "categoryTag": "install"}, {"id": "tool-canva", "front": "Canva", "back": "Web-based. Template-rich, beginner-friendly, fast. Massive asset library. Best for speed and collaboration; less best for pixel-level control.", "launchUrl": "https://www.canva.com/", "categoryTag": "web-based"}, {"id": "tool-pixlr", "front": "Pixlr E", "back": "Web-based. A free, Photoshop-like editor in the browser. Surprisingly capable for layer work, filters, and adjustments. No sign-in required.", "launchUrl": "https://pixlr.com/e/", "categoryTag": "web-based"}, {"id": "tool-affinity-designer", "front": "Affinity Designer", "back": "Install. One-time purchase vector and raster tool. Fast, powerful, and a strong Illustrator/Photoshop alternative for players who don't want a subscription.", "launchUrl": "https://drive.google.com/file/d/15MGFwL35KwJZeTZsoKyRESpXahtMGso4/view?usp=drive_link", "categoryTag": "install"}, {"id": "tool-affinity-publisher", "front": "Affinity Publisher", "back": "Install. Layout-and-publishing sibling to Designer. Think InDesign without the subscription. Strong for zines, posters, long-form print work.", "launchUrl": "https://drive.google.com/file/d/1cvw9Zi19JFiVMsWf7KPeq9qeZxOKJpCw/view?usp=drive_link", "categoryTag": "install"}, {"id": "tool-affinity-photo", "front": "Affinity Photo", "back": "Install. Photo-editing sibling to Designer. RAW processing, retouching, and compositing without a subscription.", "launchUrl": "https://drive.google.com/file/d/1GBjVqewyNQKDDr2mRaYhkkcj3IXKJlMT/view?usp=drive_link", "categoryTag": "install"}]}, "spacedRepetition": true, "unlocksCodexEntry": true, "masteryThreshold": 3, "resurfacesInLaterCourses": true, "companionActions": [{"label": "Launch selected tool", "mode": "warpJump", "fromCard": true, "autoReturn": {"enabled": true, "timerSeconds": 1200, "onCompletion": true}, "embedHub": true}]}}, {"id": "slide-10", "type": "taskSubmission", "title": "Submit your project", "body": [{"kind": "markdown", "content": "Upload your finished design artifact and your screencast video (or a link to where they live). In your description, briefly walk through how each of the five concepts shows up in your work."}, {"kind": "callout", "tone": "info", "content": "Save drafts as often as you like. When you're ready, hit **Submit for Approval** — your host will review against the five criteria and award XC + badges on approval."}], "interaction": {"mode": "submission", "acceptFile": true, "acceptLink": true, "descriptionRequired": true, "descriptionMinLength": 50, "submitAction": "routeToNode", "allowDrafts": true, "descriptionHint": "In 2–3 sentences per concept: how does Fundamentals show up in your work? Layout? Typography? Color? Images?"}}, {"id": "slide-11", "type": "peerFeedforward", "title": "Peer Feedforward", "required": false, "body": [{"kind": "markdown", "content": "Invite 2–3 peers to give you feedforward on your design before you publish the final branded version. They'll rate your work on the five concepts and give one actionable suggestion per concept."}, {"kind": "callout", "tone": "info", "content": "Top-tier designers ship early drafts to trusted peers before final polish. This is that move, built into the course."}], "interaction": {"mode": "peerFeedforward", "xcCostPerPeer": 10, "minPeers": 0, "maxPeers": 3, "optional": true, "cohortScoped": true, "criteria": [{"id": "ff1", "label": "Fundamentals — what's working, what could level up?", "scale": "1-5"}, {"id": "ff2", "label": "Layout & Composition — does your eye travel where it should?", "scale": "1-5"}, {"id": "ff3", "label": "Typography — is the font choice and hierarchy serving the idea?", "scale": "1-5"}, {"id": "ff4", "label": "Color — does the palette feel intentional and on-tone?", "scale": "1-5"}, {"id": "ff5", "label": "Images — are they sharp, distinct, and memorable?", "scale": "1-5"}, {"id": "ff6", "label": "One concrete suggestion for the next version", "scale": "open"}], "rewards": {"masterCollaboratorBadgeId": "master-collaborator", "beaconOfCollaborationBadgeId": "beacon-of-collaboration", "beaconThreshold": 3}}}, {"id": "slide-12", "type": "refine", "title": "Refine & innovate", "body": [{"kind": "markdown", "content": "Sketch what you're changing based on the feedforward. Use **Prototype Pad** below — it loads your brand board and the PFLX stamp kit. Mark up your current version with revisions, or start fresh."}, {"kind": "markdown", "content": "Then upload the refined version as a new draft. This does **not** replace your submission yet — it lives with your course state until Slide 13 when you lock the final branded version."}], "interaction": {"mode": "prototypePad", "prompt": "Sketch your refinements. What are you changing, and why?", "canvasBackground": "brandBoard", "backgroundImageUrl": null, "stamps": ["pflx-badges", "studio-logos", "xc-symbols", "pathway-glyphs"], "studioFilter": {"enabled": true, "default": "none"}, "savesToPortfolio": true, "xBotVisionReview": true, "tools": ["pen", "highlighter", "eraser", "text", "stamp"]}}, {"id": "slide-13", "type": "branding", "title": "Branding & implementation", "body": [{"kind": "markdown", "content": "### Final touches\n- Logo in the corner (pulled from your brand board automatically)\n- Color palette reinforced across all pieces\n- Typography consistent with your brand system\n- Clean opening and closing slate on your screencast"}, {"kind": "markdown", "content": "Record your **final** screencast walking through the finished branded project. Pitch Take auto-applies your logo watermark and brand-matched opening/closing slates — you focus on talking through the design, the tool handles the polish."}], "interaction": {"mode": "pitchTake", "prompt": "Record a 3–6 minute pitch of your final branded graphic design project. Walk through how each of the five concepts shows up.", "maxDurationSeconds": 360, "recordingStudio": true, "autoBrand": {"logoWatermark": true, "openingSlate": true, "closingSlate": true}, "savesToVideoReel": true, "peerTimestampedVoiceComments": true, "submitAction": "updateNodeSubmission", "label": "Final Branded Pitch"}}, {"id": "slide-14", "type": "reflection", "title": "Where are you now?", "body": [{"kind": "markdown", "content": "You started with a Tier List on Slide 3. Here's where you put each concept when you began."}, {"kind": "callout", "tone": "info", "content": "Your Slide 3 Tier List renders here for comparison — hosted by the CourseViewer."}, {"kind": "markdown", "content": "Take a moment to rebuild the same tier list with today's confidence. Where did you move? What grew? What got harder as you learned more? The growth delta reveals below after you submit."}], "interaction": {"mode": "reflectionPrompts", "prompts": [{"id": "r1", "focus": "work", "prompt": "Which of the five concepts shows up most strongly in your final design, and why?"}, {"id": "r2", "focus": "process", "prompt": "Which concept was hardest to apply on your first try? What finally clicked?"}, {"id": "r3", "focus": "self", "prompt": "What kind of designer are you becoming? Name the part of this work that felt most like you."}], "saveToPortfolio": true, "companionReveal": {"mode": "tierListCompare", "comparesAgainstSlideId": "slide-03"}}}, {"id": "slide-15", "type": "completion", "title": "Course complete", "body": [{"kind": "markdown", "content": "You've wrapped **Graphic Design Concepts**. Once your host approves your submission, the rewards unlock:"}, {"kind": "callout", "tone": "success", "content": "Graphic Design Foundations badge • 5 tagged sub-badges (Design Fundamentals, Layout & Composition, Typography Master, Color Theorist, Visual Storyteller) • 300 XC + 50 bonus"}, {"kind": "markdown", "content": "### What unlocks next\nWith Graphic Design Foundations in your profile, new nodes open on the **Digital Artist** pathway. Your work is also now visible to hosts on other pathways (Content Creator, Professional Entrepreneur) who are looking for designers — you may start getting Job applications in your inbox."}], "interaction": {"mode": "completionSummary", "showBadges": true, "showXCPayout": true, "showNextNodes": true}}]}</script>
+
+  <script type="text/babel">
+/* =========================================================================
+   PFLX Host Dashboard — Graphic Design Concepts
+   Companion to viewer.html. Shows cohort-wide progress + per-player drill-in
+   with every response rendered by activity type.
+
+   Mock data for this prototype. Production build pulls from pflx_cloud_save
+   via the Supabase bridge. The shape of slideStates matches what viewer.html
+   writes — swap the in-memory mock for a real data source and nothing else
+   about this file has to change.
+   ========================================================================= */
+
+const { useState, useMemo } = React;
+const course = JSON.parse(document.getElementById('course-manifest').textContent);
+
+/* ============ PFLX SESSION ============
+   Same contract as viewer.html. The Host Dashboard MUST gate access by rank —
+   plain Scouts and Associates should never see this surface. Integration with
+   PFLX Platform SSO reads window.PFLX_SESSION. For this prototype, identity
+   is injected via URL params, e.g. ?role=host&rank=Director&name=Ennis. */
+const session = (function resolveSession() {
+  if (typeof window.PFLX_SESSION === 'object' && window.PFLX_SESSION) return window.PFLX_SESSION;
+  const qs = new URLSearchParams(window.location.search);
+  const name = qs.get('name') || 'Player';
+  return {
+    playerId: qs.get('pid') || 'p-me',
+    displayName: name,
+    initials: (name.match(/\b[A-Z]/g) || [name[0] || 'P']).slice(0, 2).join('').toUpperCase(),
+    studio: qs.get('studio') || 'emagination',
+    cohort: qs.get('cohort') || 'spring-2026',
+    rank: qs.get('rank') || 'Scout',
+    role: qs.get('role') || 'player'
+  };
+})();
+
+// Host Dashboard access is strictly role-based. Player rank (Scout → Partner)
+// is a player-progression ladder — even a Partner-rank player is still a
+// player and does NOT get Host Dashboard access. The Host role is reserved
+// for adults/facilitators running the program.
+const canAccessHostDashboard = session.role === 'host' || session.role === 'god';
+
+// Scope: regular Hosts see their assigned cohort(s); God tier sees everything.
+// In production, hosts carry a `hostScope` field listing assigned cohorts;
+// if not present we assume they see the current course's cohort.
+const canSeeAllCohorts = session.role === 'god';
+
+
+// ======================= MOCK COHORT =======================
+const STUDIOS = ['mindforge', 'emagination', 'gentech', 'innov8'];
+
+const mockPlayers = [
+  {
+    id: 'p-ava',   name: 'Ava Morita',   initials: 'AM', studio: 'emagination', rank: 'Manager',
+    progressStage: 14, status: 'approved', lastActive: '2h ago', pace: 'ahead'
+  },
+  {
+    id: 'p-kai',   name: 'Kai Reynolds', initials: 'KR', studio: 'mindforge',   rank: 'Manager',
+    progressStage: 14, status: 'submitted', lastActive: '36m ago', pace: 'on-pace'
+  },
+  {
+    id: 'p-jun',   name: 'Jun Sato',     initials: 'JS', studio: 'innov8',      rank: 'Scout',
+    progressStage: 12, status: 'in-progress', lastActive: '1h ago', pace: 'on-pace'
+  },
+  {
+    id: 'p-leo',   name: 'Leo Patel',    initials: 'LP', studio: 'gentech',     rank: 'Scout',
+    progressStage: 9,  status: 'in-progress', lastActive: '4h ago', pace: 'on-pace'
+  },
+  {
+    id: 'p-mara',  name: 'Mara Holt',    initials: 'MH', studio: 'emagination', rank: 'Scout',
+    progressStage: 7,  status: 'stuck', lastActive: '2d ago', pace: 'behind'
+  },
+  {
+    id: 'p-rio',   name: 'Rio Chen',     initials: 'RC', studio: 'innov8',      rank: 'Associate',
+    progressStage: 5,  status: 'in-progress', lastActive: '18m ago', pace: 'on-pace'
+  },
+  {
+    id: 'p-sol',   name: 'Sol Vasquez',  initials: 'SV', studio: 'mindforge',   rank: 'Scout',
+    progressStage: 3,  status: 'in-progress', lastActive: '6h ago', pace: 'behind'
+  },
+  {
+    id: 'p-eli',   name: 'Eli Banerjee', initials: 'EB', studio: 'gentech',     rank: 'Scout',
+    progressStage: 1,  status: 'not-started', lastActive: '—', pace: 'not-started'
+  }
+];
+
+// Build slideStates per player with realistic mock responses
+function buildSlideStates(player) {
+  const states = {};
+  const allSlides = course.slides;
+  for (let i = 0; i < allSlides.length; i++) {
+    const slide = allSlides[i];
+    const slideNumber = i + 1;  // 1-based
+    const completed = slideNumber <= player.progressStage;
+    if (!completed && slideNumber !== player.progressStage + 1) {
+      states[slide.id] = { completed: false, response: null };
+      continue;
+    }
+    // Generate mock response per slide type
+    states[slide.id] = {
+      completed,
+      startedAt: '2026-04-20T14:15:00Z',
+      completedAt: completed ? '2026-04-20T14:22:30Z' : null,
+      response: completed ? mockResponseFor(slide, player) : null
+    };
+  }
+  return states;
+}
+
+function mockResponseFor(slide, player) {
+  const mode = slide.interaction?.mode;
+  switch (slide.type) {
+    case 'title':
+    case 'overview':
+    case 'why':
+      return { viewed: true };
+    case 'diagnostic': {
+      if (mode === 'tierListEngine') {
+        // Simulate each player placing the 5 concepts differently
+        const options = ['S', 'A', 'B', 'C'];
+        const placements = {};
+        slide.interaction.items.forEach((item, idx) => {
+          // Deterministic by player + item
+          const seed = (player.initials.charCodeAt(0) + idx * 3) % 4;
+          placements[item.id] = options[seed];
+        });
+        return { placements, submitted: true };
+      }
+      return { viewed: true };
+    }
+    case 'concept': {
+      if (mode === 'broadcast') {
+        return {
+          cueResponses: {
+            c1: { choice: ['a','b','c','d'][player.initials.charCodeAt(0) % 4] },
+            c2: { words: pickWords(player, 2) }
+          },
+          complete: true
+        };
+      }
+      return { viewed: true };
+    }
+    case 'connection': {
+      if (mode === 'signalWall') {
+        const signals = [
+          "Noticed the new Apple airport signage — huge typographic restraint, all wayfinding leaning on color blocks. Felt calm in a place that's usually chaotic.",
+          "A poster at a ramen shop near me used only two weights of one font. Whole identity came from the composition, not the decoration.",
+          "The pharmacy I stopped at had a dispenser label where the dosage info was smaller than the warnings. Hierarchy doing its job.",
+          "Saw a beer label yesterday where the whole design is illustration — no photo, no stock. Stood out on the shelf immediately.",
+          "The Duolingo owl on the subway — the green is SO loud, and the expression does all the work. Design lesson: character > polish.",
+          "My dentist's new sign has the logo the wrong size for the distance drivers approach from. Bad choice, but instructive.",
+          "Spotted a zine in a bookstore — hand-drawn type, three colors, messy as hell, totally worked."
+        ];
+        const idx = player.initials.charCodeAt(0) % signals.length;
+        return { posted: true, body: signals[idx], boosts: {} };
+      }
+      return { viewed: true };
+    }
+    case 'useCases': {
+      if (mode === 'waypoint') {
+        // 5 pins, roughly positioned across the image
+        const pinSet = [
+          [[0.22, 0.4, 'fundamentals'], [0.78, 0.35, 'color'], [0.45, 0.65, 'layout'], [0.65, 0.75, 'images'], [0.35, 0.15, 'typography']],
+          [[0.15, 0.55, 'images'], [0.5, 0.3, 'color'], [0.72, 0.6, 'fundamentals'], [0.35, 0.7, 'layout'], [0.82, 0.42, 'typography']],
+          [[0.4, 0.5, 'layout'], [0.6, 0.25, 'typography'], [0.2, 0.7, 'color'], [0.75, 0.55, 'images'], [0.55, 0.8, 'fundamentals']]
+        ];
+        const pins = pinSet[player.initials.charCodeAt(0) % pinSet.length];
+        return {
+          waypoints: pins.map((p, i) => ({
+            id: `wp-${i}`, x: p[0], y: p[1], tag: p[2],
+            note: i === 0 ? 'This is where the eye lands first.' : ''
+          }))
+        };
+      }
+      return { viewed: true };
+    }
+    case 'taskIntro':
+      return { viewed: true, criteriaAcknowledged: true };
+    case 'toolsTutorials': {
+      if (mode === 'dataCards') {
+        const viewed = {};
+        const toolCards = slide.interaction.deck?.cards?.length || 8;
+        // Different players viewed different numbers of cards
+        const n = Math.max(1, Math.min(toolCards, (player.initials.charCodeAt(0) % toolCards) + 2));
+        for (let i = 0; i < n; i++) viewed[i] = true;
+        return { viewed, focus: n - 1, flipped: viewed };
+      }
+      return { viewed: true };
+    }
+    case 'taskSubmission': {
+      return {
+        submitted: true,
+        fileName: `${player.initials.toLowerCase()}-graphic-design-final.mp4`,
+        link: `https://example.com/${player.initials.toLowerCase()}/design-work`,
+        description: descriptionFor(player)
+      };
+    }
+    case 'peerFeedforward': {
+      const pool = mockPlayers.filter(p => p.id !== player.id);
+      const invitedCount = (player.initials.charCodeAt(0) % 3);
+      const invites = pool.slice(0, invitedCount).map(p => ({
+        id: p.id, name: p.name, initials: p.initials, studio: p.studio
+      }));
+      return { invites };
+    }
+    case 'refine': {
+      return { saved: true, summary: 'Sketched adjustments to composition + color palette' };
+    }
+    case 'branding': {
+      return {
+        recorded: true,
+        seconds: 180 + (player.initials.charCodeAt(0) % 120),
+        label: 'Final Branded Pitch'
+      };
+    }
+    case 'reflection': {
+      return {
+        submitted: true,
+        answers: {
+          r1: reflectionAnswer(player, 'work'),
+          r2: reflectionAnswer(player, 'process'),
+          r3: reflectionAnswer(player, 'self')
+        }
+      };
+    }
+    case 'completion':
+      return { viewed: true };
+    default:
+      return { viewed: true };
+  }
+}
+
+function pickWords(player, n) {
+  const pool = ['communicate', 'solve', 'simplify', 'show', 'emote', 'sell', 'identify', 'inspire', 'translate', 'evoke', 'focus'];
+  const seed = player.initials.charCodeAt(0);
+  return Array.from({ length: n }, (_, i) => pool[(seed + i * 3) % pool.length]);
+}
+
+function descriptionFor(player) {
+  const templates = [
+    "I built a poster for a local independent bookstore. Fundamentals: strong diagonal linework guides the eye to the title. Layout: grid-based with intentional negative space on the left. Typography: Fraunces headline paired with IBM Plex Sans body — opposing fonts. Color: muted palette of terracotta + cream + deep teal for warmth and stability. Images: high-contrast photo of an open book with strong shadow.",
+    "Created a brand identity for a sustainable coffee roaster. The line work in the mark evokes steam rising (fundamentals). Composition centers the wordmark with orbiting leaf marks (layout). Typography pairs a condensed display with a warm serif (opposition). The palette is earth-toned greens and browns for the tone. Illustrated imagery replaces photography to stay distinctive on a crowded shelf.",
+    "Designed an album cover. Line and shape drive the visual — bold curved forms in overlap. Composition uses rule of thirds with the main subject in the lower left. Typography is a single display weight at large scale. Color is a complementary purple-yellow palette for emotional energy. The central image is a symbolic silhouette that carries the mood.",
+    "Made a movie poster for an indie horror short. Balance is asymmetric and intentionally unsettling. Layout: the title is pushed to the bottom while the character's face dominates the upper half. Typography: condensed sans for tension. Color: red and black with cool gray accents — high contrast. Image: high-grain photograph with selective color isolation.",
+    "I designed a restaurant menu. Texture comes from paper stock and letterforms. Layout uses two columns with consistent dish hierarchy. Typography: Playfair Display for dish names, Inter for descriptions — a classic pairing. Color: cream background, charcoal text, a single accent color for chef specials. Images: small black-and-white dish illustrations instead of photos, which felt more intimate."
+  ];
+  return templates[player.initials.charCodeAt(0) % templates.length];
+}
+
+function reflectionAnswer(player, focus) {
+  const byFocus = {
+    work: [
+      "The layout. I kept simplifying until it felt intentional — every element had to earn its place.",
+      "Most proud of my color choices. I was scared to commit to a real palette and I pushed through.",
+      "The typography pairing. I almost defaulted to what felt safe and caught myself.",
+      "The overall restraint. I used to think more = better and this course killed that instinct.",
+      "How the five concepts reinforce each other. Each choice clicks into the others."
+    ],
+    process: [
+      "I iterate too slowly. The peer feedforward was a bigger unlock than I expected — it got me unstuck.",
+      "Starting with the concept video first before touching any tools paid off. I wasted less.",
+      "I spent too long on color and not enough on layout. Next time I'll start with composition sketches.",
+      "Prototype Pad made me actually sketch before designing. Usually I open Photoshop and wing it.",
+      "Sequential mode forced me to actually finish each activity instead of skipping around."
+    ],
+    self: [
+      "I'm a thinker who needs a deadline. Without structure I wander; with it I ship.",
+      "A designer who cares about meaning more than polish. That's either a strength or a trap.",
+      "A maker who doesn't trust simplicity yet. I keep adding decoration I don't need.",
+      "Someone who can see a brand system, not just a piece. I want to keep building at that level.",
+      "A beginner. That word used to feel like a put-down — now it feels like permission."
+    ]
+  };
+  return byFocus[focus][player.initials.charCodeAt(0) % byFocus[focus].length];
+}
+
+// Attach built states to each player
+const players = mockPlayers.map(p => ({ ...p, slideStates: buildSlideStates(p) }));
+
+// Course-level stats
+const stats = {
+  enrolled: players.length,
+  avgProgress: Math.round(
+    players.reduce((sum, p) => sum + (p.progressStage / course.slides.length) * 100, 0) / players.length
+  ),
+  completed: players.filter(p => p.progressStage >= course.slides.length && p.status === 'approved').length,
+  awaitingApproval: players.filter(p => p.status === 'submitted').length,
+  stuck: players.filter(p => p.status === 'stuck').length
+};
+
+// =========== APP ===========
+function AccessDenied() {
+  const qs = window.location.search;
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'column',
+      padding: 40,
+      position: 'relative',
+      zIndex: 1
+    }}>
+      <div style={{
+        padding: '40px 48px',
+        background: 'var(--pflx-panel)',
+        border: '1px solid var(--pflx-red)',
+        borderRadius: 12,
+        textAlign: 'center',
+        maxWidth: 540,
+        boxShadow: '0 0 40px rgba(255, 68, 102, 0.15)'
+      }}>
+        <div style={{
+          fontFamily: 'Orbitron, sans-serif',
+          fontSize: 11,
+          letterSpacing: '0.25em',
+          color: 'var(--pflx-red)',
+          textTransform: 'uppercase',
+          marginBottom: 12
+        }}>Access Denied</div>
+        <div style={{
+          fontFamily: 'Orbitron, sans-serif',
+          fontSize: 24,
+          color: 'var(--pflx-text)',
+          fontWeight: 700,
+          marginBottom: 14
+        }}>Host Dashboard is Restricted</div>
+        <div style={{ fontSize: 15, color: 'var(--pflx-muted)', lineHeight: 1.6, marginBottom: 24 }}>
+          The Host Dashboard is only visible to <strong style={{ color: 'var(--pflx-magenta)' }}>Hosts</strong> — facilitators running the program. You are signed in as <strong style={{ color: 'var(--pflx-cyan)' }}>{session.displayName}</strong> ({session.rank}, role: {session.role}).
+        </div>
+        <a href={`viewer.html${qs}`} style={{
+          display: 'inline-block',
+          padding: '12px 24px',
+          background: 'linear-gradient(135deg, var(--pflx-teal), var(--pflx-cyan))',
+          color: 'var(--pflx-darker)',
+          fontFamily: 'Orbitron, sans-serif',
+          fontSize: 11,
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          borderRadius: 4,
+          textDecoration: 'none',
+          fontWeight: 700
+        }}>← Return to Course</a>
+      </div>
+    </div>
+  );
+}
+
+function HostDashboard() {
+  // Hooks first (rules of hooks — even for gated surfaces)
+  const [filter, setFilter] = useState('all');
+  const [selectedId, setSelectedId] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const filtered = useMemo(() => {
+    if (!canAccessHostDashboard) return [];
+    switch (filter) {
+      case 'submitted': return players.filter(p => p.status === 'submitted');
+      case 'approved':  return players.filter(p => p.status === 'approved');
+      case 'stuck':     return players.filter(p => p.status === 'stuck' || p.pace === 'behind');
+      case 'active':    return players.filter(p => p.status === 'in-progress');
+      default:          return players;
+    }
+  }, [filter]);
+
+  // Access gate — players and Scouts/Associates never see this surface
+  if (!canAccessHostDashboard) {
+    return <AccessDenied />;
+  }
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 1800); };
+  const selected = players.find(p => p.id === selectedId);
+
+  return (
+    <>
+      <div className="top-bar">
+        <span className="host-badge">Host Dashboard</span>
+        <div className="course-title">
+          {course.title}
+          <span style={{ marginLeft: 14, fontFamily: 'Share Tech Mono, monospace', fontSize: 10, color: 'var(--pflx-muted)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            {canSeeAllCohorts ? 'Scope · All Cohorts' : `Scope · Cohort ${session.cohort}`}
+          </span>
+        </div>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '4px 12px 4px 4px',
+          background: 'rgba(139, 92, 246, 0.1)',
+          border: '1px solid rgba(139, 92, 246, 0.35)',
+          borderRadius: 20
+        }}>
+          <span style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--pflx-magenta), var(--pflx-purple))',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'Orbitron, sans-serif', fontWeight: 700, fontSize: 11, color: 'white'
+          }}>{session.initials}</span>
+          <span style={{ fontSize: 12 }}>
+            <span style={{ color: 'var(--pflx-text)' }}>{session.displayName}</span>
+            <span style={{ color: '#c4b5fd', fontFamily: 'Share Tech Mono, monospace', fontSize: 10, marginLeft: 6, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{session.rank}</span>
+          </span>
+        </div>
+        <div className="view-toggle">
+          <a className="active">Host</a>
+          <a href={`viewer.html${window.location.search}`}>View as Player</a>
+        </div>
+      </div>
+
+      <div className="dashboard">
+        <StatsStrip />
+        <FilterRow active={filter} onChange={setFilter} />
+        <Roster players={filtered} onSelect={setSelectedId} selectedId={selectedId} />
+      </div>
+
+      <div className={`detail-backdrop ${selected ? 'visible' : ''}`} onClick={() => setSelectedId(null)} />
+      <div className={`detail-overlay ${selected ? 'visible' : ''}`}>
+        {selected && <PlayerDetail player={selected} onClose={() => setSelectedId(null)} onToast={showToast} />}
+      </div>
+
+      <div className={`toast ${toast ? 'visible' : ''}`}>{toast}</div>
+    </>
+  );
+}
+
+function StatsStrip() {
+  return (
+    <div className="stats-strip">
+      <div className="stat-card">
+        <div className="stat-label">Enrolled</div>
+        <div className="stat-value">{stats.enrolled}</div>
+        <div className="stat-detail">{mockPlayers.filter(p => p.pace === 'not-started').length} haven't started</div>
+      </div>
+      <div className="stat-card">
+        <div className="stat-label">Avg Progress</div>
+        <div className="stat-value">{stats.avgProgress}%</div>
+        <div className="stat-detail">across all 15 slides</div>
+      </div>
+      <div className="stat-card good">
+        <div className="stat-label">Approved</div>
+        <div className="stat-value">{stats.completed}</div>
+        <div className="stat-detail">badges awarded</div>
+      </div>
+      <div className={`stat-card ${stats.awaitingApproval > 0 ? 'alert' : ''}`}>
+        <div className="stat-label">Awaiting Approval</div>
+        <div className="stat-value">{stats.awaitingApproval}</div>
+        <div className="stat-detail">{stats.awaitingApproval > 0 ? 'action required' : 'all caught up'}</div>
+      </div>
+      <div className={`stat-card ${stats.stuck > 0 ? 'alert' : ''}`}>
+        <div className="stat-label">Need a Nudge</div>
+        <div className="stat-value">{stats.stuck}</div>
+        <div className="stat-detail">stuck or behind pace</div>
+      </div>
+    </div>
+  );
+}
+
+function FilterRow({ active, onChange }) {
+  const filters = [
+    { id: 'all', label: 'All' },
+    { id: 'active', label: 'In Progress' },
+    { id: 'submitted', label: 'Awaiting Approval' },
+    { id: 'approved', label: 'Approved' },
+    { id: 'stuck', label: 'Need Nudge' }
+  ];
+  return (
+    <div className="filter-row">
+      <span className="filter-label">Filter</span>
+      {filters.map(f => (
+        <button key={f.id}
+                className={`filter-chip ${active === f.id ? 'active' : ''}`}
+                onClick={() => onChange(f.id)}>
+          {f.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Roster({ players, onSelect, selectedId }) {
+  return (
+    <div className="roster">
+      <div className="roster-header">
+        <div></div>
+        <div>Player</div>
+        <div className="col-studio">Studio</div>
+        <div>Progress</div>
+        <div className="col-current">Current</div>
+        <div className="col-heatmap">Slide Completion</div>
+        <div className="col-active">Last Active</div>
+        <div>Status</div>
+      </div>
+      {players.map(p => (
+        <div key={p.id}
+             className={`roster-row ${selectedId === p.id ? 'selected' : ''}`}
+             onClick={() => onSelect(p.id)}>
+          <div className={`avatar ${p.studio}`}>{p.initials}</div>
+          <div>
+            <div className="player-name">{p.name}</div>
+            <div className="player-rank">{p.rank}</div>
+          </div>
+          <div className="col-studio">
+            <span className={`studio-tag ${p.studio}`}>{p.studio}</span>
+          </div>
+          <div>
+            <div className="mini-progress">
+              <div className={`mini-progress-bar ${p.progressStage >= course.slides.length ? 'complete' : ''}`}
+                   style={{ width: `${(p.progressStage / course.slides.length) * 100}%` }} />
+            </div>
+            <div className="mini-progress-label">
+              {p.progressStage}/{course.slides.length} · {Math.round((p.progressStage / course.slides.length) * 100)}%
+            </div>
+          </div>
+          <div className="col-current current-slide">
+            {p.progressStage >= course.slides.length ? '✓ Done' : `#${p.progressStage + 1}`}
+          </div>
+          <div className="col-heatmap heatmap">
+            {course.slides.map((_, i) => {
+              let cls = 'heat-cell';
+              if (i < p.progressStage) cls += ' complete';
+              else if (i === p.progressStage && p.status !== 'approved') cls += ' current';
+              else cls += ' locked';
+              return <div key={i} className={cls} title={`Slide ${i+1}`} />;
+            })}
+          </div>
+          <div className="col-active last-active">{p.lastActive}</div>
+          <div>
+            <span className={`status-chip ${p.status}`}>
+              {p.status === 'in-progress' ? 'Active'
+               : p.status === 'submitted' ? 'Submitted'
+               : p.status === 'approved' ? 'Approved ✓'
+               : p.status === 'stuck' ? 'Stuck'
+               : 'Not Started'}
+            </span>
+          </div>
+        </div>
+      ))}
+      {players.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--pflx-muted)' }}>
+          No players match this filter.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ PLAYER DETAIL ============
+function PlayerDetail({ player, onClose, onToast }) {
+  const pct = Math.round((player.progressStage / course.slides.length) * 100);
+  const completedCount = player.progressStage;
+  const submission = player.slideStates['slide-10']?.response;
+
+  return (
+    <>
+      <div className="detail-head">
+        <div className={`avatar ${player.studio} detail-big-avatar`}>{player.initials}</div>
+        <div>
+          <div className="detail-name">{player.name}</div>
+          <div className="detail-meta">
+            <span className={`studio-tag ${player.studio}`}>{player.studio}</span>
+            &nbsp;&nbsp;<span style={{ color: 'var(--pflx-cyan)' }}>{player.rank}</span>
+            &nbsp;&nbsp;· Last active {player.lastActive}
+          </div>
+        </div>
+        <button className="detail-close" onClick={onClose}>✕</button>
+      </div>
+
+      <div className="detail-body">
+        <div className="detail-quick-row">
+          <div className="quick-stat">
+            <div className="quick-stat-label">Progress</div>
+            <div className="quick-stat-value">{pct}%</div>
+          </div>
+          <div className="quick-stat">
+            <div className="quick-stat-label">Slides Complete</div>
+            <div className="quick-stat-value">{completedCount}/{course.slides.length}</div>
+          </div>
+          <div className="quick-stat">
+            <div className="quick-stat-label">Status</div>
+            <div className="quick-stat-value" style={{ fontSize: 14 }}>
+              <span className={`status-chip ${player.status}`}>
+                {player.status}
+              </span>
+            </div>
+          </div>
+          <div className="quick-stat">
+            <div className="quick-stat-label">Pace</div>
+            <div className="quick-stat-value" style={{ fontSize: 14, color: player.pace === 'behind' ? 'var(--pflx-red)' : (player.pace === 'ahead' ? 'var(--pflx-green)' : 'var(--pflx-cyan)') }}>
+              {player.pace}
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-actions">
+          {player.status === 'submitted' && (
+            <button className="action-btn primary" onClick={() => onToast('Submission approved — badges and XC queued')}>
+              ✓ Approve Submission
+            </button>
+          )}
+          <button className="action-btn" onClick={() => onToast('X-Bot nudge sent to ' + player.name)}>
+            ⚡ Send X-Bot Nudge
+          </button>
+          {player.status === 'submitted' && (
+            <button className="action-btn" onClick={() => onToast('Revision request sent')}>
+              ← Request Revision
+            </button>
+          )}
+          <button className="action-btn" onClick={() => onToast('Opened player view in new window')}>
+            ↗ View as Player
+          </button>
+          {player.pace === 'behind' && (
+            <button className="action-btn warn" onClick={() => onToast('Deadline extension offered')}>
+              Extend Deadline
+            </button>
+          )}
+        </div>
+
+        {submission?.submitted && (
+          <div style={{ marginBottom: 24 }}>
+            <div className="submission-label" style={{ marginBottom: 8, fontSize: 11 }}>Final Submission · Awaiting Approval</div>
+            <div className="submission-card">
+              <div className="submission-row">
+                <div className="submission-label">File</div>
+                <div className="submission-body">📎 {submission.fileName}</div>
+              </div>
+              {submission.link && (
+                <div className="submission-row">
+                  <div className="submission-label">Link</div>
+                  <div className="submission-body">
+                    <a href={submission.link} target="_blank" rel="noreferrer" style={{ color: 'var(--pflx-cyan)' }}>
+                      {submission.link}
+                    </a>
+                  </div>
+                </div>
+              )}
+              <div className="submission-row">
+                <div className="submission-label">Player's description</div>
+                <div className="submission-body">{submission.description}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontFamily: 'Share Tech Mono, monospace', fontSize: 10, color: 'var(--pflx-muted)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 12 }}>
+          Slide-by-Slide Responses
+        </div>
+
+        {course.slides.map((slide, i) => (
+          <SlideResponseBlock key={slide.id}
+                              slide={slide}
+                              slideNumber={i + 1}
+                              state={player.slideStates[slide.id]}
+                              isCurrent={i === player.progressStage && player.status !== 'approved'} />
+        ))}
+
+        {player.progressStage === course.slides.length && player.status === 'approved' && (
+          <div className="xbot-note">
+            <strong>Approved {player.lastActive}.</strong> Badges granted, XC paid, cohort Lineage Gallery updated. This player's work is now surfaced to hosts on other pathways looking for design talent.
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function SlideResponseBlock({ slide, slideNumber, state, isCurrent }) {
+  const completed = state?.completed;
+  const cls = completed ? 'complete' : (isCurrent ? 'current' : 'pending');
+  return (
+    <div className={`slide-block ${cls}`}>
+      <div className="slide-block-head">
+        <span className="slide-block-number">SLIDE {String(slideNumber).padStart(2,'0')}</span>
+        <span className="slide-block-title">{slide.title}</span>
+        <span className="slide-block-icon" />
+      </div>
+      <div className="slide-block-body">
+        {!completed && !isCurrent && <div className="empty-note">Not reached yet.</div>}
+        {!completed && isCurrent && <div className="empty-note">Currently here. No response yet.</div>}
+        {completed && <ResponseRenderer slide={slide} response={state.response} />}
+      </div>
+    </div>
+  );
+}
+
+// Renders the player's response for any slide type
+function ResponseRenderer({ slide, response }) {
+  const mode = slide.interaction?.mode;
+
+  if (!response) return <div className="empty-note">No response recorded.</div>;
+
+  if (slide.type === 'title' || slide.type === 'overview' || slide.type === 'why' ||
+      slide.type === 'taskIntro' || slide.type === 'completion') {
+    return <div className="empty-note">Viewed — no input for this slide type.</div>;
+  }
+
+  if (mode === 'tierListEngine') {
+    const tiers = { S: [], A: [], B: [], C: [] };
+    slide.interaction.items.forEach(item => {
+      const t = response.placements?.[item.id];
+      if (t && tiers[t]) tiers[t].push(item);
+    });
+    return (
+      <div>
+        <div className="response-k" style={{ marginBottom: 6 }}>Tier placements</div>
+        {['S','A','B','C'].map(t => (
+          <div key={t} style={{ marginBottom: 6 }}>
+            <span className={`tier-pill ${t}`}>
+              <span className="tier-pill-letter">{t}</span>
+              {tiers[t].length === 0 && <span style={{ color: 'var(--pflx-muted)', fontSize: 11 }}>empty</span>}
+              {tiers[t].map(it => <span key={it.id} style={{ fontSize: 11 }}> {it.label.split('(')[0].trim()}</span>)}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (mode === 'broadcast') {
+    const cr = response.cueResponses || {};
+    return (
+      <div className="response-kv">
+        <div className="response-k">Cue 1 (Pulse)</div>
+        <div className="response-v">
+          Picked: <strong>{cr.c1?.choice?.toUpperCase() || '—'}</strong>
+        </div>
+        <div className="response-k">Cue 2 (Nebula)</div>
+        <div className="response-v">
+          Words: {cr.c2?.words?.map((w, i) => <span key={i} className="tier-pill">{w}</span>)}
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'signalWall') {
+    return (
+      <div>
+        <div className="response-k" style={{ marginBottom: 4 }}>Posted Signal</div>
+        <div className="signal-preview">{response.body}</div>
+      </div>
+    );
+  }
+
+  if (mode === 'waypoint') {
+    const wps = response.waypoints || [];
+    return (
+      <div>
+        <div className="response-k" style={{ marginBottom: 6 }}>Dropped {wps.length} waypoints</div>
+        <div className="waypoint-preview">
+          <img src="./background.png" alt="Waypoint canvas" />
+          {wps.map((wp, i) => (
+            <div key={i} className={`mini-pin ${wp.tag || 'images'}`}
+                 style={{ left: `${wp.x*100}%`, top: `${wp.y*100}%` }}>
+              {i+1}
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--pflx-muted)' }}>
+          {wps.map((wp, i) => (
+            <span key={i} style={{ marginRight: 14 }}>
+              #{i+1}: <strong style={{ color: `var(--pflx-${{
+                fundamentals: 'cyan', layout: 'green', typography: 'purple', color: 'magenta', images: 'amber'
+              }[wp.tag] || 'muted'})` }}>{wp.tag}</strong>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'dataCards') {
+    const cards = slide.interaction.deck?.cards || [];
+    const viewedCount = Object.keys(response.viewed || {}).length;
+    return (
+      <div className="response-kv">
+        <div className="response-k">Reviewed</div>
+        <div className="response-v">{viewedCount} of {cards.length} tools</div>
+        <div className="response-k">Last focused</div>
+        <div className="response-v">{cards[response.focus]?.front || '—'}</div>
+      </div>
+    );
+  }
+
+  if (slide.type === 'taskSubmission') {
+    return (
+      <div className="submission-card">
+        <div className="submission-row">
+          <div className="submission-label">File</div>
+          <div className="submission-body">📎 {response.fileName}</div>
+        </div>
+        {response.link && (
+          <div className="submission-row">
+            <div className="submission-label">Link</div>
+            <div className="submission-body">
+              <a href={response.link} target="_blank" rel="noreferrer" style={{ color: 'var(--pflx-cyan)' }}>
+                {response.link}
+              </a>
+            </div>
+          </div>
+        )}
+        <div className="submission-row">
+          <div className="submission-label">Description</div>
+          <div className="submission-body">{response.description}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'peerFeedforward') {
+    const invites = response.invites || [];
+    if (invites.length === 0) return <div className="empty-note">Skipped (optional).</div>;
+    return (
+      <div>
+        <div className="response-k" style={{ marginBottom: 6 }}>
+          Invited {invites.length} peer{invites.length === 1 ? '' : 's'} ({invites.length * 10} XC)
+        </div>
+        <div className="peer-invitations">
+          {invites.map(p => (
+            <span key={p.id} className="peer-invitation">
+              <span className="mini-avatar">{p.initials}</span>
+              {p.name}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (slide.type === 'refine') {
+    return (
+      <div>
+        <div className="response-k" style={{ marginBottom: 6 }}>Prototype Pad sketch</div>
+        <div className="proto-thumb" />
+        <div style={{ fontSize: 12, color: 'var(--pflx-muted)', marginTop: 6 }}>{response.summary}</div>
+      </div>
+    );
+  }
+
+  if (mode === 'pitchTake') {
+    const m = Math.floor(response.seconds / 60);
+    const s = String(response.seconds % 60).padStart(2, '0');
+    return (
+      <div className="pitch-preview">
+        <div className="pitch-play">▶</div>
+        <div>
+          <div style={{ fontWeight: 600 }}>{response.label}</div>
+          <div className="pitch-duration">{m}:{s} · Auto-branded</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (mode === 'reflectionPrompts') {
+    return (
+      <div>
+        {slide.interaction.prompts.map(p => (
+          <div key={p.id} className="reflection-answer" data-focus={p.focus}>
+            {response.answers?.[p.id] || <em>—</em>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <div className="empty-note">Response recorded (type: {mode || slide.type}).</div>;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<HostDashboard />);
+  </script>
+</body>
+</html>
