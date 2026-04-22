@@ -8601,64 +8601,93 @@ document.addEventListener('keydown', function(e) {
     await installBundle(slug, bundle);
   }
 
-  // ---- Build a zip Blob for either /api/upload-course or local download ----
-  async function buildZipBlob(slug, bundle) {
-    const zip = new JSZip();
-    bundle.forEach(f => zip.file(f.relativePath, f.data));
-    return await zip.generateAsync({ type: 'blob' });
-  }
+  // ---- Figure out which Vercel deployment hosts the API ----
+  // pathway.html may be iframed from pflx-platform.vercel.app, where the
+  // /api/upload-course function doesn't exist. Always POST to the portal's
+  // own origin. window.location.origin inside the iframe IS the portal's
+  // origin regardless of the parent.
+  const UPLOAD_API = '/api/upload-course';
 
-  // ---- Upload to Vercel Blob via /api/upload-course (preferred for deploys) ----
-  async function uploadToApi(slug, bundle) {
-    const blob = await buildZipBlob(slug, bundle);
+  // ---- Per-file upload to Vercel Blob via the portal's own API route ----
+  async function uploadOneFile(slug, relativePath, data) {
     const token = localStorage.getItem('pflx_upload_token') || '';
-    const resp = await fetch('/api/upload-course', {
+    const resp = await fetch(UPLOAD_API, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/zip',
+        'Content-Type': guessContentType(relativePath),
+        'x-pflx-course-slug': slug,
+        'x-pflx-file-path': encodeURIComponent(relativePath),
         ...(token ? { 'x-pflx-upload-token': token } : {})
       },
-      body: blob
+      body: data
     });
     const text = await resp.text();
-    let data = {};
-    try { data = JSON.parse(text); } catch(e) { /* non-JSON error */ }
+    let json = {};
+    try { json = JSON.parse(text); } catch(e) {}
     if (!resp.ok) {
-      // 401 = token required → prompt once
       if (resp.status === 401) {
-        const t = prompt('Upload token required. Ask Ennis for the value (stored in your browser for future uploads).');
+        const t = prompt('Upload token required. Enter the UPLOAD_TOKEN (stored in your browser for future uploads).');
         if (t) { localStorage.setItem('pflx_upload_token', t); return { retry: true }; }
         throw new Error('Upload token required.');
       }
-      throw new Error(data.error || `Upload failed (${resp.status}): ${text.slice(0, 200)}`);
+      const reason = json.error || `HTTP ${resp.status}: ${text.slice(0, 200)}`;
+      throw new Error(reason);
     }
-    return data;
+    return json;
+  }
+  function guessContentType(path) {
+    const ext = (path.split('.').pop() || '').toLowerCase();
+    const map = {
+      html: 'text/html; charset=utf-8',
+      json: 'application/json; charset=utf-8',
+      js: 'application/javascript; charset=utf-8',
+      css: 'text/css; charset=utf-8',
+      svg: 'image/svg+xml',
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', webp: 'image/webp',
+      mp4: 'video/mp4', webm: 'video/webm',
+      mp3: 'audio/mpeg', wav: 'audio/wav',
+      woff: 'font/woff', woff2: 'font/woff2',
+      ttf: 'font/ttf', otf: 'font/otf',
+      txt: 'text/plain; charset=utf-8', md: 'text/markdown; charset=utf-8',
+    };
+    return map[ext] || 'application/octet-stream';
   }
 
   async function installBundle(slug, bundle) {
     setStatus(`Uploading <strong>${slug}</strong> (${bundle.length} files)…`, 'info');
 
-    // -------- PRIMARY PATH: upload to Vercel Blob via API --------
-    // Works on the deployed portal, inside any iframe, in every browser.
-    // The course goes live immediately — no git commit or redeploy needed.
+    // -------- PRIMARY PATH: per-file upload to Blob (no body size limit) --------
+    const urls = {};
+    let totalBytes = 0;
     try {
-      let result = await uploadToApi(slug, bundle);
-      if (result.retry) result = await uploadToApi(slug, bundle);
-
-      if (result && result.success) {
-        const input = document.getElementById('neCoursePackage');
-        // Store the full base URL so the launch logic loads from Blob storage
-        if (input) input.value = result.baseUrl || slug;
-        setStatus(
-          `✓ <strong>${result.slug}</strong> published to Blob (${result.files} files, ${Math.round((result.totalBytes || 0) / 1024)} KB). ` +
-          `Course Package set to the Blob URL — click <strong>Save Node</strong> to attach.`,
-          'ok'
-        );
-        return;
+      for (let i = 0; i < bundle.length; i++) {
+        const f = bundle[i];
+        setStatus(`Uploading <strong>${f.relativePath}</strong> (${i + 1}/${bundle.length})…`, 'info');
+        let result = await uploadOneFile(slug, f.relativePath, f.data);
+        if (result && result.retry) result = await uploadOneFile(slug, f.relativePath, f.data);
+        if (!result || !result.success) throw new Error(`Upload of ${f.relativePath} returned no success flag`);
+        urls[f.relativePath] = result.url;
+        totalBytes += (result.bytes || 0);
       }
+
+      const viewerUrl = urls['viewer.html'];
+      if (!viewerUrl) {
+        throw new Error('All files uploaded but no viewer.html found — cannot compute base URL.');
+      }
+      const baseUrl = viewerUrl.replace(/\/viewer\.html(\?.*)?$/, '');
+
+      const input = document.getElementById('neCoursePackage');
+      if (input) input.value = baseUrl;
+      setStatus(
+        `✓ <strong>${slug}</strong> published to Blob (${bundle.length} files, ${Math.round(totalBytes / 1024)} KB). ` +
+        `Course Package set to the Blob URL — click <strong>Save Node</strong> to attach.`,
+        'ok'
+      );
+      return;
     } catch (e) {
-      console.warn('[pflx-uploader] API upload failed, trying fallbacks:', e.message);
-      setStatus(`API upload unavailable (${e.message}). Trying local options…`, 'warn');
+      console.warn('[pflx-uploader] Per-file upload failed, trying fallbacks:', e.message);
+      setStatus(`API upload failed: ${e.message}. Trying local fallback…`, 'warn');
     }
 
     // -------- FALLBACK 1: Direct filesystem write (Chrome/Edge, same-origin top) --------
@@ -8680,8 +8709,7 @@ document.addEventListener('keydown', function(e) {
     const input = document.getElementById('neCoursePackage');
     if (input) input.value = slug;
     setStatus(
-      `✓ Downloaded <code>${slug}.zip</code>. Unzip into <code>pflx-pathway-portal/courses/</code>, ` +
-      `commit, and push — Vercel will redeploy.`,
+      `✓ Downloaded <code>${slug}.zip</code>. Unzip into <code>pflx-pathway-portal/courses/</code>, commit, push.`,
       'ok'
     );
   }
