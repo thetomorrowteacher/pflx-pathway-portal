@@ -8601,36 +8601,87 @@ document.addEventListener('keydown', function(e) {
     await installBundle(slug, bundle);
   }
 
-  async function installBundle(slug, bundle) {
-    setStatus(`Installing <strong>${slug}</strong> (${bundle.length} files)…`, 'info');
+  // ---- Build a zip Blob for either /api/upload-course or local download ----
+  async function buildZipBlob(slug, bundle) {
+    const zip = new JSZip();
+    bundle.forEach(f => zip.file(f.relativePath, f.data));
+    return await zip.generateAsync({ type: 'blob' });
+  }
 
-    // Try direct filesystem write first (Chrome/Edge + same-origin top-level only)
+  // ---- Upload to Vercel Blob via /api/upload-course (preferred for deploys) ----
+  async function uploadToApi(slug, bundle) {
+    const blob = await buildZipBlob(slug, bundle);
+    const token = localStorage.getItem('pflx_upload_token') || '';
+    const resp = await fetch('/api/upload-course', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/zip',
+        ...(token ? { 'x-pflx-upload-token': token } : {})
+      },
+      body: blob
+    });
+    const text = await resp.text();
+    let data = {};
+    try { data = JSON.parse(text); } catch(e) { /* non-JSON error */ }
+    if (!resp.ok) {
+      // 401 = token required → prompt once
+      if (resp.status === 401) {
+        const t = prompt('Upload token required. Ask Ennis for the value (stored in your browser for future uploads).');
+        if (t) { localStorage.setItem('pflx_upload_token', t); return { retry: true }; }
+        throw new Error('Upload token required.');
+      }
+      throw new Error(data.error || `Upload failed (${resp.status}): ${text.slice(0, 200)}`);
+    }
+    return data;
+  }
+
+  async function installBundle(slug, bundle) {
+    setStatus(`Uploading <strong>${slug}</strong> (${bundle.length} files)…`, 'info');
+
+    // -------- PRIMARY PATH: upload to Vercel Blob via API --------
+    // Works on the deployed portal, inside any iframe, in every browser.
+    // The course goes live immediately — no git commit or redeploy needed.
+    try {
+      let result = await uploadToApi(slug, bundle);
+      if (result.retry) result = await uploadToApi(slug, bundle);
+
+      if (result && result.success) {
+        const input = document.getElementById('neCoursePackage');
+        // Store the full base URL so the launch logic loads from Blob storage
+        if (input) input.value = result.baseUrl || slug;
+        setStatus(
+          `✓ <strong>${result.slug}</strong> published to Blob (${result.files} files, ${Math.round((result.totalBytes || 0) / 1024)} KB). ` +
+          `Course Package set to the Blob URL — click <strong>Save Node</strong> to attach.`,
+          'ok'
+        );
+        return;
+      }
+    } catch (e) {
+      console.warn('[pflx-uploader] API upload failed, trying fallbacks:', e.message);
+      setStatus(`API upload unavailable (${e.message}). Trying local options…`, 'warn');
+    }
+
+    // -------- FALLBACK 1: Direct filesystem write (Chrome/Edge, same-origin top) --------
     if (window.showDirectoryPicker) {
       try {
         await writeTreeToCourses(slug, bundle);
         const input = document.getElementById('neCoursePackage');
         if (input) input.value = slug;
-        setStatus(`✓ Installed at <code>courses/${slug}/</code> — click <strong>Save Node</strong> to attach.`, 'ok');
+        setStatus(`✓ Installed at <code>courses/${slug}/</code> locally — commit and push to deploy.`, 'ok');
         return;
       } catch (e) {
-        if (e.name === 'AbortError') {
-          setStatus('Directory access canceled.', 'warn');
-          return;
-        }
-        // Any other failure (cross-origin iframe, permission denied, unsupported) → fall through to zip
-        console.warn('[pflx-uploader] Direct write unavailable, falling back to zip:', e.message);
+        if (e.name === 'AbortError') { setStatus('Directory access canceled.', 'warn'); return; }
+        console.warn('[pflx-uploader] Direct write unavailable:', e.message);
       }
     }
 
-    // Zip download fallback — always works, in any browser, any iframe context.
-    // For a deployed portal, this is actually the correct flow: hosts unzip the
-    // package into their local /courses/, commit, push, and Vercel redeploys.
+    // -------- FALLBACK 2: Download zip for manual commit --------
     await downloadBundle(slug, bundle);
     const input = document.getElementById('neCoursePackage');
     if (input) input.value = slug;
     setStatus(
       `✓ Downloaded <code>${slug}.zip</code>. Unzip into <code>pflx-pathway-portal/courses/</code>, ` +
-      `commit, and push — Vercel will redeploy. (Direct filesystem write is blocked when the portal is embedded in the Platform shell.)`,
+      `commit, and push — Vercel will redeploy.`,
       'ok'
     );
   }
