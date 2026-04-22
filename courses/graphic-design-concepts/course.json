@@ -1,0 +1,462 @@
+{
+  "courseId": "graphic-design-concepts",
+  "title": "Graphic Design Concepts",
+  "subtitle": "A mastercourse on the five foundational concepts every graphic designer needs",
+  "pathway": "digital-artist",
+  "nodeId": "graphic-design-concepts",
+  "estimatedMinutes": 120,
+  "required": true,
+  "bonusXC": 50,
+  "rewards": {
+    "primaryBadgeId": "graphic-design-foundations",
+    "taggedBadgeIds": [
+      "design-fundamentals",
+      "layout-composition",
+      "typography-master",
+      "color-theorist",
+      "visual-storyteller"
+    ],
+    "xcReward": 300
+  },
+  "cohortScope": "all",
+  "settings": {
+    "navigationMode": "sequential",
+    "showSidebar": true,
+    "showProgressBar": true,
+    "backgroundImageUrl": "./background.png",
+    "backgroundMode": "hero"
+  },
+  "taskCriteria": [
+    {
+      "id": "c1",
+      "label": "Fundamentals of Design — uses line, shape, form, texture, and balance intentionally",
+      "scale": "1-5",
+      "required": true
+    },
+    {
+      "id": "c2",
+      "label": "Layout & Composition — applies the five principles of layout to guide the viewer's eye",
+      "scale": "1-5",
+      "required": true
+    },
+    {
+      "id": "c3",
+      "label": "Typography — identifies font type, uses hierarchy, and combines opposing fonts effectively",
+      "scale": "1-5",
+      "required": true
+    },
+    {
+      "id": "c4",
+      "label": "Color — applies color theory, respects do's/don'ts, and sets appropriate tone",
+      "scale": "1-5",
+      "required": true
+    },
+    {
+      "id": "c5",
+      "label": "Images — incorporates sharp, clear, distinct, and memorable imagery",
+      "scale": "1-5",
+      "required": true
+    }
+  ],
+  "slides": [
+    {
+      "id": "slide-01",
+      "type": "title",
+      "title": "Graphic Design Concepts",
+      "body": [
+        { "kind": "image", "url": "./background.png", "alt": "Graphic Design Concepts hero — two stylized faces in bold color with circular geometric accents" }
+      ]
+    },
+    {
+      "id": "slide-02",
+      "type": "overview",
+      "title": "Overview",
+      "body": [
+        { "kind": "markdown", "content": "### What you'll learn\n- The **Fundamentals of Design** — line, shape, form, texture, balance\n- **Layout & Composition** — arranging elements with intention\n- **Typography** — making text work visually\n- **Color** — theory, tone, readability\n- **Images** — sharp, clear, distinct, memorable" },
+        { "kind": "markdown", "content": "### Mastercourse objective\nLearn essential concepts of graphic design and how they connect with marketing and advertising. Develop materials to present your creations with quality visuals." },
+        { "kind": "markdown", "content": "### Essential questions\n- How can I apply key concepts of graphic design into my projects?\n- How can I use these skills to visualize my thoughts and ideas?" },
+        { "kind": "callout", "tone": "info", "content": "Estimated time: 2 hours • Rewards: Graphic Design Foundations badge + 5 tagged sub-badges + 300 XC (+50 bonus)" }
+      ]
+    },
+    {
+      "id": "slide-03",
+      "type": "diagnostic",
+      "title": "Where are you right now?",
+      "body": [
+        { "kind": "markdown", "content": "Before we dive in, rank these five graphic design concepts by how confident you feel about each one today. There are no wrong answers — this is your starting line, and we'll revisit it at the end to see how far you've traveled." }
+      ],
+      "interaction": {
+        "mode": "tierListEngine",
+        "prompt": "Rank the five graphic design concepts by your current confidence.",
+        "tiers": ["S — I've got this", "A — Pretty comfortable", "B — Some idea", "C — New to me"],
+        "items": [
+          { "id": "sub-fundamentals", "label": "Fundamentals (line, shape, form, texture, balance)" },
+          { "id": "sub-layout", "label": "Layout & Composition" },
+          { "id": "sub-typography", "label": "Typography" },
+          { "id": "sub-color", "label": "Color" },
+          { "id": "sub-images", "label": "Images" }
+        ],
+        "savesToPortfolio": true,
+        "cohortConsensusReveal": true,
+        "officialReferenceRanks": ["director", "producer", "partner"],
+        "shareToSignalWall": false,
+        "pairedWithSlideId": "slide-14"
+      }
+    },
+    {
+      "id": "slide-04",
+      "type": "concept",
+      "title": "What is Graphic Design?",
+      "body": [
+        { "kind": "markdown", "content": "Graphic design is the process of visual communication and problem-solving through the use of typography, photography, iconography, and illustration. The field is considered a subset of visual communication and communication design — the terms are often used synonymously." }
+      ],
+      "interaction": {
+        "mode": "broadcast",
+        "videoUrl": "https://www.youtube.com/watch?v=sTi5SNgxE3U",
+        "cues": [
+          {
+            "id": "c1",
+            "atSeconds": 60,
+            "activity": {
+              "mode": "cohortPulse",
+              "prompt": "Which part of graphic design interests you most so far?",
+              "options": [
+                { "id": "a", "label": "Solving visual problems" },
+                { "id": "b", "label": "Communicating complex ideas simply" },
+                { "id": "c", "label": "Crafting beauty and feel" },
+                { "id": "d", "label": "All of the above" }
+              ],
+              "xcWeightedVoting": { "enabled": false },
+              "showResultsAfterVote": true,
+              "xBotMinorityView": true
+            }
+          },
+          {
+            "id": "c2",
+            "atSeconds": 150,
+            "activity": {
+              "mode": "thoughtNebula",
+              "prompt": "In one or two words, what does graphic design do?",
+              "minWords": 1,
+              "maxWords": 2,
+              "maxCharsPerWord": 20,
+              "cohortVisible": true,
+              "signalBonus": { "enabled": true, "coreThreshold": 3, "xcReward": 2 },
+              "xBotClusterSummary": true
+            }
+          }
+        ],
+        "allowAnyActivityAsCue": true,
+        "xBotRecap": true
+      }
+    },
+    {
+      "id": "slide-05",
+      "type": "connection",
+      "title": "Make it personal — where have you seen this?",
+      "body": [
+        { "kind": "markdown", "content": "Graphic design is everywhere once you start noticing. Post a Signal with a real-world example you've spotted in the wild — a poster, a brand identity, a package, a menu, an app interface. Attach a photo if you have one and add a quick note about why it grabbed you." }
+      ],
+      "interaction": {
+        "mode": "signalWall",
+        "prompt": "Share one graphic design piece you've noticed in your own life recently. What is it, and what made you notice it?",
+        "allowText": true,
+        "allowImage": true,
+        "allowVoiceMemo": true,
+        "maxVoiceSeconds": 45,
+        "boosts": { "enabled": true, "costXC": 1, "revenueGoesTo": "poster" },
+        "xBotClusterThemes": true,
+        "rewards": { "topBoostedBadgeId": "signal-amplified" },
+        "persistToCohortFeed": true,
+        "optionalPost": false
+      }
+    },
+    {
+      "id": "slide-06",
+      "type": "why",
+      "title": "Why graphic design matters",
+      "body": [
+        { "kind": "markdown", "content": "Graphic design is where **ideas become visible**. Every brand you trust, every product you pick up, every app you use, every video thumbnail you click — a designer made a decision that changed how you felt about it in a fraction of a second." },
+        { "kind": "markdown", "content": "Strong graphic design is a career multiplier for every pathway in PFLX — not just Digital Artists. Content Creators need thumbnails and titles that earn the click. Sound Designers need album covers that match their sonic identity. Professional Entrepreneurs need brand systems that make their startup look real. Industrial Designers need packaging and collateral. A player who can design well is a player whose ideas travel farther." },
+        { "kind": "callout", "tone": "info", "content": "By the end of this course, you'll be able to look at any piece of visual communication and name the five concepts at work inside it — and apply them to your own work." }
+      ]
+    },
+    {
+      "id": "slide-07",
+      "type": "useCases",
+      "title": "Spot the five concepts in the wild",
+      "body": [
+        { "kind": "markdown", "content": "Now you'll see the five concepts one at a time. Each has a short video that defines it, then you'll use **Waypoint** below to tag where each concept shows up in a real design." },
+        { "kind": "markdown", "content": "### 1 · Fundamentals of Design" },
+        { "kind": "video", "url": "https://www.youtube.com/watch?v=YqQx75OPRa0", "caption": "Line, shape, form, texture, balance — the vocabulary of visual design." },
+        { "kind": "markdown", "content": "### 2 · Layout & Composition" },
+        { "kind": "video", "url": "https://www.youtube.com/watch?v=a5KYlHNKQB8", "caption": "Arranging the parts of a design so the viewer's eye moves with intention." },
+        { "kind": "markdown", "content": "### 3 · Typography" },
+        { "kind": "video", "url": "https://www.youtube.com/watch?v=sByzHoiYFX0", "caption": "Making text not just readable but emotive — hierarchy, pairing, tone." },
+        { "kind": "markdown", "content": "### 4 · Color" },
+        { "kind": "video", "url": "https://www.youtube.com/watch?v=_2LLXnUdUIc", "caption": "Color theory, readability, do's and don'ts, and the feeling a palette creates." },
+        { "kind": "markdown", "content": "### 5 · Images" },
+        { "kind": "video", "url": "https://www.youtube.com/watch?v=MELKuexR3sQ", "caption": "Why images work — sharp, clear, distinct, memorable, and story-carrying." },
+        { "kind": "markdown", "content": "### Your turn — Waypoint exercise" },
+        { "kind": "markdown", "content": "Drop five waypoints on the design below — one per concept. Tap the image to drop, then tag which concept that spot demonstrates. You can add a short note explaining what you see." }
+      ],
+      "interaction": {
+        "mode": "waypoint",
+        "prompt": "On the design above, drop a Waypoint for each of the five concepts. Tag which concept your Waypoint is for and add a short note on what you see.",
+        "imageUrl": "./background.png",
+        "imageAlt": "A graphic design piece demonstrating multiple concepts",
+        "activityMode": "recon",
+        "minWaypoints": 5,
+        "maxWaypoints": 8,
+        "notesEnabled": true,
+        "cohortOverlay": true,
+        "zones": [
+          { "id": "z-fundamentals", "shape": "polygon", "coords": { "points": [[0.02, 0.1], [0.48, 0.1], [0.48, 0.95], [0.02, 0.95]] }, "correct": true, "xcReward": 2, "label": "Fundamentals", "feedbackOnHit": "Notice the bold geometric shapes, the sweeping diagonal line, and the contrast between textured stipple patterns and flat color — those are fundamentals at work." },
+          { "id": "z-layout", "shape": "polygon", "coords": { "points": [[0.2, 0.05], [0.85, 0.05], [0.85, 0.95], [0.2, 0.95]] }, "correct": true, "xcReward": 2, "label": "Layout & Composition", "feedbackOnHit": "Layout: the faces are staged as two focal points with a diagonal split — classic asymmetric balance guiding your eye." },
+          { "id": "z-color", "shape": "polygon", "coords": { "points": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]] }, "correct": true, "xcReward": 2, "label": "Color", "feedbackOnHit": "Color: bold primary palette — cyan, red-orange, yellow — a triadic scheme that creates visual energy." },
+          { "id": "z-images", "shape": "polygon", "coords": { "points": [[0.15, 0.15], [0.55, 0.15], [0.55, 0.85], [0.15, 0.85]] }, "correct": true, "xcReward": 2, "label": "Images", "feedbackOnHit": "Images: the stylized portrait carries the entire emotional weight. Sharp, distinct, memorable." }
+        ],
+        "availableTags": [
+          { "id": "fundamentals", "label": "Fundamentals" },
+          { "id": "layout", "label": "Layout & Composition" },
+          { "id": "typography", "label": "Typography" },
+          { "id": "color", "label": "Color" },
+          { "id": "images", "label": "Images" }
+        ]
+      }
+    },
+    {
+      "id": "slide-08",
+      "type": "taskIntro",
+      "title": "Your mission",
+      "body": [
+        { "kind": "markdown", "content": "### The task\nCreate a **graphic design project** — a poster, brand identity, album cover, app screen, or packaging — that demonstrates all five concepts you just studied. Record a **screencast video** walking through how you applied each concept in your design." },
+        { "kind": "markdown", "content": "### Requirements\n- A finished design artifact (static or animated)\n- A screencast video explaining your choices (3–6 minutes)\n- Written description of the design brief and your creative approach" },
+        { "kind": "callout", "tone": "info", "content": "You'll be graded on all five concepts. Each counts equally. Aim for a design where every concept is visible and intentional — even modest choices count if you can articulate them." }
+      ],
+      "interaction": {
+        "mode": "criteriaPreview",
+        "referencesTaskCriteria": true
+      }
+    },
+    {
+      "id": "slide-09",
+      "type": "toolsTutorials",
+      "title": "Tools & Tutorials",
+      "body": [
+        { "kind": "markdown", "content": "### Choose your weapon\nEvery designer has preferred tools. Explore the deck below — flip through the **Data Cards** to see what each tool does best, then use **Warp Jump** to launch directly into your chosen tool." },
+        { "kind": "callout", "tone": "info", "content": "There's no single 'right' tool. Canva is great for speed, Photoshop for depth, Affinity for the install-owners-forever crowd, Adobe Express for quick social-ready assets. Pick based on your task." }
+      ],
+      "interaction": {
+        "mode": "dataCards",
+        "deck": {
+          "type": "custom",
+          "cards": [
+            {
+              "id": "tool-adobe-express",
+              "front": "Adobe Express",
+              "back": "Web-based. Fastest path to social posts, quick flyers, short videos. No install. Strong template library. Best when you need publish-ready output in minutes.",
+              "launchUrl": "https://express.adobe.com/sp/",
+              "categoryTag": "web-based"
+            },
+            {
+              "id": "tool-photoshop",
+              "front": "Adobe Photoshop",
+              "back": "Install. The industry-standard raster editor for photo, illustration, and complex composites. Steep learning curve but extremely deep. Part of Creative Cloud.",
+              "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop",
+              "categoryTag": "install"
+            },
+            {
+              "id": "tool-indesign",
+              "front": "Adobe InDesign",
+              "back": "Install. The layout tool for multi-page documents — magazines, books, brochures, portfolios. Pair with Photoshop and Illustrator for a complete pro workflow.",
+              "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop",
+              "categoryTag": "install"
+            },
+            {
+              "id": "tool-canva",
+              "front": "Canva",
+              "back": "Web-based. Template-rich, beginner-friendly, fast. Massive asset library. Best for speed and collaboration; less best for pixel-level control.",
+              "launchUrl": "https://www.canva.com/",
+              "categoryTag": "web-based"
+            },
+            {
+              "id": "tool-pixlr",
+              "front": "Pixlr E",
+              "back": "Web-based. A free, Photoshop-like editor in the browser. Surprisingly capable for layer work, filters, and adjustments. No sign-in required.",
+              "launchUrl": "https://pixlr.com/e/",
+              "categoryTag": "web-based"
+            },
+            {
+              "id": "tool-affinity-designer",
+              "front": "Affinity Designer",
+              "back": "Install. One-time purchase vector and raster tool. Fast, powerful, and a strong Illustrator/Photoshop alternative for players who don't want a subscription.",
+              "launchUrl": "https://drive.google.com/file/d/15MGFwL35KwJZeTZsoKyRESpXahtMGso4/view?usp=drive_link",
+              "categoryTag": "install"
+            },
+            {
+              "id": "tool-affinity-publisher",
+              "front": "Affinity Publisher",
+              "back": "Install. Layout-and-publishing sibling to Designer. Think InDesign without the subscription. Strong for zines, posters, long-form print work.",
+              "launchUrl": "https://drive.google.com/file/d/1cvw9Zi19JFiVMsWf7KPeq9qeZxOKJpCw/view?usp=drive_link",
+              "categoryTag": "install"
+            },
+            {
+              "id": "tool-affinity-photo",
+              "front": "Affinity Photo",
+              "back": "Install. Photo-editing sibling to Designer. RAW processing, retouching, and compositing without a subscription.",
+              "launchUrl": "https://drive.google.com/file/d/1GBjVqewyNQKDDr2mRaYhkkcj3IXKJlMT/view?usp=drive_link",
+              "categoryTag": "install"
+            }
+          ]
+        },
+        "spacedRepetition": true,
+        "unlocksCodexEntry": true,
+        "masteryThreshold": 3,
+        "resurfacesInLaterCourses": true,
+        "companionActions": [
+          {
+            "label": "Launch selected tool",
+            "mode": "warpJump",
+            "fromCard": true,
+            "autoReturn": { "enabled": true, "timerSeconds": 1200, "onCompletion": true },
+            "embedHub": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "slide-10",
+      "type": "taskSubmission",
+      "title": "Submit your project",
+      "body": [
+        { "kind": "markdown", "content": "Upload your finished design artifact and your screencast video (or a link to where they live). In your description, briefly walk through how each of the five concepts shows up in your work." },
+        { "kind": "callout", "tone": "info", "content": "Save drafts as often as you like. When you're ready, hit **Submit for Approval** — your host will review against the five criteria and award XC + badges on approval." }
+      ],
+      "interaction": {
+        "mode": "submission",
+        "acceptFile": true,
+        "acceptLink": true,
+        "descriptionRequired": true,
+        "descriptionMinLength": 50,
+        "submitAction": "routeToNode",
+        "allowDrafts": true,
+        "descriptionHint": "In 2–3 sentences per concept: how does Fundamentals show up in your work? Layout? Typography? Color? Images?"
+      }
+    },
+    {
+      "id": "slide-11",
+      "type": "peerFeedforward",
+      "title": "Peer Feedforward",
+      "required": false,
+      "body": [
+        { "kind": "markdown", "content": "Invite 2–3 peers to give you feedforward on your design before you publish the final branded version. They'll rate your work on the five concepts and give one actionable suggestion per concept." },
+        { "kind": "callout", "tone": "info", "content": "Top-tier designers ship early drafts to trusted peers before final polish. This is that move, built into the course." }
+      ],
+      "interaction": {
+        "mode": "peerFeedforward",
+        "xcCostPerPeer": 10,
+        "minPeers": 0,
+        "maxPeers": 3,
+        "optional": true,
+        "cohortScoped": true,
+        "criteria": [
+          { "id": "ff1", "label": "Fundamentals — what's working, what could level up?", "scale": "1-5" },
+          { "id": "ff2", "label": "Layout & Composition — does your eye travel where it should?", "scale": "1-5" },
+          { "id": "ff3", "label": "Typography — is the font choice and hierarchy serving the idea?", "scale": "1-5" },
+          { "id": "ff4", "label": "Color — does the palette feel intentional and on-tone?", "scale": "1-5" },
+          { "id": "ff5", "label": "Images — are they sharp, distinct, and memorable?", "scale": "1-5" },
+          { "id": "ff6", "label": "One concrete suggestion for the next version", "scale": "open" }
+        ],
+        "rewards": {
+          "masterCollaboratorBadgeId": "master-collaborator",
+          "beaconOfCollaborationBadgeId": "beacon-of-collaboration",
+          "beaconThreshold": 3
+        }
+      }
+    },
+    {
+      "id": "slide-12",
+      "type": "refine",
+      "title": "Refine & innovate",
+      "body": [
+        { "kind": "markdown", "content": "Sketch what you're changing based on the feedforward. Use **Prototype Pad** below — it loads your brand board and the PFLX stamp kit. Mark up your current version with revisions, or start fresh." },
+        { "kind": "markdown", "content": "Then upload the refined version as a new draft. This does **not** replace your submission yet — it lives with your course state until Slide 13 when you lock the final branded version." }
+      ],
+      "interaction": {
+        "mode": "prototypePad",
+        "prompt": "Sketch your refinements. What are you changing, and why?",
+        "canvasBackground": "brandBoard",
+        "backgroundImageUrl": null,
+        "stamps": ["pflx-badges", "studio-logos", "xc-symbols", "pathway-glyphs"],
+        "studioFilter": { "enabled": true, "default": "none" },
+        "savesToPortfolio": true,
+        "xBotVisionReview": true,
+        "tools": ["pen", "highlighter", "eraser", "text", "stamp"]
+      }
+    },
+    {
+      "id": "slide-13",
+      "type": "branding",
+      "title": "Branding & implementation",
+      "body": [
+        { "kind": "markdown", "content": "### Final touches\n- Logo in the corner (pulled from your brand board automatically)\n- Color palette reinforced across all pieces\n- Typography consistent with your brand system\n- Clean opening and closing slate on your screencast" },
+        { "kind": "markdown", "content": "Record your **final** screencast walking through the finished branded project. Pitch Take auto-applies your logo watermark and brand-matched opening/closing slates — you focus on talking through the design, the tool handles the polish." }
+      ],
+      "interaction": {
+        "mode": "pitchTake",
+        "prompt": "Record a 3–6 minute pitch of your final branded graphic design project. Walk through how each of the five concepts shows up.",
+        "maxDurationSeconds": 360,
+        "recordingStudio": true,
+        "autoBrand": {
+          "logoWatermark": true,
+          "openingSlate": true,
+          "closingSlate": true
+        },
+        "savesToVideoReel": true,
+        "peerTimestampedVoiceComments": true,
+        "submitAction": "updateNodeSubmission",
+        "label": "Final Branded Pitch"
+      }
+    },
+    {
+      "id": "slide-14",
+      "type": "reflection",
+      "title": "Where are you now?",
+      "body": [
+        { "kind": "markdown", "content": "You started with a Tier List on Slide 3. Here's where you put each concept when you began." },
+        { "kind": "callout", "tone": "info", "content": "Your Slide 3 Tier List renders here for comparison — hosted by the CourseViewer." },
+        { "kind": "markdown", "content": "Take a moment to rebuild the same tier list with today's confidence. Where did you move? What grew? What got harder as you learned more? The growth delta reveals below after you submit." }
+      ],
+      "interaction": {
+        "mode": "reflectionPrompts",
+        "prompts": [
+          { "id": "r1", "focus": "work", "prompt": "Which of the five concepts shows up most strongly in your final design, and why?" },
+          { "id": "r2", "focus": "process", "prompt": "Which concept was hardest to apply on your first try? What finally clicked?" },
+          { "id": "r3", "focus": "self", "prompt": "What kind of designer are you becoming? Name the part of this work that felt most like you." }
+        ],
+        "saveToPortfolio": true,
+        "companionReveal": {
+          "mode": "tierListCompare",
+          "comparesAgainstSlideId": "slide-03"
+        }
+      }
+    },
+    {
+      "id": "slide-15",
+      "type": "completion",
+      "title": "Course complete",
+      "body": [
+        { "kind": "markdown", "content": "You've wrapped **Graphic Design Concepts**. Once your host approves your submission, the rewards unlock:" },
+        { "kind": "callout", "tone": "success", "content": "Graphic Design Foundations badge • 5 tagged sub-badges (Design Fundamentals, Layout & Composition, Typography Master, Color Theorist, Visual Storyteller) • 300 XC + 50 bonus" },
+        { "kind": "markdown", "content": "### What unlocks next\nWith Graphic Design Foundations in your profile, new nodes open on the **Digital Artist** pathway. Your work is also now visible to hosts on other pathways (Content Creator, Professional Entrepreneur) who are looking for designers — you may start getting Job applications in your inbox." }
+      ],
+      "interaction": {
+        "mode": "completionSummary",
+        "showBadges": true,
+        "showXCPayout": true,
+        "showNextNodes": true
+      }
+    }
+  ]
+}

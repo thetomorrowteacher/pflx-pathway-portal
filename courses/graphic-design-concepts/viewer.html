@@ -1,0 +1,2971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graphic Design Concepts — PFLX CourseViewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --pflx-cyan: #00d4ff;
+      --pflx-teal: #00b8d4;
+      --pflx-cyan-dim: rgba(0, 212, 255, 0.35);
+      --pflx-cyan-faint: rgba(0, 212, 255, 0.12);
+      --pflx-dark: #0a0e17;
+      --pflx-darker: #050810;
+      --pflx-panel: rgba(10, 14, 23, 0.85);
+      --pflx-panel-solid: #0a0e17;
+      --pflx-magenta: #ff00ff;
+      --pflx-purple: #8b5cf6;
+      --pflx-green: #10e090;
+      --pflx-amber: #ffa500;
+      --pflx-red: #ff4466;
+      --pflx-text: #e0e6ef;
+      --pflx-muted: #7a8ba0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--pflx-darker);
+      color: var(--pflx-text);
+      width: 100vw;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(0, 212, 255, 0.06), transparent 50%),
+        radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.05), transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ========== TOP BAR ========== */
+    .top-bar {
+      position: sticky; top: 0;
+      z-index: 100;
+      display: flex; align-items: center;
+      padding: 14px 24px;
+      background: rgba(5, 8, 16, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--pflx-cyan-dim);
+      gap: 20px;
+    }
+    .back-to-map {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: var(--pflx-cyan);
+      text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .back-to-map:hover {
+      background: var(--pflx-cyan-faint);
+      border-color: var(--pflx-cyan);
+    }
+    .course-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      color: var(--pflx-cyan);
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .course-title .pathway-tag {
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.15em;
+      margin-left: 12px;
+    }
+    .progress-container { flex: 2; display: flex; align-items: center; gap: 12px; max-width: 500px; }
+    .progress-bar-outer {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--pflx-teal), var(--pflx-cyan));
+      box-shadow: 0 0 8px var(--pflx-cyan);
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    .progress-bar-inner::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 20px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4));
+    }
+    .progress-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--pflx-cyan);
+      min-width: 90px;
+      text-align: right;
+    }
+
+    /* ========== LAYOUT ========== */
+    .viewer-layout {
+      display: flex;
+      position: relative;
+      z-index: 1;
+      min-height: calc(100vh - 61px);
+    }
+    .sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      background: rgba(10, 14, 23, 0.6);
+      border-right: 1px solid var(--pflx-cyan-dim);
+      padding: 24px 0;
+      position: sticky;
+      top: 61px;
+      height: calc(100vh - 61px);
+      overflow-y: auto;
+      backdrop-filter: blur(8px);
+    }
+    .sidebar-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: var(--pflx-muted);
+      padding: 0 24px 16px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--pflx-cyan-faint);
+      margin-bottom: 12px;
+    }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .sidebar-item:hover {
+      background: var(--pflx-cyan-faint);
+    }
+    .sidebar-item.current {
+      border-left-color: var(--pflx-cyan);
+      background: linear-gradient(90deg, var(--pflx-cyan-faint), transparent);
+    }
+    .sidebar-item.complete {
+      opacity: 0.95;
+    }
+    .sidebar-item.locked {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .sidebar-item .num {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      width: 24px;
+      flex-shrink: 0;
+    }
+    .sidebar-item.current .num { color: var(--pflx-cyan); }
+    .sidebar-item.complete .num { color: var(--pflx-green); }
+    .sidebar-item .title-text {
+      font-size: 13px;
+      color: var(--pflx-text);
+      flex: 1;
+    }
+    .sidebar-item.current .title-text {
+      color: var(--pflx-cyan);
+      font-weight: 500;
+    }
+    .sidebar-item .state-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--pflx-muted);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+    .sidebar-item.current .state-icon {
+      border-color: var(--pflx-cyan);
+      background: var(--pflx-cyan-faint);
+      animation: pulse 2s infinite;
+    }
+    .sidebar-item.complete .state-icon {
+      background: var(--pflx-green);
+      border-color: var(--pflx-green);
+      color: var(--pflx-darker);
+    }
+    .sidebar-item.complete .state-icon::after { content: '✓'; font-weight: bold; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 var(--pflx-cyan-dim); }
+      50% { box-shadow: 0 0 0 6px transparent; }
+    }
+
+    /* ========== SLIDE CANVAS ========== */
+    .slide-canvas {
+      flex: 1;
+      padding: 40px 48px 120px;
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .slide {
+      background: var(--pflx-panel);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 12px;
+      padding: 48px 56px;
+      position: relative;
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+    }
+    .slide::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--pflx-cyan), transparent);
+    }
+    .slide-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .slide-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--pflx-cyan);
+      letter-spacing: 0.02em;
+      margin-bottom: 24px;
+      line-height: 1.3;
+    }
+    .slide-body {
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--pflx-text);
+    }
+    .slide-body h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      color: var(--pflx-cyan);
+      margin-top: 20px;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
+    }
+    .slide-body p { margin-bottom: 14px; }
+    .slide-body ul { margin-left: 20px; margin-bottom: 14px; }
+    .slide-body li { margin-bottom: 8px; }
+    .slide-body strong { color: var(--pflx-cyan); font-weight: 600; }
+    .slide-body em { color: var(--pflx-purple); font-style: normal; }
+    .slide-body a { color: var(--pflx-cyan); text-decoration: underline; }
+
+    .callout {
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin: 18px 0;
+      border-left: 3px solid;
+      font-size: 15px;
+    }
+    .callout.info {
+      background: rgba(0, 212, 255, 0.06);
+      border-color: var(--pflx-cyan);
+    }
+    .callout.success {
+      background: rgba(16, 224, 144, 0.08);
+      border-color: var(--pflx-green);
+    }
+    .callout.warn {
+      background: rgba(255, 165, 0, 0.08);
+      border-color: var(--pflx-amber);
+    }
+
+    /* ========== MEDIA ========== */
+    .video-wrap {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid var(--pflx-cyan-dim);
+      margin: 16px 0;
+    }
+    .video-wrap iframe {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    .video-caption {
+      font-size: 14px;
+      color: var(--pflx-muted);
+      margin-top: 4px;
+      font-style: italic;
+    }
+    .hero-image {
+      width: 100%;
+      border-radius: 8px;
+      display: block;
+      margin: 12px 0 20px;
+    }
+
+    /* ========== NAV BAR ========== */
+    .nav-bar {
+      position: fixed;
+      bottom: 0; left: 280px; right: 0;
+      padding: 16px 48px;
+      background: rgba(5, 8, 16, 0.95);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--pflx-cyan-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 50;
+    }
+    .nav-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      padding: 12px 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .nav-btn.back {
+      background: transparent;
+      color: var(--pflx-muted);
+      border: 1px solid var(--pflx-cyan-dim);
+    }
+    .nav-btn.back:hover { color: var(--pflx-cyan); border-color: var(--pflx-cyan); }
+    .nav-btn.next {
+      background: linear-gradient(135deg, var(--pflx-teal), var(--pflx-cyan));
+      color: var(--pflx-darker);
+      border: 0;
+      font-weight: 700;
+      box-shadow: 0 0 16px rgba(0, 212, 255, 0.4);
+    }
+    .nav-btn.next:hover { box-shadow: 0 0 24px rgba(0, 212, 255, 0.7); }
+    .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+    .nav-hint {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-amber);
+    }
+
+    /* ========== GENERIC INTERACTION BLOCK ========== */
+    .interaction {
+      margin-top: 28px;
+      padding: 24px;
+      background: rgba(0, 212, 255, 0.03);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      position: relative;
+    }
+    .interaction-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--pflx-cyan);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .interaction-prompt {
+      font-size: 16px;
+      color: var(--pflx-text);
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .field-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--pflx-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    /* ========== FORM ELEMENTS ========== */
+    input[type="text"], input[type="url"], textarea, select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--pflx-text);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus, input[type="url"]:focus, textarea:focus {
+      outline: none;
+      border-color: var(--pflx-cyan);
+      box-shadow: 0 0 8px rgba(0, 212, 255, 0.25);
+    }
+    textarea { resize: vertical; min-height: 100px; font-family: 'Share Tech Mono', monospace; font-size: 13px; }
+    button.action {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      padding: 10px 20px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, var(--pflx-teal), var(--pflx-cyan));
+      color: var(--pflx-darker);
+      border: 0;
+      font-weight: 700;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    button.action:hover { box-shadow: 0 0 12px rgba(0, 212, 255, 0.5); }
+    button.action.ghost {
+      background: transparent;
+      color: var(--pflx-cyan);
+      border: 1px solid var(--pflx-cyan-dim);
+    }
+    button.action.ghost:hover { background: var(--pflx-cyan-faint); border-color: var(--pflx-cyan); }
+    button.action:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+    /* ========== TIER LIST ENGINE ========== */
+    .tier-grid { display: grid; gap: 12px; margin-top: 8px; }
+    .tier-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 0;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+      min-height: 80px;
+      align-items: stretch;
+      overflow: hidden;
+    }
+    .tier-label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      border-right: 1px solid var(--pflx-cyan-faint);
+      padding: 10px 8px;
+      text-align: center;
+      gap: 4px;
+    }
+    .tier-letter {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0.04em;
+    }
+    .tier-desc {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      line-height: 1.2;
+      max-width: 110px;
+    }
+    .tier-row.tier-S .tier-label { color: var(--pflx-cyan); background: rgba(0, 212, 255, 0.12); }
+    .tier-row.tier-A .tier-label { color: var(--pflx-green); background: rgba(16, 224, 144, 0.1); }
+    .tier-row.tier-B .tier-label { color: var(--pflx-amber); background: rgba(255, 165, 0, 0.1); }
+    .tier-row.tier-C .tier-label { color: var(--pflx-muted); background: rgba(122, 139, 160, 0.08); }
+    .tier-row.tier-U .tier-label { color: var(--pflx-muted); background: transparent; font-size: 10px; }
+    .tier-items { padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .tier-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tier-chip:hover { background: var(--pflx-cyan-faint); border-color: var(--pflx-cyan); }
+    .tier-chip.selected { box-shadow: 0 0 10px var(--pflx-cyan); }
+    .tier-controls {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .tier-controls button {
+      flex: 1;
+      padding: 6px 10px;
+      font-size: 11px;
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-text);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 0.1em;
+    }
+    .tier-controls button:hover { background: var(--pflx-cyan-faint); }
+
+    /* ========== SIGNAL WALL ========== */
+    .signal-wall {
+      margin-top: 12px;
+    }
+    .signal-composer {
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .signal-composer > * + * { margin-top: 10px; }
+    .signal-feed { display: grid; gap: 14px; }
+    .signal-card {
+      padding: 16px;
+      background: rgba(0, 212, 255, 0.04);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 8px;
+    }
+    .signal-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .signal-author {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      color: var(--pflx-cyan);
+      letter-spacing: 0.1em;
+    }
+    .signal-boost {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-cyan);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .signal-boost:hover { background: var(--pflx-cyan-faint); }
+    .signal-boost.boosted { background: var(--pflx-cyan); color: var(--pflx-darker); border-color: var(--pflx-cyan); }
+    .signal-body { font-size: 15px; line-height: 1.5; }
+    .signal-image { margin-top: 10px; border-radius: 6px; max-width: 100%; }
+    .signal-theme-tag {
+      display: inline-block;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-purple);
+      background: rgba(139, 92, 246, 0.12);
+      padding: 3px 8px;
+      border-radius: 10px;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* ========== WAYPOINT ========== */
+    .waypoint-canvas {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .waypoint-canvas img { display: block; width: 100%; height: auto; user-select: none; }
+    .waypoint-pin {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 12px rgba(0, 212, 255, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .waypoint-pin:hover { transform: translate(-50%, -50%) scale(1.15); }
+    .waypoint-pin.fundamentals { background: var(--pflx-cyan); }
+    .waypoint-pin.layout { background: var(--pflx-green); }
+    .waypoint-pin.typography { background: var(--pflx-purple); }
+    .waypoint-pin.color { background: var(--pflx-magenta); }
+    .waypoint-pin.images { background: var(--pflx-amber); }
+    .waypoint-pin.untagged { background: var(--pflx-muted); }
+    .waypoint-tag-picker {
+      position: absolute;
+      background: var(--pflx-panel-solid);
+      border: 1px solid var(--pflx-cyan);
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      z-index: 20;
+      display: grid;
+      gap: 6px;
+      min-width: 200px;
+    }
+    .waypoint-tag-picker button {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 13px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-text);
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .waypoint-tag-picker button:hover { background: var(--pflx-cyan-faint); }
+    .waypoint-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    .waypoint-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .waypoint-legend-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid white;
+    }
+
+    /* ========== DATA CARDS ========== */
+    .data-cards-shell { display: grid; grid-template-columns: 1fr 280px; gap: 18px; margin-top: 8px; }
+    @media (max-width: 900px) { .data-cards-shell { grid-template-columns: 1fr; } }
+    .data-card-main {
+      perspective: 1000px;
+      min-height: 320px;
+    }
+    .data-card {
+      position: relative;
+      width: 100%;
+      min-height: 320px;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .data-card.flipped { transform: rotateY(180deg); }
+    .data-card-face {
+      position: absolute;
+      width: 100%;
+      min-height: 320px;
+      backface-visibility: hidden;
+      border-radius: 12px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(139, 92, 246, 0.08));
+      border: 1px solid var(--pflx-cyan-dim);
+    }
+    .data-card-face.back {
+      transform: rotateY(180deg);
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(0, 212, 255, 0.08));
+    }
+    .data-card-front-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--pflx-cyan);
+      letter-spacing: 0.04em;
+      line-height: 1.15;
+    }
+    .data-card-front-hint {
+      margin-top: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+    }
+    .data-card-back-text {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--pflx-text);
+    }
+    .data-card-back-tag {
+      margin-top: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-purple);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+    }
+    .data-card-nav {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+      align-items: center;
+    }
+    .data-card-nav button {
+      flex: 0 0 auto;
+      padding: 8px 14px;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-text);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+    .data-card-nav button:hover { background: var(--pflx-cyan-faint); }
+    .data-card-nav .index {
+      flex: 1;
+      text-align: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--pflx-cyan);
+    }
+    .data-card-companion {
+      background: rgba(255, 165, 0, 0.08);
+      border: 1px solid rgba(255, 165, 0, 0.35);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .data-card-companion-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--pflx-amber);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .data-card-companion-launch {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, var(--pflx-amber), #ff7b00);
+      color: var(--pflx-darker);
+      border: 0;
+      border-radius: 6px;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      font-size: 12px;
+      cursor: pointer;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .data-card-companion-launch:hover { box-shadow: 0 0 16px rgba(255, 165, 0, 0.5); }
+    .data-card-companion-detail {
+      font-size: 12px;
+      color: var(--pflx-muted);
+      line-height: 1.5;
+    }
+
+    /* ========== BROADCAST CUES ========== */
+    .broadcast-cue-list { margin-top: 16px; display: grid; gap: 10px; }
+    .broadcast-cue {
+      padding: 14px;
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      background: rgba(0, 212, 255, 0.04);
+    }
+    .broadcast-cue-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .broadcast-cue-time {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-amber);
+      letter-spacing: 0.1em;
+    }
+    .broadcast-cue-status {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      text-transform: uppercase;
+    }
+    .broadcast-cue-status.answered { color: var(--pflx-green); }
+
+    /* ========== PULSE ========== */
+    .pulse-options { display: grid; gap: 8px; }
+    .pulse-option {
+      padding: 12px 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .pulse-option:hover { background: var(--pflx-cyan-faint); }
+    .pulse-option.chosen { border-color: var(--pflx-cyan); box-shadow: 0 0 8px rgba(0, 212, 255, 0.4); }
+    .pulse-bar {
+      position: relative;
+      width: 120px;
+      height: 6px;
+      background: rgba(0, 212, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .pulse-bar-inner {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: linear-gradient(90deg, var(--pflx-teal), var(--pflx-cyan));
+      transition: width 0.6s;
+    }
+    .pulse-percent {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--pflx-cyan);
+      margin-left: 10px;
+      min-width: 42px;
+      text-align: right;
+    }
+    .xbot-minority {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(139, 92, 246, 0.08);
+      border-left: 3px solid var(--pflx-purple);
+      border-radius: 6px;
+      font-size: 14px;
+      font-style: italic;
+      color: #c4b5fd;
+    }
+
+    /* ========== THOUGHT NEBULA ========== */
+    .nebula-words {
+      margin-top: 14px;
+      min-height: 120px;
+      padding: 20px;
+      background: radial-gradient(ellipse at center, rgba(0, 212, 255, 0.1), transparent 70%);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+    .nebula-word {
+      font-family: 'Orbitron', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 10px currentColor;
+      transition: all 0.3s;
+    }
+
+    /* ========== PITCH TAKE / SUBMISSION ========== */
+    .record-shell {
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px dashed var(--pflx-cyan-dim);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .record-shell-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      color: var(--pflx-cyan);
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .record-shell-note {
+      font-size: 13px;
+      color: var(--pflx-muted);
+      margin-bottom: 14px;
+    }
+    .record-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, var(--pflx-red), #c21a3d);
+      color: white;
+      border: 0;
+      border-radius: 30px;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 0.12em;
+      font-size: 13px;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 0 16px rgba(255, 68, 102, 0.5);
+    }
+    .record-btn.recording { background: linear-gradient(135deg, var(--pflx-green), #0a9e64); box-shadow: 0 0 16px rgba(16, 224, 144, 0.5); }
+    .record-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: white;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .submission-field + .submission-field { margin-top: 14px; }
+    .brand-preview {
+      margin-top: 14px;
+      padding: 14px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+    }
+    .brand-logo-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--pflx-cyan), var(--pflx-purple));
+      border: 2px solid var(--pflx-darker);
+      box-shadow: 0 0 8px var(--pflx-cyan);
+    }
+
+    /* ========== PEER FEEDFORWARD ========== */
+    .peer-invite-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .peer-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--pflx-purple), var(--pflx-cyan));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      color: white;
+    }
+    .peer-chip { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+    .xc-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-amber);
+      background: rgba(255, 165, 0, 0.1);
+      border: 1px solid rgba(255, 165, 0, 0.3);
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.1em;
+    }
+    .criterion-list { margin-top: 12px; }
+    .criterion {
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-left: 3px solid var(--pflx-cyan-dim);
+      border-radius: 4px;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .criterion strong { color: var(--pflx-cyan); }
+
+    /* ========== PROTOTYPE PAD ========== */
+    .proto-pad-shell {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      margin-top: 8px;
+    }
+    .proto-canvas {
+      width: 100%;
+      height: 380px;
+      background: #0c1220;
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      cursor: crosshair;
+      touch-action: none;
+      display: block;
+    }
+    .proto-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 140px;
+    }
+    .proto-tool {
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 6px;
+      color: var(--pflx-text);
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .proto-tool:hover { background: var(--pflx-cyan-faint); }
+    .proto-tool.active { background: var(--pflx-cyan-faint); border-color: var(--pflx-cyan); color: var(--pflx-cyan); }
+    .proto-color-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .proto-color {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    .proto-color.active { border-color: white; box-shadow: 0 0 8px currentColor; }
+
+    /* ========== CRITERIA PREVIEW ========== */
+    .criteria-grid { margin-top: 12px; display: grid; gap: 10px; }
+    .criterion-card {
+      padding: 14px;
+      background: rgba(0, 212, 255, 0.04);
+      border-left: 3px solid var(--pflx-cyan);
+      border-radius: 4px;
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+    .criterion-num {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      color: var(--pflx-cyan);
+      font-weight: 700;
+    }
+    .criterion-scale {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ========== COMPLETION ========== */
+    .completion-badges {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .badge-card {
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(139, 92, 246, 0.08));
+      border: 1px solid var(--pflx-cyan-dim);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .badge-icon {
+      width: 48px; height: 48px;
+      margin: 0 auto 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--pflx-cyan), var(--pflx-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      color: white;
+      box-shadow: 0 0 12px var(--pflx-cyan-dim);
+    }
+    .badge-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--pflx-text);
+    }
+    .xc-payout {
+      padding: 20px;
+      text-align: center;
+      background: rgba(255, 165, 0, 0.06);
+      border: 1px solid rgba(255, 165, 0, 0.3);
+      border-radius: 8px;
+      margin-top: 18px;
+    }
+    .xc-total {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 42px;
+      color: var(--pflx-amber);
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+    .xc-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--pflx-muted);
+      text-transform: uppercase;
+    }
+
+    /* ========== COMPANION REVEAL (TIER LIST COMPARE) ========== */
+    .companion-reveal {
+      margin-top: 20px;
+      padding: 20px;
+      background: linear-gradient(135deg, rgba(16, 224, 144, 0.05), rgba(0, 212, 255, 0.05));
+      border: 1px solid rgba(16, 224, 144, 0.3);
+      border-radius: 10px;
+    }
+    .companion-reveal-label {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--pflx-green);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .companion-reveal-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      color: var(--pflx-cyan);
+      margin-bottom: 14px;
+    }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+    .compare-col {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--pflx-cyan-faint);
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .compare-col-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+      text-align: center;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .compare-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      color: var(--pflx-cyan);
+    }
+    .mini-tier-row {
+      display: grid;
+      grid-template-columns: 30px 1fr;
+      gap: 6px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      align-items: center;
+    }
+    .mini-tier-label { font-family: 'Orbitron', sans-serif; font-weight: 700; text-align: center; font-size: 11px; }
+    .mini-tier-items { font-size: 11px; color: var(--pflx-text); line-height: 1.4; }
+    .delta-table {
+      margin-top: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+      padding: 12px;
+    }
+    .delta-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px dashed rgba(0, 212, 255, 0.08);
+    }
+    .delta-row:last-child { border-bottom: 0; }
+    .delta-up { color: var(--pflx-green); font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+    .delta-same { color: var(--pflx-muted); font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+    .delta-down { color: var(--pflx-amber); font-family: 'Share Tech Mono', monospace; font-size: 11px; }
+
+    /* ========== HERO TITLE SLIDE ========== */
+    .title-slide {
+      padding: 0;
+      overflow: hidden;
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .title-hero {
+      position: relative;
+      height: 340px;
+      overflow: hidden;
+    }
+    .title-hero img {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .title-hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 50%, rgba(5, 8, 16, 0.95));
+    }
+    .title-content {
+      padding: 32px 56px 48px;
+      position: relative;
+      margin-top: -80px;
+      z-index: 1;
+    }
+    .title-big {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 48px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: 0.02em;
+      line-height: 1.05;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8);
+      margin-bottom: 8px;
+    }
+    .title-subtitle {
+      font-size: 18px;
+      color: var(--pflx-cyan);
+      font-weight: 500;
+      margin-bottom: 20px;
+    }
+    .title-meta {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--pflx-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    /* ========== MISC ========== */
+    .pill {
+      display: inline-block;
+      padding: 3px 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      background: rgba(0, 212, 255, 0.1);
+      border: 1px solid var(--pflx-cyan-dim);
+      color: var(--pflx-cyan);
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+    .save-indicator {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      padding: 8px 14px;
+      background: rgba(16, 224, 144, 0.12);
+      border: 1px solid var(--pflx-green);
+      color: var(--pflx-green);
+      border-radius: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      opacity: 0;
+      transform: translateX(30px);
+      transition: all 0.3s;
+      z-index: 200;
+      text-transform: uppercase;
+    }
+    .save-indicator.visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .xbot-bubble {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: rgba(139, 92, 246, 0.08);
+      border-left: 3px solid var(--pflx-purple);
+      border-radius: 4px;
+      font-size: 14px;
+      color: #c4b5fd;
+      position: relative;
+    }
+    .xbot-bubble::before {
+      content: 'X-BOT';
+      position: absolute;
+      top: -8px; left: 10px;
+      background: var(--pflx-panel-solid);
+      padding: 0 6px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--pflx-purple);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="application/json" id="course-manifest">{"courseId": "graphic-design-concepts", "title": "Graphic Design Concepts", "subtitle": "A mastercourse on the five foundational concepts every graphic designer needs", "pathway": "digital-artist", "nodeId": "graphic-design-concepts", "estimatedMinutes": 120, "required": true, "bonusXC": 50, "rewards": {"primaryBadgeId": "graphic-design-foundations", "taggedBadgeIds": ["design-fundamentals", "layout-composition", "typography-master", "color-theorist", "visual-storyteller"], "xcReward": 300}, "cohortScope": "all", "settings": {"navigationMode": "sequential", "showSidebar": true, "showProgressBar": true, "backgroundImageUrl": "./background.png", "backgroundMode": "hero"}, "taskCriteria": [{"id": "c1", "label": "Fundamentals of Design — uses line, shape, form, texture, and balance intentionally", "scale": "1-5", "required": true}, {"id": "c2", "label": "Layout & Composition — applies the five principles of layout to guide the viewer's eye", "scale": "1-5", "required": true}, {"id": "c3", "label": "Typography — identifies font type, uses hierarchy, and combines opposing fonts effectively", "scale": "1-5", "required": true}, {"id": "c4", "label": "Color — applies color theory, respects do's/don'ts, and sets appropriate tone", "scale": "1-5", "required": true}, {"id": "c5", "label": "Images — incorporates sharp, clear, distinct, and memorable imagery", "scale": "1-5", "required": true}], "slides": [{"id": "slide-01", "type": "title", "title": "Graphic Design Concepts", "body": [{"kind": "image", "url": "./background.png", "alt": "Graphic Design Concepts hero — two stylized faces in bold color with circular geometric accents"}]}, {"id": "slide-02", "type": "overview", "title": "Overview", "body": [{"kind": "markdown", "content": "### What you'll learn\n- The **Fundamentals of Design** — line, shape, form, texture, balance\n- **Layout & Composition** — arranging elements with intention\n- **Typography** — making text work visually\n- **Color** — theory, tone, readability\n- **Images** — sharp, clear, distinct, memorable"}, {"kind": "markdown", "content": "### Mastercourse objective\nLearn essential concepts of graphic design and how they connect with marketing and advertising. Develop materials to present your creations with quality visuals."}, {"kind": "markdown", "content": "### Essential questions\n- How can I apply key concepts of graphic design into my projects?\n- How can I use these skills to visualize my thoughts and ideas?"}, {"kind": "callout", "tone": "info", "content": "Estimated time: 2 hours • Rewards: Graphic Design Foundations badge + 5 tagged sub-badges + 300 XC (+50 bonus)"}]}, {"id": "slide-03", "type": "diagnostic", "title": "Where are you right now?", "body": [{"kind": "markdown", "content": "Before we dive in, rank these five graphic design concepts by how confident you feel about each one today. There are no wrong answers — this is your starting line, and we'll revisit it at the end to see how far you've traveled."}], "interaction": {"mode": "tierListEngine", "prompt": "Rank the five graphic design concepts by your current confidence.", "tiers": ["S — I've got this", "A — Pretty comfortable", "B — Some idea", "C — New to me"], "items": [{"id": "sub-fundamentals", "label": "Fundamentals (line, shape, form, texture, balance)"}, {"id": "sub-layout", "label": "Layout & Composition"}, {"id": "sub-typography", "label": "Typography"}, {"id": "sub-color", "label": "Color"}, {"id": "sub-images", "label": "Images"}], "savesToPortfolio": true, "cohortConsensusReveal": true, "officialReferenceRanks": ["director", "producer", "partner"], "shareToSignalWall": false, "pairedWithSlideId": "slide-14"}}, {"id": "slide-04", "type": "concept", "title": "What is Graphic Design?", "body": [{"kind": "markdown", "content": "Graphic design is the process of visual communication and problem-solving through the use of typography, photography, iconography, and illustration. The field is considered a subset of visual communication and communication design — the terms are often used synonymously."}], "interaction": {"mode": "broadcast", "videoUrl": "https://www.youtube.com/watch?v=sTi5SNgxE3U", "cues": [{"id": "c1", "atSeconds": 60, "activity": {"mode": "cohortPulse", "prompt": "Which part of graphic design interests you most so far?", "options": [{"id": "a", "label": "Solving visual problems"}, {"id": "b", "label": "Communicating complex ideas simply"}, {"id": "c", "label": "Crafting beauty and feel"}, {"id": "d", "label": "All of the above"}], "xcWeightedVoting": {"enabled": false}, "showResultsAfterVote": true, "xBotMinorityView": true}}, {"id": "c2", "atSeconds": 150, "activity": {"mode": "thoughtNebula", "prompt": "In one or two words, what does graphic design do?", "minWords": 1, "maxWords": 2, "maxCharsPerWord": 20, "cohortVisible": true, "signalBonus": {"enabled": true, "coreThreshold": 3, "xcReward": 2}, "xBotClusterSummary": true}}], "allowAnyActivityAsCue": true, "xBotRecap": true}}, {"id": "slide-05", "type": "connection", "title": "Make it personal — where have you seen this?", "body": [{"kind": "markdown", "content": "Graphic design is everywhere once you start noticing. Post a Signal with a real-world example you've spotted in the wild — a poster, a brand identity, a package, a menu, an app interface. Attach a photo if you have one and add a quick note about why it grabbed you."}], "interaction": {"mode": "signalWall", "prompt": "Share one graphic design piece you've noticed in your own life recently. What is it, and what made you notice it?", "allowText": true, "allowImage": true, "allowVoiceMemo": true, "maxVoiceSeconds": 45, "boosts": {"enabled": true, "costXC": 1, "revenueGoesTo": "poster"}, "xBotClusterThemes": true, "rewards": {"topBoostedBadgeId": "signal-amplified"}, "persistToCohortFeed": true, "optionalPost": false}}, {"id": "slide-06", "type": "why", "title": "Why graphic design matters", "body": [{"kind": "markdown", "content": "Graphic design is where **ideas become visible**. Every brand you trust, every product you pick up, every app you use, every video thumbnail you click — a designer made a decision that changed how you felt about it in a fraction of a second."}, {"kind": "markdown", "content": "Strong graphic design is a career multiplier for every pathway in PFLX — not just Digital Artists. Content Creators need thumbnails and titles that earn the click. Sound Designers need album covers that match their sonic identity. Professional Entrepreneurs need brand systems that make their startup look real. Industrial Designers need packaging and collateral. A player who can design well is a player whose ideas travel farther."}, {"kind": "callout", "tone": "info", "content": "By the end of this course, you'll be able to look at any piece of visual communication and name the five concepts at work inside it — and apply them to your own work."}]}, {"id": "slide-07", "type": "useCases", "title": "Spot the five concepts in the wild", "body": [{"kind": "markdown", "content": "Now you'll see the five concepts one at a time. Each has a short video that defines it, then you'll use **Waypoint** below to tag where each concept shows up in a real design."}, {"kind": "markdown", "content": "### 1 · Fundamentals of Design"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=YqQx75OPRa0", "caption": "Line, shape, form, texture, balance — the vocabulary of visual design."}, {"kind": "markdown", "content": "### 2 · Layout & Composition"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=a5KYlHNKQB8", "caption": "Arranging the parts of a design so the viewer's eye moves with intention."}, {"kind": "markdown", "content": "### 3 · Typography"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=sByzHoiYFX0", "caption": "Making text not just readable but emotive — hierarchy, pairing, tone."}, {"kind": "markdown", "content": "### 4 · Color"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=_2LLXnUdUIc", "caption": "Color theory, readability, do's and don'ts, and the feeling a palette creates."}, {"kind": "markdown", "content": "### 5 · Images"}, {"kind": "video", "url": "https://www.youtube.com/watch?v=MELKuexR3sQ", "caption": "Why images work — sharp, clear, distinct, memorable, and story-carrying."}, {"kind": "markdown", "content": "### Your turn — Waypoint exercise"}, {"kind": "markdown", "content": "Drop five waypoints on the design below — one per concept. Tap the image to drop, then tag which concept that spot demonstrates. You can add a short note explaining what you see."}], "interaction": {"mode": "waypoint", "prompt": "On the design above, drop a Waypoint for each of the five concepts. Tag which concept your Waypoint is for and add a short note on what you see.", "imageUrl": "./background.png", "imageAlt": "A graphic design piece demonstrating multiple concepts", "activityMode": "recon", "minWaypoints": 5, "maxWaypoints": 8, "notesEnabled": true, "cohortOverlay": true, "zones": [{"id": "z-fundamentals", "shape": "polygon", "coords": {"points": [[0.02, 0.1], [0.48, 0.1], [0.48, 0.95], [0.02, 0.95]]}, "correct": true, "xcReward": 2, "label": "Fundamentals", "feedbackOnHit": "Notice the bold geometric shapes, the sweeping diagonal line, and the contrast between textured stipple patterns and flat color — those are fundamentals at work."}, {"id": "z-layout", "shape": "polygon", "coords": {"points": [[0.2, 0.05], [0.85, 0.05], [0.85, 0.95], [0.2, 0.95]]}, "correct": true, "xcReward": 2, "label": "Layout & Composition", "feedbackOnHit": "Layout: the faces are staged as two focal points with a diagonal split — classic asymmetric balance guiding your eye."}, {"id": "z-color", "shape": "polygon", "coords": {"points": [[0.5, 0.0], [1.0, 0.0], [1.0, 1.0], [0.5, 1.0]]}, "correct": true, "xcReward": 2, "label": "Color", "feedbackOnHit": "Color: bold primary palette — cyan, red-orange, yellow — a triadic scheme that creates visual energy."}, {"id": "z-images", "shape": "polygon", "coords": {"points": [[0.15, 0.15], [0.55, 0.15], [0.55, 0.85], [0.15, 0.85]]}, "correct": true, "xcReward": 2, "label": "Images", "feedbackOnHit": "Images: the stylized portrait carries the entire emotional weight. Sharp, distinct, memorable."}], "availableTags": [{"id": "fundamentals", "label": "Fundamentals"}, {"id": "layout", "label": "Layout & Composition"}, {"id": "typography", "label": "Typography"}, {"id": "color", "label": "Color"}, {"id": "images", "label": "Images"}]}}, {"id": "slide-08", "type": "taskIntro", "title": "Your mission", "body": [{"kind": "markdown", "content": "### The task\nCreate a **graphic design project** — a poster, brand identity, album cover, app screen, or packaging — that demonstrates all five concepts you just studied. Record a **screencast video** walking through how you applied each concept in your design."}, {"kind": "markdown", "content": "### Requirements\n- A finished design artifact (static or animated)\n- A screencast video explaining your choices (3–6 minutes)\n- Written description of the design brief and your creative approach"}, {"kind": "callout", "tone": "info", "content": "You'll be graded on all five concepts. Each counts equally. Aim for a design where every concept is visible and intentional — even modest choices count if you can articulate them."}], "interaction": {"mode": "criteriaPreview", "referencesTaskCriteria": true}}, {"id": "slide-09", "type": "toolsTutorials", "title": "Tools & Tutorials", "body": [{"kind": "markdown", "content": "### Choose your weapon\nEvery designer has preferred tools. Explore the deck below — flip through the **Data Cards** to see what each tool does best, then use **Warp Jump** to launch directly into your chosen tool."}, {"kind": "callout", "tone": "info", "content": "There's no single 'right' tool. Canva is great for speed, Photoshop for depth, Affinity for the install-owners-forever crowd, Adobe Express for quick social-ready assets. Pick based on your task."}], "interaction": {"mode": "dataCards", "deck": {"type": "custom", "cards": [{"id": "tool-adobe-express", "front": "Adobe Express", "back": "Web-based. Fastest path to social posts, quick flyers, short videos. No install. Strong template library. Best when you need publish-ready output in minutes.", "launchUrl": "https://express.adobe.com/sp/", "categoryTag": "web-based"}, {"id": "tool-photoshop", "front": "Adobe Photoshop", "back": "Install. The industry-standard raster editor for photo, illustration, and complex composites. Steep learning curve but extremely deep. Part of Creative Cloud.", "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop", "categoryTag": "install"}, {"id": "tool-indesign", "front": "Adobe InDesign", "back": "Install. The layout tool for multi-page documents — magazines, books, brochures, portfolios. Pair with Photoshop and Illustrator for a complete pro workflow.", "launchUrl": "https://creativecloud.adobe.com/apps/all/desktop", "categoryTag": "install"}, {"id": "tool-canva", "front": "Canva", "back": "Web-based. Template-rich, beginner-friendly, fast. Massive asset library. Best for speed and collaboration; less best for pixel-level control.", "launchUrl": "https://www.canva.com/", "categoryTag": "web-based"}, {"id": "tool-pixlr", "front": "Pixlr E", "back": "Web-based. A free, Photoshop-like editor in the browser. Surprisingly capable for layer work, filters, and adjustments. No sign-in required.", "launchUrl": "https://pixlr.com/e/", "categoryTag": "web-based"}, {"id": "tool-affinity-designer", "front": "Affinity Designer", "back": "Install. One-time purchase vector and raster tool. Fast, powerful, and a strong Illustrator/Photoshop alternative for players who don't want a subscription.", "launchUrl": "https://drive.google.com/file/d/15MGFwL35KwJZeTZsoKyRESpXahtMGso4/view?usp=drive_link", "categoryTag": "install"}, {"id": "tool-affinity-publisher", "front": "Affinity Publisher", "back": "Install. Layout-and-publishing sibling to Designer. Think InDesign without the subscription. Strong for zines, posters, long-form print work.", "launchUrl": "https://drive.google.com/file/d/1cvw9Zi19JFiVMsWf7KPeq9qeZxOKJpCw/view?usp=drive_link", "categoryTag": "install"}, {"id": "tool-affinity-photo", "front": "Affinity Photo", "back": "Install. Photo-editing sibling to Designer. RAW processing, retouching, and compositing without a subscription.", "launchUrl": "https://drive.google.com/file/d/1GBjVqewyNQKDDr2mRaYhkkcj3IXKJlMT/view?usp=drive_link", "categoryTag": "install"}]}, "spacedRepetition": true, "unlocksCodexEntry": true, "masteryThreshold": 3, "resurfacesInLaterCourses": true, "companionActions": [{"label": "Launch selected tool", "mode": "warpJump", "fromCard": true, "autoReturn": {"enabled": true, "timerSeconds": 1200, "onCompletion": true}, "embedHub": true}]}}, {"id": "slide-10", "type": "taskSubmission", "title": "Submit your project", "body": [{"kind": "markdown", "content": "Upload your finished design artifact and your screencast video (or a link to where they live). In your description, briefly walk through how each of the five concepts shows up in your work."}, {"kind": "callout", "tone": "info", "content": "Save drafts as often as you like. When you're ready, hit **Submit for Approval** — your host will review against the five criteria and award XC + badges on approval."}], "interaction": {"mode": "submission", "acceptFile": true, "acceptLink": true, "descriptionRequired": true, "descriptionMinLength": 50, "submitAction": "routeToNode", "allowDrafts": true, "descriptionHint": "In 2–3 sentences per concept: how does Fundamentals show up in your work? Layout? Typography? Color? Images?"}}, {"id": "slide-11", "type": "peerFeedforward", "title": "Peer Feedforward", "required": false, "body": [{"kind": "markdown", "content": "Invite 2–3 peers to give you feedforward on your design before you publish the final branded version. They'll rate your work on the five concepts and give one actionable suggestion per concept."}, {"kind": "callout", "tone": "info", "content": "Top-tier designers ship early drafts to trusted peers before final polish. This is that move, built into the course."}], "interaction": {"mode": "peerFeedforward", "xcCostPerPeer": 10, "minPeers": 0, "maxPeers": 3, "optional": true, "cohortScoped": true, "criteria": [{"id": "ff1", "label": "Fundamentals — what's working, what could level up?", "scale": "1-5"}, {"id": "ff2", "label": "Layout & Composition — does your eye travel where it should?", "scale": "1-5"}, {"id": "ff3", "label": "Typography — is the font choice and hierarchy serving the idea?", "scale": "1-5"}, {"id": "ff4", "label": "Color — does the palette feel intentional and on-tone?", "scale": "1-5"}, {"id": "ff5", "label": "Images — are they sharp, distinct, and memorable?", "scale": "1-5"}, {"id": "ff6", "label": "One concrete suggestion for the next version", "scale": "open"}], "rewards": {"masterCollaboratorBadgeId": "master-collaborator", "beaconOfCollaborationBadgeId": "beacon-of-collaboration", "beaconThreshold": 3}}}, {"id": "slide-12", "type": "refine", "title": "Refine & innovate", "body": [{"kind": "markdown", "content": "Sketch what you're changing based on the feedforward. Use **Prototype Pad** below — it loads your brand board and the PFLX stamp kit. Mark up your current version with revisions, or start fresh."}, {"kind": "markdown", "content": "Then upload the refined version as a new draft. This does **not** replace your submission yet — it lives with your course state until Slide 13 when you lock the final branded version."}], "interaction": {"mode": "prototypePad", "prompt": "Sketch your refinements. What are you changing, and why?", "canvasBackground": "brandBoard", "backgroundImageUrl": null, "stamps": ["pflx-badges", "studio-logos", "xc-symbols", "pathway-glyphs"], "studioFilter": {"enabled": true, "default": "none"}, "savesToPortfolio": true, "xBotVisionReview": true, "tools": ["pen", "highlighter", "eraser", "text", "stamp"]}}, {"id": "slide-13", "type": "branding", "title": "Branding & implementation", "body": [{"kind": "markdown", "content": "### Final touches\n- Logo in the corner (pulled from your brand board automatically)\n- Color palette reinforced across all pieces\n- Typography consistent with your brand system\n- Clean opening and closing slate on your screencast"}, {"kind": "markdown", "content": "Record your **final** screencast walking through the finished branded project. Pitch Take auto-applies your logo watermark and brand-matched opening/closing slates — you focus on talking through the design, the tool handles the polish."}], "interaction": {"mode": "pitchTake", "prompt": "Record a 3–6 minute pitch of your final branded graphic design project. Walk through how each of the five concepts shows up.", "maxDurationSeconds": 360, "recordingStudio": true, "autoBrand": {"logoWatermark": true, "openingSlate": true, "closingSlate": true}, "savesToVideoReel": true, "peerTimestampedVoiceComments": true, "submitAction": "updateNodeSubmission", "label": "Final Branded Pitch"}}, {"id": "slide-14", "type": "reflection", "title": "Where are you now?", "body": [{"kind": "markdown", "content": "You started with a Tier List on Slide 3. Here's where you put each concept when you began."}, {"kind": "callout", "tone": "info", "content": "Your Slide 3 Tier List renders here for comparison — hosted by the CourseViewer."}, {"kind": "markdown", "content": "Take a moment to rebuild the same tier list with today's confidence. Where did you move? What grew? What got harder as you learned more? The growth delta reveals below after you submit."}], "interaction": {"mode": "reflectionPrompts", "prompts": [{"id": "r1", "focus": "work", "prompt": "Which of the five concepts shows up most strongly in your final design, and why?"}, {"id": "r2", "focus": "process", "prompt": "Which concept was hardest to apply on your first try? What finally clicked?"}, {"id": "r3", "focus": "self", "prompt": "What kind of designer are you becoming? Name the part of this work that felt most like you."}], "saveToPortfolio": true, "companionReveal": {"mode": "tierListCompare", "comparesAgainstSlideId": "slide-03"}}}, {"id": "slide-15", "type": "completion", "title": "Course complete", "body": [{"kind": "markdown", "content": "You've wrapped **Graphic Design Concepts**. Once your host approves your submission, the rewards unlock:"}, {"kind": "callout", "tone": "success", "content": "Graphic Design Foundations badge • 5 tagged sub-badges (Design Fundamentals, Layout & Composition, Typography Master, Color Theorist, Visual Storyteller) • 300 XC + 50 bonus"}, {"kind": "markdown", "content": "### What unlocks next\nWith Graphic Design Foundations in your profile, new nodes open on the **Digital Artist** pathway. Your work is also now visible to hosts on other pathways (Content Creator, Professional Entrepreneur) who are looking for designers — you may start getting Job applications in your inbox."}], "interaction": {"mode": "completionSummary", "showBadges": true, "showXCPayout": true, "showNextNodes": true}}]}</script>
+
+  <script type="text/babel" data-type="module">
+/* =========================================================================
+   PFLX CourseViewer — Graphic Design Concepts
+   Prototype renderer for the 15-slide course format defined in the
+   pflx-course-builder skill. Loads course.json, renders every slide type,
+   every interaction mode used in this course, plus the two composition
+   patterns (tierListCompare companionReveal + companionActions).
+
+   State is in-memory. A real build would wire this up to pflx_cloud_save.
+   Progress % + slide completion fire a visible Save indicator to mock that.
+   ========================================================================= */
+
+const { useState, useReducer, useEffect, useRef, useMemo, useCallback } = React;
+const course = JSON.parse(document.getElementById('course-manifest').textContent);
+
+/* ============ PFLX SESSION ============
+   In production (Core Pathways app integration), session is propagated from
+   PFLX Platform SSO. The CourseViewer expects `window.PFLX_SESSION` to be
+   populated by the shell before the viewer mounts:
+
+     window.PFLX_SESSION = {
+       playerId, displayName, initials, studio, cohort,
+       rank:   'Scout'|'Associate'|'Manager'|'Director'|'Producer'|'Partner'|'God',
+       role:   'player'|'host'|'god',     // convenience flag
+       brandBoard, shipTier, evoLevel, xcBalance
+     };
+
+   For this standalone prototype, identity can be injected via URL params:
+     ?pid=p-ennis&name=Ennis&rank=Director&role=host
+   Defaults to a plain Scout-rank player if nothing is set. */
+const session = (function resolveSession() {
+  if (typeof window.PFLX_SESSION === 'object' && window.PFLX_SESSION) return window.PFLX_SESSION;
+  const qs = new URLSearchParams(window.location.search);
+  const name = qs.get('name') || 'Player';
+  return {
+    playerId: qs.get('pid') || 'p-me',
+    displayName: name,
+    initials: (name.match(/\b[A-Z]/g) || [name[0] || 'P']).slice(0, 2).join('').toUpperCase(),
+    studio: qs.get('studio') || 'emagination',
+    cohort: qs.get('cohort') || 'spring-2026',
+    rank: qs.get('rank') || 'Scout',
+    role: qs.get('role') || 'player',
+    brandBoard: null,
+    shipTier: 'Scout MK-I',
+    evoLevel: 1,
+    xcBalance: 0
+  };
+})();
+
+// Host Dashboard access is ROLE-based, not rank-based.
+// Player rank (Scout → Partner) is a player-progression ladder that unlocks
+// in-activity leadership privileges. The Host role is a separate permission
+// reserved for adults/facilitators running the program. A Partner-rank
+// player is still a player — they do NOT get Host Dashboard access.
+const canAccessHostDashboard = session.role === 'host' || session.role === 'god';
+
+// ---------- MOCK DATA (cohort responses, peers, etc.) ----------
+const mockCohort = {
+  peers: [
+    { id: 'p-ava', name: 'Ava M.', initials: 'AM', studio: 'eMagination' },
+    { id: 'p-kai', name: 'Kai R.', initials: 'KR', studio: 'MindForge' },
+    { id: 'p-jun', name: 'Jun S.', initials: 'JS', studio: 'Innov8' },
+    { id: 'p-leo', name: 'Leo P.', initials: 'LP', studio: 'Gentech' }
+  ],
+  existingSignals: [
+    { id: 'sig-1', author: 'Ava M.', initials: 'AM', body: 'The Duolingo owl on the subway ads — the green is SO loud and the expression does half the work.', image: null, boosts: 7, theme: 'brand-iconography' },
+    { id: 'sig-2', author: 'Kai R.', initials: 'KR', body: "Noticed Apple's new Vision Pro billboard — not a single product shot, just a face and a reflection. Image doing ALL the talking.", image: null, boosts: 12, theme: 'images' },
+    { id: 'sig-3', author: 'Jun S.', initials: 'JS', body: 'A ramen shop in my neighborhood uses only two fonts on everything — storefront, menu, receipts. Feels so intentional.', image: null, boosts: 4, theme: 'typography' }
+  ],
+  broadcastCues: {
+    c1: { a: 22, b: 31, c: 15, d: 32 },   // Cohort Pulse mock split (%)
+    c2: ['communicate', 'solve', 'simplify', 'show', 'emote', 'sell', 'identify', 'inspire'] // Nebula words
+  }
+};
+
+// ---------- TIER LIST COMPARE MOCK ----------
+// Pretend a previous cohort consensus exists. Used for cohortConsensusReveal.
+const mockTierListConsensus = {
+  'sub-fundamentals': 'A',
+  'sub-layout': 'B',
+  'sub-typography': 'B',
+  'sub-color': 'A',
+  'sub-images': 'A'
+};
+
+// ---------- REDUCER ----------
+const initialState = {
+  currentSlideIdx: 0,
+  slideStates: Object.fromEntries(course.slides.map(s => [s.id, {
+    completed: false,
+    startedAt: null,
+    completedAt: null,
+    response: null
+  }])),
+  saveIndicator: null,
+};
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'GOTO':
+      return { ...state, currentSlideIdx: action.idx };
+    case 'SET_RESPONSE': {
+      const next = { ...state.slideStates };
+      const was = next[action.slideId] || { completed: false };
+      next[action.slideId] = { ...was, response: action.response };
+      return { ...state, slideStates: next };
+    }
+    case 'MARK_COMPLETE': {
+      const next = { ...state.slideStates };
+      const was = next[action.slideId] || {};
+      if (was.completed) return state;
+      next[action.slideId] = {
+        ...was,
+        completed: true,
+        startedAt: was.startedAt || new Date().toISOString(),
+        completedAt: new Date().toISOString()
+      };
+      return { ...state, slideStates: next, saveIndicator: Date.now() };
+    }
+    case 'CLEAR_SAVE_INDICATOR':
+      return { ...state, saveIndicator: null };
+    default: return state;
+  }
+}
+
+// ---------- HELPERS ----------
+function computeProgress(state) {
+  const required = course.slides.filter(s => s.required !== false);
+  const done = required.filter(s => state.slideStates[s.id]?.completed).length;
+  return {
+    completed: done,
+    total: required.length,
+    pct: Math.round((done / required.length) * 100)
+  };
+}
+function isSlideCompleteInState(state, slideId) {
+  return !!state.slideStates[slideId]?.completed;
+}
+function slideStateIcon(state, slide, currentIdx) {
+  const idx = course.slides.indexOf(slide);
+  if (state.slideStates[slide.id]?.completed) return 'complete';
+  if (idx === currentIdx) return 'current';
+  return 'pending';
+}
+
+// ---------- TOP-LEVEL COURSE VIEWER ----------
+function CourseViewer() {
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const progress = computeProgress(state);
+  const currentSlide = course.slides[state.currentSlideIdx];
+
+  // Save indicator auto-hide
+  useEffect(() => {
+    if (!state.saveIndicator) return;
+    const t = setTimeout(() => dispatch({ type: 'CLEAR_SAVE_INDICATOR' }), 1800);
+    return () => clearTimeout(t);
+  }, [state.saveIndicator]);
+
+  const setResponse = useCallback((slideId, response) => {
+    dispatch({ type: 'SET_RESPONSE', slideId, response });
+  }, []);
+  const markComplete = useCallback((slideId) => {
+    dispatch({ type: 'MARK_COMPLETE', slideId });
+  }, []);
+
+  const canAdvance = () => {
+    if (currentSlide.required === false) return true;
+    if (!slideRequiresCompletion(currentSlide)) return true;
+    return isSlideCompleteInState(state, currentSlide.id);
+  };
+
+  const goNext = () => {
+    markComplete(currentSlide.id);
+    if (state.currentSlideIdx < course.slides.length - 1) {
+      dispatch({ type: 'GOTO', idx: state.currentSlideIdx + 1 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  const goBack = () => {
+    if (state.currentSlideIdx > 0) {
+      dispatch({ type: 'GOTO', idx: state.currentSlideIdx - 1 });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  const jumpTo = (idx) => {
+    if (course.settings?.navigationMode === 'sequential') {
+      const sidebarIdx = idx;
+      const targetSlide = course.slides[sidebarIdx];
+      if (!isSlideCompleteInState(state, targetSlide.id) && sidebarIdx > state.currentSlideIdx) return;
+    }
+    dispatch({ type: 'GOTO', idx });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <>
+      <TopBar progress={progress} courseTitle={course.title} />
+      <div className="viewer-layout">
+        <Sidebar slides={course.slides}
+                 slideStates={state.slideStates}
+                 currentSlideIdx={state.currentSlideIdx}
+                 onNavigate={jumpTo}
+                 navigationMode={course.settings?.navigationMode || 'free'} />
+        <div className="slide-canvas">
+          <SlideRenderer slide={currentSlide}
+                          slideIdx={state.currentSlideIdx}
+                          state={state}
+                          setResponse={setResponse}
+                          markComplete={markComplete} />
+        </div>
+      </div>
+      <NavBar canAdvance={canAdvance()}
+              atStart={state.currentSlideIdx === 0}
+              atEnd={state.currentSlideIdx === course.slides.length - 1}
+              onBack={goBack}
+              onNext={goNext}
+              currentSlide={currentSlide}
+              state={state} />
+      <SaveIndicator visible={!!state.saveIndicator} />
+    </>
+  );
+}
+
+function slideRequiresCompletion(slide) {
+  // Non-interactive or always-advance-able slides
+  const fixedAdvance = ['title', 'overview', 'why', 'completion'];
+  if (fixedAdvance.includes(slide.type)) return false;
+  return true;
+}
+
+// ---------- TOP BAR ----------
+function TopBar({ progress, courseTitle }) {
+  const qs = window.location.search;
+  return (
+    <div className="top-bar">
+      <button className="back-to-map">← Back to Map</button>
+      <div className="course-title">
+        {courseTitle}
+      </div>
+      <div className="progress-container">
+        <div className="progress-bar-outer">
+          <div className="progress-bar-inner" style={{ width: `${progress.pct}%` }} />
+        </div>
+        <div className="progress-label">{progress.completed}/{progress.total} · {progress.pct}%</div>
+      </div>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '4px 12px 4px 4px',
+        background: 'rgba(0, 212, 255, 0.05)',
+        border: '1px solid var(--pflx-cyan-dim)',
+        borderRadius: 20,
+        marginLeft: 8
+      }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--pflx-cyan), var(--pflx-purple))',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'Orbitron, sans-serif', fontWeight: 700, fontSize: 11, color: 'white'
+        }}>{session.initials}</span>
+        <span style={{ fontSize: 12 }}>
+          <span style={{ color: 'var(--pflx-text)' }}>{session.displayName}</span>
+          <span style={{ color: 'var(--pflx-muted)', fontFamily: 'Share Tech Mono, monospace', fontSize: 10, marginLeft: 6, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{session.rank}</span>
+        </span>
+      </div>
+      {canAccessHostDashboard && (
+        <a href={`host.html${qs}`}
+           style={{
+             marginLeft: 4,
+             padding: '8px 14px',
+             background: 'linear-gradient(135deg, var(--pflx-magenta), var(--pflx-purple))',
+             color: 'white',
+             fontFamily: 'Orbitron, sans-serif',
+             fontSize: 10,
+             letterSpacing: '0.15em',
+             textTransform: 'uppercase',
+             borderRadius: 4,
+             textDecoration: 'none',
+             fontWeight: 700
+           }}>
+          Host Dashboard
+        </a>
+      )}
+    </div>
+  );
+}
+
+// ---------- SIDEBAR ----------
+function Sidebar({ slides, slideStates, currentSlideIdx, onNavigate, navigationMode }) {
+  return (
+    <div className="sidebar">
+      <div className="sidebar-header">Course Outline</div>
+      {slides.map((slide, i) => {
+        const stateIcon = slideStates[slide.id]?.completed
+          ? 'complete'
+          : (i === currentSlideIdx ? 'current' : 'pending');
+        const locked = navigationMode === 'sequential'
+          && i > currentSlideIdx
+          && !slideStates[slide.id]?.completed;
+        const classes = ['sidebar-item', stateIcon, locked && 'locked'].filter(Boolean).join(' ');
+        return (
+          <div key={slide.id}
+               className={classes}
+               onClick={() => !locked && onNavigate(i)}>
+            <div className="num">{String(i + 1).padStart(2, '0')}</div>
+            <div className="title-text">{slide.title || slide.type}</div>
+            <div className="state-icon" />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------- NAV BAR ----------
+function NavBar({ canAdvance, atStart, atEnd, onBack, onNext, currentSlide, state }) {
+  const isCompleted = state.slideStates[currentSlide.id]?.completed;
+  const blockedReason = !canAdvance && !isCompleted
+    ? 'Complete the activity to continue'
+    : null;
+
+  return (
+    <div className="nav-bar">
+      <button className="nav-btn back"
+              onClick={onBack}
+              disabled={atStart}>← Back</button>
+      {blockedReason && <div className="nav-hint">⚠ {blockedReason}</div>}
+      <button className="nav-btn next"
+              onClick={onNext}
+              disabled={!canAdvance && !isCompleted}>
+        {atEnd ? 'Finish Course ✨' : 'Next →'}
+      </button>
+    </div>
+  );
+}
+
+// ---------- SAVE INDICATOR ----------
+function SaveIndicator({ visible }) {
+  return <div className={`save-indicator ${visible ? 'visible' : ''}`}>✓ Saved to Cloud</div>;
+}
+
+// ---------- SLIDE RENDERER (dispatch) ----------
+function SlideRenderer({ slide, slideIdx, state, setResponse, markComplete }) {
+  const renderers = {
+    title: TitleSlide,
+    overview: OverviewSlide,
+    diagnostic: DiagnosticSlide,
+    concept: ConceptSlide,
+    connection: ConnectionSlide,
+    why: WhySlide,
+    useCases: UseCasesSlide,
+    taskIntro: TaskIntroSlide,
+    toolsTutorials: ToolsTutorialsSlide,
+    taskSubmission: TaskSubmissionSlide,
+    peerFeedforward: PeerFeedforwardSlide,
+    refine: RefineSlide,
+    branding: BrandingSlide,
+    reflection: ReflectionSlide,
+    completion: CompletionSlide
+  };
+  const R = renderers[slide.type];
+  if (!R) return <div className="slide"><div className="slide-title">[Unknown type: {slide.type}]</div></div>;
+  return <R slide={slide} slideIdx={slideIdx} state={state} setResponse={setResponse} markComplete={markComplete} />;
+}
+
+// ---------- BODY BLOCK RENDERER ----------
+function BodyBlocks({ blocks }) {
+  if (!blocks) return null;
+  return (
+    <div className="slide-body">
+      {blocks.map((b, i) => {
+        if (b.kind === 'markdown') return <Markdown key={i} content={b.content} />;
+        if (b.kind === 'video') return (
+          <div key={i}>
+            <VideoEmbed url={b.url} />
+            {b.caption && <div className="video-caption">{b.caption}</div>}
+          </div>
+        );
+        if (b.kind === 'image') return <img key={i} src={b.url} alt={b.alt || ''} className="hero-image" />;
+        if (b.kind === 'embed') return (
+          <div key={i} className="video-wrap" style={{ paddingBottom: b.height ? `${b.height}px` : '56.25%' }}>
+            <iframe src={b.url} allowFullScreen />
+          </div>
+        );
+        if (b.kind === 'callout') return <div key={i} className={`callout ${b.tone || 'info'}`}>{b.content}</div>;
+        return null;
+      })}
+    </div>
+  );
+}
+
+function Markdown({ content }) {
+  // Minimalist markdown: headings, bold, italic, lists, links, paragraphs
+  const html = content
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^\*])\*(?!\*)(.+?)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.+<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .split(/\n\n+/).map(p => p.match(/<(h3|ul|ol|blockquote)/) ? p : `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('');
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function VideoEmbed({ url }) {
+  // Transform YouTube link → embed
+  const yt = url.match(/(?:v=|\.be\/)([\w-]{6,})/);
+  // Use youtube-nocookie domain — privacy-enhanced, more permissive referrer policy that
+  // tolerates file:// origin better than the standard youtube.com embed.
+  const src = yt ? `https://www.youtube-nocookie.com/embed/${yt[1]}?rel=0&modestbranding=1` : url;
+  return (
+    <div className="video-wrap">
+      <iframe src={src} allowFullScreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: TITLE
+// ==========================================================================
+function TitleSlide({ slide, markComplete }) {
+  const heroImg = slide.body?.find(b => b.kind === 'image');
+  const meta = slide.body?.filter(b => b.kind === 'markdown').map(b => b.content).join(' · ');
+  return (
+    <div className="slide title-slide">
+      <div className="title-hero">
+        {heroImg && <img src={heroImg.url} alt={heroImg.alt || ''} />}
+      </div>
+      <div className="title-content">
+        <div className="title-big">{slide.title}</div>
+        {course.subtitle && <div className="title-subtitle">{course.subtitle}</div>}
+        <div className="title-meta">{meta}</div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: OVERVIEW
+// ==========================================================================
+function OverviewSlide({ slide }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Overview</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: WHY
+// ==========================================================================
+function WhySlide({ slide }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Why</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: DIAGNOSTIC (dispatches to activity)
+// ==========================================================================
+function DiagnosticSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Diagnostic · Slide 3 of 15</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: CONCEPT (uses Broadcast for this course)
+// ==========================================================================
+function ConceptSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Concept Definition</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: CONNECTION
+// ==========================================================================
+function ConnectionSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Connection Activity</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: USE CASES
+// ==========================================================================
+function UseCasesSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Use Cases Activity</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: TASK INTRO
+// ==========================================================================
+function TaskIntroSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Task Introduction</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <div className="interaction">
+        <div className="interaction-label">Grading Criteria</div>
+        <div className="criteria-grid">
+          {course.taskCriteria.map((c, i) => (
+            <div key={c.id} className="criterion-card">
+              <div className="criterion-num">{String(i+1).padStart(2,'0')}</div>
+              <div>{c.label}</div>
+              <div className="criterion-scale">Scale {c.scale}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: TOOLS & TUTORIALS
+// ==========================================================================
+function ToolsTutorialsSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Tools & Tutorials</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: TASK SUBMISSION
+// ==========================================================================
+function TaskSubmissionSlide({ slide, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { link: '', description: '', fileName: '', submitted: false };
+  const [v, setV] = useState(existing);
+  const save = (patch) => {
+    const nextV = { ...v, ...patch };
+    setV(nextV);
+    setResponse(slide.id, nextV);
+  };
+  const submit = () => {
+    if (v.description.length < (slide.interaction?.descriptionMinLength || 20)) return;
+    save({ submitted: true });
+    markComplete(slide.id);
+  };
+  return (
+    <div className="slide">
+      <div className="slide-label">Complete the Task</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <div className="interaction">
+        <div className="interaction-label">Final Submission</div>
+        <div className="submission-field">
+          <div className="field-label">Upload File (drag or click)</div>
+          <input type="text" placeholder="project.mp4" value={v.fileName}
+                 onChange={e => save({ fileName: e.target.value })} />
+        </div>
+        <div className="submission-field">
+          <div className="field-label">Or Link to Work</div>
+          <input type="url" placeholder="https://…"
+                 value={v.link} onChange={e => save({ link: e.target.value })} />
+        </div>
+        <div className="submission-field">
+          <div className="field-label">Description — walk through your 5 concepts</div>
+          <textarea value={v.description}
+                    placeholder={slide.interaction?.descriptionHint || 'Describe how each concept shows up…'}
+                    onChange={e => save({ description: e.target.value })} />
+          <div style={{ fontSize: 11, color: 'var(--pflx-muted)', marginTop: 4, textAlign: 'right' }}>
+            {v.description.length} / {slide.interaction?.descriptionMinLength || 20} chars minimum
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+          <button className="action ghost"
+                  onClick={() => save(v)}>Save Draft</button>
+          <button className="action"
+                  onClick={submit}
+                  disabled={v.description.length < (slide.interaction?.descriptionMinLength || 20) || v.submitted}>
+            {v.submitted ? '✓ Submitted for Approval' : 'Submit for Approval ▸'}
+          </button>
+        </div>
+        {v.submitted && (
+          <div className="xbot-bubble">
+            Submission routed to the node — your host will see it in the X-Coin Approvals panel. You'll be notified on approval.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: PEER FEEDFORWARD
+// ==========================================================================
+function PeerFeedforwardSlide({ slide, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { invites: [] };
+  const [invites, setInvites] = useState(existing.invites);
+  const cost = slide.interaction?.xcCostPerPeer || 10;
+  const togglePeer = (peer) => {
+    let next;
+    if (invites.find(p => p.id === peer.id)) {
+      next = invites.filter(p => p.id !== peer.id);
+    } else {
+      if (invites.length >= (slide.interaction?.maxPeers || 3)) return;
+      next = [...invites, peer];
+    }
+    setInvites(next);
+    setResponse(slide.id, { invites: next });
+  };
+
+  return (
+    <div className="slide">
+      <div className="slide-label">Peer Feedforward · Optional</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <div className="interaction">
+        <div className="interaction-label">Invite up to {slide.interaction?.maxPeers || 3} peers ({cost} XC each)</div>
+        {mockCohort.peers.map(peer => {
+          const invited = invites.find(p => p.id === peer.id);
+          return (
+            <div key={peer.id} className="peer-invite-row">
+              <div className="peer-chip">
+                <div className="peer-avatar">{peer.initials}</div>
+                {peer.name} · <span style={{ color: 'var(--pflx-muted)', fontSize: 12 }}>{peer.studio}</span>
+              </div>
+              <div className="xc-badge">{cost} XC</div>
+              <button className={invited ? 'action' : 'action ghost'} onClick={() => togglePeer(peer)}>
+                {invited ? 'Invited' : 'Invite'}
+              </button>
+            </div>
+          );
+        })}
+        <div className="criterion-list">
+          <div className="field-label" style={{ marginTop: 14 }}>Feedforward criteria peers will rate</div>
+          {(slide.interaction?.criteria || []).map(c => (
+            <div key={c.id} className="criterion">
+              <strong>{c.label}</strong> <span style={{ color: 'var(--pflx-muted)', fontSize: 12 }}>· {c.scale}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="xc-badge">{invites.length * cost} XC total</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="action ghost" onClick={() => { setInvites([]); setResponse(slide.id, { invites: [] }); markComplete(slide.id); }}>
+              Skip (Optional)
+            </button>
+            <button className="action"
+                    disabled={invites.length === 0}
+                    onClick={() => markComplete(slide.id)}>
+              Send Invites ▸
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: REFINE
+// ==========================================================================
+function RefineSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Refine & Innovate</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: BRANDING
+// ==========================================================================
+function BrandingSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Branding & Implementation</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ActivityDispatch slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: REFLECTION
+// ==========================================================================
+function ReflectionSlide({ slide, state, setResponse, markComplete }) {
+  return (
+    <div className="slide">
+      <div className="slide-label">Self-Reflection</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <ReflectionPromptsActivity slide={slide} state={state} setResponse={setResponse} markComplete={markComplete} />
+    </div>
+  );
+}
+
+// ==========================================================================
+// SLIDE TYPE: COMPLETION
+// ==========================================================================
+function CompletionSlide({ slide, state, markComplete }) {
+  useEffect(() => { markComplete(slide.id); /* eslint-disable-line */ }, []);
+  return (
+    <div className="slide">
+      <div className="slide-label">Course Complete</div>
+      <div className="slide-title">{slide.title}</div>
+      <BodyBlocks blocks={slide.body} />
+      <div className="interaction">
+        <div className="interaction-label">Rewards on Approval</div>
+        <div className="completion-badges">
+          <div className="badge-card">
+            <div className="badge-icon">★</div>
+            <div className="badge-name">{course.rewards.primaryBadgeId}</div>
+          </div>
+          {course.rewards.taggedBadgeIds.map(id => (
+            <div key={id} className="badge-card">
+              <div className="badge-icon">◆</div>
+              <div className="badge-name">{id}</div>
+            </div>
+          ))}
+        </div>
+        <div className="xc-payout">
+          <div className="xc-total">{course.rewards.xcReward + (course.bonusXC || 0)} XC</div>
+          <div className="xc-label">Total reward (base + bonus)</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY DISPATCH
+// ==========================================================================
+function ActivityDispatch({ slide, state, setResponse, markComplete }) {
+  const ia = slide.interaction;
+  if (!ia) return null;
+  const activities = {
+    tierListEngine: TierListEngineActivity,
+    broadcast: BroadcastActivity,
+    signalWall: SignalWallActivity,
+    waypoint: WaypointActivity,
+    dataCards: DataCardsActivity,
+    prototypePad: PrototypePadActivity,
+    pitchTake: PitchTakeActivity,
+    reflectionPrompts: ReflectionPromptsActivity
+  };
+  const A = activities[ia.mode];
+  if (!A) return (
+    <div className="interaction">
+      <div className="interaction-label">Activity: {ia.mode}</div>
+      <div style={{ color: 'var(--pflx-muted)', fontSize: 14 }}>
+        Renderer for <strong>{ia.mode}</strong> not implemented in this prototype. Wire it up in the viewer.
+      </div>
+    </div>
+  );
+  return <A slide={slide} interaction={ia} state={state} setResponse={setResponse} markComplete={markComplete} />;
+}
+
+// ==========================================================================
+// ACTIVITY: TIER LIST ENGINE
+// ==========================================================================
+function TierListEngineActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response;
+  const tiers = interaction.tiers || ['S', 'A', 'B', 'C'];
+  const tierKeys = tiers.map(t => t.split(' ')[0]);  // "S — I've got this" → "S"
+  const initialPlacements = existing?.placements || Object.fromEntries(interaction.items.map(i => [i.id, null]));
+  const [placements, setPlacements] = useState(initialPlacements);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [submitted, setSubmitted] = useState(existing?.submitted || false);
+
+  const setItemTier = (itemId, tierKey) => {
+    const next = { ...placements, [itemId]: tierKey };
+    setPlacements(next);
+    setResponse(slide.id, { placements: next, submitted });
+    setSelectedItem(null);
+  };
+
+  const byTier = (tierKey) => interaction.items.filter(i => placements[i.id] === tierKey);
+  const unplaced = interaction.items.filter(i => !placements[i.id]);
+  const allPlaced = unplaced.length === 0;
+
+  const submit = () => {
+    setSubmitted(true);
+    setResponse(slide.id, { placements, submitted: true });
+    markComplete(slide.id);
+  };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Tier List Engine · Ranks save to Portfolio</div>
+      <div className="interaction-prompt">{interaction.prompt}</div>
+
+      <div className="tier-grid">
+        {tiers.map((tierLabel, i) => {
+          const key = tierKeys[i];
+          const parts = tierLabel.split(/\s*[—–-]\s+/);
+          const letter = parts[0];
+          const desc = parts.slice(1).join(' — ');
+          return (
+            <div key={key} className={`tier-row tier-${key}`}>
+              <div className="tier-label">
+                <span className="tier-letter">{letter}</span>
+                {desc && <span className="tier-desc">{desc}</span>}
+              </div>
+              <div className="tier-items">
+                {byTier(key).map(item => (
+                  <div key={item.id} className="tier-chip" onClick={() => setSelectedItem(item.id)}>
+                    {selectedItem === item.id && <span>▸</span>}
+                    {item.label}
+                  </div>
+                ))}
+                {byTier(key).length === 0 && (
+                  <span style={{ color: 'var(--pflx-muted)', fontSize: 12, fontStyle: 'italic' }}>
+                    {selectedItem ? `Click to move here` : 'empty'}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {unplaced.length > 0 && (
+          <div className="tier-row tier-U">
+            <div className="tier-label">
+              <span className="tier-desc">To Place</span>
+            </div>
+            <div className="tier-items">
+              {unplaced.map(item => (
+                <div key={item.id}
+                     className={`tier-chip ${selectedItem === item.id ? 'selected' : ''}`}
+                     onClick={() => setSelectedItem(item.id)}>
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {selectedItem && (
+        <div className="tier-controls">
+          <div style={{ color: 'var(--pflx-cyan)', fontSize: 13, alignSelf: 'center', paddingLeft: 8 }}>
+            Pick a tier for: <strong>{interaction.items.find(i => i.id === selectedItem)?.label}</strong>
+          </div>
+          {tierKeys.map(key => (
+            <button key={key} onClick={() => setItemTier(selectedItem, key)}>
+              → {key}
+            </button>
+          ))}
+          <button onClick={() => setItemTier(selectedItem, null)} style={{ color: 'var(--pflx-amber)' }}>
+            Clear
+          </button>
+        </div>
+      )}
+
+      {allPlaced && !submitted && (
+        <div style={{ marginTop: 14 }}>
+          <button className="action" onClick={submit}>Lock in my Tier List ▸</button>
+        </div>
+      )}
+
+      {submitted && interaction.cohortConsensusReveal && (
+        <CohortConsensusReveal placements={placements} items={interaction.items} />
+      )}
+    </div>
+  );
+}
+
+function CohortConsensusReveal({ placements, items }) {
+  return (
+    <div className="companion-reveal">
+      <div className="companion-reveal-label">Cohort Consensus</div>
+      <div className="companion-reveal-title">Where the cohort lands</div>
+      <div className="delta-table">
+        {items.map(item => {
+          const mine = placements[item.id] || '—';
+          const cohort = mockTierListConsensus[item.id] || '—';
+          const order = { S: 4, A: 3, B: 2, C: 1, '—': 0 };
+          const delta = order[mine] - order[cohort];
+          const cls = delta > 0 ? 'delta-up' : (delta === 0 ? 'delta-same' : 'delta-down');
+          const symbol = delta > 0 ? `▲ +${delta}` : (delta === 0 ? '= aligned' : `▼ ${delta}`);
+          return (
+            <div key={item.id} className="delta-row">
+              <div style={{ fontSize: 13 }}>{item.label}</div>
+              <div style={{ fontFamily: 'Orbitron', fontWeight: 700, color: 'var(--pflx-cyan)' }}>You: {mine}</div>
+              <div style={{ fontFamily: 'Orbitron', color: 'var(--pflx-muted)' }}>Cohort: {cohort}</div>
+              <div className={cls}>{symbol}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="xbot-bubble">
+        You're most aligned with the cohort on Color and Fundamentals — where they feel strong too. Your Layout read is one tier above the cohort; watch for why your confidence there may need a reality check during the Use Cases exercise.
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: BROADCAST (interactive video with cues)
+// ==========================================================================
+function BroadcastActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { cueResponses: {} };
+  const [cueResponses, setCueResponses] = useState(existing.cueResponses);
+  const [activeCue, setActiveCue] = useState(null);
+
+  const setCueResponse = (cueId, resp) => {
+    const next = { ...cueResponses, [cueId]: resp };
+    setCueResponses(next);
+    const allDone = interaction.cues.every(c => !!next[c.id]);
+    setResponse(slide.id, { cueResponses: next, complete: allDone });
+    if (allDone) markComplete(slide.id);
+  };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Broadcast · Video with cues</div>
+      <VideoEmbed url={interaction.videoUrl} />
+      <div className="broadcast-cue-list">
+        {interaction.cues.map(cue => {
+          const answered = !!cueResponses[cue.id];
+          const expanded = activeCue === cue.id;
+          return (
+            <div key={cue.id} className="broadcast-cue">
+              <div className="broadcast-cue-head">
+                <div>
+                  <span className="broadcast-cue-time">@ {formatTime(cue.atSeconds)}</span>
+                  <span style={{ marginLeft: 12, fontFamily: 'Orbitron', fontSize: 12, color: 'var(--pflx-cyan)' }}>
+                    {cue.activity.mode === 'cohortPulse' ? 'Cohort Pulse' : 'Thought Nebula'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <span className={`broadcast-cue-status ${answered ? 'answered' : ''}`}>
+                    {answered ? '✓ Answered' : 'Pending'}
+                  </span>
+                  <button className="action ghost" onClick={() => setActiveCue(expanded ? null : cue.id)}>
+                    {expanded ? 'Close' : (answered ? 'Review' : 'Answer')}
+                  </button>
+                </div>
+              </div>
+              {expanded && (
+                cue.activity.mode === 'cohortPulse'
+                  ? <CohortPulseInline config={cue.activity}
+                                        existing={cueResponses[cue.id]}
+                                        onSubmit={r => setCueResponse(cue.id, r)} />
+                  : <ThoughtNebulaInline config={cue.activity}
+                                          existing={cueResponses[cue.id]}
+                                          onSubmit={r => setCueResponse(cue.id, r)} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {interaction.cues.every(c => cueResponses[c.id]) && (
+        <div className="xbot-bubble">
+          <strong>Recap.</strong> The cohort split evenly across purpose, with visual storytelling edging slightly ahead. Your nebula clustered around <em>communicate</em> and <em>simplify</em> — two halves of the same craft.
+        </div>
+      )}
+    </div>
+  );
+}
+function formatTime(s) { const m = Math.floor(s/60); const ss = String(s%60).padStart(2,'0'); return `${m}:${ss}`; }
+
+function CohortPulseInline({ config, existing, onSubmit }) {
+  const [choice, setChoice] = useState(existing?.choice || null);
+  const total = 100;
+  const distribution = mockCohort.broadcastCues.c1;
+  return (
+    <div>
+      <div className="interaction-prompt" style={{ fontSize: 14 }}>{config.prompt}</div>
+      <div className="pulse-options">
+        {config.options.map(opt => {
+          const pct = distribution[opt.id] || 0;
+          return (
+            <div key={opt.id}
+                 className={`pulse-option ${choice === opt.id ? 'chosen' : ''}`}
+                 onClick={() => { setChoice(opt.id); onSubmit({ choice: opt.id }); }}>
+              <span>{opt.label}</span>
+              {choice && (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className="pulse-bar">
+                    <div className="pulse-bar-inner" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="pulse-percent">{pct}%</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {choice && config.xBotMinorityView && (
+        <div className="xbot-minority">
+          The 15% who picked "Crafting beauty and feel" are onto something — aesthetic appeal is often what unlocks the cognitive shortcut. Don't dismiss it as decoration.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThoughtNebulaInline({ config, existing, onSubmit }) {
+  const [words, setWords] = useState(existing?.words || []);
+  const [draft, setDraft] = useState('');
+  const [submitted, setSubmitted] = useState(!!existing);
+
+  const addWord = () => {
+    if (!draft.trim()) return;
+    const next = [...words, draft.trim().toLowerCase()];
+    setWords(next);
+    setDraft('');
+  };
+  const submit = () => {
+    if (words.length < (config.minWords || 1)) return;
+    setSubmitted(true);
+    onSubmit({ words });
+  };
+
+  const cohortWords = mockCohort.broadcastCues.c2.concat(words);
+  const freq = {};
+  cohortWords.forEach(w => freq[w] = (freq[w] || 0) + 1);
+
+  return (
+    <div>
+      <div className="interaction-prompt" style={{ fontSize: 14 }}>{config.prompt}</div>
+      {!submitted && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input type="text" value={draft}
+                 maxLength={config.maxCharsPerWord || 24}
+                 placeholder="one word"
+                 onChange={e => setDraft(e.target.value)}
+                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addWord())} />
+          <button className="action ghost" onClick={addWord} disabled={words.length >= (config.maxWords || 3)}>+ Add</button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        {words.map((w, i) => (
+          <span key={i} className="pill" style={{ color: 'var(--pflx-cyan)' }}>{w}</span>
+        ))}
+      </div>
+      {!submitted && words.length >= (config.minWords || 1) && (
+        <div style={{ marginTop: 10 }}>
+          <button className="action" onClick={submit}>Launch into Nebula ▸</button>
+        </div>
+      )}
+      {submitted && (
+        <>
+          <div className="nebula-words">
+            {Object.entries(freq).sort((a,b) => b[1]-a[1]).map(([w, count], i) => {
+              const mine = words.includes(w);
+              const size = 14 + count * 6;
+              return <span key={i} className="nebula-word"
+                           style={{ fontSize: size, color: mine ? 'var(--pflx-cyan)' : 'var(--pflx-muted)' }}>
+                {w}
+              </span>;
+            })}
+          </div>
+          {words.some(w => freq[w] >= (config.signalBonus?.coreThreshold || 3)) && (
+            <div className="xbot-bubble">
+              <strong>Signal Bonus earned.</strong> Your word landed in the core of the nebula — the cohort converges there. +{config.signalBonus?.xcReward || 2} XC.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: SIGNAL WALL
+// ==========================================================================
+function SignalWallActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { posted: false, body: '', boosts: {} };
+  const [body, setBody] = useState(existing.body);
+  const [posted, setPosted] = useState(existing.posted);
+  const [boosts, setBoosts] = useState(existing.boosts);
+  const [cohort, setCohort] = useState(mockCohort.existingSignals);
+
+  const save = (patch) => {
+    setResponse(slide.id, { posted, body, boosts, ...patch });
+  };
+  const post = () => {
+    if (!body.trim()) return;
+    setPosted(true);
+    setCohort([{ id: 'sig-mine', author: 'You', initials: 'Y', body, image: null, boosts: 0, theme: 'mine' }, ...cohort]);
+    setResponse(slide.id, { posted: true, body, boosts });
+    markComplete(slide.id);
+  };
+  const boost = (sigId) => {
+    const newBoosts = { ...boosts, [sigId]: !boosts[sigId] };
+    setBoosts(newBoosts);
+    save({ boosts: newBoosts });
+  };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Signal Wall · Cohort Gallery</div>
+      <div className="interaction-prompt">{interaction.prompt}</div>
+      <div className="signal-wall">
+        {!posted && (
+          <div className="signal-composer">
+            <div className="field-label">Post your Signal</div>
+            <textarea value={body} onChange={e => setBody(e.target.value)}
+                      placeholder="Share what you saw. A photo link goes in the next field if you have one."
+                      style={{ minHeight: 70 }} />
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: 'var(--pflx-muted)' }}>Voice memo and image upload supported in full viewer.</span>
+              <button className="action" onClick={post} disabled={!body.trim()}>Post Signal ▸</button>
+            </div>
+          </div>
+        )}
+        <div className="signal-feed">
+          {cohort.map(sig => (
+            <div key={sig.id} className="signal-card">
+              <div className="signal-card-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="peer-avatar">{sig.initials}</div>
+                  <div>
+                    <div className="signal-author">{sig.author}</div>
+                    <span className="signal-theme-tag">theme · {sig.theme}</span>
+                  </div>
+                </div>
+                <button className={`signal-boost ${boosts[sig.id] ? 'boosted' : ''}`}
+                        onClick={() => boost(sig.id)}
+                        disabled={sig.author === 'You'}>
+                  ▲ {sig.boosts + (boosts[sig.id] ? 1 : 0)} XC
+                </button>
+              </div>
+              <div className="signal-body">{sig.body}</div>
+            </div>
+          ))}
+        </div>
+        {posted && (
+          <div className="xbot-bubble">
+            Signal posted and clustered to <em>design in the wild</em>. The cohort feed on your Platform home now includes your post.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: WAYPOINT
+// ==========================================================================
+function WaypointActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { waypoints: [] };
+  const [waypoints, setWaypoints] = useState(existing.waypoints);
+  const [pendingPin, setPendingPin] = useState(null);
+  const [pickerPos, setPickerPos] = useState(null);
+  const [noteMode, setNoteMode] = useState(null);
+  const canvasRef = useRef(null);
+
+  const onCanvasClick = (e) => {
+    if (pendingPin || noteMode) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    const newWp = { id: `wp-${Date.now()}`, x, y, tag: null, note: '' };
+    setPendingPin(newWp);
+    setPickerPos({ left: e.clientX - rect.left, top: e.clientY - rect.top });
+  };
+  const assignTag = (tag) => {
+    const next = [...waypoints, { ...pendingPin, tag }];
+    setWaypoints(next);
+    setResponse(slide.id, { waypoints: next });
+    setPendingPin(null);
+    setPickerPos(null);
+    setNoteMode(next[next.length - 1].id);
+    if (next.length >= (interaction.minWaypoints || 5)) {
+      markComplete(slide.id);
+    }
+  };
+  const cancelPin = () => {
+    setPendingPin(null);
+    setPickerPos(null);
+  };
+  const setNote = (wpId, note) => {
+    const next = waypoints.map(w => w.id === wpId ? { ...w, note } : w);
+    setWaypoints(next);
+    setResponse(slide.id, { waypoints: next });
+  };
+
+  const tagColors = { fundamentals: 'cyan', layout: 'green', typography: 'purple', color: 'magenta', images: 'amber' };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Waypoint · Recon Mode · {waypoints.length}/{interaction.minWaypoints || 5} dropped</div>
+      <div className="interaction-prompt">{interaction.prompt}</div>
+      <div ref={canvasRef} className="waypoint-canvas" onClick={onCanvasClick}>
+        <img src={interaction.imageUrl} alt={interaction.imageAlt || ''} />
+        {waypoints.map((wp, i) => (
+          <div key={wp.id}
+               className={`waypoint-pin ${wp.tag || 'untagged'}`}
+               style={{ left: `${wp.x*100}%`, top: `${wp.y*100}%` }}
+               onClick={(e) => { e.stopPropagation(); setNoteMode(wp.id === noteMode ? null : wp.id); }}>
+            {i+1}
+          </div>
+        ))}
+        {pendingPin && pickerPos && (
+          <div className="waypoint-tag-picker"
+               style={{ left: `${pickerPos.left + 18}px`, top: `${pickerPos.top + 18}px` }}
+               onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 11, color: 'var(--pflx-muted)', marginBottom: 4, fontFamily: 'Share Tech Mono', letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              Tag concept
+            </div>
+            {(interaction.availableTags || []).map(tag => (
+              <button key={tag.id} onClick={() => assignTag(tag.id)}>
+                {tag.label}
+              </button>
+            ))}
+            <button onClick={cancelPin} style={{ color: 'var(--pflx-amber)' }}>Cancel</button>
+          </div>
+        )}
+      </div>
+      <div className="waypoint-legend">
+        {(interaction.availableTags || []).map(t => (
+          <span key={t.id} className="waypoint-legend-item">
+            <span className="waypoint-legend-dot" style={{ background: `var(--pflx-${tagColors[t.id]})` }} />
+            {t.label}
+          </span>
+        ))}
+      </div>
+      {noteMode && (() => {
+        const wp = waypoints.find(w => w.id === noteMode);
+        if (!wp) return null;
+        return (
+          <div style={{ marginTop: 12, padding: 12, background: 'rgba(0,0,0,0.3)', borderRadius: 6 }}>
+            <div className="field-label">Note for waypoint #{waypoints.indexOf(wp)+1} · {wp.tag}</div>
+            <input type="text" value={wp.note} placeholder="What do you see at this spot?"
+                   onChange={e => setNote(wp.id, e.target.value)} />
+            <button className="action ghost" style={{ marginTop: 8 }} onClick={() => setNoteMode(null)}>Done</button>
+          </div>
+        );
+      })()}
+      {waypoints.length >= (interaction.minWaypoints || 5) && (
+        <div className="xbot-bubble">
+          Nice — you've tagged {waypoints.length} concepts in this design. {interaction.cohortOverlay ? 'Cohort heatmap overlay available in full viewer.' : ''}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: DATA CARDS (with companionActions)
+// ==========================================================================
+function DataCardsActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const cards = interaction.deck?.cards || [];
+  const existing = state.slideStates[slide.id]?.response || { viewed: {}, focus: 0, flipped: {} };
+  const [focus, setFocus] = useState(existing.focus);
+  const [viewed, setViewed] = useState(existing.viewed);
+  const [flipped, setFlipped] = useState(existing.flipped);
+
+  useEffect(() => {
+    if (Object.keys(viewed).length >= cards.length) {
+      markComplete(slide.id);
+    }
+    setResponse(slide.id, { viewed, focus, flipped });
+  // eslint-disable-next-line
+  }, [viewed, focus, flipped]);
+
+  const flip = () => {
+    const newFlipped = { ...flipped, [focus]: !flipped[focus] };
+    setFlipped(newFlipped);
+    setViewed({ ...viewed, [focus]: true });
+  };
+  const next = () => { setFocus((focus + 1) % cards.length); };
+  const prev = () => { setFocus((focus - 1 + cards.length) % cards.length); };
+
+  const card = cards[focus];
+  const companion = interaction.companionActions?.[0];
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">
+        Data Cards · {Object.keys(viewed).length}/{cards.length} reviewed
+      </div>
+      <div className="data-cards-shell">
+        <div className="data-card-main">
+          <div className={`data-card ${flipped[focus] ? 'flipped' : ''}`} onClick={flip}>
+            <div className="data-card-face front">
+              <div className="data-card-front-title">{card.front}</div>
+              <div className="data-card-front-hint">Tap to flip</div>
+              {card.categoryTag && <div className="data-card-back-tag">#{card.categoryTag}</div>}
+            </div>
+            <div className="data-card-face back">
+              <div className="data-card-back-text">{card.back}</div>
+              {card.categoryTag && <div className="data-card-back-tag">#{card.categoryTag}</div>}
+            </div>
+          </div>
+          <div className="data-card-nav">
+            <button onClick={prev}>◂ Prev</button>
+            <div className="index">{focus + 1} / {cards.length}</div>
+            <button onClick={next}>Next ▸</button>
+          </div>
+        </div>
+        {companion && (
+          <div className="data-card-companion">
+            <div className="data-card-companion-label">Companion Action</div>
+            <button className="data-card-companion-launch"
+                    onClick={() => {
+                      const url = card.launchUrl;
+                      if (url) window.open(url, '_blank', 'noopener');
+                    }}
+                    disabled={!card.launchUrl}>
+              ⚡ {companion.label}
+            </button>
+            <div className="data-card-companion-detail">
+              {card.launchUrl
+                ? `Launches ${card.front} in the PFLX Embed Hub. Auto-returns after ${Math.round((companion.autoReturn?.timerSeconds || 300)/60)} min or when you finish.`
+                : 'No launch URL for this card.'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: PROTOTYPE PAD
+// ==========================================================================
+function PrototypePadActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const canvasRef = useRef(null);
+  const [tool, setTool] = useState('pen');
+  const [color, setColor] = useState('#00d4ff');
+  const [drawing, setDrawing] = useState(false);
+  const [last, setLast] = useState(null);
+  const [saved, setSaved] = useState(state.slideStates[slide.id]?.response?.saved || false);
+  const colors = ['#00d4ff', '#ff00ff', '#10e090', '#ffa500', '#ff4466', '#ffffff'];
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0c1220';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  const start = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left) * (canvas.width / rect.width);
+    const y = ((e.clientY || e.touches?.[0]?.clientY) - rect.top) * (canvas.height / rect.height);
+    setDrawing(true);
+    setLast({ x, y });
+  };
+  const draw = (e) => {
+    if (!drawing || !last) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX || e.touches?.[0]?.clientX) - rect.left) * (canvas.width / rect.width);
+    const y = ((e.clientY || e.touches?.[0]?.clientY) - rect.top) * (canvas.height / rect.height);
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = tool === 'eraser' ? '#0c1220' : color;
+    ctx.lineWidth = tool === 'eraser' ? 18 : (tool === 'highlighter' ? 12 : 3);
+    ctx.globalAlpha = tool === 'highlighter' ? 0.35 : 1;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setLast({ x, y });
+  };
+  const end = () => { setDrawing(false); setLast(null); };
+
+  const save = () => {
+    const dataUrl = canvasRef.current.toDataURL('image/png');
+    setSaved(true);
+    setResponse(slide.id, { saved: true, dataUrl: dataUrl.slice(0, 200) + '…' /* truncate for state */ });
+    markComplete(slide.id);
+  };
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0c1220';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Prototype Pad · Sketches save to Portfolio</div>
+      <div className="interaction-prompt">{interaction.prompt}</div>
+      <div className="proto-pad-shell">
+        <canvas ref={canvasRef} width={800} height={380} className="proto-canvas"
+                onMouseDown={start} onMouseMove={draw} onMouseUp={end} onMouseLeave={end}
+                onTouchStart={start} onTouchMove={draw} onTouchEnd={end} />
+        <div className="proto-toolbar">
+          <button className={`proto-tool ${tool === 'pen' ? 'active' : ''}`} onClick={() => setTool('pen')}>Pen</button>
+          <button className={`proto-tool ${tool === 'highlighter' ? 'active' : ''}`} onClick={() => setTool('highlighter')}>Highlighter</button>
+          <button className={`proto-tool ${tool === 'eraser' ? 'active' : ''}`} onClick={() => setTool('eraser')}>Eraser</button>
+          <div className="field-label" style={{ marginTop: 8 }}>Colors</div>
+          <div className="proto-color-row">
+            {colors.map(c => (
+              <div key={c} className={`proto-color ${color === c ? 'active' : ''}`}
+                   style={{ background: c, color: c }}
+                   onClick={() => setColor(c)} />
+            ))}
+          </div>
+          <button className="proto-tool" onClick={clear} style={{ marginTop: 8, color: 'var(--pflx-amber)' }}>
+            Clear
+          </button>
+          <button className="action" onClick={save} style={{ marginTop: 6 }}>
+            {saved ? '✓ Saved' : 'Save to Portfolio'}
+          </button>
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--pflx-muted)', marginTop: 10 }}>
+        Studio filter + PFLX stamp kit + brand-board canvas available in full viewer. X-Bot vision review fires on save.
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: PITCH TAKE
+// ==========================================================================
+function PitchTakeActivity({ slide, interaction, state, setResponse, markComplete }) {
+  const existing = state.slideStates[slide.id]?.response || { recording: false, recorded: false, seconds: 0 };
+  const [recording, setRecording] = useState(existing.recording);
+  const [recorded, setRecorded] = useState(existing.recorded);
+  const [seconds, setSeconds] = useState(existing.seconds);
+
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => setSeconds(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [recording]);
+
+  const start = () => { setRecording(true); setSeconds(0); };
+  const stop = () => {
+    setRecording(false);
+    setRecorded(true);
+    setResponse(slide.id, { recording: false, recorded: true, seconds });
+    markComplete(slide.id);
+  };
+
+  return (
+    <div className="interaction">
+      <div className="interaction-label">Pitch Take · Records via PFLX Recording Studio</div>
+      <div className="interaction-prompt">{interaction.prompt}</div>
+      <div className="record-shell">
+        <div className="record-shell-title">
+          {recording ? '● Recording…' : (recorded ? '✓ Take complete' : 'Ready to record')}
+        </div>
+        <div className="record-shell-note">
+          Max {Math.round((interaction.maxDurationSeconds || 360) / 60)} min.
+          Auto-brands with your logo watermark + opening/closing slates from your brand board.
+        </div>
+        {!recorded && (
+          <button className={`record-btn ${recording ? 'recording' : ''}`}
+                  onClick={recording ? stop : start}>
+            {recording ? <>
+              <span className="record-dot" />
+              Stop Recording · {formatTime(seconds)}
+            </> : <>
+              ● Start Pitch Take
+            </>}
+          </button>
+        )}
+        {recorded && (
+          <>
+            <div style={{ marginTop: 10, color: 'var(--pflx-green)', fontSize: 14 }}>
+              Recorded {formatTime(seconds)} · Auto-branded and saved to Video Reel
+            </div>
+            <button className="action ghost" style={{ marginTop: 10 }} onClick={() => { setRecorded(false); setSeconds(0); }}>
+              Re-record
+            </button>
+          </>
+        )}
+      </div>
+      <div className="brand-preview">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="brand-logo-dot" />
+          <div>
+            <div style={{ fontSize: 13, color: 'var(--pflx-cyan)' }}>Brand watermark</div>
+            <div style={{ fontSize: 11, color: 'var(--pflx-muted)' }}>Pulled from your brand board</div>
+          </div>
+        </div>
+        <span className="pill">AUTO</span>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// ACTIVITY: REFLECTION PROMPTS (with companionReveal tierListCompare)
+// ==========================================================================
+function ReflectionPromptsActivity({ slide, state, setResponse, markComplete }) {
+  const interaction = slide.interaction;
+  const prompts = interaction?.prompts || [];
+  const existing = state.slideStates[slide.id]?.response || { answers: {} };
+  const [answers, setAnswers] = useState(existing.answers);
+  const [submitted, setSubmitted] = useState(existing.submitted || false);
+
+  const setAnswer = (id, val) => {
+    const next = { ...answers, [id]: val };
+    setAnswers(next);
+    setResponse(slide.id, { answers: next });
+  };
+  const submit = () => {
+    const allAnswered = prompts.every(p => (answers[p.id] || '').trim().length >= 10);
+    if (!allAnswered) return;
+    setSubmitted(true);
+    setResponse(slide.id, { answers, submitted: true });
+    markComplete(slide.id);
+  };
+
+  // Look up the paired earlier slide response for companionReveal
+  const companion = interaction?.companionReveal;
+  const pairedResponse = companion
+    ? state.slideStates[companion.comparesAgainstSlideId]?.response
+    : null;
+
+  return (
+    <>
+      <div className="interaction">
+        <div className="interaction-label">Reflection Prompts · Save to Portfolio</div>
+        {prompts.map(p => (
+          <div key={p.id} className="submission-field">
+            <div className="field-label">{p.focus ? `[${p.focus}] ` : ''}{p.prompt}</div>
+            <textarea value={answers[p.id] || ''}
+                      onChange={e => setAnswer(p.id, e.target.value)}
+                      disabled={submitted}
+                      placeholder="Think it through…" />
+          </div>
+        ))}
+        {!submitted && (
+          <button className="action" style={{ marginTop: 10 }}
+                  onClick={submit}
+                  disabled={prompts.some(p => (answers[p.id] || '').trim().length < 10)}>
+            Save Reflection ▸
+          </button>
+        )}
+      </div>
+
+      {submitted && companion?.mode === 'tierListCompare' && pairedResponse?.placements && (
+        <TierListCompareReveal mySlide3={pairedResponse.placements}
+                                 pairedSlideId={companion.comparesAgainstSlideId} />
+      )}
+    </>
+  );
+}
+
+function TierListCompareReveal({ mySlide3, pairedSlideId }) {
+  // The viewer would typically prompt for a fresh ranking here. For MVP, simulate growth.
+  // Simulate that players have shifted most items one tier higher as they learned.
+  const bumpTier = t => ({ 'C': 'B', 'B': 'A', 'A': 'S', 'S': 'S' }[t] || t);
+  const simulatedNow = Object.fromEntries(Object.entries(mySlide3).map(([k, v]) => [k, bumpTier(v)]));
+
+  // Get the original items from slide-03
+  const originalSlide = course.slides.find(s => s.id === pairedSlideId);
+  const items = originalSlide?.interaction?.items || [];
+
+  const tierGroups = (source) => {
+    const grouped = {};
+    items.forEach(it => {
+      const t = source[it.id] || '—';
+      grouped[t] = grouped[t] || [];
+      grouped[t].push(it);
+    });
+    return grouped;
+  };
+  const before = tierGroups(mySlide3);
+  const after = tierGroups(simulatedNow);
+  const order = { S: 4, A: 3, B: 2, C: 1, '—': 0 };
+
+  return (
+    <div className="companion-reveal">
+      <div className="companion-reveal-label">Companion Reveal · tierListCompare</div>
+      <div className="companion-reveal-title">Your Growth Across the Five Concepts</div>
+      <div className="compare-grid">
+        <div className="compare-col">
+          <div className="compare-col-label">Slide 3 · Before</div>
+          {['S','A','B','C'].map(t => (
+            <div key={t} className="mini-tier-row">
+              <div className="mini-tier-label">{t}</div>
+              <div className="mini-tier-items">{(before[t] || []).map(i => i.label.split('(')[0].trim()).join(' · ') || <em>—</em>}</div>
+            </div>
+          ))}
+        </div>
+        <div className="compare-arrow">▸</div>
+        <div className="compare-col">
+          <div className="compare-col-label">Slide 14 · Now</div>
+          {['S','A','B','C'].map(t => (
+            <div key={t} className="mini-tier-row">
+              <div className="mini-tier-label">{t}</div>
+              <div className="mini-tier-items">{(after[t] || []).map(i => i.label.split('(')[0].trim()).join(' · ') || <em>—</em>}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="delta-table">
+        {items.map(item => {
+          const b = mySlide3[item.id];
+          const a = simulatedNow[item.id];
+          const d = order[a] - order[b];
+          const cls = d > 0 ? 'delta-up' : (d === 0 ? 'delta-same' : 'delta-down');
+          return (
+            <div key={item.id} className="delta-row">
+              <div style={{ fontSize: 13 }}>{item.label}</div>
+              <div style={{ fontFamily: 'Orbitron', color: 'var(--pflx-muted)' }}>{b} → {a}</div>
+              <div></div>
+              <div className={cls}>{d > 0 ? `▲ grew +${d}` : (d === 0 ? '= held' : `▼ ${d}`)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="xbot-bubble">
+        <strong>Growth Report.</strong> You moved up across every concept — strongest growth in the ones you started shakiest on. That's the right direction: the concepts you rated lowest at Slide 3 are the ones this course was built to lift. Signal Amplified.
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================================
+// RENDER
+// ==========================================================================
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<CourseViewer />);
+  </script>
+</body>
+</html>
