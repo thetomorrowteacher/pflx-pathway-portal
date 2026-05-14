@@ -3,6 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ═══════════════════════════════════════════════════════════════════
+       PFLX PLATFORM SSO — IMMEDIATE REDIRECT
+       When this page is loaded from the PFLX Platform (Console builds the
+       iframe URL with sso=pflx&brand=... params), build a minimal user
+       record from the URL params, write it to localStorage, and redirect
+       straight to preview.html. Fires BEFORE any DOM/CSS renders, so the
+       brand-select form never paints. Bypasses the existing attemptSSO()
+       function which fails when Neuroflux et al aren't in mockUsers.
+  ═══════════════════════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        if (p.get('sso') !== 'pflx' || !p.get('brand')) return; // fall through to normal login
+
+        var brand = p.get('brand');
+        var role  = (p.get('role') || 'player').toLowerCase();
+        var isHost = role === 'admin' || role === 'host' || role === 'master host' || role === 'master-host' || role === 'teacher' || role === 'instructor';
+
+        var user = {
+          id:            p.get('id') || ('platform-' + Date.now()),
+          name:          p.get('user') || brand,
+          brandName:     brand,
+          brand:         brand,
+          role:          isHost ? 'admin' : 'player',
+          isHost:        isHost,
+          cohort:        p.get('cohort') || 'PlayerPool',
+          email:         p.get('email') || '',
+          pin:           p.get('pin') || '',
+          xcoin:         parseInt(p.get('xc'), 10) || 0,
+          totalXcoin:    parseInt(p.get('xc'), 10) || 0,
+          digitalBadges: 0,
+          level:         1,
+          rank:          1,
+          claimed:       true,
+          onboardingComplete: true,
+          __pflxFromPlatform: true
+        };
+        try {
+          localStorage.setItem('pflx_pathway_user', JSON.stringify(user));
+          localStorage.setItem('pflx_user', JSON.stringify(user));
+          localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
+        } catch (e) {}
+        // Redirect to the actual app. preview.html / pathway.html will pick up the
+        // localStorage user and render with no login flash.
+        window.location.replace('/preview.html' + (window.location.search || ''));
+      } catch (e) { /* fall through to normal login */ }
+    })();
+  </script>
   <title>PFLX Core Pathway Development — Login</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
