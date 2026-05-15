@@ -880,6 +880,36 @@
     <h3>Choose Your Pathway</h3>
   </div>
 
+  <!-- Active Checkpoint banner — populated live from Mission Control via the
+       PflxDataBus. Hidden until the bus replies with an active checkpoint. -->
+  <div id="pflxActiveCpBanner" style="
+    display: none;
+    position: fixed; top: 88px; left: 50%; transform: translateX(-50%);
+    z-index: 25;
+    padding: 8px 18px; border-radius: 999px;
+    background: rgba(8,16,30,0.85); backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,212,255,0.25);
+    color: #b8eaff; font-family: 'Rajdhani', sans-serif; font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase;">
+    <span style="color:#00f0ff;">🏁 ACTIVE CHECKPOINT —</span> <span id="pflxActiveCpName">—</span>
+    <span id="pflxActiveCpProgress" style="margin-left:8px;color:rgba(255,255,255,0.6);"></span>
+  </div>
+
+  <style>
+    /* Node progress chip — small overlay showing task counts per pathway */
+    .pflx-node-chip {
+      position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%);
+      background: rgba(8,16,30,0.92); border: 1px solid var(--accent, rgba(0,212,255,0.35));
+      color: var(--accent, #00f0ff);
+      padding: 2px 8px; border-radius: 999px;
+      font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 0.1em;
+      white-space: nowrap; pointer-events: none;
+      box-shadow: 0 0 12px color-mix(in srgb, var(--accent, #00f0ff) 25%, transparent);
+      opacity: 0; transition: opacity 0.4s ease;
+    }
+    .pflx-node-chip.show { opacity: 1; }
+  </style>
+
   <!-- Pathway Nodes -->
   <div class="pathway-map" id="pathwayMap"></div>
 
@@ -1731,6 +1761,202 @@
         window.parent.postMessage(JSON.stringify({ type: 'pflx_identity_request' }), '*');
       }
     } catch (e) {}
+
+    // ═══════════════════════════════════════════════════════════════════
+    // QUEST OVERLAYS — Live checkpoint + per-node task progress from MC
+    // ═══════════════════════════════════════════════════════════════════
+    // Pulls checkpoints + tasks for the logged-in player from the PFLX Data
+    // Bus and overlays:
+    //   1. A floating "Active Checkpoint" banner under the page header
+    //   2. A small "X/Y" chip beneath each pathway node showing how many of
+    //      that pathway's assigned tasks the player has completed
+    // Refreshes whenever MC mutates (pflx-mc-changed) so host edits land live.
+    (function pflxQuestOverlay() {
+      function getCurrentPlayerId() {
+        try {
+          var stored = localStorage.getItem('pflx_pathway_user');
+          if (!stored) return null;
+          var u = JSON.parse(stored);
+          return (u && u.id) || null;
+        } catch (e) { return null; }
+      }
+
+      function requestMc(key, opts) {
+        try {
+          if (window.parent === window) return; // standalone — no bus
+          window.parent.postMessage(JSON.stringify({ type: 'pflx_mc_get', key: key, opts: opts || {} }), '*');
+        } catch (e) {}
+      }
+
+      function refresh() {
+        var pid = getCurrentPlayerId();
+        if (!pid) return;
+        requestMc('checkpoints', { playerId: pid });
+        requestMc('tasks',       { playerId: pid });
+      }
+
+      var pflxMcCheckpoints = [];
+      var pflxMcTasks = [];
+
+      function isTaskCompleted(t) {
+        // Tasks are "completed" when approved by the host. Submitted-but-not-yet-
+        // approved counts as in-progress, not done.
+        return t && (t.status === 'approved' || t.status === 'complete' || t.completed === true);
+      }
+
+      function tasksForPathway(slug, title) {
+        if (!Array.isArray(pflxMcTasks)) return [];
+        var s = (slug || '').toLowerCase();
+        var t = (title || '').toLowerCase();
+        return pflxMcTasks.filter(function (task) {
+          if (!task) return false;
+          // Match by explicit pathway field, slug, or title presence in tags
+          if (task.pathway && String(task.pathway).toLowerCase() === t) return true;
+          if (task.pathway && String(task.pathway).toLowerCase() === s) return true;
+          if (task.pathwaySlug && String(task.pathwaySlug).toLowerCase() === s) return true;
+          if (Array.isArray(task.tags) && task.tags.some(function (tg) {
+            var lt = String(tg || '').toLowerCase();
+            return lt === s || lt === t;
+          })) return true;
+          return false;
+        });
+      }
+
+      function decorateNodes() {
+        var nodes = document.querySelectorAll('.pathway-node');
+        if (!nodes || nodes.length === 0) return;
+
+        // baseNodes from the closure isn't accessible here, but each node has
+        // a title in its label box. Pull the title text + accent color and
+        // compute a slug-ish key for tasksForPathway() to match against.
+        nodes.forEach(function (node) {
+          // Skip if already decorated this frame — replace any old chip
+          var prev = node.querySelector('.pflx-node-chip');
+          if (prev) prev.remove();
+
+          var titleEl = node.querySelector('.node-title');
+          if (!titleEl) return;
+          var title = (titleEl.textContent || '').trim();
+          var slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+          var matchedTasks = tasksForPathway(slug, title);
+          var totalCount = matchedTasks.length;
+          var doneCount  = matchedTasks.filter(isTaskCompleted).length;
+
+          // If NO tasks were tagged to any pathway slug/title, fall back to a
+          // generic chip showing total assigned tasks regardless of pathway.
+          // Otherwise tagged pathways show their specific counts.
+          var anyTagged = (pflxMcTasks || []).some(function (t) { return t && (t.pathway || t.pathwaySlug || (Array.isArray(t.tags) && t.tags.length)); });
+          var label;
+          if (totalCount > 0) {
+            label = doneCount + '/' + totalCount + ' TASKS';
+          } else if (!anyTagged && Array.isArray(pflxMcTasks) && pflxMcTasks.length > 0) {
+            // Untagged demo content — still useful to show "you have N open tasks"
+            var openCount = pflxMcTasks.filter(function (t) { return !isTaskCompleted(t); }).length;
+            label = openCount + ' OPEN TASKS';
+          } else {
+            // No tasks at all — hide the chip rather than show "0 TASKS"
+            return;
+          }
+
+          var chip = document.createElement('div');
+          chip.className = 'pflx-node-chip';
+          chip.textContent = label;
+          node.appendChild(chip);
+          // Fade in next frame so the transition fires
+          requestAnimationFrame(function () { chip.classList.add('show'); });
+        });
+      }
+
+      function renderActiveCheckpointBanner() {
+        var banner = document.getElementById('pflxActiveCpBanner');
+        var nameEl = document.getElementById('pflxActiveCpName');
+        var progEl = document.getElementById('pflxActiveCpProgress');
+        if (!banner || !nameEl) return;
+        var active = (pflxMcCheckpoints || []).find(function (c) { return c && (c.status === 'active' || c.isActive); });
+        if (!active) {
+          banner.style.display = 'none';
+          return;
+        }
+        nameEl.textContent = active.name || active.title || '—';
+
+        // Compute checkpoint-level progress if tasks carry a checkpoint/roundId
+        var cpId = active.id || active.checkpointId || null;
+        if (cpId && Array.isArray(pflxMcTasks)) {
+          var cpTasks = pflxMcTasks.filter(function (t) { return t && (t.roundId === cpId || t.checkpointId === cpId); });
+          if (cpTasks.length > 0) {
+            var done = cpTasks.filter(isTaskCompleted).length;
+            if (progEl) progEl.textContent = '· ' + done + '/' + cpTasks.length + ' tasks';
+          } else if (progEl) {
+            progEl.textContent = '';
+          }
+        }
+        banner.style.display = 'block';
+      }
+
+      // Listen for bus replies (dispatched by the message router above)
+      window.addEventListener('pflx-mc-data', function (ev) {
+        try {
+          var d = ev.detail || {};
+          if (d.key === 'checkpoints') pflxMcCheckpoints = d.items || [];
+          else if (d.key === 'tasks')  pflxMcTasks       = d.items || [];
+          renderActiveCheckpointBanner();
+          decorateNodes();
+        } catch (e) {}
+      });
+
+      // Live updates — when MC mutates anywhere, re-fetch
+      window.addEventListener('pflx-mc-changed', function (ev) {
+        try {
+          var key = ev.detail && ev.detail.key;
+          var pid = getCurrentPlayerId();
+          if (!pid) return;
+          if (key === 'checkpoints') requestMc('checkpoints', { playerId: pid });
+          if (key === 'tasks')       requestMc('tasks',       { playerId: pid });
+        } catch (e) {}
+      });
+
+      // Identity changes (login, mimic) — refresh for the new player
+      window.addEventListener('pflx-identity-changed', function () { setTimeout(refresh, 50); });
+
+      // Initial fetch — give the pathway map a beat to render its nodes, then go.
+      // The pathway-map renderer runs synchronously near page load; we wait one
+      // animation frame so node DOM exists before we try to decorate it.
+      requestAnimationFrame(function () {
+        refresh();
+      });
+
+      // Award granted toast — small +XC floater near the active node, no
+      // dependency on the canonical pflx-player-changed event (which the
+      // player card handler already consumes).
+      window.addEventListener('pflx-award-granted', function (ev) {
+        try {
+          var d = ev.detail || {};
+          var award = d.award || {};
+          if (typeof award.xc !== 'number' || award.xc === 0) return;
+          var toast = document.createElement('div');
+          toast.textContent = (award.xc > 0 ? '+' : '') + award.xc.toLocaleString() + ' XC' + (award.source ? ' · ' + String(award.source).toUpperCase() : '');
+          toast.style.cssText =
+            'position:fixed; top:140px; right:24px; z-index:300;' +
+            'padding:10px 18px; border-radius:10px;' +
+            'background:rgba(8,16,30,0.92); border:1px solid ' + (award.xc > 0 ? 'rgba(74,222,128,0.4)' : 'rgba(239,68,68,0.4)') + ';' +
+            'color:' + (award.xc > 0 ? '#4ade80' : '#ef4444') + ';' +
+            'font-family:Orbitron,monospace; font-size:13px; font-weight:800; letter-spacing:0.08em;' +
+            'box-shadow:0 0 20px ' + (award.xc > 0 ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)') + ';' +
+            'opacity:0; transform:translateY(-10px); transition:opacity 0.3s, transform 0.3s;';
+          document.body.appendChild(toast);
+          requestAnimationFrame(function () {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+          });
+          setTimeout(function () {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+            setTimeout(function () { toast.remove(); }, 400);
+          }, 2400);
+        } catch (e) {}
+      });
+    })();
   </script>
 
   <!-- Fullscreen Toggle -->
