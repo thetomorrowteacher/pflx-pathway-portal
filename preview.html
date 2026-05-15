@@ -1692,6 +1692,26 @@
         } catch (e) { console.warn('[Pathways] player_changed apply failed', e); }
       }
 
+      // ── PflxDataBus.mc: MC data response / change broadcast ──
+      // Pathways can consume this to render assigned tasks / checkpoints
+      // / projects per player. For now we just expose the events; the
+      // pathway-map renderer can subscribe to them when wiring quests.
+      if (msg && msg.type === 'pflx_mc_data' && msg.key && Array.isArray(msg.items)) {
+        try { window.dispatchEvent(new CustomEvent('pflx-mc-data', { detail: { key: msg.key, items: msg.items, opts: msg.opts || null, ackId: msg.ackId || null } })); } catch (e) {}
+      }
+      if (msg && msg.type === 'pflx_mc_changed' && msg.key && Array.isArray(msg.items)) {
+        try { window.dispatchEvent(new CustomEvent('pflx-mc-changed', { detail: { key: msg.key, items: msg.items } })); } catch (e) {}
+      }
+
+      // ── PflxDataBus.award: a reward was granted somewhere — fire a toast ──
+      // pflx_player_changed (handled above) already updates the card stats.
+      // This event lets the pathway map show a little "+50 XC" floater.
+      if (msg && msg.type === 'pflx_award_granted' && msg.playerId && msg.award) {
+        try {
+          window.dispatchEvent(new CustomEvent('pflx-award-granted', { detail: { playerId: msg.playerId, award: msg.award, txId: msg.txId, player: msg.player || null } }));
+        } catch (e) {}
+      }
+
       // Force-sync: parent says "drop your cache and re-ask"
       if (msg && msg.type === 'pflx_force_identity_sync') {
         try {
