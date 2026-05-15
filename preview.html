@@ -1514,7 +1514,10 @@
     // ═══════════════════════════════════════════════════════════════════
     // PLAYER CARD
     // ═══════════════════════════════════════════════════════════════════
-    (function initPlayerCard() {
+    // Exposed so the postMessage listener (below) can refresh the card
+    // whenever the PFLX Platform broadcasts a new identity. Same logic
+    // either way — read pflx_pathway_user, paint the DOM.
+    window.pflxRenderPlayerCard = function () {
       const stored = localStorage.getItem('pflx_pathway_user');
       if (!stored) return; // No session — show default info panel
 
@@ -1601,7 +1604,113 @@
       } catch (e) {
         console.error('Player card error:', e);
       }
-    })();
+    };
+
+    // Initial render from whatever the login.html SSO redirect cached.
+    window.pflxRenderPlayerCard();
+
+    // ─── Live identity sync from the PFLX Platform ─────────────────────
+    // When the Platform's host changes the active player (login, mimic
+    // mode, edit-player save) it postMessages a 'pflx_identity_broadcast'
+    // with the full identity object. Adopt it as our local session and
+    // re-render the card so the avatar, brand, XC, badges, rank etc. all
+    // reflect the current player — not whoever was here before. URL params
+    // can't carry the profile image (data URIs are too long for URLs), so
+    // postMessage is how the right avatar actually gets here.
+    window.addEventListener('message', function (ev) {
+      var msg;
+      try { msg = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data; } catch (e) { return; }
+      if (!msg || typeof msg !== 'object') return;
+
+      if ((msg.type === 'pflx_identity_broadcast' || msg.type === 'pflx_identity_response') && msg.user) {
+        try {
+          var u = msg.user;
+          var isHost = (u.role || '').toString().toLowerCase().match(/admin|host|teacher|instructor/);
+          var profile = {
+            id:                 u.id || ('platform-' + Date.now()),
+            name:               u.name || u.brand || 'Player',
+            brandName:          u.brand || u.brandName || u.name || '',
+            brand:              u.brand || u.brandName || '',
+            role:               isHost ? 'admin' : 'player',
+            isHost:             !!isHost,
+            cohort:             u.cohort || 'PlayerPool',
+            email:              u.email || '',
+            pin:                u.pin || '',
+            xcoin:              typeof u.xc === 'number' ? u.xc : (typeof u.xcoin === 'number' ? u.xcoin : 0),
+            totalXcoin:         typeof u.totalXcoin === 'number' ? u.totalXcoin : (typeof u.xc === 'number' ? u.xc : 0),
+            digitalBadges:      typeof u.digitalBadges === 'number' ? u.digitalBadges : 0,
+            level:              typeof u.level === 'number' ? u.level : 1,
+            rank:               typeof u.rank === 'number' ? u.rank : 1,
+            image:              u.image || '',
+            avatar:             u.avatar || '',
+            slogan:             u.slogan || '',
+            interests:          u.interests || [],
+            studioId:           u.studioId || '',
+            pathway:            u.pathway || '',
+            claimed:            true,
+            onboardingComplete: true,
+            __pflxFromPlatform: true,
+          };
+          localStorage.setItem('pflx_pathway_user', JSON.stringify(profile));
+          localStorage.setItem('pflx_user', JSON.stringify(profile));
+          window.pflxRenderPlayerCard();
+        } catch (e) {
+          console.warn('[Pathways] identity adopt failed', e);
+        }
+      }
+
+      // ── PflxDataBus: Console says player X's record changed ──
+      // Update the local cache if it's the player we're showing, then re-render.
+      if (msg && msg.type === 'pflx_player_changed' && msg.player) {
+        try {
+          var p = msg.player;
+          var cur = {};
+          try { cur = JSON.parse(localStorage.getItem('pflx_pathway_user') || '{}'); } catch (e) {}
+          if (cur && cur.id === p.id) {
+            var merged = Object.assign({}, cur, {
+              name:           p.name || cur.name,
+              brandName:      p.brand || p.brandName || cur.brandName,
+              brand:          p.brand || cur.brand,
+              role:           (String(p.role || '').toLowerCase().match(/admin|host|teacher|instructor/)) ? 'admin' : 'player',
+              isHost:         !!(String(p.role || '').toLowerCase().match(/admin|host|teacher|instructor/)),
+              cohort:         (Array.isArray(p.cohorts) ? p.cohorts.join(', ') : p.cohort) || cur.cohort,
+              email:          p.email || cur.email,
+              xcoin:          typeof p.xc === 'number' ? p.xc : cur.xcoin,
+              totalXcoin:     typeof p.totalXcoin === 'number' ? p.totalXcoin : cur.totalXcoin,
+              digitalBadges:  typeof p.digitalBadges === 'number' ? p.digitalBadges : cur.digitalBadges,
+              level:          typeof p.level === 'number' ? p.level : cur.level,
+              rank:           typeof p.rank === 'number' ? p.rank : cur.rank,
+              image:          (p.image !== undefined ? p.image : cur.image) || '',
+              slogan:         p.slogan || cur.slogan,
+              interests:      p.interests || cur.interests,
+              studioId:       p.studioId || cur.studioId,
+              pathway:        p.pathway || cur.pathway,
+            });
+            localStorage.setItem('pflx_pathway_user', JSON.stringify(merged));
+            window.pflxRenderPlayerCard();
+          }
+        } catch (e) { console.warn('[Pathways] player_changed apply failed', e); }
+      }
+
+      // Force-sync: parent says "drop your cache and re-ask"
+      if (msg && msg.type === 'pflx_force_identity_sync') {
+        try {
+          localStorage.removeItem('pflx_pathway_user');
+          if (window.parent !== window) {
+            window.parent.postMessage(JSON.stringify({ type: 'pflx_identity_request' }), '*');
+          }
+        } catch (e) {}
+      }
+    });
+
+    // On boot inside the Platform iframe, ask the parent for fresh identity
+    // so the card is current even if pflx_pathway_user is stale or missing
+    // fields the login.html redirect couldn't carry (e.g. the profile image).
+    try {
+      if (window.parent !== window) {
+        window.parent.postMessage(JSON.stringify({ type: 'pflx_identity_request' }), '*');
+      }
+    } catch (e) {}
   </script>
 
   <!-- Fullscreen Toggle -->
