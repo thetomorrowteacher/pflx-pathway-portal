@@ -864,7 +864,9 @@
           <div class="pc-stat-label">Level</div>
         </div>
       </div>
-      <button class="pc-logout" id="pcLogout">Sign Out</button>
+      <!-- Sign Out removed — handled by the PFLX Platform's profile menu.
+           Pathways no longer owns identity, so a local sign-out only clears
+           its iframe state and leaves the player half-logged-in elsewhere. -->
     </div>
   </div>
   <button class="pc-restore" id="pcRestore" title="Show Player Card">👤</button>
@@ -1613,12 +1615,10 @@
         document.getElementById('pcBadges').textContent = (user.digitalBadges || 0).toLocaleString();
         document.getElementById('pcLevel').textContent = user.level || 1;
 
-        // Logout
-        document.getElementById('pcLogout').addEventListener('click', () => {
-          localStorage.removeItem('pflx_pathway_user');
-          localStorage.removeItem('pflx_pathway_keep_signed_in');
-          window.location.href = 'login.html';
-        });
+        // Logout handler removed — Platform owns sign-out. Defensive null-check
+        // in case any saved HTML still has the button cached on a stale CDN.
+        var _pcLogoutBtn = document.getElementById('pcLogout');
+        if (_pcLogoutBtn) _pcLogoutBtn.remove();
 
         // Player card show / hide toggle
         document.getElementById('pcToggle').addEventListener('click', () => {
