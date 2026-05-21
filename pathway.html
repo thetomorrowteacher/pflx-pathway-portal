@@ -4787,17 +4787,31 @@ function renderDetailMCData(node) {
 
   var html = '';
 
+  // The host can explicitly tag a node to a Mission Control task/project
+  // via the node editor (node.mcTag = { type:'Task'|'Project', name }).
+  var mcTag = node.mcTag || null;
+  var mcTagType = mcTag && String(mcTag.type || '').toLowerCase();
+  var mcTagName = mcTag && String(mcTag.name || '').trim().toLowerCase();
+  function _mcTagMatches(item, kind) {
+    if (!mcTag || mcTagType !== kind || !mcTagName) return false;
+    var nm = String(item.title || item.name || '').trim().toLowerCase();
+    return nm === mcTagName;
+  }
+
   // 1. Find associated project(s) for this node
   var nodeProjects = pflxData.projects.filter(function(p) {
     return p.pathway === pathwaySlug ||
       (p.tasks && p.tasks.includes && p.tasks.includes(node.id)) ||
-      p.pathwayNodeId === node.id;
+      p.pathwayNodeId === node.id ||
+      _mcTagMatches(p, 'project');
   });
 
-  // 2. Find tasks linked to this node (by courseId or node id match)
+  // 2. Find tasks linked to this node (by courseId, node id, project, or
+  // the host's explicit MC tag)
   var nodeTasks = pflxData.tasks.filter(function(t) {
     return t.courseId === node.id ||
       (t.pathwayNodeId && t.pathwayNodeId === node.id) ||
+      _mcTagMatches(t, 'task') ||
       (nodeProjects.length > 0 && nodeProjects.some(function(p) {
         return t.projectId === p.id;
       }));
