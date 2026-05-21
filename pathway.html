@@ -559,6 +559,10 @@
     .detail-panel {
       position: relative; z-index: 2;
       width: 640px; max-width: 92vw;
+      /* Cap height to the viewport so the panel never runs off-screen.
+         Header stays fixed; the body scrolls. */
+      max-height: 90vh;
+      display: flex; flex-direction: column;
       background: rgba(8,12,24,0.96);
       border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
       border-radius: 4px; padding: 0;
@@ -624,6 +628,8 @@
     }
     .detail-title-graphic {
       width: 100%; aspect-ratio: 16/9;
+      /* Cap the hero so it never eats the whole panel on short screens. */
+      max-height: 32vh; flex-shrink: 0;
       background: rgba(0,212,255,0.03);
       border-bottom: 1px solid rgba(0,212,255,0.1);
       overflow: hidden; position: relative;
@@ -650,6 +656,7 @@
       padding: 16px 22px;
       border-bottom: 1px solid rgba(0,212,255,0.12);
       background: rgba(0,212,255,0.03);
+      flex-shrink: 0;
     }
     .detail-header-left { display: flex; align-items: center; gap: 14px; }
     .detail-icon { font-size: 28px; }
@@ -665,7 +672,12 @@
       cursor: pointer; font-size: 16px; transition: all 0.2s;
     }
     .detail-close:hover { color: #ff6b6b; border-color: rgba(255,80,80,0.4); background: rgba(255,80,80,0.1); }
-    .detail-body { padding: 18px 22px; }
+    .detail-body {
+      padding: 18px 22px;
+      /* Scroll within the panel instead of overflowing the viewport. */
+      flex: 1 1 auto; min-height: 0; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .detail-status {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 14px;
@@ -3530,8 +3542,15 @@ function applyTransform() {
     tiltX = 40; // deep tilt — flying into the map
   }
 
+  // The 3D tilt pivots around the point currently centred on screen, not
+  // the layer's (0,0) corner. Pivoting at the corner of a 2000px layer made
+  // rotateX swing the whole map — the "camera glitching / hard to navigate"
+  // symptom. ox/oy is the layer-space point under the viewport centre, so
+  // the tilt now rotates around what the player is actually looking at.
   if (tiltX > 0) {
-    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotateX(${tiltX}deg)`;
+    const ox = (window.innerWidth / 2 - panX) / zoom;
+    const oy = (window.innerHeight / 2 - panY) / zoom;
+    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${ox}px, ${oy}px) rotateX(${tiltX}deg) translate(${-ox}px, ${-oy}px)`;
   } else {
     nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
   }
@@ -3564,7 +3583,9 @@ function applyTransform() {
   const discLayer = document.getElementById('discoveryLayer');
   if (discLayer) {
     if (tiltX > 0) {
-      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) rotateX(${tiltX}deg)`;
+      const dox = (window.innerWidth / 2 - panX) / zoom;
+      const doy = (window.innerHeight / 2 - panY) / zoom;
+      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${dox}px, ${doy}px) rotateX(${tiltX}deg) translate(${-dox}px, ${-doy}px)`;
     } else {
       discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
     }
@@ -4787,34 +4808,17 @@ function renderDetailMCData(node) {
     return nodeProjects.some(function(p) { return j.projectId === p.id; });
   });
 
-  // 4. Find the current checkpoint/season context
-  var activeSeason = pflxData.seasons.find(function(s) { return s.status === 'active' || s.status === 'current'; }) || pflxData.seasons[0];
-  var activeCheckpoint = pflxData.checkpoints.find(function(c) { return c.status === 'active' || c.status === 'current'; }) || pflxData.checkpoints[0];
-
-  // 5. Current player's XC data
+  // 4. Current player's XC data
   var stored = localStorage.getItem('pflx_pathway_user');
   var currentPlayer = null;
   if (stored) { try { currentPlayer = JSON.parse(stored); } catch(e) {} }
   var xcUser = currentPlayer ? pflxData.users.find(function(u) { return u.id === currentPlayer.id || u.email === currentPlayer.email; }) : null;
 
-  // ─── Season & Checkpoint Context ───
-  if (activeSeason || activeCheckpoint) {
-    html += '<div class="detail-mc-section">';
-    html += '<h4>Current Season</h4>';
-    if (activeSeason) {
-      html += '<div class="detail-mc-row"><span class="mc-label">Season</span><span class="mc-value">' + (activeSeason.title || activeSeason.name || 'Season') + '</span></div>';
-    }
-    if (activeCheckpoint) {
-      html += '<div class="detail-mc-row"><span class="mc-label">Checkpoint</span><span class="mc-value">' + (activeCheckpoint.title || activeCheckpoint.name || 'Checkpoint') + '</span></div>';
-      if (activeCheckpoint.endDate) {
-        var daysLeft = Math.ceil((new Date(activeCheckpoint.endDate) - Date.now()) / 86400000);
-        if (daysLeft > 0) {
-          html += '<div class="detail-mc-row"><span class="mc-label">Days Left</span><span class="mc-value">' + daysLeft + '</span></div>';
-        }
-      }
-    }
-    html += '</div>';
-  }
+  // ─── Season & Checkpoint Context: intentionally removed ───
+  // The node panel no longer shows a "Current Season / Checkpoint" block.
+  // It previously fell back to checkpoints[0] when nothing was active,
+  // which surfaced a stale checkpoint (e.g. "Checkpoint Gamma") on nodes
+  // it had nothing to do with.
 
   // ─── Player XC Stats (if logged in) ───
   if (xcUser) {
@@ -4909,6 +4913,47 @@ const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
   // centerView is handled by the window load handler at end of script
 })();
 
+// ─── Realtime: live host edits → every player's pathway updates ───
+// When a host saves node edits, the 'pathway_<slug>' row in app_data
+// changes. Players viewing the pathway pick that up immediately instead
+// of only on their next reload. We skip applying updates while THIS user
+// is in edit mode, so a host's own in-progress work isn't pulled out
+// from under them.
+(function startPathwayRealtime() {
+  try {
+    if (typeof _supabase === 'undefined' || !_supabase || typeof _supabase.channel !== 'function') return;
+    var rowKey = 'pathway_' + pathwaySlug;
+    _supabase.channel('pflx-pathway-' + pathwaySlug)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'app_data', filter: 'key=eq.' + rowKey
+      }, function (payload) {
+        try {
+          if (editMode) return; // don't disrupt a host who is mid-edit
+          var row = payload && (payload.new || payload.record);
+          var saved = row && row.data;
+          if (!Array.isArray(saved)) return;
+          // Merge the cloud node list into the in-memory pathway.
+          saved.forEach(function (sn) {
+            var existing = pathway.nodes.find(function (n) { return n.id === sn.id; });
+            if (existing) Object.assign(existing, sn);
+            else pathway.nodes.push(sn);
+          });
+          var savedIds = saved.map(function (s) { return s.id; });
+          // Keep pitched nodes (injected separately) — drop only real deletions.
+          pathway.nodes = pathway.nodes.filter(function (n) {
+            return savedIds.indexOf(n.id) >= 0 || n.isPitchedNode;
+          });
+          try { localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch (e) {}
+          rebuildNodes();
+          console.log('[PFLX] ← realtime pathway update applied:', saved.length, 'nodes');
+        } catch (e) { console.warn('[PFLX] realtime apply failed', e); }
+      })
+      .subscribe(function (status) {
+        if (status === 'SUBSCRIBED') console.log('[PFLX] ✓ pathway realtime live');
+      });
+  } catch (e) { console.warn('[PFLX] pathway realtime setup failed', e); }
+})();
+
 function toggleEditMode() {
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
@@ -4962,6 +5007,19 @@ async function savePathwayEdits() {
         requiredBadge: n.requiredBadge || '',
         comingSoon: n.comingSoon || false,
         requires: n.requires || [],
+        // Node-editor fields — these were being dropped on save, so host
+        // edits to reward/cost/type/submission settings never reached the
+        // cloud or other players. Persist them all.
+        nodeType: n.nodeType || '',
+        xcReward: n.xcReward || 0,
+        xcCost: n.xcCost || 0,
+        contentUrl: n.contentUrl || '',
+        coursePackage: n.coursePackage || '',
+        mcTag: n.mcTag || null,
+        submission: n.submission || null,
+        hasProgressBar: n.hasProgressBar || false,
+        taggedBadges: n.taggedBadges || [],
+        imageFit: n.imageFit || 'cover',
       };
       if (n.image) {
         obj.image = await compressImage(n.image, 256, 256);
@@ -5341,6 +5399,14 @@ function rebuildNodes() {
   drawConnectors();
   updateProgress();
   updateMinimap();
+
+  // Re-billboard freshly-built nodes. applyTransform only re-applies the
+  // counter-rotation when the tilt value CHANGES; after a rebuild the new
+  // node elements have no transform yet, so in chase/cockpit mode they'd
+  // render tilted/skewed until the next mode switch. Forcing _lastTilt to
+  // null makes the next applyTransform re-billboard every node.
+  applyTransform._lastTilt = null;
+  applyTransform();
 }
 
 function setupNodeDrag(el, n, px, py) {
