@@ -3177,7 +3177,7 @@ const PATHWAYS = {
     accent: '#ff6ec7',
     nodes: [
       { id: 'cc-intro', title: 'Intro to Media Production', emoji: '🎬', x: 50, y: 85, status: 'unlocked', desc: 'Learn the fundamentals of media production, storytelling, and creative workflows.' },
-      { id: 'cc-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['cc-intro'], desc: 'Master narrative structure and visual storyboarding techniques.' },
+      { id: 'cc-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['cc-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', desc: 'Master narrative structure and visual storyboarding techniques.' },
       { id: 'cc-screenwriting', title: 'Screenwriting', emoji: '✍️', x: 20, y: 56, status: 'locked', requires: ['cc-storyboard'], desc: 'Write scripts for film, video, and digital media.' },
       { id: 'cc-media-capture', title: 'Media Capture Techniques', emoji: '📸', x: 70, y: 56, status: 'locked', requires: ['cc-intro'], desc: 'Photography, videography, lighting, and composition fundamentals.' },
       { id: 'cc-sound-design', title: 'Sound Design', emoji: '🎵', x: 18, y: 42, status: 'locked', requires: ['cc-screenwriting'], desc: 'Create and mix audio for media projects.' },
@@ -3192,7 +3192,7 @@ const PATHWAYS = {
     accent: '#c084fc',
     nodes: [
       { id: 'da-intro', title: 'Graphic Design Concepts', emoji: '🎨', x: 50, y: 85, status: 'unlocked', desc: 'Foundations of visual design — color, composition, typography, and layout.' },
-      { id: 'da-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['da-intro'], desc: 'Visual narrative and storyboarding for digital art projects.' },
+      { id: 'da-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['da-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', desc: 'Visual narrative and storyboarding for digital art projects.' },
       { id: 'da-digitize', title: 'Digitize Art', emoji: '🖌️', x: 25, y: 56, status: 'locked', requires: ['da-storyboard'], desc: 'Transform hand-drawn art into digital formats.' },
       { id: 'da-flipbook', title: 'Flipbook Animation', emoji: '📖', x: 70, y: 56, status: 'locked', requires: ['da-intro'], desc: 'Create frame-by-frame flipbook-style animations.' },
       { id: 'da-vector', title: 'Vector Graphics', emoji: '✏️', x: 18, y: 42, status: 'locked', requires: ['da-digitize'], desc: 'Master vector illustration with professional design tools.' },
@@ -6743,12 +6743,39 @@ function showLaunchOverlay(node) {
   }
   function resolvedCourseUrl(n) {
     if (!n.coursePackage) return null;
-    if (/^https?:\/\//.test(n.coursePackage)) {
-      var base = n.coursePackage.replace(/\/+$/, '');
-      return base + '/' + (isHostViewActive() ? 'host.html' : 'viewer.html');
-    }
     var viewFile = isHostViewActive() ? 'host.html' : 'viewer.html';
-    return './courses/' + n.coursePackage.replace(/^\/+|\/+$/g, '') + '/' + viewFile;
+    if (/^https?:\/\//.test(n.coursePackage)) {
+      return n.coursePackage.replace(/\/+$/, '') + '/' + viewFile;
+    }
+    var pkg = n.coursePackage.replace(/^\/+|\/+$/g, '');
+    // A package path containing a slash (e.g. "modules/storybuilding-storyboarding")
+    // resolves relative to the portal root — this is how phase-based Modules load.
+    // A bare slug is a legacy course living in ./courses/.
+    if (pkg.indexOf('/') !== -1) return './' + pkg + '/' + viewFile;
+    return './courses/' + pkg + '/' + viewFile;
+  }
+  // Best-effort player context for the Module Connector (brand + avatar only —
+  // never a real name, per the privacy rule in CONNECTOR_CONTRACT.md §7).
+  function pflxModulePlayer() {
+    var p = { id: '', brand: 'Explorer', avatar: '', initials: 'EX', isHost: isHostViewActive() };
+    try {
+      var s = window.PFLX_SESSION;
+      if (s) {
+        p.id = s.playerId || s.id || p.id;
+        p.brand = s.brand || s.displayName || p.brand;
+        p.avatar = s.avatar || p.avatar;
+        p.initials = s.initials || p.initials;
+      }
+    } catch (e) {}
+    try {
+      var qp = new URLSearchParams(window.location.search);
+      p.brand = qp.get('brand') || p.brand;
+      p.id = qp.get('pid') || p.id;
+    } catch (e) {}
+    if (p.brand && (!p.initials || p.initials === 'EX')) {
+      p.initials = p.brand.trim().split(/\s+/).map(function (w) { return w[0] || ''; }).join('').slice(0, 2).toUpperCase();
+    }
+    return p;
   }
   var _resolvedCourseUrl = resolvedCourseUrl(node);
   if (_resolvedCourseUrl) node.contentUrl = _resolvedCourseUrl;  // runtime override, not persisted
@@ -6783,6 +6810,7 @@ function showLaunchOverlay(node) {
 
         // Load saved progress for this node+player
         var savedKey = 'pflx_course_tasks_' + node.id;
+        var moduleSaveKey = 'pflx_modsave_' + node.id;   // phase-based Module Save Slot
         try {
           var saved = JSON.parse(localStorage.getItem(savedKey) || '[]');
           if (Array.isArray(saved) && saved.length > 0) courseTasks = saved;
@@ -6921,6 +6949,72 @@ function showLaunchOverlay(node) {
               courseTasks.forEach(function(ct) { ct.completed = true; });
               try { localStorage.setItem(savedKey, JSON.stringify(courseTasks)); } catch(e2) {}
               updateTaskUI();
+            }
+
+            // ===== PFLX Connector — phase-based Module protocol =====
+            // (CONNECTOR_CONTRACT.md v0.4). A Module posts pflx_mod_ready on boot;
+            // the Node answers with pflx_mod_init, then tracks progress/saves and
+            // routes the final completion to the Platform Approvals Queue.
+            if (d.type === 'pflx_mod_ready') {
+              var savedState = {};
+              try { savedState = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch(e2) {}
+              try {
+                courseFrame.contentWindow.postMessage({
+                  v: 1, type: 'pflx_mod_init',
+                  payload: {
+                    player: pflxModulePlayer(),
+                    xc: { balance: 0 },
+                    badges: [],
+                    save: savedState,
+                    context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo' },
+                    coop: { sessionId: null, role: null, peers: [] }
+                  }
+                }, '*');
+              } catch(e3) {}
+            }
+            if (d.type === 'pflx_mod_progress' && d.payload) {
+              var mp = Math.min(100, Math.max(0, parseInt(d.payload.percent) || 0));
+              document.getElementById('courseProgressFill').style.width = mp + '%';
+              if (courseTasks.length === 0) {
+                document.getElementById('courseProgressLabel').textContent = mp + '%';
+              }
+              node._courseProgress = { total: 100, completed: mp, pct: mp };
+            }
+            if (d.type === 'pflx_mod_checkpoint' && d.payload) {
+              node._lastCheckpoint = d.payload.checkpointId || '';
+            }
+            if (d.type === 'pflx_mod_save' && d.payload) {
+              try { localStorage.setItem(moduleSaveKey, JSON.stringify(d.payload.state || {})); } catch(e2) {}
+              try {
+                courseFrame.contentWindow.postMessage(
+                  { v: 1, type: 'pflx_mod_save_ack', payload: { ok: true } }, '*');
+              } catch(e3) {}
+            }
+            if (d.type === 'pflx_mod_submission' && d.payload) {
+              node._moduleSubmission = d.payload.fields || {};
+            }
+            if (d.type === 'pflx_mod_complete' && d.payload) {
+              document.getElementById('courseProgressFill').style.width = '100%';
+              document.getElementById('courseContentTitle').textContent = node.title + ' — SUBMITTED';
+              try { localStorage.setItem(moduleSaveKey, JSON.stringify(d.payload.finalState || {})); } catch(e2) {}
+              // Build the Completion Record ("credentials") and route it to the
+              // Platform's unified Approvals Queue — no reward pays until a host approves.
+              var completionRecord = {
+                moduleId: (node.coursePackage || '').split('/').pop() || node.id,
+                nodeId: node.id,
+                nodeTitle: node.title,
+                pathwaySlug: pathwaySlug,
+                player: pflxModulePlayer(),
+                submission: d.payload.submission || {},
+                score: (d.payload.score != null) ? d.payload.score : null,
+                submittedAt: Date.now(),
+                status: 'pending'
+              };
+              node._completionRecord = completionRecord;
+              try {
+                window.parent.postMessage(
+                  { v: 1, type: 'pflx_module_completion', payload: completionRecord }, '*');
+              } catch(e3) {}
             }
           } catch(err) { /* cross-origin safety */ }
         };
