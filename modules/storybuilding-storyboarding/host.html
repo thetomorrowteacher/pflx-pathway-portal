@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storybuilding & Storyboarding — Host View</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cyan:#00d4ff; --purple:#8b5cf6; --amber:#ffa500; --green:#10e090;
+    --darker:#050810; --panel:rgba(13,18,30,0.92);
+    --line:rgba(0,212,255,0.18); --text:#e0e6ef; --muted:#7a8ba0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Rajdhani',sans-serif;background:var(--darker);color:var(--text);
+    min-height:100vh;line-height:1.5;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;z-index:0;
+    background:
+      radial-gradient(900px 500px at 10% -5%,rgba(0,212,255,0.10),transparent 70%),
+      radial-gradient(900px 600px at 105% 110%,rgba(139,92,246,0.10),transparent 70%);
+  }
+  .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:34px 32px 70px}
+  .kicker{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--cyan)}
+  h1{font-size:32px;font-weight:700;margin:8px 0 4px}
+  .sub{font-size:15px;color:var(--muted)}
+  .host-tag{
+    display:inline-block;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;
+    padding:4px 11px;border-radius:5px;background:rgba(139,92,246,0.16);
+    border:1px solid rgba(139,92,246,0.4);color:var(--purple);margin-top:10px;
+  }
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .meta{
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:9px 14px;font-size:13px;
+  }
+  .meta b{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--cyan);display:block;margin-top:2px}
+  .section{margin-top:34px}
+  .section-h{
+    font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:2px;color:var(--cyan);
+    border-bottom:1px solid var(--line);padding-bottom:7px;margin-bottom:16px;
+  }
+  .phase-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .pcard{
+    background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--strand);
+    border-radius:10px;padding:14px;
+  }
+  .pcard .pk{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;color:var(--strand)}
+  .pcard .pt{font-size:16px;font-weight:700;margin:5px 0 8px;line-height:1.2}
+  .pcard .pe{font-size:12px;color:var(--muted);line-height:1.5}
+  .pcard .pobj{margin-top:9px;display:flex;flex-wrap:wrap;gap:4px}
+  .ocode{
+    font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.5px;padding:3px 6px;
+    border-radius:4px;background:rgba(0,212,255,0.1);border:1px solid var(--line);color:var(--cyan);
+  }
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:var(--muted)}
+  td.code{font-family:'Orbitron',sans-serif;font-size:10px;color:var(--cyan);white-space:nowrap}
+  .xwrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 14px;overflow-x:auto}
+  .crit{
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;
+    padding:11px 14px;margin-bottom:8px;display:flex;gap:11px;align-items:flex-start;
+  }
+  .crit .cn{font-family:'Orbitron',sans-serif;font-size:13px;color:var(--green);flex-shrink:0}
+  .crit .cl{font-size:13.5px}
+  .crit .cs{font-size:11px;color:var(--muted);font-family:'Orbitron',sans-serif;letter-spacing:1px}
+  .flow{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+    font-size:14px;line-height:1.7;color:#cdd6e4;
+  }
+  .flow b{color:var(--cyan)}
+  .flow .arrow{color:var(--purple);margin:0 6px}
+  .reward{
+    margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;
+  }
+  .rchip{
+    background:rgba(16,224,144,0.1);border:1px solid rgba(16,224,144,0.35);
+    color:var(--green);border-radius:8px;padding:8px 13px;font-size:13px;font-weight:600;
+  }
+  @media(max-width:760px){ .phase-grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:480px){ .phase-grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+
+<script type="application/json" id="module-manifest">
+{
+  "moduleId": "storybuilding-storyboarding",
+  "name": "Storybuilding & Storyboarding",
+  "subtitle": "Build a story from the ground up, then plan it scene by scene.",
+  "version": "1.0.0",
+  "moduleType": "course",
+  "framework": "FLX",
+  "estimatedMinutes": 90,
+  "suggestedReward": { "xc": 200, "badgeIds": ["visual-storyteller"] },
+  "taskCriteria": [
+    { "id": "tc1", "label": "Story uses all 7 elements intentionally — theme, characters, setting, plot, conflict, point of view, style", "scale": "1-5" },
+    { "id": "tc2", "label": "Storyboard plans every scene with a sketch and a description", "scale": "1-5" },
+    { "id": "tc3", "label": "Screencast clearly walks through the storyboard with a voiceover", "scale": "1-5" },
+    { "id": "tc4", "label": "Visuals and descriptions are clear, quality, and communicate the idea", "scale": "1-5" }
+  ],
+  "phases": [
+    { "id": "engagement", "kind": "engagement", "title": "Why Stories Move Us",
+      "essence": "A diagnostic confidence-check and a warm-up reflection on a story that stuck with the learner.",
+      "flxObjectives": ["FLX.CN.1", "FLX.CN.2"] },
+    { "id": "development", "kind": "development", "title": "Build Your Story, Then Storyboard It",
+      "essence": "Ideation: the 7 story elements + build a story. Creation: storyboarding concepts + draft a storyboard.",
+      "flxObjectives": ["FLX.ID.1", "FLX.ID.3", "FLX.CR.1", "FLX.CR.2"] },
+    { "id": "enhancement", "kind": "enhancement", "title": "Test, Share, Refine",
+      "essence": "Peer/mentor feedforward on the draft, a deliberate refinement pass, and reflection.",
+      "flxObjectives": ["FLX.RE.1", "FLX.RE.2", "FLX.RE.3"] },
+    { "id": "fulfillment", "kind": "fulfillment", "title": "Finalize & Present",
+      "essence": "Finalize the storyboard, record a screencast walkthrough, submit for host approval.",
+      "flxObjectives": ["FLX.PR.1", "FLX.PR.2"] }
+  ]
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  var M = JSON.parse(document.getElementById('module-manifest').textContent);
+  var STRAND = { engagement:'#00d4ff', development:'#8b5cf6', enhancement:'#ffa500', fulfillment:'#10e090' };
+
+  /* PFLX reference data — the FLX objective crosswalk (per MODULE_STRUCTURE.md §3,
+     the crosswalk lives in PFLX, not in the cartridge). Only the objectives this
+     module uses are shown. */
+  var OBJ = {
+    "FLX.CN.1": "Use empathetic understanding to inform and shape solution development.",
+    "FLX.CN.2": "Generate and communicate precise questions to define the problem.",
+    "FLX.ID.1": "Engage in divergent thinking; brainstorm a broad range of solutions.",
+    "FLX.ID.3": "Develop and organize a clear, detailed plan of execution.",
+    "FLX.CR.1": "Construct physical or digital representations of multiple solutions.",
+    "FLX.CR.2": "Develop and leverage skills in various prototyping methods and tools.",
+    "FLX.RE.1": "Conduct comprehensive testing; gather feedback and self-evaluation.",
+    "FLX.RE.2": "Refine and improve the solution based on feedback and testing.",
+    "FLX.RE.3": "Showcase a reflective understanding of the learning process.",
+    "FLX.PR.1": "Complete the final solution for real-world implementation on a timeline.",
+    "FLX.PR.2": "Develop and execute a presentation method showing concept-to-product."
+  };
+  var XWALK = {
+    "FLX.CN.1": ["Communication & Collaboration","Empowered Learner","Creating","Multiple Means of Engagement","Self-awareness"],
+    "FLX.CN.2": ["Critical Thinking & Problem Solving","Digital Citizen","Responding","Multiple Means of Representation","Social Awareness"],
+    "FLX.ID.1": ["Creativity & Innovation","Innovative Designer","Creating","Multiple Means of Engagement","Self-management"],
+    "FLX.ID.3": ["Leadership & Responsibility","Creative Communicator","Connecting","Multiple Means of Action & Expression","Responsible Decision-Making"],
+    "FLX.CR.1": ["Creativity & Innovation","Computational Thinker","Creating","Multiple Means of Engagement","Self-management"],
+    "FLX.CR.2": ["Flexibility & Adaptability","Innovative Designer","Responding","Multiple Means of Representation","Social Awareness"],
+    "FLX.RE.1": ["Critical Thinking & Problem Solving","Empowered Learner","Responding","Multiple Means of Representation","Self-awareness"],
+    "FLX.RE.2": ["Creativity & Innovation","Creative Communicator","Creating","Multiple Means of Engagement","Self-management"],
+    "FLX.RE.3": ["Communication & Collaboration","Global Collaborator","Connecting","Multiple Means of Action & Expression","Self-awareness"],
+    "FLX.PR.1": ["Critical Thinking & Problem Solving","Innovative Designer","Creating","Multiple Means of Action & Expression","Responsible Decision-Making"],
+    "FLX.PR.2": ["Communication & Collaboration","Creative Communicator","Responding","Multiple Means of Representation","Social Awareness"]
+  };
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  var allObj = [];
+  M.phases.forEach(function(p){ p.flxObjectives.forEach(function(o){ if(allObj.indexOf(o)<0) allObj.push(o); }); });
+
+  var phaseCards = M.phases.map(function(p){
+    return '<div class="pcard" style="--strand:'+STRAND[p.kind]+'">'
+      + '<div class="pk">'+p.kind.toUpperCase()+'</div>'
+      + '<div class="pt">'+esc(p.title)+'</div>'
+      + '<div class="pe">'+esc(p.essence)+'</div>'
+      + '<div class="pobj">'+p.flxObjectives.map(function(o){return '<span class="ocode">'+o+'</span>';}).join('')+'</div>'
+      + '</div>';
+  }).join('');
+
+  var xrows = allObj.map(function(o){
+    var x = XWALK[o]||[];
+    return '<tr><td class="code">'+o+'</td><td>'+esc(OBJ[o]||'')+'</td>'
+      + '<td>'+esc(x[0]||'')+'</td><td>'+esc(x[1]||'')+'</td><td>'+esc(x[2]||'')+'</td>'
+      + '<td>'+esc(x[3]||'')+'</td><td>'+esc(x[4]||'')+'</td></tr>';
+  }).join('');
+
+  var crits = M.taskCriteria.map(function(c,i){
+    return '<div class="crit"><div class="cn">'+(i+1)+'</div>'
+      + '<div><div class="cl">'+esc(c.label)+'</div>'
+      + '<div class="cs">SCALE '+esc(c.scale)+'</div></div></div>';
+  }).join('');
+
+  document.getElementById('wrap').innerHTML =
+    '<div class="kicker">PFLX MODULE · HOST VIEW</div>'
+    + '<h1>'+esc(M.name)+'</h1>'
+    + '<div class="sub">'+esc(M.subtitle)+'</div>'
+    + '<div class="host-tag">HOST VIEW — '+M.framework+' FRAMEWORK · '+M.moduleType.toUpperCase()+'</div>'
+    + '<div class="meta-row">'
+      + '<div class="meta">Module ID<b>'+esc(M.moduleId)+'</b></div>'
+      + '<div class="meta">Version<b>'+esc(M.version)+'</b></div>'
+      + '<div class="meta">Est. time<b>'+M.estimatedMinutes+' min</b></div>'
+      + '<div class="meta">FLX objectives<b>'+allObj.length+'</b></div>'
+      + '<div class="meta">Phases<b>'+M.phases.length+'</b></div>'
+    + '</div>'
+
+    + '<div class="section"><div class="section-h">FLX FRAMEWORK MAP</div>'
+      + '<div class="phase-grid">'+phaseCards+'</div></div>'
+
+    + '<div class="section"><div class="section-h">STANDARDS CROSSWALK</div>'
+      + '<p style="font-size:13px;color:var(--muted);margin-bottom:10px">'
+      + 'Each FLX objective this module teaches, expanded through the PFLX crosswalk. '
+      + 'The cartridge stores only the codes — this mapping is PFLX reference data.</p>'
+      + '<div class="xwrap"><table><thead><tr>'
+      + '<th>FLX</th><th>Objective</th><th>21st-Century</th><th>ISTE</th><th>Arts</th>'
+      + '<th>UDL</th><th>CASEL</th></tr></thead><tbody>'+xrows+'</tbody></table></div></div>'
+
+    + '<div class="section"><div class="section-h">APPROVAL CRITERIA</div>'
+      + '<p style="font-size:13px;color:var(--muted);margin-bottom:10px">'
+      + 'When the learner submits, score the Completion Record against these criteria in the Approvals Queue.</p>'
+      + crits + '</div>'
+
+    + '<div class="section"><div class="section-h">COMPLETION & APPROVAL FLOW</div>'
+      + '<div class="flow">The learner works through all four FLX phases. Only the '
+      + '<b>Fulfillment</b> submission is a real gate. On submit, the Module sends '
+      + '<b>pflx_mod_complete</b><span class="arrow">→</span> the Node builds a '
+      + '<b>Completion Record</b><span class="arrow">→</span> it lands in the shared '
+      + '<b>Approvals Queue</b> alongside every other approval. No XC or badge is paid until '
+      + 'a host approves. On approval the clamped reward pays out and the Module receives '
+      + '<b>pflx_mod_approval_result</b>.'
+      + '<div class="reward">'
+      + '<div class="rchip">+ '+M.suggestedReward.xc+' XC (suggested — node editor sets the ceiling)</div>'
+      + M.suggestedReward.badgeIds.map(function(b){return '<div class="rchip">🏅 '+esc(b)+'</div>';}).join('')
+      + '</div></div></div>';
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storybuilding & Storyboarding — PFLX Module</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cyan:#00d4ff; --purple:#8b5cf6; --amber:#ffa500; --green:#10e090;
+    --dark:#0a0e17; --darker:#050810; --panel:rgba(13,18,30,0.92);
+    --line:rgba(0,212,255,0.18); --text:#e0e6ef; --muted:#7a8ba0; --red:#ff4466;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Rajdhani',sans-serif;background:var(--darker);color:var(--text);
+    overflow:hidden;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;z-index:0;
+    background:
+      radial-gradient(900px 500px at 12% -5%,rgba(0,212,255,0.10),transparent 70%),
+      radial-gradient(900px 600px at 105% 110%,rgba(139,92,246,0.10),transparent 70%);
+  }
+  #app{position:relative;z-index:1;display:flex;height:100vh}
+
+  /* ---- phase rail ---- */
+  .rail{
+    width:248px;flex-shrink:0;background:var(--panel);
+    border-right:1px solid var(--line);display:flex;flex-direction:column;
+  }
+  .rail-head{padding:20px 18px 14px;border-bottom:1px solid var(--line)}
+  .rail-kicker{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2.5px;color:var(--cyan);opacity:.8}
+  .rail-title{font-size:19px;font-weight:700;line-height:1.15;margin-top:6px}
+  .rail-sub{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
+  .progress-wrap{padding:14px 18px;border-bottom:1px solid var(--line)}
+  .progress-bar{height:6px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden}
+  .progress-fill{height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .4s}
+  .progress-label{font-size:11px;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between}
+  .phases{flex:1;overflow-y:auto;padding:10px}
+  .phase-item{
+    display:flex;gap:11px;align-items:flex-start;padding:12px 11px;border-radius:10px;
+    cursor:pointer;margin-bottom:4px;border:1px solid transparent;transition:.15s;
+  }
+  .phase-item:hover{background:rgba(255,255,255,0.03)}
+  .phase-item.active{background:rgba(0,212,255,0.08);border-color:var(--line)}
+  .phase-item.locked{opacity:.4;cursor:not-allowed}
+  .phase-dot{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;
+    align-items:center;justify-content:center;font-size:12px;font-weight:700;
+    border:2px solid var(--strand);color:var(--strand);
+  }
+  .phase-item.done .phase-dot{background:var(--strand);color:var(--darker)}
+  .phase-meta{flex:1;min-width:0}
+  .phase-strand{font-family:'Orbitron',sans-serif;font-size:8.5px;letter-spacing:1.5px;color:var(--strand)}
+  .phase-name{font-size:14px;font-weight:600;line-height:1.2;margin-top:2px}
+  .rail-foot{padding:12px 18px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .save-dot{display:flex;align-items:center;gap:6px}
+  .save-dot i{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .save-dot.saving i{background:var(--amber)}
+
+  /* ---- main ---- */
+  .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+  .stage{max-width:780px;width:100%;margin:0 auto;padding:34px 38px 60px}
+  .phase-header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px}
+  .ph-strand{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--strand)}
+  .ph-title{font-size:30px;font-weight:700;line-height:1.1;margin-top:6px}
+  .obj-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .obj-chip{
+    font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;
+    padding:4px 9px;border-radius:5px;background:rgba(0,212,255,0.10);
+    border:1px solid var(--line);color:var(--cyan);cursor:help;
+  }
+  .eq{
+    margin-top:14px;padding:13px 15px;border-left:3px solid var(--strand);
+    background:rgba(255,255,255,0.025);border-radius:0 8px 8px 0;
+  }
+  .eq-label{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;color:var(--muted)}
+  .eq p{font-size:15px;font-style:italic;margin-top:5px;color:#cfd8e6}
+
+  /* blocks */
+  .block{margin-bottom:20px}
+  .md h2{font-size:22px;font-weight:700;margin:4px 0 10px}
+  .md h3{font-size:17px;font-weight:600;margin:14px 0 7px;color:var(--cyan)}
+  .md p{font-size:15.5px;line-height:1.7;margin:8px 0;color:#d4dce8}
+  .md ul{margin:8px 0 8px 4px;list-style:none}
+  .md li{font-size:15px;line-height:1.65;margin:6px 0;padding-left:18px;position:relative;color:#d4dce8}
+  .md li::before{content:'▸';position:absolute;left:0;color:var(--cyan)}
+  .md strong{color:#fff;font-weight:700}
+  .callout{padding:13px 16px;border-radius:9px;font-size:14px;line-height:1.6;border:1px solid}
+  .callout.info{background:rgba(0,212,255,0.07);border-color:var(--line);color:#bfe6f2}
+  .callout.success{background:rgba(16,224,144,0.08);border-color:rgba(16,224,144,0.3);color:#bff0d8}
+  .callout.warn{background:rgba(255,165,0,0.08);border-color:rgba(255,165,0,0.3);color:#f0dcb8}
+  .video-embed{position:relative;padding-bottom:56.25%;height:0;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  .video-embed iframe{position:absolute;inset:0;width:100%;height:100%}
+  .vid-cap{font-size:13px;color:var(--muted);margin-top:6px}
+
+  /* tool card */
+  .tool-card{
+    display:flex;gap:14px;align-items:center;padding:15px 16px;border-radius:11px;
+    background:rgba(139,92,246,0.07);border:1px solid rgba(139,92,246,0.28);
+  }
+  .tool-ic{font-size:30px}
+  .tool-body{flex:1}
+  .tool-name{font-size:16px;font-weight:700}
+  .tool-tag{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1px;color:var(--purple);margin-left:8px}
+  .tool-desc{font-size:13.5px;color:#c4cee0;line-height:1.55;margin-top:3px}
+  .tool-note{font-size:12px;color:var(--muted);margin-top:5px;font-style:italic}
+
+  /* interactive task */
+  .task{
+    border:1px solid var(--line);border-radius:12px;padding:18px;background:rgba(255,255,255,0.022);
+  }
+  .task.done{border-color:rgba(16,224,144,0.4);background:rgba(16,224,144,0.04)}
+  .task-head{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+  .task-badge{font-family:'Orbitron',sans-serif;font-size:8.5px;letter-spacing:1.5px;padding:3px 7px;border-radius:4px;background:rgba(0,212,255,0.12);color:var(--cyan)}
+  .task.done .task-badge{background:rgba(16,224,144,0.18);color:var(--green)}
+  .task-title{font-size:17px;font-weight:700}
+  .task-instr{font-size:14px;color:#c4cee0;line-height:1.6;margin:6px 0 12px}
+  .field{margin-bottom:11px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--cyan);margin-bottom:4px;letter-spacing:.3px}
+  .field input,.field textarea{
+    width:100%;background:rgba(5,8,16,0.7);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);font-family:'Rajdhani',sans-serif;font-size:14.5px;padding:9px 11px;resize:vertical;
+  }
+  .field textarea{min-height:74px}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--cyan)}
+
+  /* diagnostic */
+  .dx-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .dx-label{flex:1;font-size:14.5px;font-weight:600}
+  .dx-scale{display:flex;gap:5px;flex-wrap:wrap}
+  .dx-opt{
+    font-size:11px;padding:5px 9px;border-radius:6px;cursor:pointer;
+    background:rgba(255,255,255,0.04);border:1px solid var(--line);color:var(--muted);transition:.12s;
+  }
+  .dx-opt:hover{border-color:var(--cyan)}
+  .dx-opt.sel{background:var(--cyan);color:var(--darker);border-color:var(--cyan);font-weight:700}
+
+  .btn{
+    font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1.5px;font-weight:700;
+    padding:11px 20px;border-radius:9px;border:1px solid var(--cyan);background:rgba(0,212,255,0.12);
+    color:var(--cyan);cursor:pointer;transition:.15s;
+  }
+  .btn:hover:not(:disabled){background:var(--cyan);color:var(--darker)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn.solid{background:var(--cyan);color:var(--darker)}
+  .btn.green{border-color:var(--green);background:var(--green);color:var(--darker)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+  .task-foot{margin-top:10px;display:flex;align-items:center;gap:12px}
+  .done-tag{font-size:12px;color:var(--green);font-weight:700;display:flex;align-items:center;gap:5px}
+
+  .nav-row{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:30px;padding-top:20px;border-top:1px solid var(--line);
+  }
+  .gate-note{font-size:13px;color:var(--muted)}
+  .gate-note.ok{color:var(--green)}
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--panel);border:1px solid var(--cyan);border-radius:10px;
+    padding:11px 20px;font-size:13px;z-index:50;transition:transform .35s;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .pill{
+    display:inline-block;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1.5px;
+    padding:4px 10px;border-radius:5px;background:rgba(16,224,144,0.14);color:var(--green);
+    border:1px solid rgba(16,224,144,0.35);
+  }
+  .seg-label{
+    font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2.5px;color:var(--strand);
+    margin:26px 0 4px;padding-top:14px;border-top:1px dashed var(--line);
+  }
+  .seg-label:first-child{border-top:none;padding-top:0;margin-top:6px}
+  @media(max-width:720px){
+    .rail{display:none}
+    .stage{padding:24px 20px 60px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="application/json" id="module-manifest">
+{
+  "schemaVersion": 2,
+  "moduleId": "storybuilding-storyboarding",
+  "moduleType": "course",
+  "name": "Storybuilding & Storyboarding",
+  "subtitle": "Build a story from the ground up, then plan it scene by scene.",
+  "version": "1.0.0",
+  "protocolVersion": 1,
+  "saveVersion": 1,
+  "framework": "FLX",
+  "description": "Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions.",
+  "estimatedMinutes": 90,
+  "capabilities": { "progress": true, "stats": true, "checkpoints": true, "coop": false, "submission": true, "hostDashboard": true },
+  "suggestedReward": { "xc": 200, "badgeIds": ["visual-storyteller"] },
+  "objectiveText": {
+    "FLX.CN.1": "Use empathetic understanding to inform and shape solution development.",
+    "FLX.CN.2": "Generate and communicate precise questions to define the problem.",
+    "FLX.ID.1": "Engage in divergent thinking; brainstorm a broad range of solutions.",
+    "FLX.ID.3": "Develop and organize a clear, detailed plan of execution.",
+    "FLX.CR.1": "Construct physical or digital representations of multiple solutions.",
+    "FLX.CR.2": "Develop and leverage skills in various prototyping methods and tools.",
+    "FLX.RE.1": "Conduct comprehensive testing; gather feedback and self-evaluation.",
+    "FLX.RE.2": "Refine and improve the solution based on feedback and testing.",
+    "FLX.RE.3": "Showcase a reflective understanding of the learning process.",
+    "FLX.PR.1": "Complete the final solution for real-world implementation on a timeline.",
+    "FLX.PR.2": "Develop and execute a presentation method showing concept-to-product."
+  },
+  "structure": {
+    "phases": [
+      {
+        "id": "engagement", "kind": "engagement", "title": "Why Stories Move Us",
+        "flxObjectives": ["FLX.CN.1", "FLX.CN.2"],
+        "desiredResults": {
+          "essentialQuestions": [
+            "How can I use storybuilding and storyboarding to visualize my thoughts and ideas?",
+            "What makes a story stick with the people who experience it?"
+          ]
+        },
+        "gate": { "type": "activity" },
+        "blocks": [
+          { "kind": "markdown", "content": "## Welcome to Storybuilding & Storyboarding\n\nEvery film, game, comic, and animation you have ever loved started the same way: as an **idea** that someone built into a world.\n\nIn this course you will do two things. First you will **build a story** from the ground up. Then you will **storyboard it** — turning that story into a visual plan you could actually hand to a production team." },
+          { "kind": "callout", "tone": "info", "content": "Course objective — Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions. Estimated time: about 90 minutes." },
+          { "kind": "diagnostic", "id": "dx-confidence", "prompt": "Before we begin — how confident do you feel about each of these right now? There are no wrong answers. This is your starting line, and you will revisit it at the end.",
+            "scale": ["New to me", "Some idea", "Pretty comfortable", "I've got this"],
+            "items": [
+              { "id": "d-theme", "label": "Theme" }, { "id": "d-characters", "label": "Characters" },
+              { "id": "d-setting", "label": "Setting" }, { "id": "d-plot", "label": "Plot" },
+              { "id": "d-conflict", "label": "Conflict" }, { "id": "d-pov", "label": "Point of View" },
+              { "id": "d-style", "label": "Style" }, { "id": "d-storyboard", "label": "Storyboarding" }
+            ] },
+          { "kind": "activity", "id": "act-warmup", "title": "Warm-up — A story that stuck with you",
+            "instructions": "Think of a story — a film, a game, a book, a show — that has stayed with you. In a few sentences, describe what made it unforgettable. Was it a character? A moment? The world? Keep this in mind: by the end of the course you will be able to name exactly which story element did that work.",
+            "fields": [
+              { "id": "f-story", "label": "The story", "type": "text" },
+              { "id": "f-why", "label": "What made it unforgettable", "type": "textarea" }
+            ] }
+        ]
+      },
+      {
+        "id": "development", "kind": "development", "title": "Build Your Story, Then Storyboard It",
+        "flxObjectives": ["FLX.ID.1", "FLX.ID.3", "FLX.CR.1", "FLX.CR.2"],
+        "desiredResults": {
+          "essentialQuestions": [
+            "How do the seven elements work together to make a story whole?",
+            "How does storyboarding make an idea producible?"
+          ]
+        },
+        "gate": { "type": "activity" },
+        "segments": [
+          {
+            "id": "ideation", "subDomain": "ID", "title": "Ideation — Storybuilding",
+            "blocks": [
+              { "kind": "markdown", "content": "## What is storybuilding?\n\nStorybuilding is the process of creating a story from the ground up — starting with an idea and developing it into a complete world.\n\nIt begins with imagining your characters, giving them goals or problems, and placing them in a setting that shapes their journey. Then you build the plot — what happens, why it matters, and how it changes your characters.\n\nIn short: **storybuilding is about creating the people, places, and events that bring your imagination to life.**" },
+              { "kind": "markdown", "content": "## The 7 elements of a story\n\nAlmost every story you will ever build is made from these seven elements:\n\n- **Theme** — the central idea or message; what the story is really about beneath the events.\n- **Characters** — the people, or beings, who drive the story; their goals, flaws, and changes.\n- **Setting** — when and where the story happens; the world that shapes the journey.\n- **Plot** — the sequence of events; what happens, and in what order.\n- **Conflict** — the problem or tension the characters face; the engine of the story.\n- **Point of View** — whose eyes we experience the story through.\n- **Style** — the voice and texture of the telling; tone, pacing, and language." },
+              { "kind": "tool", "name": "Plot Factory", "categoryTag": "web-based",
+                "description": "A web-based AI writing assistant for building characters, worlds, and plots. Use it as a thinking partner while you assemble your story.",
+                "launchUrl": "https://www.plotfactory.com/",
+                "tutorialNote": "Watch the Plot Factory tutorial linked in your class resources before you start, if this is your first time." },
+              { "kind": "activity", "id": "act-build-story", "title": "Complete the Task — Build your own story",
+                "instructions": "Use the 7 elements of a story to build your own. Fill in each element below. It does not need to be long — it needs to be deliberate. Every element should be a real choice you can explain.",
+                "fields": [
+                  { "id": "e-theme", "label": "Theme", "type": "text" },
+                  { "id": "e-characters", "label": "Characters", "type": "textarea" },
+                  { "id": "e-setting", "label": "Setting", "type": "text" },
+                  { "id": "e-plot", "label": "Plot", "type": "textarea" },
+                  { "id": "e-conflict", "label": "Conflict", "type": "text" },
+                  { "id": "e-pov", "label": "Point of View", "type": "text" },
+                  { "id": "e-style", "label": "Style", "type": "text" }
+                ] }
+            ]
+          },
+          {
+            "id": "creation", "subDomain": "CR", "title": "Creation — Storyboarding",
+            "blocks": [
+              { "kind": "markdown", "content": "## What is storyboarding?\n\nStoryboarding is the process used to visualize what the final look of a motion picture, motion graphic, animation, or interactive media sequence will be.\n\nThink of it as a comic strip where all the important details are laid out — including audio, camera moves, and what the characters will be doing or feeling." },
+              { "kind": "markdown", "content": "## How to storyboard your story\n\n- Use a storyboard to plan your story. It can be **digital or physical** (unless your host specifies one).\n- Develop a **sketch and a description for each scene** of your production. A sketch may not be necessary depending on the needs of the production.\n- Note the important details for each scene: audio, camera moves, and what the characters are doing or feeling." },
+              { "kind": "tool", "name": "Storyboard Templates", "categoryTag": "template",
+                "description": "Start from a ready-made storyboard template — pick the Slides version or the Canva version, whichever fits how you work.",
+                "launchUrl": "https://www.canva.com/templates/?query=storyboard",
+                "tutorialNote": "A Slides template and a Canva template are linked in your class resources. An example storyboard is included there too." },
+              { "kind": "activity", "id": "act-draft-storyboard", "title": "Complete the Task — Draft your storyboard",
+                "instructions": "Using a template or your own layout, draft a storyboard for the story you built. Plan every scene with a sketch and a description. When you have a working draft, paste a link to it below (or note where it lives).",
+                "fields": [
+                  { "id": "sb-link", "label": "Link to your storyboard draft", "type": "text" },
+                  { "id": "sb-scenes", "label": "How many scenes does your storyboard cover?", "type": "text" },
+                  { "id": "sb-notes", "label": "Anything you are unsure about and want feedback on", "type": "textarea" }
+                ] }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "enhancement", "kind": "enhancement", "title": "Test, Share, Refine",
+        "flxObjectives": ["FLX.RE.1", "FLX.RE.2", "FLX.RE.3"],
+        "desiredResults": {
+          "essentialQuestions": [
+            "How does outside feedback reveal what I cannot see in my own work?",
+            "What changes when I revise with intention instead of guessing?"
+          ]
+        },
+        "gate": { "type": "activity" },
+        "blocks": [
+          { "kind": "markdown", "content": "## Why share before you finalize\n\nTop creators ship rough versions to trusted people *before* final polish. A storyboard is the perfect thing to test — it is quick to read and quick to change. Fixing a confusing scene now costs you a sentence. Fixing it after you have filmed costs you a reshoot." },
+          { "kind": "activity", "id": "act-feedback", "title": "Share & get feedforward",
+            "instructions": "Share your storyboard draft with 1–2 peers or a mentor. Ask them specifically about clarity (can they follow the story?), pacing (does any scene drag or rush?), and visual storytelling (do the sketches carry the idea?). Record the feedback you received below.",
+            "fields": [
+              { "id": "fb-who", "label": "Who gave you feedback", "type": "text" },
+              { "id": "fb-clarity", "label": "What they said about clarity", "type": "textarea" },
+              { "id": "fb-pacing", "label": "What they said about pacing and visual storytelling", "type": "textarea" }
+            ] },
+          { "kind": "activity", "id": "act-refine", "title": "Refine your storyboard",
+            "instructions": "Revise your storyboard based on the feedback. You do not have to accept every note — but you do have to decide. List what you changed and why.",
+            "fields": [
+              { "id": "rf-changes", "label": "What you changed", "type": "textarea" },
+              { "id": "rf-why", "label": "Why you made those changes (and any feedback you chose not to take, and why)", "type": "textarea" }
+            ] },
+          { "kind": "reflection", "id": "act-reflect", "title": "Reflect",
+            "prompts": [
+              { "id": "r-hard", "prompt": "Which of the 7 story elements was hardest to make clear in your storyboard? What finally worked?" },
+              { "id": "r-grew", "prompt": "What part of your storyboard improved the most between the draft and the refined version?" }
+            ] }
+        ]
+      },
+      {
+        "id": "fulfillment", "kind": "fulfillment", "title": "Finalize & Present",
+        "flxObjectives": ["FLX.PR.1", "FLX.PR.2"],
+        "desiredResults": {
+          "essentialQuestions": [
+            "How do I present my process so someone else understands the choices I made?"
+          ]
+        },
+        "gate": { "type": "submission", "blockId": "act-submit" },
+        "blocks": [
+          { "kind": "markdown", "content": "## Finalize your storyboard\n\nComplete your storyboard so every scene has a sketch and a description and is ready to read. This is the version you would actually hand to a production team." },
+          { "kind": "markdown", "content": "## Document your work\n\nRecord a **screen recording with a voiceover** that walks through your finished storyboard. Explain, scene by scene, what is happening, and point out where your 7 story elements show up." },
+          { "kind": "callout", "tone": "info", "content": "Presentation checklist — every scene has a sketch and a description • the screen recording shows the full storyboard • your voiceover explains the story, not just the pictures • you name where your theme, conflict, and point of view appear." },
+          { "kind": "submission", "id": "act-submit", "title": "Submit for approval",
+            "instructions": "Submit your finished storyboard and your screencast walkthrough. Your host will review them against the course criteria and award XC and your badge on approval.",
+            "acceptFile": true, "acceptLink": true, "descriptionRequired": true, "descriptionMinLength": 50,
+            "descriptionHint": "In a few sentences: which story elements are strongest in your storyboard, and what should your host watch for in the screencast?" }
+        ]
+      }
+    ]
+  }
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     PFLX Module Viewer — phase-based renderer
+     Reads a phase-based manifest (MODULE_STRUCTURE.md v0.2),
+     renders the 4 FLX strands, enforces gates, and speaks the
+     Connector protocol (CONNECTOR_CONTRACT.md v0.4).
+     ============================================================ */
+
+  var MANIFEST = JSON.parse(document.getElementById('module-manifest').textContent);
+  var PHASES = MANIFEST.structure.phases;
+  var OBJ = MANIFEST.objectiveText || {};
+  var STRAND = { engagement:'#00d4ff', development:'#8b5cf6', enhancement:'#ffa500', fulfillment:'#10e090' };
+
+  /* ---- Connector transport ---- */
+  var embedded = !!(window.parent && window.parent !== window);
+  var session = { displayName:'Explorer', initials:'EX' };
+  var SAVE_KEY = 'pflx_module_' + MANIFEST.moduleId;
+
+  function postToNode(type, payload){
+    if(!embedded) return;
+    try { window.parent.postMessage({ v:1, type:type, payload:payload||{} }, '*'); } catch(e){}
+  }
+
+  /* ---- state ---- */
+  var state = { currentPhase:0, blocks:{}, submitted:false };
+
+  function loadStandalone(){
+    if(embedded) return;
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if(raw){ var s = JSON.parse(raw); if(s && s.blocks) state = s; }
+    } catch(e){}
+  }
+
+  /* ---- block helpers ---- */
+  function phaseBlocks(phase){
+    if(phase.segments){
+      var out = [];
+      phase.segments.forEach(function(seg){
+        seg.blocks.forEach(function(b){ out.push({ block:b, segment:seg }); });
+      });
+      return out;
+    }
+    return phase.blocks.map(function(b){ return { block:b, segment:null }; });
+  }
+  function isCompletable(b){ return b.kind==='diagnostic'||b.kind==='activity'||b.kind==='reflection'||b.kind==='submission'; }
+  function blockState(id){ if(!state.blocks[id]) state.blocks[id] = {}; return state.blocks[id]; }
+  function isBlockDone(id){ return !!(state.blocks[id] && state.blocks[id].done); }
+
+  function phaseCompletables(phase){
+    return phaseBlocks(phase).map(function(x){return x.block;}).filter(isCompletable);
+  }
+  function isPhaseComplete(idx){
+    var cs = phaseCompletables(PHASES[idx]);
+    if(!cs.length) return true;
+    return cs.every(function(b){ return isBlockDone(b.id); });
+  }
+  function allCompletables(){
+    var n = 0; PHASES.forEach(function(p){ n += phaseCompletables(p).length; }); return n;
+  }
+  function doneCompletables(){
+    var n = 0;
+    PHASES.forEach(function(p){ phaseCompletables(p).forEach(function(b){ if(isBlockDone(b.id)) n++; }); });
+    return n;
+  }
+  function progressPercent(){
+    var t = allCompletables(); return t ? Math.round(doneCompletables()/t*100) : 0;
+  }
+
+  /* ---- persistence ---- */
+  var saveTimer = null, saveDotEl = null;
+  function flagSaving(on){
+    if(saveDotEl) saveDotEl.className = 'save-dot' + (on?' saving':'');
+  }
+  function persist(){
+    flagSaving(true);
+    if(!embedded){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){} }
+    postToNode('pflx_mod_save', { state: state });
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){ flagSaving(false); }, 500);
+    postToNode('pflx_mod_progress', { percent: progressPercent() });
+  }
+
+  /* ---- markdown mini-parser ---- */
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function inline(s){
+    return esc(s)
+      .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  }
+  function renderMarkdown(src){
+    var lines = (src||'').split('\n'), html = '', list = [];
+    function flush(){ if(list.length){ html += '<ul>'+list.join('')+'</ul>'; list = []; } }
+    lines.forEach(function(ln){
+      if(/^### /.test(ln)){ flush(); html += '<h3>'+inline(ln.slice(4))+'</h3>'; }
+      else if(/^## /.test(ln)){ flush(); html += '<h2>'+inline(ln.slice(3))+'</h2>'; }
+      else if(/^- /.test(ln)){ list.push('<li>'+inline(ln.slice(2))+'</li>'); }
+      else if(ln.trim()===''){ flush(); }
+      else { flush(); html += '<p>'+inline(ln)+'</p>'; }
+    });
+    flush();
+    return '<div class="md">'+html+'</div>';
+  }
+
+  /* ---- toast ---- */
+  function toast(msg){
+    var t = document.createElement('div');
+    t.className = 'toast'; t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.classList.add('show'); }, 12);
+    setTimeout(function(){ t.classList.remove('show'); setTimeout(function(){ t.remove(); }, 400); }, 2600);
+  }
+
+  /* ============ RENDER ============ */
+  var app = document.getElementById('app');
+
+  function render(){
+    var phase = PHASES[state.currentPhase];
+    app.innerHTML = '';
+    app.appendChild(renderRail());
+    var main = document.createElement('div');
+    main.className = 'main';
+    main.appendChild(renderStage(phase));
+    app.appendChild(main);
+  }
+
+  function renderRail(){
+    var rail = document.createElement('div');
+    rail.className = 'rail';
+    var pct = progressPercent();
+    var phaseHtml = PHASES.map(function(p, i){
+      var done = isPhaseComplete(i);
+      var locked = i > 0 && !isPhaseComplete(i-1);
+      var active = i === state.currentPhase;
+      var cls = 'phase-item' + (active?' active':'') + (done?' done':'') + (locked?' locked':'');
+      return '<div class="'+cls+'" data-phase="'+i+'" style="--strand:'+STRAND[p.kind]+'">'
+        + '<div class="phase-dot">'+(done?'✓':(i+1))+'</div>'
+        + '<div class="phase-meta"><div class="phase-strand">'+p.kind.toUpperCase()+'</div>'
+        + '<div class="phase-name">'+esc(p.title)+'</div></div></div>';
+    }).join('');
+    rail.innerHTML =
+      '<div class="rail-head">'
+      + '<div class="rail-kicker">PFLX MODULE · COURSE</div>'
+      + '<div class="rail-title">'+esc(MANIFEST.name)+'</div>'
+      + '<div class="rail-sub">'+esc(MANIFEST.subtitle||'')+'</div></div>'
+      + '<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>'
+      + '<div class="progress-label"><span>FLX progress</span><span>'+pct+'%</span></div></div>'
+      + '<div class="phases">'+phaseHtml+'</div>'
+      + '<div class="rail-foot"><div class="save-dot"><i></i> '+(embedded?'Synced':'Saved')+'</div>'
+      + '<span>'+(embedded?'In Node':'Standalone')+'</span></div>';
+    saveDotEl = rail.querySelector('.save-dot');
+    rail.querySelectorAll('.phase-item').forEach(function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-phase');
+        if(i>0 && !isPhaseComplete(i-1)){ toast('Finish the previous phase first.'); return; }
+        state.currentPhase = i; persist(); render();
+      });
+    });
+    return rail;
+  }
+
+  function renderStage(phase){
+    var stage = document.createElement('div');
+    stage.className = 'stage';
+    stage.style.setProperty('--strand', STRAND[phase.kind]);
+
+    /* header */
+    var objChips = (phase.flxObjectives||[]).map(function(code){
+      return '<span class="obj-chip" title="'+esc(OBJ[code]||code)+'">'+code+'</span>';
+    }).join('');
+    var eq = '';
+    if(phase.desiredResults && phase.desiredResults.essentialQuestions){
+      eq = '<div class="eq"><div class="eq-label">ESSENTIAL QUESTIONS</div>'
+        + phase.desiredResults.essentialQuestions.map(function(q){ return '<p>'+esc(q)+'</p>'; }).join('')
+        + '</div>';
+    }
+    var header = document.createElement('div');
+    header.className = 'phase-header';
+    header.innerHTML = '<div class="ph-strand">'+phase.kind.toUpperCase()+' &middot; FLX STRAND '+(state.currentPhase+1)+' OF 4</div>'
+      + '<div class="ph-title">'+esc(phase.title)+'</div>'
+      + '<div class="obj-row">'+objChips+'</div>' + eq;
+    stage.appendChild(header);
+
+    /* blocks */
+    var lastSeg = null;
+    phaseBlocks(phase).forEach(function(x){
+      if(x.segment && x.segment !== lastSeg){
+        lastSeg = x.segment;
+        var sl = document.createElement('div');
+        sl.className = 'seg-label';
+        sl.textContent = x.segment.title;
+        stage.appendChild(sl);
+      }
+      stage.appendChild(renderBlock(x.block));
+    });
+
+    /* nav */
+    stage.appendChild(renderNav(phase));
+    return stage;
+  }
+
+  function renderBlock(b){
+    var wrap = document.createElement('div');
+    wrap.className = 'block';
+    switch(b.kind){
+      case 'markdown': wrap.innerHTML = renderMarkdown(b.content); break;
+      case 'callout':
+        wrap.innerHTML = '<div class="callout '+(b.tone||'info')+'">'+inline(b.content)+'</div>'; break;
+      case 'video':
+        wrap.innerHTML = '<div class="video-embed"><iframe src="'+ytEmbed(b.url)+'" allowfullscreen></iframe></div>'
+          + (b.caption?'<div class="vid-cap">'+esc(b.caption)+'</div>':''); break;
+      case 'image':
+        wrap.innerHTML = '<img src="'+esc(b.url)+'" alt="'+esc(b.alt||'')+'" style="width:100%;border-radius:10px;border:1px solid var(--line)">'; break;
+      case 'tool': wrap.appendChild(renderTool(b)); break;
+      case 'diagnostic': wrap.appendChild(renderDiagnostic(b)); break;
+      case 'activity': wrap.appendChild(renderActivity(b)); break;
+      case 'reflection': wrap.appendChild(renderReflection(b)); break;
+      case 'submission': wrap.appendChild(renderSubmission(b)); break;
+      default: wrap.innerHTML = '';
+    }
+    return wrap;
+  }
+
+  function ytEmbed(url){
+    var m = (url||'').match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/);
+    return m ? 'https://www.youtube.com/embed/'+m[1] : esc(url||'');
+  }
+
+  function renderTool(b){
+    var d = document.createElement('div');
+    d.className = 'tool-card';
+    d.innerHTML = '<div class="tool-ic">🛠️</div><div class="tool-body">'
+      + '<div class="tool-name">'+esc(b.name)+'<span class="tool-tag">'+esc((b.categoryTag||'').toUpperCase())+'</span></div>'
+      + '<div class="tool-desc">'+esc(b.description||'')+'</div>'
+      + (b.tutorialNote?'<div class="tool-note">'+esc(b.tutorialNote)+'</div>':'')
+      + '</div>';
+    var btn = document.createElement('button');
+    btn.className = 'btn'; btn.textContent = 'OPEN';
+    btn.addEventListener('click', function(){ window.open(b.launchUrl, '_blank', 'noopener'); });
+    d.appendChild(btn);
+    return d;
+  }
+
+  function markDone(blockId, label){
+    var bs = blockState(blockId);
+    if(bs.done) return;
+    bs.done = true;
+    var phase = PHASES[state.currentPhase];
+    persist();
+    if(isPhaseComplete(state.currentPhase)){
+      postToNode('pflx_mod_checkpoint', { checkpointId: phase.id, label: phase.title });
+      postToNode('pflx_mod_stat', { stats: [{ key:'phasesComplete', label:'Phases complete',
+        value: PHASES.filter(function(_,i){return isPhaseComplete(i);}).length, max: PHASES.length }] });
+    }
+    render();
+    toast(label || 'Task complete ✓');
+  }
+
+  /* diagnostic */
+  function renderDiagnostic(b){
+    var bs = blockState(b.id);
+    if(!bs.ratings) bs.ratings = {};
+    var d = document.createElement('div');
+    d.className = 'task' + (bs.done?' done':'');
+    var head = '<div class="task-head"><span class="task-badge">DIAGNOSTIC</span></div>';
+    var instr = '<div class="task-instr">'+esc(b.prompt)+'</div>';
+    d.innerHTML = head + instr;
+    b.items.forEach(function(it){
+      var row = document.createElement('div');
+      row.className = 'dx-item';
+      var scale = b.scale.map(function(opt, oi){
+        var sel = bs.ratings[it.id] === oi ? ' sel' : '';
+        return '<span class="dx-opt'+sel+'" data-it="'+it.id+'" data-oi="'+oi+'">'+esc(opt)+'</span>';
+      }).join('');
+      row.innerHTML = '<div class="dx-label">'+esc(it.label)+'</div><div class="dx-scale">'+scale+'</div>';
+      d.appendChild(row);
+    });
+    d.querySelectorAll('.dx-opt').forEach(function(opt){
+      opt.addEventListener('click', function(){
+        if(bs.done) return;
+        bs.ratings[opt.getAttribute('data-it')] = +opt.getAttribute('data-oi');
+        persist(); rerenderBlock(b, d.parentNode);
+      });
+    });
+    var allRated = b.items.every(function(it){ return bs.ratings[it.id] != null; });
+    var foot = document.createElement('div');
+    foot.className = 'task-foot';
+    if(bs.done){
+      foot.innerHTML = '<span class="done-tag">✓ Saved — revisit at the end of the course</span>';
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'btn solid'; btn.textContent = 'SAVE MY STARTING LINE';
+      btn.disabled = !allRated;
+      btn.addEventListener('click', function(){ markDone(b.id, 'Starting line saved ✓'); });
+      foot.appendChild(btn);
+      if(!allRated) foot.appendChild(elNote('Rate all '+b.items.length+' to continue.'));
+    }
+    d.appendChild(foot);
+    return d;
+  }
+
+  /* activity */
+  function renderActivity(b){
+    var bs = blockState(b.id);
+    if(!bs.fields) bs.fields = {};
+    var d = document.createElement('div');
+    d.className = 'task' + (bs.done?' done':'');
+    d.innerHTML = '<div class="task-head"><span class="task-badge">'+(bs.done?'COMPLETE':'TASK')+'</span>'
+      + '<span class="task-title">'+esc(b.title)+'</span></div>'
+      + '<div class="task-instr">'+esc(b.instructions)+'</div>';
+    b.fields.forEach(function(f){
+      var fd = document.createElement('div');
+      fd.className = 'field';
+      var ctl = f.type==='textarea'
+        ? '<textarea data-f="'+f.id+'">'+esc(bs.fields[f.id]||'')+'</textarea>'
+        : '<input type="text" data-f="'+f.id+'" value="'+esc(bs.fields[f.id]||'')+'">';
+      fd.innerHTML = '<label>'+esc(f.label)+'</label>'+ctl;
+      d.appendChild(fd);
+    });
+    bindFields(d, bs);
+    var foot = document.createElement('div');
+    foot.className = 'task-foot';
+    if(bs.done){
+      foot.innerHTML = '<span class="done-tag">✓ Task complete</span>';
+      var reopen = document.createElement('button');
+      reopen.className = 'btn ghost'; reopen.textContent = 'EDIT';
+      reopen.addEventListener('click', function(){ bs.done = false; persist(); render(); });
+      foot.appendChild(reopen);
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'btn solid'; btn.textContent = 'MARK TASK COMPLETE';
+      btn.addEventListener('click', function(){ markDone(b.id); });
+      var note = elNote('Fill in every field to complete this task.');
+      var refresh = function(){
+        var ok = b.fields.every(function(f){ return (bs.fields[f.id]||'').trim(); });
+        btn.disabled = !ok; note.style.display = ok ? 'none' : '';
+      };
+      d.addEventListener('input', refresh);
+      foot.appendChild(btn); foot.appendChild(note);
+      refresh();
+    }
+    d.appendChild(foot);
+    return d;
+  }
+
+  /* reflection */
+  function renderReflection(b){
+    var bs = blockState(b.id);
+    if(!bs.fields) bs.fields = {};
+    var d = document.createElement('div');
+    d.className = 'task' + (bs.done?' done':'');
+    d.innerHTML = '<div class="task-head"><span class="task-badge">'+(bs.done?'COMPLETE':'REFLECTION')+'</span>'
+      + '<span class="task-title">'+esc(b.title||'Reflect')+'</span></div>';
+    b.prompts.forEach(function(p){
+      var fd = document.createElement('div');
+      fd.className = 'field';
+      fd.innerHTML = '<label>'+esc(p.prompt)+'</label><textarea data-f="'+p.id+'">'+esc(bs.fields[p.id]||'')+'</textarea>';
+      d.appendChild(fd);
+    });
+    bindFields(d, bs);
+    var foot = document.createElement('div');
+    foot.className = 'task-foot';
+    if(bs.done){
+      foot.innerHTML = '<span class="done-tag">✓ Reflection saved</span>';
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'btn solid'; btn.textContent = 'SAVE REFLECTION';
+      btn.addEventListener('click', function(){ markDone(b.id, 'Reflection saved ✓'); });
+      var note = elNote('Respond to every prompt to continue.');
+      var refreshR = function(){
+        var ok = b.prompts.every(function(p){ return (bs.fields[p.id]||'').trim(); });
+        btn.disabled = !ok; note.style.display = ok ? 'none' : '';
+      };
+      d.addEventListener('input', refreshR);
+      foot.appendChild(btn); foot.appendChild(note);
+      refreshR();
+    }
+    d.appendChild(foot);
+    return d;
+  }
+
+  /* submission */
+  function renderSubmission(b){
+    var bs = blockState(b.id);
+    if(!bs.fields) bs.fields = {};
+    var d = document.createElement('div');
+    d.className = 'task' + (bs.done?' done':'');
+    d.innerHTML = '<div class="task-head"><span class="task-badge">'+(bs.done?'SUBMITTED':'FINAL SUBMISSION')+'</span>'
+      + '<span class="task-title">'+esc(b.title)+'</span></div>'
+      + '<div class="task-instr">'+esc(b.instructions)+'</div>';
+    if(bs.done){
+      d.innerHTML += '<div class="callout success" style="margin-top:6px">'
+        + '<span class="pill">PENDING APPROVAL</span><br><br>'
+        + 'Your submission was sent to your host. Once it is approved you will receive '
+        + (MANIFEST.suggestedReward? MANIFEST.suggestedReward.xc+' XC and your badge.' : 'your reward.')
+        + '</div>';
+      return d;
+    }
+    if(b.acceptLink){
+      var f1 = document.createElement('div'); f1.className = 'field';
+      f1.innerHTML = '<label>Link to your finished storyboard and screencast</label>'
+        + '<input type="text" data-f="link" value="'+esc(bs.fields.link||'')+'">';
+      d.appendChild(f1);
+    }
+    if(b.acceptFile){
+      var f2 = document.createElement('div'); f2.className = 'field';
+      f2.innerHTML = '<label>Or attach a file</label><input type="file" data-f="file">';
+      d.appendChild(f2);
+    }
+    var f3 = document.createElement('div'); f3.className = 'field';
+    f3.innerHTML = '<label>Description'+(b.descriptionRequired?' (required)':'')+'</label>'
+      + '<textarea data-f="description" placeholder="'+esc(b.descriptionHint||'')+'">'+esc(bs.fields.description||'')+'</textarea>';
+    d.appendChild(f3);
+    bindFields(d, bs);
+    var fileInput = d.querySelector('input[type=file]');
+    if(fileInput){
+      fileInput.addEventListener('change', function(){
+        bs.fields.fileName = fileInput.files[0] ? fileInput.files[0].name : '';
+        persist();
+      });
+    }
+    var foot = document.createElement('div');
+    foot.className = 'task-foot';
+    var btn = document.createElement('button');
+    btn.className = 'btn green'; btn.textContent = 'SUBMIT FOR APPROVAL';
+    function ready(){
+      var hasWork = (bs.fields.link||'').trim() || (bs.fields.fileName||'').trim();
+      var desc = (bs.fields.description||'').trim();
+      var descOk = !b.descriptionRequired || desc.length >= (b.descriptionMinLength||0);
+      return hasWork && descOk;
+    }
+    btn.disabled = !ready();
+    d.addEventListener('input', function(){ btn.disabled = !ready(); });
+    btn.addEventListener('click', function(){ doSubmit(b, bs); });
+    foot.appendChild(btn);
+    foot.appendChild(elNote('Add your work (link or file) and a description of at least '+(b.descriptionMinLength||0)+' characters.'));
+    d.appendChild(foot);
+    return d;
+  }
+
+  function doSubmit(b, bs){
+    var submission = {
+      link: bs.fields.link||'', file: bs.fields.fileName||'', description: bs.fields.description||''
+    };
+    bs.done = true; state.submitted = true;
+    postToNode('pflx_mod_submission', { fields: submission });
+    postToNode('pflx_mod_complete', {
+      score: null, finalState: state, submission: submission
+    });
+    persist();
+    render();
+    toast('Submitted — sent to your host for approval.');
+  }
+
+  function bindFields(container, bs){
+    container.querySelectorAll('[data-f]').forEach(function(el){
+      if(el.type === 'file') return;
+      el.addEventListener('input', function(){
+        bs.fields[el.getAttribute('data-f')] = el.value;
+        persist();
+      });
+    });
+  }
+
+  function rerenderBlock(b, container){
+    // light re-render of a diagnostic for selection feedback
+    render();
+  }
+
+  function elNote(txt){
+    var s = document.createElement('span');
+    s.className = 'gate-note'; s.textContent = txt;
+    return s;
+  }
+
+  function renderNav(phase){
+    var nav = document.createElement('div');
+    nav.className = 'nav-row';
+    var idx = state.currentPhase;
+    var complete = isPhaseComplete(idx);
+    var last = idx === PHASES.length - 1;
+
+    var left = document.createElement('div');
+    if(idx > 0){
+      var back = document.createElement('button');
+      back.className = 'btn ghost'; back.textContent = '← ' + PHASES[idx-1].title;
+      back.addEventListener('click', function(){ state.currentPhase = idx-1; persist(); render(); });
+      left.appendChild(back);
+    }
+    nav.appendChild(left);
+
+    var right = document.createElement('div');
+    right.style.display = 'flex'; right.style.alignItems = 'center'; right.style.gap = '12px';
+    if(last){
+      var msg = document.createElement('span');
+      if(state.submitted){ msg.className = 'gate-note ok'; msg.textContent = 'Module complete — awaiting host approval.'; }
+      else { msg.className = 'gate-note'; msg.textContent = 'Submit your final work above to complete the module.'; }
+      right.appendChild(msg);
+    } else {
+      var note = document.createElement('span');
+      note.className = 'gate-note' + (complete?' ok':'');
+      note.textContent = complete ? 'Phase complete — you can continue.' : 'Finish every task in this phase to unlock the next.';
+      right.appendChild(note);
+      var next = document.createElement('button');
+      next.className = 'btn solid'; next.textContent = PHASES[idx+1].title + ' →';
+      next.disabled = !complete;
+      next.addEventListener('click', function(){
+        state.currentPhase = idx+1; persist(); render();
+        document.querySelector('.main').scrollTop = 0;
+      });
+      right.appendChild(next);
+    }
+    nav.appendChild(right);
+    return nav;
+  }
+
+  /* ============ CONNECTOR HANDSHAKE ============ */
+  window.addEventListener('message', function(ev){
+    var msg = ev.data;
+    if(!msg || typeof msg !== 'object' || !msg.type) return;
+    if(msg.type === 'pflx_mod_init'){
+      var p = msg.payload || {};
+      if(p.player){
+        session.displayName = p.player.brand || p.player.displayName || session.displayName;
+        session.initials = p.player.initials || session.initials;
+      }
+      if(p.save && p.save.blocks){ state = p.save; }
+      render();
+      postToNode('pflx_mod_progress', { percent: progressPercent() });
+    } else if(msg.type === 'pflx_mod_command'){
+      var c = (msg.payload||{}).command;
+      if(c === 'reset'){ state = { currentPhase:0, blocks:{}, submitted:false }; persist(); render(); }
+    } else if(msg.type === 'pflx_mod_approval_result'){
+      var r = msg.payload || {};
+      toast(r.approved ? 'Approved! Reward unlocked.' : 'Returned for revision: ' + (r.note||''));
+    } else if(msg.type === 'pflx_mod_teardown'){
+      persist();
+    }
+  });
+
+  /* ---- boot ---- */
+  loadStandalone();
+  render();
+  postToNode('pflx_mod_ready', {
+    moduleId: MANIFEST.moduleId, name: MANIFEST.name, version: MANIFEST.version,
+    protocolVersion: MANIFEST.protocolVersion, capabilities: MANIFEST.capabilities
+  });
+  postToNode('pflx_mod_progress', { percent: progressPercent() });
+
+})();
+</script>
+</body>
+</html>
