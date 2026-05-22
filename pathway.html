@@ -6896,6 +6896,7 @@ function showLaunchOverlay(node) {
         window._pflxCourseProgressHandler = function(event) {
           try {
             var d = event.data;
+            if (typeof d === 'string') { try { d = JSON.parse(d); } catch(eParse) { return; } }
             if (!d || !d.type) return;
 
             // Course sends its full task checklist
@@ -7007,6 +7008,10 @@ function showLaunchOverlay(node) {
                 player: pflxModulePlayer(),
                 submission: d.payload.submission || {},
                 score: (d.payload.score != null) ? d.payload.score : null,
+                reward: {
+                  xc: parseInt(node.xcReward, 10) || 0,
+                  badgeIds: Array.isArray(node.taggedBadges) ? node.taggedBadges : []
+                },
                 submittedAt: Date.now(),
                 status: 'pending'
               };
@@ -7015,6 +7020,23 @@ function showLaunchOverlay(node) {
                 window.parent.postMessage(
                   { v: 1, type: 'pflx_module_completion', payload: completionRecord }, '*');
               } catch(e3) {}
+            }
+            // The Console approved/rejected this completion → relay the result to the Module.
+            if (d.type === 'pflx_mc_module_approval' && d.data) {
+              try {
+                courseFrame.contentWindow.postMessage({
+                  v: 1, type: 'pflx_mod_approval_result',
+                  payload: {
+                    approved: !!d.data.approved,
+                    xcAwarded: d.data.xcAwarded || 0,
+                    badges: d.data.badges || [],
+                    note: d.data.note || ''
+                  }
+                }, '*');
+              } catch(e4) {}
+              if (d.data.approved) {
+                document.getElementById('courseContentTitle').textContent = node.title + ' — APPROVED';
+              }
             }
           } catch(err) { /* cross-origin safety */ }
         };
