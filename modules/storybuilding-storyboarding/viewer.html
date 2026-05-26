@@ -63,6 +63,7 @@
   /* ---- main ---- */
   .main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
   .stage{max-width:780px;width:100%;margin:0 auto;padding:34px 38px 60px}
+  .stage-hero{display:block;width:100%;height:auto;margin:0 0 22px;border:0;border-radius:0;background:transparent}
   .phase-header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px}
   .ph-strand{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;color:var(--strand)}
   .ph-title{font-size:30px;font-weight:700;line-height:1.1;margin-top:6px}
@@ -518,6 +519,13 @@
     var stage = document.createElement('div');
     stage.className = 'stage';
     stage.style.setProperty('--strand', STRAND[phase.kind]);
+
+    /* hero banner — module-level title art, shown above every phase */
+    var hero = document.createElement('img');
+    hero.className = 'stage-hero';
+    hero.src = 'assets/title.png';
+    hero.alt = MANIFEST.name || '';
+    stage.appendChild(hero);
 
     /* header */
     var objChips = (phase.flxObjectives||[]).map(function(code){
