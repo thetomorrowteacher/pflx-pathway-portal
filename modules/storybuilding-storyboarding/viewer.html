@@ -185,7 +185,7 @@
 
 <script type="application/json" id="module-manifest">
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "moduleId": "storybuilding-storyboarding",
   "moduleType": "course",
   "name": "Storybuilding & Storyboarding",
@@ -196,8 +196,20 @@
   "framework": "FLX",
   "description": "Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions.",
   "estimatedMinutes": 90,
-  "capabilities": { "progress": true, "stats": true, "checkpoints": true, "coop": false, "submission": true, "hostDashboard": true },
-  "suggestedReward": { "xc": 200, "badgeIds": ["visual-storyteller"] },
+  "capabilities": {
+    "progress": true,
+    "stats": true,
+    "checkpoints": true,
+    "coop": false,
+    "submission": true,
+    "hostDashboard": true
+  },
+  "suggestedReward": {
+    "xc": 200,
+    "badgeIds": [
+      "visual-storyteller"
+    ]
+  },
   "objectiveText": {
     "FLX.CN.1": "Use empathetic understanding to inform and shape solution development.",
     "FLX.CN.2": "Generate and communicate precise questions to define the problem.",
@@ -212,141 +224,955 @@
     "FLX.PR.2": "Develop and execute a presentation method showing concept-to-product."
   },
   "structure": {
-    "phases": [
-      {
-        "id": "engagement", "kind": "engagement", "title": "Why Stories Move Us",
-        "flxObjectives": ["FLX.CN.1", "FLX.CN.2"],
-        "desiredResults": {
-          "essentialQuestions": [
-            "How can I use storybuilding and storyboarding to visualize my thoughts and ideas?",
-            "What makes a story stick with the people who experience it?"
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "estimatedMinutes": 120,
+        "suggestedReward": {
+          "xc": 100,
+          "badgeIds": [
+            "visual-storyteller"
           ]
         },
-        "gate": { "type": "activity" },
-        "blocks": [
-          { "kind": "markdown", "content": "## Welcome to Storybuilding & Storyboarding\n\nEvery film, game, comic, and animation you have ever loved started the same way: as an **idea** that someone built into a world.\n\nIn this course you will do two things. First you will **build a story** from the ground up. Then you will **storyboard it** — turning that story into a visual plan you could actually hand to a production team." },
-          { "kind": "callout", "tone": "info", "content": "Course objective — Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions. Estimated time: about 90 minutes." },
-          { "kind": "diagnostic", "id": "dx-confidence", "prompt": "Before we begin — how confident do you feel about each of these right now? There are no wrong answers. This is your starting line, and you will revisit it at the end.",
-            "scale": ["New to me", "Some idea", "Pretty comfortable", "I've got this"],
-            "items": [
-              { "id": "d-theme", "label": "Theme" }, { "id": "d-characters", "label": "Characters" },
-              { "id": "d-setting", "label": "Setting" }, { "id": "d-plot", "label": "Plot" },
-              { "id": "d-conflict", "label": "Conflict" }, { "id": "d-pov", "label": "Point of View" },
-              { "id": "d-style", "label": "Style" }, { "id": "d-storyboard", "label": "Storyboarding" }
-            ] },
-          { "kind": "activity", "id": "act-warmup", "title": "Warm-up — A story that stuck with you",
-            "instructions": "Think of a story — a film, a game, a book, a show — that has stayed with you. In a few sentences, describe what made it unforgettable. Was it a character? A moment? The world? Keep this in mind: by the end of the course you will be able to name exactly which story element did that work.",
-            "fields": [
-              { "id": "f-story", "label": "The story", "type": "text" },
-              { "id": "f-why", "label": "What made it unforgettable", "type": "textarea" }
-            ] }
-        ]
-      },
-      {
-        "id": "development", "kind": "development", "title": "Build Your Story, Then Storyboard It",
-        "flxObjectives": ["FLX.ID.1", "FLX.ID.3", "FLX.CR.1", "FLX.CR.2"],
-        "desiredResults": {
-          "essentialQuestions": [
-            "How do the seven elements work together to make a story whole?",
-            "How does storyboarding make an idea producible?"
-          ]
-        },
-        "gate": { "type": "activity" },
-        "segments": [
+        "phases": [
           {
-            "id": "ideation", "subDomain": "ID", "title": "Ideation — Storybuilding",
+            "id": "engagement",
+            "kind": "engagement",
+            "title": "Why Stories Move Us",
+            "flxObjectives": [
+              "FLX.CN.1",
+              "FLX.CN.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "Every memorable story is built from deliberate choices about people, place, and events.",
+                "A story connects when its audience sees themselves, or their world, somewhere inside it."
+              ],
+              "essentialQuestions": [
+                "How can I use storybuilding and storyboarding to visualize my thoughts and ideas?",
+                "What makes a story stick with the people who experience it?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 2
+            },
             "blocks": [
-              { "kind": "markdown", "content": "## What is storybuilding?\n\nStorybuilding is the process of creating a story from the ground up — starting with an idea and developing it into a complete world.\n\nIt begins with imagining your characters, giving them goals or problems, and placing them in a setting that shapes their journey. Then you build the plot — what happens, why it matters, and how it changes your characters.\n\nIn short: **storybuilding is about creating the people, places, and events that bring your imagination to life.**" },
-              { "kind": "markdown", "content": "## The 7 elements of a story\n\nAlmost every story you will ever build is made from these seven elements:\n\n- **Theme** — the central idea or message; what the story is really about beneath the events.\n- **Characters** — the people, or beings, who drive the story; their goals, flaws, and changes.\n- **Setting** — when and where the story happens; the world that shapes the journey.\n- **Plot** — the sequence of events; what happens, and in what order.\n- **Conflict** — the problem or tension the characters face; the engine of the story.\n- **Point of View** — whose eyes we experience the story through.\n- **Style** — the voice and texture of the telling; tone, pacing, and language." },
-              { "kind": "tool", "name": "Plot Factory", "categoryTag": "web-based",
-                "description": "A web-based AI writing assistant for building characters, worlds, and plots. Use it as a thinking partner while you assemble your story.",
-                "launchUrl": "https://www.plotfactory.com/",
-                "tutorialNote": "Watch the Plot Factory tutorial linked in your class resources before you start, if this is your first time." },
-              { "kind": "activity", "id": "act-build-story", "title": "Complete the Task — Build your own story",
-                "instructions": "Use the 7 elements of a story to build your own. Fill in each element below. It does not need to be long — it needs to be deliberate. Every element should be a real choice you can explain.",
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (Starter Engagement):** Replace 'story that stuck with you' reflection with 'pick a story you already love and tell us one thing that makes it work' — lower-barrier warmup. Diagnostic and other Engagement content unchanged from Novice."
+              },
+              {
+                "kind": "markdown",
+                "content": "## Welcome to Storybuilding & Storyboarding\n\nEvery film, game, comic, and animation you have ever loved started the same way: as an **idea** that someone built into a world.\n\nIn this course you will do two things. First you will **build a story** from the ground up. Then you will **storyboard it** — turning that story into a visual plan you could actually hand to a production team."
+              },
+              {
+                "kind": "callout",
+                "tone": "info",
+                "content": "Course objective — Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions. Estimated time: about 90 minutes."
+              },
+              {
+                "kind": "diagnostic",
+                "id": "dx-confidence",
+                "prompt": "Before we begin — how confident do you feel about each of these right now? There are no wrong answers. This is your starting line, and you will revisit it at the end.",
+                "scale": [
+                  "New to me",
+                  "Some idea",
+                  "Pretty comfortable",
+                  "I've got this"
+                ],
+                "items": [
+                  {
+                    "id": "d-theme",
+                    "label": "Theme"
+                  },
+                  {
+                    "id": "d-characters",
+                    "label": "Characters"
+                  },
+                  {
+                    "id": "d-setting",
+                    "label": "Setting"
+                  },
+                  {
+                    "id": "d-plot",
+                    "label": "Plot"
+                  },
+                  {
+                    "id": "d-conflict",
+                    "label": "Conflict"
+                  },
+                  {
+                    "id": "d-pov",
+                    "label": "Point of View"
+                  },
+                  {
+                    "id": "d-style",
+                    "label": "Style"
+                  },
+                  {
+                    "id": "d-storyboard",
+                    "label": "Storyboarding"
+                  }
+                ]
+              },
+              {
+                "kind": "activity",
+                "id": "act-warmup",
+                "title": "Warm-up — A story that stuck with you",
+                "instructions": "Think of a story — a film, a game, a book, a show — that has stayed with you. In a few sentences, describe what made it unforgettable. Was it a character? A moment? The world? Keep this in mind: by the end of the course you will be able to name exactly which story element did that work.",
                 "fields": [
-                  { "id": "e-theme", "label": "Theme", "type": "text" },
-                  { "id": "e-characters", "label": "Characters", "type": "textarea" },
-                  { "id": "e-setting", "label": "Setting", "type": "text" },
-                  { "id": "e-plot", "label": "Plot", "type": "textarea" },
-                  { "id": "e-conflict", "label": "Conflict", "type": "text" },
-                  { "id": "e-pov", "label": "Point of View", "type": "text" },
-                  { "id": "e-style", "label": "Style", "type": "text" }
-                ] }
+                  {
+                    "id": "f-story",
+                    "label": "The story",
+                    "type": "text"
+                  },
+                  {
+                    "id": "f-why",
+                    "label": "What made it unforgettable",
+                    "type": "textarea"
+                  }
+                ]
+              }
             ]
           },
           {
-            "id": "creation", "subDomain": "CR", "title": "Creation — Storyboarding",
+            "id": "practice-round",
+            "kind": "engagement",
+            "title": "Retell a Story You Know",
+            "flxObjectives": [
+              "FLX.CN.1",
+              "FLX.CR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "TODO — Starter/Pro authoring: understandings for practice-round."
+              ],
+              "essentialQuestions": [
+                "What does a good storyboard show that words alone cannot?"
+              ]
+            },
+            "assessmentEvidence": {
+              "performanceTasks": [],
+              "otherEvidence": []
+            },
+            "learningPlan": {
+              "activities": []
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 1
+            },
             "blocks": [
-              { "kind": "markdown", "content": "## What is storyboarding?\n\nStoryboarding is the process used to visualize what the final look of a motion picture, motion graphic, animation, or interactive media sequence will be.\n\nThink of it as a comic strip where all the important details are laid out — including audio, camera moves, and what the characters will be doing or feeling." },
-              { "kind": "markdown", "content": "## How to storyboard your story\n\n- Use a storyboard to plan your story. It can be **digital or physical** (unless your host specifies one).\n- Develop a **sketch and a description for each scene** of your production. A sketch may not be necessary depending on the needs of the production.\n- Note the important details for each scene: audio, camera moves, and what the characters are doing or feeling." },
-              { "kind": "tool", "name": "Storyboard Templates", "categoryTag": "template",
-                "description": "Start from a ready-made storyboard template — pick the Slides version or the Canva version, whichever fits how you work.",
-                "launchUrl": "https://www.canva.com/templates/?query=storyboard",
-                "tutorialNote": "A Slides template and a Canva template are linked in your class resources. An example storyboard is included there too." },
-              { "kind": "activity", "id": "act-draft-storyboard", "title": "Complete the Task — Draft your storyboard",
-                "instructions": "Using a template or your own layout, draft a storyboard for the story you built. Plan every scene with a sketch and a description. When you have a working draft, paste a link to it below (or note where it lives).",
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (practice-round):** Pick a story you already know (Goldilocks, Spider-Man's origin, *The Three Little Pigs*, or your favorite movie) and storyboard 4 frames of it. Worked example walks through what a storyboard cell shows: action, framing, beat, dialogue. No original creation pressure — just learn the structure."
+              }
+            ]
+          },
+          {
+            "id": "development",
+            "kind": "development",
+            "title": "Build Your Story, Then Storyboard It",
+            "flxObjectives": [
+              "FLX.ID.1",
+              "FLX.ID.3",
+              "FLX.CR.1",
+              "FLX.CR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "A complete story can be assembled deliberately from seven recurring elements.",
+                "A storyboard turns an idea into a shot-by-shot visual plan a team can produce from."
+              ],
+              "essentialQuestions": [
+                "How do the seven elements work together to make a story whole?",
+                "How does storyboarding make an idea producible?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 2
+            },
+            "segments": [
+              {
+                "id": "ideation",
+                "subDomain": "ID",
+                "title": "Ideation — Storybuilding",
+                "blocks": [
+                  {
+                    "kind": "markdown",
+                    "content": "## What is storybuilding?\n\nStorybuilding is the process of creating a story from the ground up — starting with an idea and developing it into a complete world.\n\nIt begins with imagining your characters, giving them goals or problems, and placing them in a setting that shapes their journey. Then you build the plot — what happens, why it matters, and how it changes your characters.\n\nIn short: **storybuilding is about creating the people, places, and events that bring your imagination to life.**"
+                  },
+                  {
+                    "kind": "markdown",
+                    "content": "## The 7 elements of a story\n\nAlmost every story you will ever build is made from these seven elements:\n\n- **Theme** — the central idea or message; what the story is really about beneath the events.\n- **Characters** — the people, or beings, who drive the story; their goals, flaws, and changes.\n- **Setting** — when and where the story happens; the world that shapes the journey.\n- **Plot** — the sequence of events; what happens, and in what order.\n- **Conflict** — the problem or tension the characters face; the engine of the story.\n- **Point of View** — whose eyes we experience the story through.\n- **Style** — the voice and texture of the telling; tone, pacing, and language."
+                  },
+                  {
+                    "kind": "tool",
+                    "name": "Plot Factory",
+                    "categoryTag": "web-based",
+                    "description": "A web-based AI writing assistant for building characters, worlds, and plots. Use it as a thinking partner while you assemble your story.",
+                    "launchUrl": "https://www.plotfactory.com/",
+                    "tutorialNote": "Watch the Plot Factory tutorial linked in your class resources before you start, if this is your first time."
+                  },
+                  {
+                    "kind": "activity",
+                    "id": "act-build-story",
+                    "title": "Complete the Task — Build your own story",
+                    "instructions": "Use the 7 elements of a story to build your own. Fill in each element below. It does not need to be long — it needs to be deliberate. Every element should be a real choice you can explain.",
+                    "fields": [
+                      {
+                        "id": "e-theme",
+                        "label": "Theme",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-characters",
+                        "label": "Characters",
+                        "type": "textarea"
+                      },
+                      {
+                        "id": "e-setting",
+                        "label": "Setting",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-plot",
+                        "label": "Plot",
+                        "type": "textarea"
+                      },
+                      {
+                        "id": "e-conflict",
+                        "label": "Conflict",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-pov",
+                        "label": "Point of View",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-style",
+                        "label": "Style",
+                        "type": "text"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "creation",
+                "subDomain": "CR",
+                "title": "Creation — Storyboarding",
+                "blocks": [
+                  {
+                    "kind": "markdown",
+                    "content": "## What is storyboarding?\n\nStoryboarding is the process used to visualize what the final look of a motion picture, motion graphic, animation, or interactive media sequence will be.\n\nThink of it as a comic strip where all the important details are laid out — including audio, camera moves, and what the characters will be doing or feeling."
+                  },
+                  {
+                    "kind": "markdown",
+                    "content": "## How to storyboard your story\n\n- Use a storyboard to plan your story. It can be **digital or physical** (unless your host specifies one).\n- Develop a **sketch and a description for each scene** of your production. A sketch may not be necessary depending on the needs of the production.\n- Note the important details for each scene: audio, camera moves, and what the characters are doing or feeling."
+                  },
+                  {
+                    "kind": "tool",
+                    "name": "Storyboard Templates",
+                    "categoryTag": "template",
+                    "description": "Start from a ready-made storyboard template — pick the Slides version or the Canva version, whichever fits how you work.",
+                    "launchUrl": "https://www.canva.com/templates/?query=storyboard",
+                    "tutorialNote": "A Slides template and a Canva template are linked in your class resources. An example storyboard is included there too."
+                  },
+                  {
+                    "kind": "activity",
+                    "id": "act-draft-storyboard",
+                    "title": "Complete the Task — Draft your storyboard",
+                    "instructions": "Using a template or your own layout, draft a storyboard for the story you built. Plan every scene with a sketch and a description. When you have a working draft, paste a link to it below (or note where it lives).",
+                    "fields": [
+                      {
+                        "id": "sb-link",
+                        "label": "Link to your storyboard draft",
+                        "type": "text"
+                      },
+                      {
+                        "id": "sb-scenes",
+                        "label": "How many scenes does your storyboard cover?",
+                        "type": "text"
+                      },
+                      {
+                        "id": "sb-notes",
+                        "label": "Anything you are unsure about and want feedback on",
+                        "type": "textarea"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "blocks": [
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (Starter Development):** Add pre-filled story templates (hero's journey, three-act skeletons). Add character/setting prompts with 3–5 suggested options each. Break Plot Factory into smaller substeps with check-ins. All other Novice content stays."
+              }
+            ]
+          },
+          {
+            "id": "enhancement",
+            "kind": "enhancement",
+            "title": "Test, Share, Refine",
+            "flxObjectives": [
+              "FLX.RE.1",
+              "FLX.RE.2",
+              "FLX.RE.3"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "Feedback before final production is cheaper and more powerful than feedback after.",
+                "Reflection turns feedback into deliberate improvement."
+              ],
+              "essentialQuestions": [
+                "How does outside feedback reveal what I cannot see in my own work?",
+                "What changes when I revise with intention instead of guessing?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 3
+            },
+            "blocks": [
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (Starter Enhancement):** Replace open feedforward with a structured 'What's confusing / What works / What's missing' worksheet. Player brings filled worksheets from 2 peers instead of free-form notes."
+              },
+              {
+                "kind": "markdown",
+                "content": "## Why share before you finalize\n\nTop creators ship rough versions to trusted people *before* final polish. A storyboard is the perfect thing to test — it is quick to read and quick to change. Fixing a confusing scene now costs you a sentence. Fixing it after you have filmed costs you a reshoot."
+              },
+              {
+                "kind": "activity",
+                "id": "act-feedback",
+                "title": "Share & get feedforward",
+                "instructions": "Share your storyboard draft with 1–2 peers or a mentor. Ask them specifically about clarity (can they follow the story?), pacing (does any scene drag or rush?), and visual storytelling (do the sketches carry the idea?). Record the feedback you received below.",
                 "fields": [
-                  { "id": "sb-link", "label": "Link to your storyboard draft", "type": "text" },
-                  { "id": "sb-scenes", "label": "How many scenes does your storyboard cover?", "type": "text" },
-                  { "id": "sb-notes", "label": "Anything you are unsure about and want feedback on", "type": "textarea" }
-                ] }
+                  {
+                    "id": "fb-who",
+                    "label": "Who gave you feedback",
+                    "type": "text"
+                  },
+                  {
+                    "id": "fb-clarity",
+                    "label": "What they said about clarity",
+                    "type": "textarea"
+                  },
+                  {
+                    "id": "fb-pacing",
+                    "label": "What they said about pacing and visual storytelling",
+                    "type": "textarea"
+                  }
+                ]
+              },
+              {
+                "kind": "activity",
+                "id": "act-refine",
+                "title": "Refine your storyboard",
+                "instructions": "Revise your storyboard based on the feedback. You do not have to accept every note — but you do have to decide. List what you changed and why.",
+                "fields": [
+                  {
+                    "id": "rf-changes",
+                    "label": "What you changed",
+                    "type": "textarea"
+                  },
+                  {
+                    "id": "rf-why",
+                    "label": "Why you made those changes (and any feedback you chose not to take, and why)",
+                    "type": "textarea"
+                  }
+                ]
+              },
+              {
+                "kind": "reflection",
+                "id": "act-reflect",
+                "title": "Reflect",
+                "prompts": [
+                  {
+                    "id": "r-hard",
+                    "prompt": "Which of the 7 story elements was hardest to make clear in your storyboard? What finally worked?"
+                  },
+                  {
+                    "id": "r-grew",
+                    "prompt": "What part of your storyboard improved the most between the draft and the refined version?"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "fulfillment",
+            "kind": "fulfillment",
+            "title": "Finalize & Present",
+            "flxObjectives": [
+              "FLX.PR.1",
+              "FLX.PR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "A finished creative work is not done until it can be presented and understood by someone else.",
+                "A walkthrough with voiceover is itself a piece of communication design."
+              ],
+              "essentialQuestions": [
+                "How do I present my process so someone else understands the choices I made?"
+              ]
+            },
+            "gate": {
+              "type": "submission",
+              "blockId": "act-submit"
+            },
+            "blocks": [
+              {
+                "kind": "markdown",
+                "content": "## Finalize your storyboard\n\nComplete your storyboard so every scene has a sketch and a description and is ready to read. This is the version you would actually hand to a production team."
+              },
+              {
+                "kind": "markdown",
+                "content": "## Document your work\n\nRecord a **screen recording with a voiceover** that walks through your finished storyboard. Explain, scene by scene, what is happening, and point out where your 7 story elements show up."
+              },
+              {
+                "kind": "callout",
+                "tone": "info",
+                "content": "Presentation checklist — every scene has a sketch and a description • the screen recording shows the full storyboard • your voiceover explains the story, not just the pictures • you name where your theme, conflict, and point of view appear."
+              },
+              {
+                "kind": "submission",
+                "id": "act-submit",
+                "title": "Submit for approval",
+                "instructions": "Submit your finished storyboard and your screencast walkthrough. Your host will review them against the course criteria and award XC and your badge on approval.",
+                "acceptFile": true,
+                "acceptLink": true,
+                "descriptionRequired": true,
+                "descriptionMinLength": 50,
+                "descriptionHint": "In a few sentences: which story elements are strongest in your storyboard, and what should your host watch for in the screencast?"
+              }
             ]
           }
         ]
       },
-      {
-        "id": "enhancement", "kind": "enhancement", "title": "Test, Share, Refine",
-        "flxObjectives": ["FLX.RE.1", "FLX.RE.2", "FLX.RE.3"],
-        "desiredResults": {
-          "essentialQuestions": [
-            "How does outside feedback reveal what I cannot see in my own work?",
-            "What changes when I revise with intention instead of guessing?"
+      "novice": {
+        "name": "Novice",
+        "estimatedMinutes": 90,
+        "suggestedReward": {
+          "xc": 200,
+          "badgeIds": [
+            "visual-storyteller"
           ]
         },
-        "gate": { "type": "activity" },
-        "blocks": [
-          { "kind": "markdown", "content": "## Why share before you finalize\n\nTop creators ship rough versions to trusted people *before* final polish. A storyboard is the perfect thing to test — it is quick to read and quick to change. Fixing a confusing scene now costs you a sentence. Fixing it after you have filmed costs you a reshoot." },
-          { "kind": "activity", "id": "act-feedback", "title": "Share & get feedforward",
-            "instructions": "Share your storyboard draft with 1–2 peers or a mentor. Ask them specifically about clarity (can they follow the story?), pacing (does any scene drag or rush?), and visual storytelling (do the sketches carry the idea?). Record the feedback you received below.",
-            "fields": [
-              { "id": "fb-who", "label": "Who gave you feedback", "type": "text" },
-              { "id": "fb-clarity", "label": "What they said about clarity", "type": "textarea" },
-              { "id": "fb-pacing", "label": "What they said about pacing and visual storytelling", "type": "textarea" }
-            ] },
-          { "kind": "activity", "id": "act-refine", "title": "Refine your storyboard",
-            "instructions": "Revise your storyboard based on the feedback. You do not have to accept every note — but you do have to decide. List what you changed and why.",
-            "fields": [
-              { "id": "rf-changes", "label": "What you changed", "type": "textarea" },
-              { "id": "rf-why", "label": "Why you made those changes (and any feedback you chose not to take, and why)", "type": "textarea" }
-            ] },
-          { "kind": "reflection", "id": "act-reflect", "title": "Reflect",
-            "prompts": [
-              { "id": "r-hard", "prompt": "Which of the 7 story elements was hardest to make clear in your storyboard? What finally worked?" },
-              { "id": "r-grew", "prompt": "What part of your storyboard improved the most between the draft and the refined version?" }
-            ] }
+        "phases": [
+          {
+            "id": "engagement",
+            "kind": "engagement",
+            "title": "Why Stories Move Us",
+            "flxObjectives": [
+              "FLX.CN.1",
+              "FLX.CN.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "Every memorable story is built from deliberate choices about people, place, and events.",
+                "A story connects when its audience sees themselves, or their world, somewhere inside it."
+              ],
+              "essentialQuestions": [
+                "How can I use storybuilding and storyboarding to visualize my thoughts and ideas?",
+                "What makes a story stick with the people who experience it?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 2
+            },
+            "blocks": [
+              {
+                "kind": "markdown",
+                "content": "## Welcome to Storybuilding & Storyboarding\n\nEvery film, game, comic, and animation you have ever loved started the same way: as an **idea** that someone built into a world.\n\nIn this course you will do two things. First you will **build a story** from the ground up. Then you will **storyboard it** — turning that story into a visual plan you could actually hand to a production team."
+              },
+              {
+                "kind": "callout",
+                "tone": "info",
+                "content": "Course objective — Learn the essential concepts of storybuilding and storyboarding, and develop materials to present your creations with quality visuals and descriptions. Estimated time: about 90 minutes."
+              },
+              {
+                "kind": "diagnostic",
+                "id": "dx-confidence",
+                "prompt": "Before we begin — how confident do you feel about each of these right now? There are no wrong answers. This is your starting line, and you will revisit it at the end.",
+                "scale": [
+                  "New to me",
+                  "Some idea",
+                  "Pretty comfortable",
+                  "I've got this"
+                ],
+                "items": [
+                  {
+                    "id": "d-theme",
+                    "label": "Theme"
+                  },
+                  {
+                    "id": "d-characters",
+                    "label": "Characters"
+                  },
+                  {
+                    "id": "d-setting",
+                    "label": "Setting"
+                  },
+                  {
+                    "id": "d-plot",
+                    "label": "Plot"
+                  },
+                  {
+                    "id": "d-conflict",
+                    "label": "Conflict"
+                  },
+                  {
+                    "id": "d-pov",
+                    "label": "Point of View"
+                  },
+                  {
+                    "id": "d-style",
+                    "label": "Style"
+                  },
+                  {
+                    "id": "d-storyboard",
+                    "label": "Storyboarding"
+                  }
+                ]
+              },
+              {
+                "kind": "activity",
+                "id": "act-warmup",
+                "title": "Warm-up — A story that stuck with you",
+                "instructions": "Think of a story — a film, a game, a book, a show — that has stayed with you. In a few sentences, describe what made it unforgettable. Was it a character? A moment? The world? Keep this in mind: by the end of the course you will be able to name exactly which story element did that work.",
+                "fields": [
+                  {
+                    "id": "f-story",
+                    "label": "The story",
+                    "type": "text"
+                  },
+                  {
+                    "id": "f-why",
+                    "label": "What made it unforgettable",
+                    "type": "textarea"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "development",
+            "kind": "development",
+            "title": "Build Your Story, Then Storyboard It",
+            "flxObjectives": [
+              "FLX.ID.1",
+              "FLX.ID.3",
+              "FLX.CR.1",
+              "FLX.CR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "A complete story can be assembled deliberately from seven recurring elements.",
+                "A storyboard turns an idea into a shot-by-shot visual plan a team can produce from."
+              ],
+              "essentialQuestions": [
+                "How do the seven elements work together to make a story whole?",
+                "How does storyboarding make an idea producible?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 2
+            },
+            "segments": [
+              {
+                "id": "ideation",
+                "subDomain": "ID",
+                "title": "Ideation — Storybuilding",
+                "blocks": [
+                  {
+                    "kind": "markdown",
+                    "content": "## What is storybuilding?\n\nStorybuilding is the process of creating a story from the ground up — starting with an idea and developing it into a complete world.\n\nIt begins with imagining your characters, giving them goals or problems, and placing them in a setting that shapes their journey. Then you build the plot — what happens, why it matters, and how it changes your characters.\n\nIn short: **storybuilding is about creating the people, places, and events that bring your imagination to life.**"
+                  },
+                  {
+                    "kind": "markdown",
+                    "content": "## The 7 elements of a story\n\nAlmost every story you will ever build is made from these seven elements:\n\n- **Theme** — the central idea or message; what the story is really about beneath the events.\n- **Characters** — the people, or beings, who drive the story; their goals, flaws, and changes.\n- **Setting** — when and where the story happens; the world that shapes the journey.\n- **Plot** — the sequence of events; what happens, and in what order.\n- **Conflict** — the problem or tension the characters face; the engine of the story.\n- **Point of View** — whose eyes we experience the story through.\n- **Style** — the voice and texture of the telling; tone, pacing, and language."
+                  },
+                  {
+                    "kind": "tool",
+                    "name": "Plot Factory",
+                    "categoryTag": "web-based",
+                    "description": "A web-based AI writing assistant for building characters, worlds, and plots. Use it as a thinking partner while you assemble your story.",
+                    "launchUrl": "https://www.plotfactory.com/",
+                    "tutorialNote": "Watch the Plot Factory tutorial linked in your class resources before you start, if this is your first time."
+                  },
+                  {
+                    "kind": "activity",
+                    "id": "act-build-story",
+                    "title": "Complete the Task — Build your own story",
+                    "instructions": "Use the 7 elements of a story to build your own. Fill in each element below. It does not need to be long — it needs to be deliberate. Every element should be a real choice you can explain.",
+                    "fields": [
+                      {
+                        "id": "e-theme",
+                        "label": "Theme",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-characters",
+                        "label": "Characters",
+                        "type": "textarea"
+                      },
+                      {
+                        "id": "e-setting",
+                        "label": "Setting",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-plot",
+                        "label": "Plot",
+                        "type": "textarea"
+                      },
+                      {
+                        "id": "e-conflict",
+                        "label": "Conflict",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-pov",
+                        "label": "Point of View",
+                        "type": "text"
+                      },
+                      {
+                        "id": "e-style",
+                        "label": "Style",
+                        "type": "text"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "creation",
+                "subDomain": "CR",
+                "title": "Creation — Storyboarding",
+                "blocks": [
+                  {
+                    "kind": "markdown",
+                    "content": "## What is storyboarding?\n\nStoryboarding is the process used to visualize what the final look of a motion picture, motion graphic, animation, or interactive media sequence will be.\n\nThink of it as a comic strip where all the important details are laid out — including audio, camera moves, and what the characters will be doing or feeling."
+                  },
+                  {
+                    "kind": "markdown",
+                    "content": "## How to storyboard your story\n\n- Use a storyboard to plan your story. It can be **digital or physical** (unless your host specifies one).\n- Develop a **sketch and a description for each scene** of your production. A sketch may not be necessary depending on the needs of the production.\n- Note the important details for each scene: audio, camera moves, and what the characters are doing or feeling."
+                  },
+                  {
+                    "kind": "tool",
+                    "name": "Storyboard Templates",
+                    "categoryTag": "template",
+                    "description": "Start from a ready-made storyboard template — pick the Slides version or the Canva version, whichever fits how you work.",
+                    "launchUrl": "https://www.canva.com/templates/?query=storyboard",
+                    "tutorialNote": "A Slides template and a Canva template are linked in your class resources. An example storyboard is included there too."
+                  },
+                  {
+                    "kind": "activity",
+                    "id": "act-draft-storyboard",
+                    "title": "Complete the Task — Draft your storyboard",
+                    "instructions": "Using a template or your own layout, draft a storyboard for the story you built. Plan every scene with a sketch and a description. When you have a working draft, paste a link to it below (or note where it lives).",
+                    "fields": [
+                      {
+                        "id": "sb-link",
+                        "label": "Link to your storyboard draft",
+                        "type": "text"
+                      },
+                      {
+                        "id": "sb-scenes",
+                        "label": "How many scenes does your storyboard cover?",
+                        "type": "text"
+                      },
+                      {
+                        "id": "sb-notes",
+                        "label": "Anything you are unsure about and want feedback on",
+                        "type": "textarea"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "enhancement",
+            "kind": "enhancement",
+            "title": "Test, Share, Refine",
+            "flxObjectives": [
+              "FLX.RE.1",
+              "FLX.RE.2",
+              "FLX.RE.3"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "Feedback before final production is cheaper and more powerful than feedback after.",
+                "Reflection turns feedback into deliberate improvement."
+              ],
+              "essentialQuestions": [
+                "How does outside feedback reveal what I cannot see in my own work?",
+                "What changes when I revise with intention instead of guessing?"
+              ]
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 3
+            },
+            "blocks": [
+              {
+                "kind": "markdown",
+                "content": "## Why share before you finalize\n\nTop creators ship rough versions to trusted people *before* final polish. A storyboard is the perfect thing to test — it is quick to read and quick to change. Fixing a confusing scene now costs you a sentence. Fixing it after you have filmed costs you a reshoot."
+              },
+              {
+                "kind": "activity",
+                "id": "act-feedback",
+                "title": "Share & get feedforward",
+                "instructions": "Share your storyboard draft with 1–2 peers or a mentor. Ask them specifically about clarity (can they follow the story?), pacing (does any scene drag or rush?), and visual storytelling (do the sketches carry the idea?). Record the feedback you received below.",
+                "fields": [
+                  {
+                    "id": "fb-who",
+                    "label": "Who gave you feedback",
+                    "type": "text"
+                  },
+                  {
+                    "id": "fb-clarity",
+                    "label": "What they said about clarity",
+                    "type": "textarea"
+                  },
+                  {
+                    "id": "fb-pacing",
+                    "label": "What they said about pacing and visual storytelling",
+                    "type": "textarea"
+                  }
+                ]
+              },
+              {
+                "kind": "activity",
+                "id": "act-refine",
+                "title": "Refine your storyboard",
+                "instructions": "Revise your storyboard based on the feedback. You do not have to accept every note — but you do have to decide. List what you changed and why.",
+                "fields": [
+                  {
+                    "id": "rf-changes",
+                    "label": "What you changed",
+                    "type": "textarea"
+                  },
+                  {
+                    "id": "rf-why",
+                    "label": "Why you made those changes (and any feedback you chose not to take, and why)",
+                    "type": "textarea"
+                  }
+                ]
+              },
+              {
+                "kind": "reflection",
+                "id": "act-reflect",
+                "title": "Reflect",
+                "prompts": [
+                  {
+                    "id": "r-hard",
+                    "prompt": "Which of the 7 story elements was hardest to make clear in your storyboard? What finally worked?"
+                  },
+                  {
+                    "id": "r-grew",
+                    "prompt": "What part of your storyboard improved the most between the draft and the refined version?"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "fulfillment",
+            "kind": "fulfillment",
+            "title": "Finalize & Present",
+            "flxObjectives": [
+              "FLX.PR.1",
+              "FLX.PR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "A finished creative work is not done until it can be presented and understood by someone else.",
+                "A walkthrough with voiceover is itself a piece of communication design."
+              ],
+              "essentialQuestions": [
+                "How do I present my process so someone else understands the choices I made?"
+              ]
+            },
+            "gate": {
+              "type": "submission",
+              "blockId": "act-submit"
+            },
+            "blocks": [
+              {
+                "kind": "markdown",
+                "content": "## Finalize your storyboard\n\nComplete your storyboard so every scene has a sketch and a description and is ready to read. This is the version you would actually hand to a production team."
+              },
+              {
+                "kind": "markdown",
+                "content": "## Document your work\n\nRecord a **screen recording with a voiceover** that walks through your finished storyboard. Explain, scene by scene, what is happening, and point out where your 7 story elements show up."
+              },
+              {
+                "kind": "callout",
+                "tone": "info",
+                "content": "Presentation checklist — every scene has a sketch and a description • the screen recording shows the full storyboard • your voiceover explains the story, not just the pictures • you name where your theme, conflict, and point of view appear."
+              },
+              {
+                "kind": "submission",
+                "id": "act-submit",
+                "title": "Submit for approval",
+                "instructions": "Submit your finished storyboard and your screencast walkthrough. Your host will review them against the course criteria and award XC and your badge on approval.",
+                "acceptFile": true,
+                "acceptLink": true,
+                "descriptionRequired": true,
+                "descriptionMinLength": 50,
+                "descriptionHint": "In a few sentences: which story elements are strongest in your storyboard, and what should your host watch for in the screencast?"
+              }
+            ]
+          }
         ]
       },
-      {
-        "id": "fulfillment", "kind": "fulfillment", "title": "Finalize & Present",
-        "flxObjectives": ["FLX.PR.1", "FLX.PR.2"],
-        "desiredResults": {
-          "essentialQuestions": [
-            "How do I present my process so someone else understands the choices I made?"
+      "pro": {
+        "name": "Pro",
+        "estimatedMinutes": 60,
+        "suggestedReward": {
+          "xc": 350,
+          "badgeIds": [
+            "visual-storyteller-pro"
           ]
         },
-        "gate": { "type": "submission", "blockId": "act-submit" },
-        "blocks": [
-          { "kind": "markdown", "content": "## Finalize your storyboard\n\nComplete your storyboard so every scene has a sketch and a description and is ready to read. This is the version you would actually hand to a production team." },
-          { "kind": "markdown", "content": "## Document your work\n\nRecord a **screen recording with a voiceover** that walks through your finished storyboard. Explain, scene by scene, what is happening, and point out where your 7 story elements show up." },
-          { "kind": "callout", "tone": "info", "content": "Presentation checklist — every scene has a sketch and a description • the screen recording shows the full storyboard • your voiceover explains the story, not just the pictures • you name where your theme, conflict, and point of view appear." },
-          { "kind": "submission", "id": "act-submit", "title": "Submit for approval",
-            "instructions": "Submit your finished storyboard and your screencast walkthrough. Your host will review them against the course criteria and award XC and your badge on approval.",
-            "acceptFile": true, "acceptLink": true, "descriptionRequired": true, "descriptionMinLength": 50,
-            "descriptionHint": "In a few sentences: which story elements are strongest in your storyboard, and what should your host watch for in the screencast?" }
+        "phases": [
+          {
+            "id": "engagement",
+            "kind": "engagement",
+            "title": "Why Stories Move Us",
+            "flxObjectives": [
+              "FLX.CN.1"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "TODO — Starter/Pro authoring: understandings for engagement."
+              ],
+              "essentialQuestions": [
+                "What is this story about, and what are you trying to make the audience feel?"
+              ]
+            },
+            "assessmentEvidence": {
+              "performanceTasks": [],
+              "otherEvidence": []
+            },
+            "learningPlan": {
+              "activities": []
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 1
+            },
+            "blocks": [
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (engagement):** Single-question self-assessment: 'What's your story about? What are you trying to make the audience feel?' Two-sentence answer. Skip the multi-item diagnostic and warmup reflection."
+              }
+            ]
+          },
+          {
+            "id": "development",
+            "kind": "development",
+            "title": "Build Your Story AND Storyboard It",
+            "flxObjectives": [
+              "FLX.ID.1",
+              "FLX.ID.3",
+              "FLX.CR.1",
+              "FLX.CR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "TODO — Starter/Pro authoring: understandings for development."
+              ],
+              "essentialQuestions": [
+                "How do all 7 elements work together in your specific story?"
+              ]
+            },
+            "assessmentEvidence": {
+              "performanceTasks": [],
+              "otherEvidence": []
+            },
+            "learningPlan": {
+              "activities": []
+            },
+            "gate": {
+              "type": "activity",
+              "requiredCount": 1
+            },
+            "blocks": [
+              {
+                "kind": "callout",
+                "tone": "warn",
+                "content": "**Authoring TODO (development):** Single merged phase (no Ideation/Creation segment split). 7-elements panel rendered as a collapsible reference checklist, not as exercises. Player goes straight to storyboard. No templates, no scaffolds — they bring their own structure."
+              }
+            ]
+          },
+          {
+            "id": "fulfillment",
+            "kind": "fulfillment",
+            "title": "Finalize & Present",
+            "flxObjectives": [
+              "FLX.PR.1",
+              "FLX.PR.2"
+            ],
+            "desiredResults": {
+              "understandings": [
+                "A finished creative work is not done until it can be presented and understood by someone else.",
+                "A walkthrough with voiceover is itself a piece of communication design."
+              ],
+              "essentialQuestions": [
+                "How do I present my process so someone else understands the choices I made?"
+              ]
+            },
+            "gate": {
+              "type": "submission",
+              "blockId": "act-submit"
+            },
+            "blocks": [
+              {
+                "kind": "markdown",
+                "content": "## Finalize your storyboard\n\nComplete your storyboard so every scene has a sketch and a description and is ready to read. This is the version you would actually hand to a production team."
+              },
+              {
+                "kind": "markdown",
+                "content": "## Document your work\n\nRecord a **screen recording with a voiceover** that walks through your finished storyboard. Explain, scene by scene, what is happening, and point out where your 7 story elements show up."
+              },
+              {
+                "kind": "callout",
+                "tone": "info",
+                "content": "Presentation checklist — every scene has a sketch and a description • the screen recording shows the full storyboard • your voiceover explains the story, not just the pictures • you name where your theme, conflict, and point of view appear."
+              },
+              {
+                "kind": "submission",
+                "id": "act-submit",
+                "title": "Submit for approval",
+                "instructions": "Submit your finished storyboard and your screencast walkthrough. Your host will review them against the course criteria and award XC and your badge on approval.",
+                "acceptFile": true,
+                "acceptLink": true,
+                "descriptionRequired": true,
+                "descriptionMinLength": 50,
+                "descriptionHint": "In a few sentences: which story elements are strongest in your storyboard, and what should your host watch for in the screencast?"
+              }
+            ]
+          }
         ]
       }
-    ]
+    }
   }
 }
 </script>
@@ -363,7 +1189,34 @@
      ============================================================ */
 
   var MANIFEST = JSON.parse(document.getElementById('module-manifest').textContent);
-  var PHASES = MANIFEST.structure.phases;
+
+  // Tier selection — for now defaults to 'novice'. When the tier picker lands
+  // in pathway.html (MODULE_STRUCTURE.md §14.2), the tier will arrive via
+  // pflx_mod_init.payload.tier and replace this default. For standalone
+  // (file://) testing, allow ?tier=starter|novice|pro URL override.
+  // Backwards compatibility: a v0.2 manifest with `structure.phases` is
+  // treated as the implicit Novice tier (spec §14.5).
+  function resolveTier() {
+    try {
+      var qs = (location.search || '').replace(/^\?/, '').split('&');
+      for (var i = 0; i < qs.length; i++) {
+        var kv = qs[i].split('=');
+        if (kv[0] === 'tier' && ['starter','novice','pro'].indexOf(kv[1]) >= 0) return kv[1];
+      }
+    } catch(e) {}
+    return 'novice';
+  }
+  var CURRENT_TIER = resolveTier();
+  function tierPhases(tier) {
+    var s = MANIFEST.structure || {};
+    if (s.tiers && s.tiers[tier] && s.tiers[tier].phases) return s.tiers[tier].phases;
+    // v0.2 fallback — single-tier shape implicitly maps to Novice.
+    if (tier === 'novice' && Array.isArray(s.phases)) return s.phases;
+    // Tier doesn't exist on this module — fall back to Novice if available.
+    if (s.tiers && s.tiers.novice && s.tiers.novice.phases) return s.tiers.novice.phases;
+    return Array.isArray(s.phases) ? s.phases : [];
+  }
+  var PHASES = tierPhases(CURRENT_TIER);
   var OBJ = MANIFEST.objectiveText || {};
   var STRAND = { engagement:'#00d4ff', development:'#8b5cf6', enhancement:'#ffa500', fulfillment:'#10e090' };
 
