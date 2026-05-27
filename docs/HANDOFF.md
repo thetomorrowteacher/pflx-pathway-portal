@@ -120,10 +120,16 @@ Both live in `pflx-pathway-portal/docs/`:
 
 1. **`CONNECTOR_CONTRACT.md` — v0.4** — the node↔module postMessage protocol.
    All open questions resolved; ready to freeze as v1.0 on next review.
-2. **`MODULE_STRUCTURE.md` — v0.2** — what's inside a `.pflx` cartridge. The
-   FLX-strand phase model, per-phase objective tagging, UbD anatomy, the three
-   Module types, the manifest schema. §13 has the remaining open questions
-   (see §6 below).
+2. **`MODULE_STRUCTURE.md` — v0.2 body + v0.3 addendum (§14)** — what's inside
+   a `.pflx` cartridge. The v0.2 body covers the FLX-strand phase model,
+   per-phase objective tagging, UbD anatomy, the three Module types, and the
+   single-tier manifest schema. The **v0.3 addendum** layers a tiered
+   (Starter/Novice/Pro) model on top: tier-aware manifest shape, badge
+   convention `<moduleId>-<tier>`, save scoping per (player, node, tier),
+   co-op gated to `moduleType: "project"`, and tier-picker UX. v0.2
+   single-tier modules are backwards-compatible (implicitly Novice). §14.8
+   has four new open questions, each with a default proposal. Once reviewed,
+   fold the addendum into the body as v0.3.
 
 Other docs:
 
@@ -146,9 +152,9 @@ From `MODULE_STRUCTURE.md` §13, after this session's resolutions:
 | 1 | Quest stage references — bundled `.pflx` inside the Quest package, or pointer? | **Open** (Quest paused, defer until Quest is unpaused) |
 | 2 | Phase content authoring | **Resolved** — Builder UI |
 | 3 | CFU / quiz item format | **Resolved** — fully inside Module content |
-| 4 | Objective completion granularity (per-phase gate vs whole-module approval) | **Open** |
+| 4 | Objective completion granularity (per-phase gate vs whole-module approval) | **Resolved** — per `MODULE_STRUCTURE.md` §14.7, marked met on tier-completion approval |
 | 5 | DIX vs FLX variant — separate framework or branding overlay? | **Open** |
-| 6 | Per-phase reward weighting within the node's XC ceiling | **Open** |
+| 6 | Per-phase reward weighting within the node's XC ceiling | **Resolved** — per-tier `suggestedReward` in v0.3 (§14.7), node `xcReward` still clamps |
 
 None of the open ones are blockers — they are refinements.
 
