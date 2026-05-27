@@ -6852,56 +6852,30 @@ function showLaunchOverlay(node) {
           } catch(e) {}
 
           // No supabase → just use local.
-          if (typeof _supabase === 'undefined' || !_supabase) {
-            try { console.log('[module_saves] no supabase, using local'); } catch(e){}
-            callback(localState); return;
-          }
-
-          // Resolve once — either Supabase responds or we time out after 3s.
-          // This guarantees pflx_mod_init always fires so the viewer never hangs.
-          var done = false;
-          function resolve(state, source) {
-            if (done) return;
-            done = true;
-            clearTimeout(timer);
-            try { console.log('[module_saves] resolved via ' + source); } catch(e){}
-            callback(state);
-          }
-          var timer = setTimeout(function(){ resolve(localState, 'timeout-fallback'); }, 3000);
+          if (typeof _supabase === 'undefined' || !_supabase) { callback(localState); return; }
 
           // Cloud fetch; last-write-wins.
-          try {
-            _supabase.from('module_saves')
-              .select('save_state, updated_at')
-              .eq('player_id', modulePlayerId)
-              .eq('node_id', node.id)
-              .maybeSingle()
-              .then(function(r) {
-                if (r && r.error) {
-                  try { console.warn('[module_saves] fetch error', r.error); } catch(e){}
-                  resolve(localState, 'cloud-error');
-                  return;
-                }
-                if (r && r.data) {
-                  var cloudUpdatedAt = new Date(r.data.updated_at).getTime();
-                  if (cloudUpdatedAt >= localUpdatedAt) {
-                    resolve(r.data.save_state || {}, 'cloud');
-                  } else {
-                    cloudSaveModule(localState, true);
-                    resolve(localState, 'local-newer');
-                  }
+          _supabase.from('module_saves')
+            .select('save_state, updated_at')
+            .eq('player_id', modulePlayerId)
+            .eq('node_id', node.id)
+            .maybeSingle()
+            .then(function(r) {
+              if (r && r.data) {
+                var cloudUpdatedAt = new Date(r.data.updated_at).getTime();
+                if (cloudUpdatedAt >= localUpdatedAt) {
+                  callback(r.data.save_state || {});
                 } else {
-                  if (localUpdatedAt > 0) cloudSaveModule(localState, true);
-                  resolve(localState, 'no-cloud-row');
+                  // Local is newer (offline edits) — push local to cloud and use local.
+                  cloudSaveModule(localState, true);
+                  callback(localState);
                 }
-              }, function(err) {
-                try { console.warn('[module_saves] fetch rejected', err); } catch(e){}
-                resolve(localState, 'cloud-reject');
-              });
-          } catch(e) {
-            try { console.warn('[module_saves] fetch threw', e); } catch(_) {}
-            resolve(localState, 'cloud-throw');
-          }
+              } else {
+                // No cloud row yet — if we have local, push it up.
+                if (localUpdatedAt > 0) cloudSaveModule(localState, true);
+                callback(localState);
+              }
+            }, function() { callback(localState); });
         }
         try {
           var saved = JSON.parse(localStorage.getItem(savedKey) || '[]');
