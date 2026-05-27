@@ -3177,7 +3177,7 @@ const PATHWAYS = {
     accent: '#ff6ec7',
     nodes: [
       { id: 'cc-intro', title: 'Intro to Media Production', emoji: '🎬', x: 50, y: 85, status: 'unlocked', desc: 'Learn the fundamentals of media production, storytelling, and creative workflows.' },
-      { id: 'cc-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['cc-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', desc: 'Master narrative structure and visual storyboarding techniques.' },
+      { id: 'cc-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['cc-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', xcReward: 200, taggedBadges: ['visual-storyteller'], desc: 'Master narrative structure and visual storyboarding techniques.' },
       { id: 'cc-screenwriting', title: 'Screenwriting', emoji: '✍️', x: 20, y: 56, status: 'locked', requires: ['cc-storyboard'], desc: 'Write scripts for film, video, and digital media.' },
       { id: 'cc-media-capture', title: 'Media Capture Techniques', emoji: '📸', x: 70, y: 56, status: 'locked', requires: ['cc-intro'], desc: 'Photography, videography, lighting, and composition fundamentals.' },
       { id: 'cc-sound-design', title: 'Sound Design', emoji: '🎵', x: 18, y: 42, status: 'locked', requires: ['cc-screenwriting'], desc: 'Create and mix audio for media projects.' },
@@ -3192,7 +3192,7 @@ const PATHWAYS = {
     accent: '#c084fc',
     nodes: [
       { id: 'da-intro', title: 'Graphic Design Concepts', emoji: '🎨', x: 50, y: 85, status: 'unlocked', desc: 'Foundations of visual design — color, composition, typography, and layout.' },
-      { id: 'da-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['da-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', desc: 'Visual narrative and storyboarding for digital art projects.' },
+      { id: 'da-storyboard', title: 'Storybuilding & Storyboarding', emoji: '📝', x: 25, y: 72, status: 'locked', requires: ['da-intro'], nodeType: 'course', coursePackage: 'modules/storybuilding-storyboarding', xcReward: 200, taggedBadges: ['visual-storyteller'], desc: 'Visual narrative and storyboarding for digital art projects.' },
       { id: 'da-digitize', title: 'Digitize Art', emoji: '🖌️', x: 25, y: 56, status: 'locked', requires: ['da-storyboard'], desc: 'Transform hand-drawn art into digital formats.' },
       { id: 'da-flipbook', title: 'Flipbook Animation', emoji: '📖', x: 70, y: 56, status: 'locked', requires: ['da-intro'], desc: 'Create frame-by-frame flipbook-style animations.' },
       { id: 'da-vector', title: 'Vector Graphics', emoji: '✏️', x: 18, y: 42, status: 'locked', requires: ['da-digitize'], desc: 'Master vector illustration with professional design tools.' },
