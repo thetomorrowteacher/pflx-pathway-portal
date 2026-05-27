@@ -1,6 +1,8 @@
-# PFLX Module Structure — v0.2 (DRAFT)
+# PFLX Module Structure — v0.2 (DRAFT) + v0.3 Addendum
 
-**Status:** Draft for review · **Scope:** what is inside a `.pflx` cartridge · **Owner:** PFLX
+**Status:** v0.2 body in review; v0.3 addendum appended at §14 covering tiers,
+co-op, and the badge convention · **Scope:** what is inside a `.pflx` cartridge
+· **Owner:** PFLX
 
 This document specifies the **internal structure of a Module** — the cartridge
 that plugs into a Node. It builds on the **Connector Contract**
@@ -13,6 +15,14 @@ that plugs into a Node. It builds on the **Connector Contract**
 > E.P.I.C. and 4-D cycles are dropped. Phases tag **FLX learning objectives**
 > per phase, which auto-crosswalk to ISTE, CASEL, 21st-Century Skills, UDL,
 > Arts Standards, and MYP Design.
+
+> **v0.3 addendum (§14):** Each Module declares **three tiers** — Starter,
+> Novice, Pro — and the player picks one at the node launch. A v0.2
+> single-tier Module is implicitly the Novice tier (backwards-compatible).
+> Tier completions auto-grant `<moduleId>-<tier>` badges; completed tiers
+> grey out on next launch (except Pro, which is always replayable). Co-op
+> mode is gated to `moduleType: "project"`. Saves are scoped per
+> (player, node, tier). Read §14 for the full spec.
 
 ---
 
@@ -445,3 +455,206 @@ before the manifest schema is frozen.*
 
 *Framework source: FLX Curriculum Planner 2023–2024 (Learning Framework
 Crosswalk + Strand sheets).*
+
+---
+
+## 14. v0.3 Addendum — Tier system, badge convention, co-op rules
+
+**Status:** Draft addendum to v0.2. Once reviewed, fold into the main body as
+v0.3 (renumbering sections and updating the §12 schema example).
+
+The single-tier four-phase model from v0.2 (§5) becomes a *special case* — the
+"Novice" tier of a tiered Module. A v0.3 Module declares **three tiers**:
+Starter, Novice, Pro. The Node picks the tier at launch; the Module renders
+that tier's phases.
+
+### 14.1 Why tiers
+
+Players come to a Module with very different starting levels. Forcing every
+learner through the same arc means either over-scaffolding the experts or
+under-scaffolding the novices. Tiers express the *same learning outcome*
+through different paths:
+
+| Tier | Phase count | Scaffolding | Tools | Repeatable? |
+|------|-------------|-------------|-------|-------------|
+| **Starter** | More (often 5+) | Heavy — added practice rounds, tool walkthroughs, worked examples | Simplest available (e.g., Tinkercad for 3D) | Once → badge → grey out |
+| **Novice** | The baseline 4 (Engagement → Development → Enhancement → Fulfillment) | Standard | Intermediate set (e.g., Tinkercad, SketchUp, Blender) | Once → badge → grey out |
+| **Pro** | Fewer (often 3) | Minimal — assumes fluency | Pro tools only (e.g., Blender; no Tinkercad) | **Unlimited** — never greys out |
+
+Same FLX objectives across all three; same final submission deliverable; same
+standards crosswalk. What changes is *path length, scaffolding depth, and
+optionally the tools the tier expects*.
+
+### 14.2 Tier picker UX
+
+The picker is a **node-launch surface**, not a module-internal surface.
+
+1. **Node launch overlay.** When a player clicks a node, the launch panel shows
+   three tier buttons (Starter / Novice / Pro) plus a Solo / Co-op toggle
+   (Co-op is enabled only on `project` Modules — see §14.6).
+2. **Badge-driven grey-out.** The Node reads the player's badges from the
+   platform. If `<moduleId>-starter` is held, Starter is greyed. Same for
+   Novice. **Pro is never greyed** — it stays selectable forever.
+3. **Hand-off to module.** Selected tier and mode are passed to the Module
+   via the existing `pflx_mod_init` payload as a new `tier` field
+   (`"starter" | "novice" | "pro"`) and `mode` field (`"solo" | "coop"`).
+4. **Diagnostic confirms, never upgrades.** Once inside, the Engagement-phase
+   diagnostic can prompt the player to **downgrade** if their answers cluster
+   at the low-confidence end ("Your answers suggest Starter might be more
+   comfortable. Switch?"). The diagnostic **never** suggests upgrading — that
+   gate is decided by badge state on the Node, not by self-assessment.
+
+The picker is the only place tier is chosen. The Module trusts the tier from
+`pflx_mod_init` for the duration of the session (with the one downgrade
+escape hatch from step 4).
+
+### 14.3 Badge convention
+
+Tier completions auto-grant badges named `<moduleId>-<tier>`. For the
+Storybuilding & Storyboarding Module:
+
+- `storybuilding-storyboarding-starter`
+- `storybuilding-storyboarding-novice`
+- `storybuilding-storyboarding-pro`
+
+Badges are awarded by the Console's existing
+`PflxDataBus.award(playerId, { badge })` flow (Connector §9 / HANDOFF §9),
+triggered when the host approves a Completion Record. The completion record
+carries the `tier` field; the Console derives the badge ID from
+`(moduleId, tier)`. No manifest field is needed.
+
+Pro is repeatable: the badge is granted once on first approval, but the tier
+button never greys out, so the player can re-run Pro and earn additional
+Completion Records (without additional badge grants).
+
+### 14.4 Save scoping — per (player, node, tier)
+
+The cloud save (see backlog: re-introducing cloud sync) uses
+`(player_id, node_id, tier)` as the unique key. Two consequences:
+
+- A player can have Starter in progress *and* Novice in progress on the same
+  module on the same node — switching tier does not wipe state.
+- The local key extends to `pflx_modsave_<playerId>_<nodeId>_<tier>`.
+
+This supersedes the v0.2 single-slot scheme. The Supabase `module_saves`
+table needs a `tier` text column added and the PK reset to
+`(player_id, node_id, tier)`. Existing rows backfill to `tier = 'novice'`.
+
+### 14.5 Tier-aware manifest shape
+
+```json
+{
+  "schemaVersion": 3,
+  "moduleId": "storybuilding-storyboarding",
+  "moduleType": "course",
+  "name": "Storybuilding & Storyboarding",
+  "framework": "FLX",
+  "capabilities": {
+    "progress": true, "stats": true, "checkpoints": true,
+    "coop": false, "submission": true, "hostDashboard": true
+  },
+  "structure": {
+    "tiers": {
+      "starter": {
+        "name": "Starter",
+        "estimatedMinutes": 120,
+        "tools": ["google-slides", "canva"],
+        "suggestedReward": { "xc": 100, "badgeIds": ["visual-storyteller"] },
+        "phases": [
+          { "id": "engagement", "kind": "engagement", "...": "..." },
+          { "id": "practice-round", "kind": "engagement", "...": "..." },
+          { "id": "development", "kind": "development", "...": "..." },
+          { "id": "enhancement", "kind": "enhancement", "...": "..." },
+          { "id": "fulfillment", "kind": "fulfillment", "...": "..." }
+        ]
+      },
+      "novice": {
+        "name": "Novice",
+        "estimatedMinutes": 90,
+        "tools": ["google-slides", "canva", "procreate"],
+        "suggestedReward": { "xc": 200, "badgeIds": ["visual-storyteller"] },
+        "phases": [ "/* the four FLX strands as in v0.2 §12 */" ]
+      },
+      "pro": {
+        "name": "Pro",
+        "estimatedMinutes": 60,
+        "tools": ["procreate", "photoshop"],
+        "suggestedReward": { "xc": 350, "badgeIds": ["visual-storyteller-pro"] },
+        "phases": [
+          { "id": "engagement",  "kind": "engagement",  "...": "/* shortened diagnostic */" },
+          { "id": "development", "kind": "development", "...": "/* one segment, not two */" },
+          { "id": "fulfillment", "kind": "fulfillment", "...": "/* skip enhancement */" }
+        ]
+      }
+    }
+  }
+}
+```
+
+Notes on the shape:
+
+- Each tier's `phases` array follows the v0.2 phase schema (§12, §5).
+- Tiers can **omit strands** — Pro often skips Enhancement. Pro can also
+  collapse Development's two segments (Ideation + Creation) into one.
+- FLX objectives still tag **per phase**, not per tier. Objectives can vary
+  by tier — Starter might cover only a subset; Pro might add advanced
+  objectives the lower tiers don't touch.
+- The `tools` array is **declarative metadata** — a hint to the player and
+  host. Tool gating itself is the Module's responsibility (the Module can
+  show a tool picker scoped to the tier's `tools` list, or hard-code one
+  tool per tier).
+- `suggestedReward` is **per tier** in v0.3 — higher tiers suggest higher
+  XC. The Node's `xcReward` field is still the ceiling.
+
+**Backwards compatibility.** A v0.2 Module with `structure.phases` (single
+tier) is implicitly the Novice tier of a tiered Module. The Node treats it as
+`tiers: { novice: { phases: [...] } }` and disables the picker (only Novice
+is selectable). This means the existing Storybuilding module keeps working
+until its content is restructured for v0.3.
+
+### 14.6 Co-op rules
+
+Co-op is **only available on `moduleType: "project"`** (HANDOFF §4.1).
+Courses are solo-only — a Course is an instructional arc, not a deliverable,
+so co-op adds nothing. Projects are deliverables, so co-op is the natural
+collaboration mode.
+
+- Session size cap: **4 players** (HANDOFF §4.8).
+- Live-only; offline co-op is not supported (HANDOFF §4.9).
+- The launch picker's Co-op toggle is greyed out for any Module that is not
+  `moduleType: "project"` OR whose manifest `capabilities.coop` is `false`.
+- Mixed-tier co-op is currently disallowed — see open question 14.8 #3.
+
+### 14.7 Resolutions to prior open questions
+
+- **§13 #4 (objective completion granularity)** — Resolved. A tier
+  completion is when the host approves its Completion Record. The
+  auto-granted `<moduleId>-<tier>` badge is the signal. Objectives covered by
+  the completed tier's phases are marked "met" at that moment.
+- **§13 #6 (per-phase reward weighting)** — Resolved. Each tier carries its
+  own `suggestedReward`. The Node's `xcReward` is still the ceiling and is
+  clamped per-tier.
+
+### 14.8 New open questions
+
+1. **Tier downgrade — restart or carry-forward?** When a player accepts the
+   diagnostic's "Switch to Starter?" prompt, do they (a) restart Starter
+   fresh, or (b) carry their Engagement-phase work into Starter? Affects the
+   save model and the diagnostic UX. Default proposal: **(a) restart** — saves
+   are tier-scoped, so the diagnostic-downgrade simply launches the Starter
+   tier's save slot (which may be empty or in-progress).
+2. **Pro badge re-grant policy.** Granted only on first completion (matching
+   Starter/Novice), or on every approved Pro completion? Default proposal:
+   **only first** — additional approved Pro runs add Completion Records to
+   the player's portfolio but don't re-grant the badge.
+3. **Mixed-tier co-op.** If two players join a co-op session at different
+   tiers, whose tier wins, or is co-op tier-locked at session creation?
+   Default proposal: **tier-locked at session creation** — the session host's
+   tier becomes the session tier; joiners adopt it for the duration.
+4. **Tools manifest registry.** The `tools` array is free-form strings today.
+   Should PFLX maintain a tools registry (id + display name + icon + launch
+   URL) so the Module Builder can render branded picker UI consistently?
+
+---
+
+*End of v0.3 addendum.*
