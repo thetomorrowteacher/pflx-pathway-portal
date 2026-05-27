@@ -6810,73 +6810,7 @@ function showLaunchOverlay(node) {
 
         // Load saved progress for this node+player
         var savedKey = 'pflx_course_tasks_' + node.id;
-
-        // Phase-based Module Save Slot — player-scoped + cloud-synced.
-        // Local key includes playerId so multiple players sharing a browser don't collide.
-        // Cloud rows live in `module_saves` (Supabase), keyed by (player_id, node_id), with
-        // last-write-wins reconcile on updated_at (HANDOFF §4.9).
-        var modulePlayerId = (currentPlayer && currentPlayer.id) ? String(currentPlayer.id) : 'anon';
-        var moduleSaveKey = 'pflx_modsave_' + modulePlayerId + '_' + node.id;
-        var moduleId = (node.coursePackage || '').split('/').pop() || node.id;
-
-        var _moduleCloudSaveTimer = null;
-        function cloudSaveModule(state, immediate) {
-          clearTimeout(_moduleCloudSaveTimer);
-          var doSave = function() {
-            if (typeof _supabase === 'undefined' || !_supabase) return;
-            _supabase.from('module_saves').upsert({
-              player_id: modulePlayerId,
-              node_id: node.id,
-              module_id: moduleId,
-              save_state: state || {},
-              updated_at: new Date().toISOString()
-            }).then(function(r) {
-              if (r && r.error) { try { console.warn('[module_saves] upsert error', r.error); } catch(e){} }
-            }, function(){});
-          };
-          if (immediate) doSave(); else _moduleCloudSaveTimer = setTimeout(doSave, 800);
-        }
-
-        function loadModuleSave(callback) {
-          // Read local first (sync). Format: { state, updatedAt } (new) or raw state (legacy).
-          var localState = {};
-          var localUpdatedAt = 0;
-          try {
-            var raw = localStorage.getItem(moduleSaveKey);
-            if (raw) {
-              var obj = JSON.parse(raw);
-              if (obj && typeof obj === 'object' && obj.state) {
-                localState = obj.state; localUpdatedAt = obj.updatedAt || 0;
-              } else { localState = obj || {}; }
-            }
-          } catch(e) {}
-
-          // No supabase → just use local.
-          if (typeof _supabase === 'undefined' || !_supabase) { callback(localState); return; }
-
-          // Cloud fetch; last-write-wins.
-          _supabase.from('module_saves')
-            .select('save_state, updated_at')
-            .eq('player_id', modulePlayerId)
-            .eq('node_id', node.id)
-            .maybeSingle()
-            .then(function(r) {
-              if (r && r.data) {
-                var cloudUpdatedAt = new Date(r.data.updated_at).getTime();
-                if (cloudUpdatedAt >= localUpdatedAt) {
-                  callback(r.data.save_state || {});
-                } else {
-                  // Local is newer (offline edits) — push local to cloud and use local.
-                  cloudSaveModule(localState, true);
-                  callback(localState);
-                }
-              } else {
-                // No cloud row yet — if we have local, push it up.
-                if (localUpdatedAt > 0) cloudSaveModule(localState, true);
-                callback(localState);
-              }
-            }, function() { callback(localState); });
-        }
+        var moduleSaveKey = 'pflx_modsave_' + node.id;   // phase-based Module Save Slot
         try {
           var saved = JSON.parse(localStorage.getItem(savedKey) || '[]');
           if (Array.isArray(saved) && saved.length > 0) courseTasks = saved;
@@ -7023,21 +6957,21 @@ function showLaunchOverlay(node) {
             // the Node answers with pflx_mod_init, then tracks progress/saves and
             // routes the final completion to the Platform Approvals Queue.
             if (d.type === 'pflx_mod_ready') {
-              loadModuleSave(function(savedState) {
-                try {
-                  courseFrame.contentWindow.postMessage({
-                    v: 1, type: 'pflx_mod_init',
-                    payload: {
-                      player: pflxModulePlayer(),
-                      xc: { balance: 0 },
-                      badges: [],
-                      save: savedState,
-                      context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo' },
-                      coop: { sessionId: null, role: null, peers: [] }
-                    }
-                  }, '*');
-                } catch(e3) {}
-              });
+              var savedState = {};
+              try { savedState = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch(e2) {}
+              try {
+                courseFrame.contentWindow.postMessage({
+                  v: 1, type: 'pflx_mod_init',
+                  payload: {
+                    player: pflxModulePlayer(),
+                    xc: { balance: 0 },
+                    badges: [],
+                    save: savedState,
+                    context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo' },
+                    coop: { sessionId: null, role: null, peers: [] }
+                  }
+                }, '*');
+              } catch(e3) {}
             }
             if (d.type === 'pflx_mod_progress' && d.payload) {
               var mp = Math.min(100, Math.max(0, parseInt(d.payload.percent) || 0));
@@ -7051,12 +6985,7 @@ function showLaunchOverlay(node) {
               node._lastCheckpoint = d.payload.checkpointId || '';
             }
             if (d.type === 'pflx_mod_save' && d.payload) {
-              var newState = d.payload.state || {};
-              try {
-                localStorage.setItem(moduleSaveKey,
-                  JSON.stringify({ state: newState, updatedAt: Date.now() }));
-              } catch(e2) {}
-              cloudSaveModule(newState, false);  // debounced cloud upsert
+              try { localStorage.setItem(moduleSaveKey, JSON.stringify(d.payload.state || {})); } catch(e2) {}
               try {
                 courseFrame.contentWindow.postMessage(
                   { v: 1, type: 'pflx_mod_save_ack', payload: { ok: true } }, '*');
@@ -7068,12 +6997,7 @@ function showLaunchOverlay(node) {
             if (d.type === 'pflx_mod_complete' && d.payload) {
               document.getElementById('courseProgressFill').style.width = '100%';
               document.getElementById('courseContentTitle').textContent = node.title + ' — SUBMITTED';
-              var finalState = d.payload.finalState || {};
-              try {
-                localStorage.setItem(moduleSaveKey,
-                  JSON.stringify({ state: finalState, updatedAt: Date.now() }));
-              } catch(e2) {}
-              cloudSaveModule(finalState, true);  // immediate (not debounced) — completion is final
+              try { localStorage.setItem(moduleSaveKey, JSON.stringify(d.payload.finalState || {})); } catch(e2) {}
               // Build the Completion Record ("credentials") and route it to the
               // Platform's unified Approvals Queue — no reward pays until a host approves.
               var completionRecord = {
