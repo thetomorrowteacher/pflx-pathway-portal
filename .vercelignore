@@ -3,6 +3,8 @@ node_modules
 app
 *.png
 !public/**/*.png
+!modules/**/*.png
+!courses/**/*.png
 package.json
 package-lock.json
 next.config.mjs
