@@ -6920,10 +6920,49 @@ function showLaunchOverlay(node) {
               var picked = btn.getAttribute('data-tier');
               if (!picked || ALLOWED_TIERS.indexOf(picked) === -1) return;
               if (picked === CLOUD_SAVE_CTX.tier) return;
+              var prevTier = CLOUD_SAVE_CTX.tier;
               try { localStorage.setItem('pflx_player_tier', picked); } catch (er) {}
               CLOUD_SAVE_CTX.tier = picked;
               paint(picked);
               _modLog('tier changed → ' + picked + ' (saved + next loads use new PK)');
+              // Announce the change to the parent platform so MC can append
+              // a tierHistory entry on the player record and update the badge
+              // chips that surface tier next to rank everywhere.
+              try {
+                window.parent && window.parent.postMessage({
+                  type: 'pflx_tier_change',
+                  playerId: CLOUD_SAVE_CTX.player_id,
+                  from: prevTier,
+                  to: picked,
+                  source: 'launch-overlay',
+                  ts: new Date().toISOString()
+                }, '*');
+              } catch (e) {}
+              // Best-effort: also append directly to the Supabase audit row
+              // so a tier change made from a standalone pathway URL (no
+              // parent platform) still gets logged.
+              try {
+                if (window._supabase) {
+                  var historyKey = 'pflx_tier_history';
+                  window._supabase.from('app_data').select('data').eq('key', historyKey).maybeSingle()
+                    .then(function (res) {
+                      var current = (res && res.data && Array.isArray(res.data.data)) ? res.data.data : [];
+                      current.push({
+                        playerId: CLOUD_SAVE_CTX.player_id,
+                        from: prevTier,
+                        to: picked,
+                        source: 'launch-overlay',
+                        ts: new Date().toISOString()
+                      });
+                      // Cap at 2000 entries so the row never blows up.
+                      if (current.length > 2000) current = current.slice(current.length - 2000);
+                      window._supabase.from('app_data').upsert(
+                        { key: historyKey, data: current, updated_at: new Date().toISOString() },
+                        { onConflict: 'key' }
+                      );
+                    });
+                }
+              } catch (e) {}
               // If the iframe has already received pflx_mod_init, push a
               // refresh so tier-aware modules can adapt. Best-effort.
               if (_cloudInitDelivered) {
