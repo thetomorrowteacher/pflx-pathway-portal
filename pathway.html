@@ -3124,6 +3124,21 @@
     <div class="launch-message">
       <div class="launch-title" id="launchTitle">Initiating Warp Drive</div>
       <div class="launch-subtitle" id="launchSubtitle">Preparing mission environment...</div>
+      <!--
+        Tier picker — Starter / Novice / Pro. Selection is persisted per
+        player in localStorage and applied to: (1) the cloud module_saves
+        PK (player_id, node_id, tier) so each tier has its own slot, and
+        (2) pflx_mod_init.payload.context.tier so tier-aware modules can
+        adapt their content (see Storybuilding viewer.html). Pre-selected
+        from URL ?tier= → localStorage → 'novice'. Clicking a tier updates
+        the choice and posts a refreshed pflx_mod_init to the iframe.
+      -->
+      <div id="launchTierPicker" style="margin: 20px auto 10px; display: inline-flex; gap: 6px; padding: 6px; background: rgba(10,18,40,0.55); border: 1px solid rgba(0,212,255,0.25); border-radius: 999px;">
+        <button class="tier-btn" data-tier="starter" style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">STARTER</button>
+        <button class="tier-btn" data-tier="novice"  style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">NOVICE</button>
+        <button class="tier-btn" data-tier="pro"     style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">PRO</button>
+      </div>
+      <div id="launchTierHint" style="font-family:Rajdhani,sans-serif;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:0.06em;margin-bottom:14px;">Pick a tier to lock in your difficulty. Stored per player.</div>
       <div class="launch-spinner"></div>
     </div>
     <!-- Embedded Course Content Container -->
@@ -6833,17 +6848,80 @@ function showLaunchOverlay(node) {
           } catch (e) { return false; }
         })();
         var _modPlayer = pflxModulePlayer();
+
+        // Resolve the current tier from (in priority order):
+        //   1. ?tier= URL param (explicit override)
+        //   2. localStorage 'pflx_player_tier' (last sticky choice)
+        //   3. 'novice' (safe default)
+        // ALLOWED is enforced so a typo in the URL doesn't crash the picker.
+        var ALLOWED_TIERS = ['starter','novice','pro'];
+        function _resolveTier() {
+          try {
+            var qp = new URLSearchParams(window.location.search);
+            var fromQp = qp.get('tier');
+            if (fromQp && ALLOWED_TIERS.indexOf(fromQp) !== -1) return fromQp;
+          } catch (e) {}
+          try {
+            var stored = localStorage.getItem('pflx_player_tier');
+            if (stored && ALLOWED_TIERS.indexOf(stored) !== -1) return stored;
+          } catch (e) {}
+          return 'novice';
+        }
+
         var CLOUD_SAVE_CTX = {
           player_id: _modPlayer.id || (_modPlayer.brand || 'anon-' + (location.hash || 'unknown')).slice(0, 60),
           node_id:   node.id,
           module_id: node.moduleId || node.id,
-          tier:      (function () {
-            try {
-              var qp = new URLSearchParams(window.location.search);
-              return qp.get('tier') || _modPlayer.tier || 'novice';
-            } catch (e) { return 'novice'; }
-          })()
+          tier:      _resolveTier()
         };
+
+        // Wire the launch-overlay tier picker. Highlights the current choice;
+        // clicking a different tier persists it, updates CLOUD_SAVE_CTX so
+        // subsequent cloud loads/saves go to the right PK, and pushes a
+        // refreshed pflx_mod_init into the iframe so tier-aware modules can
+        // re-render with the new tier without a full reload.
+        (function _wireTierPicker() {
+          var picker = document.getElementById('launchTierPicker');
+          if (!picker) return;
+          function paint(tier) {
+            picker.querySelectorAll('.tier-btn').forEach(function (btn) {
+              var active = btn.getAttribute('data-tier') === tier;
+              btn.style.background = active ? 'linear-gradient(90deg, rgba(0,212,255,0.25), rgba(167,139,250,0.25))' : 'transparent';
+              btn.style.color      = active ? '#ffffff' : 'rgba(255,255,255,0.55)';
+              btn.style.boxShadow  = active ? '0 0 14px rgba(0,212,255,0.35)' : 'none';
+            });
+          }
+          paint(CLOUD_SAVE_CTX.tier);
+          picker.querySelectorAll('.tier-btn').forEach(function (btn) {
+            btn.onclick = function (e) {
+              e.preventDefault();
+              var picked = btn.getAttribute('data-tier');
+              if (!picked || ALLOWED_TIERS.indexOf(picked) === -1) return;
+              if (picked === CLOUD_SAVE_CTX.tier) return;
+              try { localStorage.setItem('pflx_player_tier', picked); } catch (er) {}
+              CLOUD_SAVE_CTX.tier = picked;
+              paint(picked);
+              _modLog('tier changed → ' + picked + ' (saved + next loads use new PK)');
+              // If the iframe has already received pflx_mod_init, push a
+              // refresh so tier-aware modules can adapt. Best-effort.
+              if (_cloudInitDelivered) {
+                try {
+                  var local = {};
+                  try { local = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch (er2) {}
+                  courseFrame.contentWindow.postMessage({
+                    v: 1, type: 'pflx_mod_init',
+                    payload: {
+                      player: pflxModulePlayer(),
+                      save: local,
+                      context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo', tier: picked },
+                      _source: 'tier-change'
+                    }
+                  }, '*');
+                } catch (er3) {}
+              }
+            };
+          });
+        })();
         function _modLog(msg, extra) {
           try { console.log('[module_saves]', msg, extra !== undefined ? extra : ''); } catch (e) {}
         }
