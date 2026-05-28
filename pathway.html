@@ -6816,6 +6816,125 @@ function showLaunchOverlay(node) {
           if (Array.isArray(saved) && saved.length > 0) courseTasks = saved;
         } catch(e) {}
 
+        // ── Cloud module saves (feature-flagged) ──────────────────────
+        // The previous attempt at cloud saves blocked the iframe because we
+        // tried to AWAIT the Supabase fetch before sending pflx_mod_init.
+        // This version is async-mirror only: localStorage is the primary,
+        // cloud is a best-effort backup. The iframe is never made to wait.
+        //
+        // Enable per-request via ?cloudSaves=1, or persistently with
+        // localStorage.pflx_cloud_saves = '1'. Disable any time.
+        var CLOUD_SAVES_ENABLED = (function () {
+          try {
+            var qp = new URLSearchParams(window.location.search);
+            if (qp.get('cloudSaves') === '1') return true;
+            if (qp.get('cloudSaves') === '0') return false;
+            return localStorage.getItem('pflx_cloud_saves') === '1';
+          } catch (e) { return false; }
+        })();
+        var _modPlayer = pflxModulePlayer();
+        var CLOUD_SAVE_CTX = {
+          player_id: _modPlayer.id || (_modPlayer.brand || 'anon-' + (location.hash || 'unknown')).slice(0, 60),
+          node_id:   node.id,
+          module_id: node.moduleId || node.id,
+          tier:      (function () {
+            try {
+              var qp = new URLSearchParams(window.location.search);
+              return qp.get('tier') || _modPlayer.tier || 'novice';
+            } catch (e) { return 'novice'; }
+          })()
+        };
+        function _modLog(msg, extra) {
+          try { console.log('[module_saves]', msg, extra !== undefined ? extra : ''); } catch (e) {}
+        }
+        if (CLOUD_SAVES_ENABLED) {
+          _modLog('cloud saves ENABLED for', CLOUD_SAVE_CTX);
+        }
+
+        // Async cloud load — fires on launch alongside the synchronous
+        // localStorage read. Result is merged into moduleSaveKey only if
+        // the cloud copy is strictly newer (updated_at > local), and only
+        // if the iframe has not yet sent pflx_mod_ready — so we never race
+        // the init handshake.
+        var _cloudInitDelivered = false;
+        if (CLOUD_SAVES_ENABLED && window._supabase) {
+          var t0 = performance.now();
+          _supabase.from('module_saves')
+            .select('save_state, updated_at')
+            .eq('player_id', CLOUD_SAVE_CTX.player_id)
+            .eq('node_id',   CLOUD_SAVE_CTX.node_id)
+            .eq('tier',      CLOUD_SAVE_CTX.tier)
+            .maybeSingle()
+            .then(function (res) {
+              var ms = (performance.now() - t0).toFixed(0);
+              if (res && res.error) {
+                _modLog('cloud load error after ' + ms + 'ms', res.error);
+                return;
+              }
+              if (!res || !res.data) {
+                _modLog('cloud load: no row after ' + ms + 'ms');
+                return;
+              }
+              _modLog('cloud load OK after ' + ms + 'ms', { updated_at: res.data.updated_at });
+              try {
+                var local = {};
+                try { local = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch (e) {}
+                var localUpdated = local && local._updatedAt ? new Date(local._updatedAt).getTime() : 0;
+                var cloudUpdated = res.data.updated_at ? new Date(res.data.updated_at).getTime() : 0;
+                if (cloudUpdated > localUpdated) {
+                  var merged = Object.assign({}, res.data.save_state || {}, { _updatedAt: res.data.updated_at });
+                  localStorage.setItem(moduleSaveKey, JSON.stringify(merged));
+                  _modLog('cloud state was newer — wrote to localStorage');
+                  // If the iframe is already loaded and has acked init, push
+                  // a refresh. If init hasn't happened yet, the pflx_mod_ready
+                  // handler will pick up the new localStorage value naturally.
+                  if (_cloudInitDelivered) {
+                    try {
+                      courseFrame.contentWindow.postMessage({
+                        v: 1, type: 'pflx_mod_init',
+                        payload: { save: res.data.save_state || {}, _source: 'cloud-late' }
+                      }, '*');
+                      _modLog('posted late pflx_mod_init from cloud');
+                    } catch (e) {}
+                  }
+                } else {
+                  _modLog('local is newer or equal — keeping local copy');
+                }
+              } catch (e) {
+                _modLog('cloud load merge threw', e && e.message);
+              }
+            }, function (err) {
+              var ms = (performance.now() - t0).toFixed(0);
+              _modLog('cloud load promise rejected after ' + ms + 'ms', err);
+            });
+        }
+
+        // Async cloud upsert. Called from the pflx_mod_save handler. Best
+        // effort — never blocks the ack back to the iframe. Logs everything
+        // under [module_saves] so the iframe console shows the trail.
+        function _cloudUpsertModuleSave(state) {
+          if (!CLOUD_SAVES_ENABLED || !window._supabase) return;
+          var nowIso = new Date().toISOString();
+          var row = Object.assign({}, CLOUD_SAVE_CTX, {
+            save_state: state || {},
+            updated_at: nowIso
+          });
+          var t0 = performance.now();
+          _supabase.from('module_saves')
+            .upsert(row, { onConflict: 'player_id,node_id,tier' })
+            .then(function (res) {
+              var ms = (performance.now() - t0).toFixed(0);
+              if (res && res.error) {
+                _modLog('cloud upsert error after ' + ms + 'ms', res.error);
+              } else {
+                _modLog('cloud upsert OK after ' + ms + 'ms');
+              }
+            }, function (err) {
+              var ms = (performance.now() - t0).toFixed(0);
+              _modLog('cloud upsert promise rejected after ' + ms + 'ms', err);
+            });
+        }
+
         function updateTaskUI() {
           var total = courseTasks.length;
           var done = courseTasks.filter(function(t) { return t.completed; }).length;
@@ -6967,10 +7086,12 @@ function showLaunchOverlay(node) {
                     xc: { balance: 0 },
                     badges: [],
                     save: savedState,
-                    context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo' },
+                    context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo', tier: CLOUD_SAVE_CTX.tier },
                     coop: { sessionId: null, role: null, peers: [] }
                   }
                 }, '*');
+                _cloudInitDelivered = true;
+                _modLog('pflx_mod_init delivered (from local) — cloud load may still patch later');
               } catch(e3) {}
             }
             if (d.type === 'pflx_mod_progress' && d.payload) {
@@ -6985,11 +7106,18 @@ function showLaunchOverlay(node) {
               node._lastCheckpoint = d.payload.checkpointId || '';
             }
             if (d.type === 'pflx_mod_save' && d.payload) {
-              try { localStorage.setItem(moduleSaveKey, JSON.stringify(d.payload.state || {})); } catch(e2) {}
+              var __state = d.payload.state || {};
+              try {
+                // Stamp _updatedAt so the cloud-load merge can compare freshness.
+                var __local = Object.assign({}, __state, { _updatedAt: new Date().toISOString() });
+                localStorage.setItem(moduleSaveKey, JSON.stringify(__local));
+              } catch(e2) {}
               try {
                 courseFrame.contentWindow.postMessage(
                   { v: 1, type: 'pflx_mod_save_ack', payload: { ok: true } }, '*');
               } catch(e3) {}
+              // Best-effort cloud mirror — no await, never blocks the ack.
+              try { _cloudUpsertModuleSave(__state); } catch (e4) {}
             }
             if (d.type === 'pflx_mod_submission' && d.payload) {
               node._moduleSubmission = d.payload.fields || {};
