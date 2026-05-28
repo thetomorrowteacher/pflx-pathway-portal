@@ -6837,16 +6837,38 @@ function showLaunchOverlay(node) {
         // This version is async-mirror only: localStorage is the primary,
         // cloud is a best-effort backup. The iframe is never made to wait.
         //
-        // Enable per-request via ?cloudSaves=1, or persistently with
-        // localStorage.pflx_cloud_saves = '1'. Disable any time.
+        // Enable per-request via ?cloudSaves=1, persistently with
+        // localStorage.pflx_cloud_saves = '1', or globally for everyone via
+        // the MC Settings toggle which writes pflx_cloud_saves_global. The
+        // local mirror of the global flag is cached in localStorage so we
+        // don't need a Supabase round-trip on every launch.
         var CLOUD_SAVES_ENABLED = (function () {
           try {
             var qp = new URLSearchParams(window.location.search);
             if (qp.get('cloudSaves') === '1') return true;
             if (qp.get('cloudSaves') === '0') return false;
-            return localStorage.getItem('pflx_cloud_saves') === '1';
+            if (localStorage.getItem('pflx_cloud_saves') === '1') return true;
+            if (localStorage.getItem('pflx_cloud_saves_global') === '1') return true;
+            return false;
           } catch (e) { return false; }
         })();
+        // After launch starts, refresh the global flag from Supabase in the
+        // background so this device picks up changes from other devices.
+        // The flag only affects FUTURE launches; the current session sticks
+        // with whatever was resolved above to avoid mid-session churn.
+        setTimeout(function () {
+          if (!window._supabase) return;
+          window._supabase.from('app_data')
+            .select('data')
+            .eq('key', 'pflx_cloud_saves_global')
+            .maybeSingle()
+            .then(function (res) {
+              if (res && res.error) return;
+              var on = !!(res && res.data && (res.data.data === true || res.data.data === 'true' || (res.data.data && res.data.data.enabled === true)));
+              try { localStorage.setItem('pflx_cloud_saves_global', on ? '1' : '0'); } catch (e) {}
+              _modLog('global flag refreshed from cloud → ' + (on ? 'ON' : 'OFF'));
+            });
+        }, 1200);
         var _modPlayer = pflxModulePlayer();
 
         // Resolve the current tier from (in priority order):
