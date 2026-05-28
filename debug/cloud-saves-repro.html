@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PFLX Cloud Module Saves — Repro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    Local repro page for the module_saves cloud round-trip.
+
+    Why this exists: cloud module saves were shipped + reverted on the same day
+    (commits 905a01c + 6db17d8 → reverted 814a435 + e6ae4fc). The viewer hung
+    after the warp animation because loadModuleSave's Supabase fetch never
+    resolved. We never isolated whether the freeze was in the fetch itself,
+    in the rxjs await, or in the iframe postMessage handshake.
+
+    This page calls the EXACT same Supabase client + endpoint pathway.html
+    uses, but with nothing else in the loop — no warp animation, no iframe,
+    no pflx_mod_init handshake. Every step is timed and logged so you can
+    see whether `select()` hangs, whether `upsert()` returns, or whether
+    the bug is somewhere else entirely.
+
+    How to use:
+      1. Serve this directory locally:  python3 -m http.server 5500
+      2. Open http://localhost:5500/debug/cloud-saves-repro.html in Chrome
+      3. Click LOAD. If it hangs, the bug is in the Supabase client, not in
+         pathway.html. If it returns instantly, the bug is in our integration.
+
+    Schema (from migration module_saves_add_tier_column):
+      player_id text not null
+      node_id   text not null
+      module_id text not null
+      save_state jsonb default '{}'
+      tier text not null default 'novice' check (tier in ('starter','novice','pro'))
+      PK (player_id, node_id, tier)
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #0a0d18;
+      color: #e0e6ff;
+      font-family: 'JetBrains Mono', 'Menlo', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    h1 {
+      font-family: 'Orbitron', 'Rajdhani', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.12em;
+      color: #00d4ff;
+      margin: 0 0 4px 0;
+    }
+    .sub {
+      color: rgba(255,255,255,0.45);
+      font-size: 11px;
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .panel {
+      background: rgba(22,22,31,0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    label {
+      display: block;
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(10,18,40,0.7);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #e0e6ff;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: inherit;
+      margin-bottom: 10px;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    button {
+      background: rgba(0,212,255,0.12);
+      color: #00d4ff;
+      border: 1px solid rgba(0,212,255,0.4);
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      font-family: inherit;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    button:hover { background: rgba(0,212,255,0.20); }
+    button.warn { background: rgba(245,200,66,0.10); color: #f5c842; border-color: rgba(245,200,66,0.4); }
+    button.warn:hover { background: rgba(245,200,66,0.18); }
+    button.danger { background: rgba(239,68,68,0.10); color: #ef4444; border-color: rgba(239,68,68,0.4); }
+    button.danger:hover { background: rgba(239,68,68,0.18); }
+
+    .log {
+      background: #05070d;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 12px;
+      height: 360px;
+      overflow-y: auto;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log .row { padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.04); }
+    .log .ts  { color: rgba(255,255,255,0.35); }
+    .log .tag { font-weight: 700; padding: 0 6px; border-radius: 4px; margin: 0 4px; }
+    .log .info  { background: rgba(0,212,255,0.10);  color: #00d4ff; }
+    .log .ok    { background: rgba(34,197,94,0.12);  color: #22c55e; }
+    .log .warn  { background: rgba(245,200,66,0.12); color: #f5c842; }
+    .log .err   { background: rgba(239,68,68,0.12);  color: #ef4444; }
+    .log .ms    { color: #a78bfa; font-weight: 700; }
+    .log pre    { margin: 4px 0 0 16px; color: rgba(255,255,255,0.6); }
+    .row-actions { margin-top: 8px; }
+    .kv  { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 11px; color: rgba(255,255,255,0.65); }
+    .kv b { color: #00d4ff; font-weight: 700; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<h1>PFLX Cloud Module Saves — Repro</h1>
+<div class="sub">
+  Isolated test harness for the <code>module_saves</code> table. Every Supabase call is timed and the result body is logged verbatim.
+  No warp animation, no iframe, no postMessage — if it hangs here, the issue is in the Supabase layer itself.
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <label>Player ID</label>
+    <input id="f-player" value="repro-player-001">
+
+    <label>Node ID</label>
+    <input id="f-node" value="storybuilding-storyboarding">
+
+    <label>Module ID</label>
+    <input id="f-module" value="storybuilding-storyboarding">
+
+    <label>Tier</label>
+    <select id="f-tier">
+      <option value="starter">starter</option>
+      <option value="novice" selected>novice</option>
+      <option value="pro">pro</option>
+    </select>
+
+    <label>Save state (JSON)</label>
+    <textarea id="f-state">{"progressPct":42,"lastSlide":3,"notes":"repro write"}</textarea>
+
+    <div class="row-actions">
+      <button onclick="doLoad()">LOAD</button>
+      <button class="warn" onclick="doSave()">SAVE (upsert)</button>
+      <button class="danger" onclick="doDelete()">DELETE</button>
+      <button onclick="doSelfTest()">SELF-TEST (load → save → load → delete)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label>Connection</label>
+    <div class="kv">
+      <span>Project</span><b>hyxiagexyptzvetqjmnj</b>
+      <span>Table</span><b>module_saves</b>
+      <span>SDK</span><b id="kv-sdk">supabase-js v2</b>
+      <span>Online</span><b id="kv-online">—</b>
+      <span>Latency</span><b id="kv-latency">—</b>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label>Hang detector</label>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">
+        Each request runs against a <b>3-second budget</b> (matches the fallback that didn't fix the bug last time).
+        If <code>await</code> returns AFTER the budget expires, you'll see <span style="color:#ef4444;">EXCEEDED</span> in the log.
+        If it never returns, the row stays at <span style="color:#f5c842;">PENDING</span>.
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <label>Cleanup</label>
+      <button class="danger" onclick="doDeleteAllRepro()">Delete all rows where player_id starts with "repro-"</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <label>Event log</label>
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+  // Same constants pathway.html uses.
+  const SUPABASE_URL = 'https://hyxiagexyptzvetqjmnj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY';
+  const REQUEST_BUDGET_MS = 3000;
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  document.getElementById('kv-online').textContent = navigator.onLine ? 'yes' : 'NO';
+  document.getElementById('kv-online').style.color = navigator.onLine ? '#22c55e' : '#ef4444';
+
+  // ── tiny logger ────────────────────────────────────────────────────
+  const logEl = document.getElementById('log');
+  function log(level, tag, msg, payload) {
+    const ts = new Date().toISOString().split('T')[1].replace('Z','');
+    const row = document.createElement('div');
+    row.className = 'row';
+    let html = '<span class="ts">' + ts + '</span>'
+             + '<span class="tag ' + level + '">' + tag + '</span>'
+             + '<span>' + msg + '</span>';
+    if (payload !== undefined) {
+      html += '<pre>' + JSON.stringify(payload, null, 2) + '</pre>';
+    }
+    row.innerHTML = html;
+    logEl.appendChild(row);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function fields() {
+    const tier = document.getElementById('f-tier').value;
+    return {
+      player_id: document.getElementById('f-player').value.trim(),
+      node_id:   document.getElementById('f-node').value.trim(),
+      module_id: document.getElementById('f-module').value.trim(),
+      tier:      tier
+    };
+  }
+
+  // Wrap any Supabase promise with a budget timer. We DO NOT reject when the
+  // budget expires — that's exactly what we want to observe. Instead we log
+  // "EXCEEDED" and let the real promise continue to either resolve or hang.
+  // This matches the production failure where a 3s timeout fallback "shipped"
+  // but the original promise still kept the iframe blocked.
+  async function timed(label, promise) {
+    const t0 = performance.now();
+    const tag = 'PENDING';
+    log('info', 'CALL', label + ' starting…');
+    const budget = setTimeout(() => {
+      const ms = (performance.now() - t0).toFixed(0);
+      log('err', 'EXCEEDED', label + ' has not resolved after ' + ms + 'ms. This is the bug. Watch for late resolve below.');
+    }, REQUEST_BUDGET_MS);
+    try {
+      const res = await promise;
+      const ms = (performance.now() - t0).toFixed(0);
+      clearTimeout(budget);
+      document.getElementById('kv-latency').textContent = ms + 'ms';
+      if (res && res.error) {
+        log('err', 'ERROR', label + ' resolved with error in <span class="ms">' + ms + 'ms</span>', res.error);
+      } else {
+        log('ok', 'RESOLVED', label + ' completed in <span class="ms">' + ms + 'ms</span>', { data: res && res.data, count: res && res.count, status: res && res.status });
+      }
+      return res;
+    } catch (e) {
+      const ms = (performance.now() - t0).toFixed(0);
+      clearTimeout(budget);
+      log('err', 'THROW', label + ' threw in <span class="ms">' + ms + 'ms</span>', { message: e && e.message, stack: e && e.stack && e.stack.split('\n').slice(0,4) });
+      throw e;
+    }
+  }
+
+  // ── ops ────────────────────────────────────────────────────────────
+  async function doLoad() {
+    const f = fields();
+    log('info', 'LOAD', 'fetching save_state', f);
+    await timed('select().eq(player,node,tier).maybeSingle()',
+      sb.from('module_saves')
+        .select('save_state, updated_at, created_at')
+        .eq('player_id', f.player_id)
+        .eq('node_id',   f.node_id)
+        .eq('tier',      f.tier)
+        .maybeSingle()
+    );
+  }
+
+  async function doSave() {
+    const f = fields();
+    let state;
+    try { state = JSON.parse(document.getElementById('f-state').value); }
+    catch (e) { log('err', 'PARSE', 'save_state is not valid JSON: ' + e.message); return; }
+    const row = Object.assign({}, f, { save_state: state, updated_at: new Date().toISOString() });
+    log('info', 'SAVE', 'upserting', row);
+    await timed('upsert(onConflict=player,node,tier)',
+      sb.from('module_saves')
+        .upsert(row, { onConflict: 'player_id,node_id,tier' })
+        .select()
+    );
+  }
+
+  async function doDelete() {
+    const f = fields();
+    log('info', 'DEL', 'deleting', f);
+    await timed('delete().eq(player,node,tier)',
+      sb.from('module_saves')
+        .delete()
+        .eq('player_id', f.player_id)
+        .eq('node_id',   f.node_id)
+        .eq('tier',      f.tier)
+    );
+  }
+
+  async function doDeleteAllRepro() {
+    if (!confirm('Delete every row where player_id starts with "repro-"?')) return;
+    log('warn', 'CLEAN', 'deleting all repro-* rows');
+    await timed('delete().like(player_id, repro-%)',
+      sb.from('module_saves').delete().like('player_id', 'repro-%')
+    );
+  }
+
+  async function doSelfTest() {
+    log('info', 'TEST', 'running self-test (load → save → load → delete)');
+    await doLoad();
+    await doSave();
+    await doLoad();
+    await doDelete();
+    log('ok', 'TEST', 'self-test sequence complete — check timings above');
+  }
+
+  log('info', 'BOOT', 'repro page ready. supabase-js v' + (window.supabase.VERSION || 'unknown'));
+</script>
+
+</body>
+</html>
