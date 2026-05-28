@@ -7185,9 +7185,36 @@ function showLaunchOverlay(node) {
             }
             if (d.type === 'pflx_mod_save' && d.payload) {
               var __state = d.payload.state || {};
+              var __nowIso = new Date().toISOString();
+              // ── Save Slot history ──
+              // Each pflx_mod_save appends a snapshot under _history so the
+              // host can show a timeline of the player's progress per node.
+              // History is capped at HISTORY_MAX (oldest evicted) to keep
+              // the JSONB row from growing without bound. Snapshot shape:
+              // { ts, state, summary } where summary is a short human-readable
+              // string derived from the state (% complete, current step,
+              // checkpoint label, etc.) so we don't need the full state to
+              // render the timeline.
+              var HISTORY_MAX = 12;
+              function _summarizeState(st) {
+                if (!st || typeof st !== 'object') return '';
+                var parts = [];
+                if (typeof st.progressPct === 'number') parts.push(Math.round(st.progressPct) + '%');
+                if (typeof st.percent === 'number')     parts.push(Math.round(st.percent) + '%');
+                if (st.currentSlide !== undefined)      parts.push('slide ' + st.currentSlide);
+                if (st.checkpoint)                       parts.push(String(st.checkpoint).slice(0, 24));
+                if (st.lastStep)                         parts.push(String(st.lastStep).slice(0, 24));
+                if (st.tier)                             parts.push('tier:' + st.tier);
+                return parts.join(' · ').slice(0, 80) || 'saved';
+              }
               try {
-                // Stamp _updatedAt so the cloud-load merge can compare freshness.
-                var __local = Object.assign({}, __state, { _updatedAt: new Date().toISOString() });
+                // Read prior to preserve history across saves.
+                var __priorLocal = {};
+                try { __priorLocal = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch (er) {}
+                var __history = Array.isArray(__priorLocal._history) ? __priorLocal._history.slice() : [];
+                __history.push({ ts: __nowIso, summary: _summarizeState(__state), state: __state });
+                if (__history.length > HISTORY_MAX) __history = __history.slice(__history.length - HISTORY_MAX);
+                var __local = Object.assign({}, __state, { _updatedAt: __nowIso, _history: __history });
                 localStorage.setItem(moduleSaveKey, JSON.stringify(__local));
               } catch(e2) {}
               try {
@@ -7195,7 +7222,13 @@ function showLaunchOverlay(node) {
                   { v: 1, type: 'pflx_mod_save_ack', payload: { ok: true } }, '*');
               } catch(e3) {}
               // Best-effort cloud mirror — no await, never blocks the ack.
-              try { _cloudUpsertModuleSave(__state); } catch (e4) {}
+              // We send the FULL local row (state + _history) so the cloud
+              // copy stays in sync with the timeline.
+              try {
+                var __cloudLocal = {};
+                try { __cloudLocal = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch (er2) {}
+                _cloudUpsertModuleSave(__cloudLocal);
+              } catch (e4) {}
             }
             if (d.type === 'pflx_mod_submission' && d.payload) {
               node._moduleSubmission = d.payload.fields || {};
