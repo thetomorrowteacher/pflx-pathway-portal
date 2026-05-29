@@ -2793,6 +2793,16 @@
         </div>
         <button class="detail-close" id="detailClose">&times;</button>
       </div>
+      <!--
+        Entry Video — host-configurable YouTube or Google Drive URL on the
+        node. When set, this iframe replaces the title-graphic banner and
+        auto-plays muted. Player taps to unmute or skip. Falls back to the
+        title-graphic above when n.entryVideo is empty.
+      -->
+      <div class="detail-entry-video" id="detailEntryVideo" style="display:none;position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden;margin:0 0 14px 0;border:1px solid rgba(0,212,255,0.25);">
+        <iframe id="detailEntryVideoFrame" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen frameborder="0" style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe>
+        <button id="detailEntryVideoSkip" type="button" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:5px 10px;font-family:Orbitron,sans-serif;font-size:10px;font-weight:700;letter-spacing:0.12em;cursor:pointer;backdrop-filter:blur(4px);">SKIP ✕</button>
+      </div>
       <div class="detail-body">
         <div class="detail-status">
           <span class="status-dot" id="detailDot"></span>
@@ -2801,7 +2811,28 @@
         <div class="detail-desc" id="detailDesc"></div>
         <div class="detail-requires" id="detailRequires"></div>
         <div id="detailMCData"></div>
-        <!-- Player Submission Section -->
+        <!--
+          Live module progress bar — listens for pflx_mod_progress events
+          posted by the module while the player is inside, falls back to
+          the player's last cloud module_saves percent when the module is
+          not currently posting. Hidden by default; revealed once a saved
+          percent > 0 is found OR the player has started this node.
+        -->
+        <div id="detailModuleProgress" style="display:none;margin:12px 0;padding:10px 12px;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span style="font-family:Orbitron,sans-serif;font-size:10px;font-weight:800;color:#00d4ff;letter-spacing:0.12em;">MODULE PROGRESS</span>
+            <span id="detailModuleProgressPct" style="font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:700;color:#00d4ff;">0%</span>
+          </div>
+          <div style="width:100%;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+            <div id="detailModuleProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00d4ff,#7c3aed);border-radius:3px;transition:width 0.4s ease;"></div>
+          </div>
+          <div id="detailModuleProgressSource" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,0.35);margin-top:4px;letter-spacing:0.04em;">Reading saved progress…</div>
+        </div>
+        <!-- Start button — moved BEFORE the submission section so the
+             player launches first, then comes back to submit. -->
+        <button class="launch-btn" id="launchBtn"></button>
+        <!-- Player Submission Section — now hidden until the player has
+             at least started the node (status in_progress / completed). -->
         <div id="detailSubmission" style="display:none;margin-top:12px;padding:12px;border:1px solid rgba(0,212,255,0.15);border-radius:8px;background:rgba(0,212,255,0.03);">
           <div style="font-family:Orbitron;font-size:10px;letter-spacing:2px;color:#00d4ff;margin-bottom:10px;text-transform:uppercase;">Submit Your Work</div>
           <div id="subLinkField" style="display:none;margin-bottom:8px;">
@@ -2829,7 +2860,6 @@
           <button id="subSubmitBtn" type="button" style="width:100%;padding:10px;background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:Orbitron;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">Submit for Approval</button>
           <div id="subPendingMsg" style="display:none;text-align:center;padding:10px;color:#f59e0b;font-family:Rajdhani;font-size:13px;">⏳ Submission pending approval</div>
         </div>
-        <button class="launch-btn" id="launchBtn"></button>
       </div>
     </div>
   </div>
@@ -3033,6 +3063,11 @@
           <label class="ne-label">HTML Content File (legacy — embeds after warp scene)</label>
           <input class="ne-input" id="neContentUrl" placeholder="https://yoursite.com/course-content.html">
           <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">URL to an HTML file that loads inside the node. Used only if Course Package is empty.</span>
+        </div>
+        <div class="ne-field">
+          <label class="ne-label">Entry Video (YouTube or Google Drive embed)</label>
+          <input class="ne-input" id="neEntryVideo" placeholder="https://youtube.com/watch?v=… or https://drive.google.com/file/d/…/view">
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;display:block;">Shown above the banner when a player opens this node. Auto-plays muted; player can unmute or skip. Paste a YouTube or Google Drive share link — the embed URL is computed automatically.</span>
         </div>
         <div class="ne-field">
           <label class="ne-label">External URL (opens in new tab on Start)</label>
@@ -3972,6 +4007,73 @@ function smoothZoomTo(targetX, targetY, targetZoom) {
   setTimeout(() => nodeLayer.classList.remove('smooth-zoom'), 650);
 }
 
+// ── Entry video URL normalizer ────────────────────────────────────────
+// Convert YouTube watch/short URLs and Google Drive "view" links into
+// embed URLs the iframe can play. Returns an empty string when the
+// URL can't be normalized so we hide the player instead of showing a
+// broken iframe.
+function _pflxNormalizeEntryVideo(raw) {
+  if (!raw) return '';
+  var u = String(raw).trim();
+  if (!u) return '';
+  // YouTube watch?v=ID
+  var m = u.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/embed\/|youtu\.be\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/);
+  if (m && m[1]) {
+    return 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&mute=1&playsinline=1&rel=0';
+  }
+  // Google Drive — /file/d/ID/view
+  m = u.match(/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]+)/);
+  if (m && m[1]) {
+    return 'https://drive.google.com/file/d/' + m[1] + '/preview';
+  }
+  // Vimeo for completeness
+  m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (m && m[1]) {
+    return 'https://player.vimeo.com/video/' + m[1] + '?autoplay=1&muted=1';
+  }
+  // Already an embed URL? Pass it through.
+  if (/^https?:\/\//.test(u)) return u;
+  return '';
+}
+
+// ── Live module progress bar plumbing ─────────────────────────────────
+// Tracks the most recent pflx_mod_progress percent the running module
+// has posted. When the detail panel opens for that node, we read this
+// in-memory map first, then fall back to a one-shot cloud lookup of
+// module_saves.save_state.progressPct / .percent. Updates while the
+// player is inside the iframe too.
+var _pflxModProgressMap = window._pflxModProgressMap || {};
+window._pflxModProgressMap = _pflxModProgressMap;
+
+function _pflxPaintModuleProgress(percent, source) {
+  var box   = document.getElementById('detailModuleProgress');
+  var bar   = document.getElementById('detailModuleProgressBar');
+  var pctEl = document.getElementById('detailModuleProgressPct');
+  var srcEl = document.getElementById('detailModuleProgressSource');
+  if (!box || !bar || !pctEl) return;
+  var p = Math.max(0, Math.min(100, Math.round(percent || 0)));
+  bar.style.width = p + '%';
+  pctEl.textContent = p + '%';
+  if (srcEl) srcEl.textContent = source || '';
+  box.style.display = (p > 0 || source === 'awaiting') ? 'block' : 'none';
+}
+
+// Listen for module progress events posted by the running module. We
+// stash the percent by node id (when known) and live-paint the bar if
+// the detail panel is open for the same node.
+window.addEventListener('message', function (ev) {
+  try {
+    var d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+    if (!d || d.type !== 'pflx_mod_progress') return;
+    var pct = parseFloat((d.payload && d.payload.percent) || d.percent || 0) || 0;
+    var nid = (d.payload && d.payload.nodeId) || d.nodeId || (window.selectedNode && selectedNode.id) || '';
+    if (nid) _pflxModProgressMap[nid] = pct;
+    if (window.selectedNode && selectedNode.id === nid) {
+      _pflxPaintModuleProgress(pct, 'live from module');
+    }
+  } catch (e) {}
+});
+
 function showDetail(n) {
   selectedNode = n;
 
@@ -4005,6 +4107,39 @@ function showDetail(n) {
     bgEl.style.backgroundImage = '';
     bgEl.style.opacity = '0';
   }
+
+  // ── Entry video — normalize the URL and show above the banner ──
+  // Accepts YouTube watch / shortlinks / Shorts and Google Drive view
+  // links; everything else passes through as-is. Auto-plays muted so
+  // browsers don't block it. Skip button removes the video so the
+  // banner shows. Hidden when n.entryVideo is empty.
+  (function () {
+    var videoBox = document.getElementById('detailEntryVideo');
+    var frame    = document.getElementById('detailEntryVideoFrame');
+    var skipBtn  = document.getElementById('detailEntryVideoSkip');
+    if (!videoBox || !frame) return;
+    if (!n.entryVideo) {
+      videoBox.style.display = 'none';
+      frame.src = '';
+      return;
+    }
+    var embed = _pflxNormalizeEntryVideo(n.entryVideo);
+    if (!embed) {
+      videoBox.style.display = 'none';
+      frame.src = '';
+      return;
+    }
+    frame.src = embed;
+    videoBox.style.display = 'block';
+    // Make sure the title graphic still sits below — banner stays as a
+    // secondary visual once the player skips or finishes the video.
+    if (skipBtn) {
+      skipBtn.onclick = function () {
+        videoBox.style.display = 'none';
+        frame.src = '';
+      };
+    }
+  })();
   // Re-bind upload button (only exists in edit mode)
   const uploadBtn = document.getElementById('dtgUploadBtn');
   if (uploadBtn) {
@@ -4039,6 +4174,51 @@ function showDetail(n) {
       inp.click();
     });
   }
+
+  // ── Module progress: live first, fall back to cloud ──
+  // Reset the bar, then either paint from the in-memory live map (if
+  // the module has been streaming progress this session) or fire an
+  // async Supabase fetch of module_saves.save_state. We do not block
+  // panel render on the fetch — it just patches the bar when it lands.
+  (function () {
+    _pflxPaintModuleProgress(0, '');
+    var live = _pflxModProgressMap[n.id];
+    if (typeof live === 'number' && live > 0) {
+      _pflxPaintModuleProgress(live, 'live from module');
+      return;
+    }
+    // Cloud fallback — only when the cloud client is available. Reads
+    // both legacy and per-tier rows.
+    if (!window._supabase) return;
+    try {
+      _pflxPaintModuleProgress(0, 'fetching last saved…');
+      var tier = (window.CLOUD_SAVE_CTX && CLOUD_SAVE_CTX.tier) ||
+                 (function () { try { var s = localStorage.getItem('pflx_player_tier'); return s || 'novice'; } catch (e) { return 'novice'; } })();
+      var pid  = (window.CLOUD_SAVE_CTX && CLOUD_SAVE_CTX.player_id) ||
+                 (function () { try { var u = JSON.parse(localStorage.getItem('pflxUser') || '{}'); return u.id || u.brand || ''; } catch (e) { return ''; } })();
+      if (!pid) {
+        _pflxPaintModuleProgress(0, 'sign in to track progress');
+        return;
+      }
+      window._supabase.from('module_saves')
+        .select('save_state, updated_at')
+        .eq('player_id', pid)
+        .eq('node_id', n.id)
+        .eq('tier', tier)
+        .maybeSingle()
+        .then(function (res) {
+          if (!res || res.error || !res.data) {
+            _pflxPaintModuleProgress(0, n.status === 'in_progress' ? 'in progress — module hasn\'t reported a percent yet' : '');
+            return;
+          }
+          var st = res.data.save_state || {};
+          var cloudPct = (typeof st.progressPct === 'number') ? st.progressPct
+                       : (typeof st.percent === 'number')     ? st.percent
+                       : 0;
+          _pflxPaintModuleProgress(cloudPct, 'last saved ' + (res.data.updated_at ? new Date(res.data.updated_at).toLocaleDateString() : ''));
+        });
+    } catch (e) { _pflxPaintModuleProgress(0, ''); }
+  })();
 
   // Requirements
   const reqEl = document.getElementById('detailRequires');
@@ -4097,10 +4277,16 @@ function showDetail(n) {
   renderDetailMCData(n);
 
   // ── Submission section ──
+  // Now gated on the player having actually started the node. Submit
+  // form stays hidden until status is in_progress or completed, so the
+  // flow is: open → watch entry video → Start → do the work in module
+  // → return → Submit. Edit-mode (host) still sees it always so they
+  // can configure submission fields.
   const subSection = document.getElementById('detailSubmission');
   const sub = n.submission || {};
   const hasSubmission = sub.link || sub.screenshot || sub.html || sub.description;
-  if (hasSubmission && !editMode && n.status !== 'locked' && !n.comingSoon) {
+  const hasStarted = n.status === 'in_progress' || n.status === 'completed';
+  if (hasSubmission && !editMode && n.status !== 'locked' && !n.comingSoon && (hasStarted || editMode)) {
     subSection.style.display = 'block';
     document.getElementById('subLinkField').style.display = sub.link ? 'block' : 'none';
     document.getElementById('subScreenshotField').style.display = sub.screenshot ? 'block' : 'none';
@@ -5044,6 +5230,7 @@ async function savePathwayEdits() {
         xcCost: n.xcCost || 0,
         contentUrl: n.contentUrl || '',
         coursePackage: n.coursePackage || '',
+        entryVideo: n.entryVideo || '',
         mcTag: n.mcTag || null,
         submission: n.submission || null,
         hasProgressBar: n.hasProgressBar || false,
@@ -5633,6 +5820,7 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neXcReward').value = node.xcReward || '';
   document.getElementById('neXcCost').value = node.xcCost || '';
   document.getElementById('neContentUrl').value = node.contentUrl || '';
+  var __neEv = document.getElementById('neEntryVideo'); if (__neEv) __neEv.value = node.entryVideo || '';
   document.getElementById('neCoursePackage').value = node.coursePackage || '';
   // ── Populate MC Task/Project dropdown from pflxData ──
   var mcTypeEl = document.getElementById('neMcTagType');
@@ -5708,6 +5896,8 @@ function _doSaveNode() {
     editorNode.xcReward = parseInt(document.getElementById('neXcReward').value) || 0;
     editorNode.xcCost = parseInt(document.getElementById('neXcCost').value) || 0;
     editorNode.contentUrl = document.getElementById('neContentUrl').value || '';
+    var __neEv2 = document.getElementById('neEntryVideo');
+    editorNode.entryVideo = (__neEv2 && __neEv2.value || '').trim();
     editorNode.coursePackage = document.getElementById('neCoursePackage').value.trim() || '';
     var mcType = document.getElementById('neMcTagType').value;
     var mcName = document.getElementById('neMcTagName').value;
