@@ -2828,6 +2828,20 @@
           </div>
           <div id="detailModuleProgressSource" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(255,255,255,0.35);margin-top:4px;letter-spacing:0.04em;">Reading saved progress…</div>
         </div>
+        <!-- Tier picker on the Detail Panel — picked here BEFORE the
+             warp so the player has all the time they want. Color-coded
+             pills (Starter purple / Novice cyan / Pro gold). Selection
+             persists in localStorage and is read by showLaunchOverlay
+             when Start is tapped. Hidden for hosts in edit mode. -->
+        <div id="detailTierPicker" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 14px 0;padding:10px 14px;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:8px;">
+          <span style="font-family:Orbitron,sans-serif;font-size:10px;font-weight:800;color:rgba(255,255,255,0.5);letter-spacing:0.12em;">DIFFICULTY:</span>
+          <div id="detailTierBtnRow" style="display:inline-flex;gap:6px;padding:4px;background:rgba(10,18,40,0.55);border:1px solid rgba(0,212,255,0.25);border-radius:999px;">
+            <button class="detail-tier-btn" data-tier="starter" style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 14px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">STARTER</button>
+            <button class="detail-tier-btn" data-tier="novice"  style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 14px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">NOVICE</button>
+            <button class="detail-tier-btn" data-tier="pro"     style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 14px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">PRO</button>
+          </div>
+          <span style="flex:1;min-width:160px;font-family:Rajdhani,sans-serif;font-size:11px;color:rgba(255,255,255,0.4);">Sticks for this and future nodes.</span>
+        </div>
         <!-- Start button — moved BEFORE the submission section so the
              player launches first, then comes back to submit. -->
         <button class="launch-btn" id="launchBtn"></button>
@@ -3160,20 +3174,17 @@
       <div class="launch-title" id="launchTitle">Initiating Warp Drive</div>
       <div class="launch-subtitle" id="launchSubtitle">Preparing mission environment...</div>
       <!--
-        Tier picker — Starter / Novice / Pro. Selection is persisted per
-        player in localStorage and applied to: (1) the cloud module_saves
-        PK (player_id, node_id, tier) so each tier has its own slot, and
-        (2) pflx_mod_init.payload.context.tier so tier-aware modules can
-        adapt their content (see Storybuilding viewer.html). Pre-selected
-        from URL ?tier= → localStorage → 'novice'. Clicking a tier updates
-        the choice and posts a refreshed pflx_mod_init to the iframe.
+        Tier confirmation chip — read-only at this point. The actual
+        picker lives on the Detail Panel before Start so the player has
+        all the time they want. This just confirms which tier they're
+        entering with so they're not surprised. Color matches the picked
+        tier (Starter purple / Novice cyan / Pro gold). Filled by
+        showLaunchOverlay reading CLOUD_SAVE_CTX.tier.
       -->
-      <div id="launchTierPicker" style="margin: 20px auto 10px; display: inline-flex; gap: 6px; padding: 6px; background: rgba(10,18,40,0.55); border: 1px solid rgba(0,212,255,0.25); border-radius: 999px;">
-        <button class="tier-btn" data-tier="starter" style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">STARTER</button>
-        <button class="tier-btn" data-tier="novice"  style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">NOVICE</button>
-        <button class="tier-btn" data-tier="pro"     style="background:transparent;border:none;color:rgba(255,255,255,0.55);padding:6px 16px;border-radius:999px;font-family:Orbitron,sans-serif;font-size:11px;letter-spacing:0.12em;font-weight:700;cursor:pointer;transition:all 0.15s;">PRO</button>
+      <div id="launchTierChip" style="margin: 18px auto 14px; display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background: rgba(0,212,255,0.10); border: 1px solid rgba(0,212,255,0.35); border-radius: 999px; font-family:Orbitron,sans-serif; font-size:10px; font-weight:800; letter-spacing:0.16em; color:#00d4ff;">
+        <span style="opacity:0.6;">ENTERING:</span>
+        <span id="launchTierChipLabel">NOVICE</span>
       </div>
-      <div id="launchTierHint" style="font-family:Rajdhani,sans-serif;font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:0.06em;margin-bottom:14px;">Pick a tier to lock in your difficulty. Stored per player.</div>
       <div class="launch-spinner"></div>
     </div>
     <!-- Embedded Course Content Container -->
@@ -4174,6 +4185,83 @@ function showDetail(n) {
       inp.click();
     });
   }
+
+  // ── Detail Panel tier picker ──
+  // Pre-select from localStorage / URL / default novice and let the
+  // player change before Start. Selection persists and is read by
+  // showLaunchOverlay so the warp picks up the right tier. Hidden in
+  // host edit mode since hosts aren't picking difficulty for players.
+  (function _wireDetailTierPicker() {
+    var picker = document.getElementById('detailTierPicker');
+    if (!picker) return;
+    picker.style.display = editMode ? 'none' : 'flex';
+    var TIER_RGB = { starter: '167,139,250', novice: '0,212,255', pro: '245,200,66' };
+    function _readTier() {
+      try {
+        var qp = new URLSearchParams(window.location.search);
+        var fq = qp.get('tier');
+        if (fq === 'starter' || fq === 'novice' || fq === 'pro') return fq;
+      } catch (e) {}
+      try {
+        var st = localStorage.getItem('pflx_player_tier');
+        if (st === 'starter' || st === 'novice' || st === 'pro') return st;
+      } catch (e) {}
+      return 'novice';
+    }
+    function paint(t) {
+      picker.querySelectorAll('.detail-tier-btn').forEach(function (btn) {
+        var active = btn.getAttribute('data-tier') === t;
+        var rgb = TIER_RGB[btn.getAttribute('data-tier')] || '0,212,255';
+        btn.style.background = active ? 'linear-gradient(90deg, rgba(' + rgb + ',0.35), rgba(' + rgb + ',0.18))' : 'transparent';
+        btn.style.color      = active ? '#ffffff' : 'rgba(255,255,255,0.55)';
+        btn.style.boxShadow  = active ? '0 0 14px rgba(' + rgb + ',0.45)' : 'none';
+      });
+    }
+    var current = _readTier();
+    paint(current);
+    picker.querySelectorAll('.detail-tier-btn').forEach(function (btn) {
+      btn.onclick = function (ev) {
+        ev.preventDefault();
+        var picked = btn.getAttribute('data-tier');
+        if (!picked || ['starter','novice','pro'].indexOf(picked) === -1) return;
+        if (picked === current) return;
+        var prev = current;
+        current = picked;
+        try { localStorage.setItem('pflx_player_tier', picked); } catch (e) {}
+        paint(picked);
+        // Announce to MC so tierHistory + badge chips update everywhere.
+        try {
+          window.parent && window.parent.postMessage({
+            type: 'pflx_tier_change',
+            playerId: (function () { try { var u = JSON.parse(localStorage.getItem('pflxUser') || '{}'); return u.id || u.brand || ''; } catch (e) { return ''; } })(),
+            from: prev, to: picked,
+            source: 'detail-panel',
+            ts: new Date().toISOString()
+          }, '*');
+        } catch (e) {}
+        // Cloud audit row — best-effort.
+        try {
+          if (window._supabase) {
+            window._supabase.from('app_data').select('data').eq('key', 'pflx_tier_history').maybeSingle()
+              .then(function (res) {
+                var cur = (res && res.data && Array.isArray(res.data.data)) ? res.data.data : [];
+                cur.push({
+                  playerId: (function () { try { var u = JSON.parse(localStorage.getItem('pflxUser') || '{}'); return u.id || u.brand || ''; } catch (e) { return ''; } })(),
+                  from: prev, to: picked,
+                  source: 'detail-panel',
+                  ts: new Date().toISOString()
+                });
+                if (cur.length > 2000) cur = cur.slice(cur.length - 2000);
+                window._supabase.from('app_data').upsert(
+                  { key: 'pflx_tier_history', data: cur, updated_at: new Date().toISOString() },
+                  { onConflict: 'key' }
+                );
+              });
+          }
+        } catch (e) {}
+      };
+    });
+  })();
 
   // ── Module progress: live first, fall back to cloud ──
   // Reset the bar, then either paint from the in-memory live map (if
@@ -7092,86 +7180,20 @@ function showLaunchOverlay(node) {
         // subsequent cloud loads/saves go to the right PK, and pushes a
         // refreshed pflx_mod_init into the iframe so tier-aware modules can
         // re-render with the new tier without a full reload.
-        (function _wireTierPicker() {
-          var picker = document.getElementById('launchTierPicker');
-          if (!picker) return;
-          function paint(tier) {
-            picker.querySelectorAll('.tier-btn').forEach(function (btn) {
-              var active = btn.getAttribute('data-tier') === tier;
-              btn.style.background = active ? 'linear-gradient(90deg, rgba(0,212,255,0.25), rgba(167,139,250,0.25))' : 'transparent';
-              btn.style.color      = active ? '#ffffff' : 'rgba(255,255,255,0.55)';
-              btn.style.boxShadow  = active ? '0 0 14px rgba(0,212,255,0.35)' : 'none';
-            });
-          }
-          paint(CLOUD_SAVE_CTX.tier);
-          picker.querySelectorAll('.tier-btn').forEach(function (btn) {
-            btn.onclick = function (e) {
-              e.preventDefault();
-              var picked = btn.getAttribute('data-tier');
-              if (!picked || ALLOWED_TIERS.indexOf(picked) === -1) return;
-              if (picked === CLOUD_SAVE_CTX.tier) return;
-              var prevTier = CLOUD_SAVE_CTX.tier;
-              try { localStorage.setItem('pflx_player_tier', picked); } catch (er) {}
-              CLOUD_SAVE_CTX.tier = picked;
-              paint(picked);
-              _modLog('tier changed → ' + picked + ' (saved + next loads use new PK)');
-              // Announce the change to the parent platform so MC can append
-              // a tierHistory entry on the player record and update the badge
-              // chips that surface tier next to rank everywhere.
-              try {
-                window.parent && window.parent.postMessage({
-                  type: 'pflx_tier_change',
-                  playerId: CLOUD_SAVE_CTX.player_id,
-                  from: prevTier,
-                  to: picked,
-                  source: 'launch-overlay',
-                  ts: new Date().toISOString()
-                }, '*');
-              } catch (e) {}
-              // Best-effort: also append directly to the Supabase audit row
-              // so a tier change made from a standalone pathway URL (no
-              // parent platform) still gets logged.
-              try {
-                if (window._supabase) {
-                  var historyKey = 'pflx_tier_history';
-                  window._supabase.from('app_data').select('data').eq('key', historyKey).maybeSingle()
-                    .then(function (res) {
-                      var current = (res && res.data && Array.isArray(res.data.data)) ? res.data.data : [];
-                      current.push({
-                        playerId: CLOUD_SAVE_CTX.player_id,
-                        from: prevTier,
-                        to: picked,
-                        source: 'launch-overlay',
-                        ts: new Date().toISOString()
-                      });
-                      // Cap at 2000 entries so the row never blows up.
-                      if (current.length > 2000) current = current.slice(current.length - 2000);
-                      window._supabase.from('app_data').upsert(
-                        { key: historyKey, data: current, updated_at: new Date().toISOString() },
-                        { onConflict: 'key' }
-                      );
-                    });
-                }
-              } catch (e) {}
-              // If the iframe has already received pflx_mod_init, push a
-              // refresh so tier-aware modules can adapt. Best-effort.
-              if (_cloudInitDelivered) {
-                try {
-                  var local = {};
-                  try { local = JSON.parse(localStorage.getItem(moduleSaveKey) || '{}'); } catch (er2) {}
-                  courseFrame.contentWindow.postMessage({
-                    v: 1, type: 'pflx_mod_init',
-                    payload: {
-                      player: pflxModulePlayer(),
-                      save: local,
-                      context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo', tier: picked },
-                      _source: 'tier-change'
-                    }
-                  }, '*');
-                } catch (er3) {}
-              }
-            };
-          });
+        // Tier chip — read-only confirmation on the warp screen. The
+        // primary picker now lives on the Detail Panel (showDetail) so
+        // the player has all the time they want. This just confirms
+        // which tier they're entering with, color-coded by tier.
+        (function _paintLaunchTierChip() {
+          var chip = document.getElementById('launchTierChip');
+          var label = document.getElementById('launchTierChipLabel');
+          if (!chip || !label) return;
+          var TIER_RGB = { starter: '167,139,250', novice: '0,212,255', pro: '245,200,66' };
+          var rgb = TIER_RGB[CLOUD_SAVE_CTX.tier] || '0,212,255';
+          label.textContent = (CLOUD_SAVE_CTX.tier || 'novice').toUpperCase();
+          chip.style.background = 'rgba(' + rgb + ',0.10)';
+          chip.style.borderColor = 'rgba(' + rgb + ',0.35)';
+          chip.style.color = 'rgb(' + rgb + ')';
         })();
         function _modLog(msg, extra) {
           try { console.log('[module_saves]', msg, extra !== undefined ? extra : ''); } catch (e) {}
