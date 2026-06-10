@@ -822,9 +822,11 @@
     }
 
     /* ========== ZOOM CONTROLS ========== */
+    /* Right control rail, bottom-up: minimap (20) → ship mode (128) → zoom row (166).
+       Previously zoom (135) and ship-mode (120) stacked into each other. */
     .zoom-controls {
-      position: absolute; bottom: 135px; right: 20px;
-      display: flex; flex-direction: column; gap: 4px;
+      position: absolute; bottom: 166px; right: 20px;
+      display: flex; flex-direction: row; gap: 4px;
       z-index: 100;
     }
     .zoom-btn {
@@ -2028,9 +2030,9 @@
       z-index: 99;
     }
     .ship-mode-toggle {
-      position: fixed; bottom: 120px; right: 20px;
+      position: fixed; bottom: 128px; right: 20px;
       z-index: 70;
-      display: flex; flex-direction: column; gap: 4px;
+      display: flex; flex-direction: row; gap: 4px;
     }
     .ship-mode-btn {
       background: rgba(6,10,18,0.9);
@@ -3029,7 +3031,7 @@
     <button class="zoom-btn" id="zoomOut">&minus;</button>
     <button class="zoom-btn" id="zoomFit" style="font-size:10px;">FIT</button>
     <button class="zoom-btn" id="zoomMag" title="Magnify: click to zoom in, Shift+click to zoom out" style="font-size:14px;">🔍</button>
-    <button class="zoom-btn" id="fullscreenBtn" title="Toggle Fullscreen" style="font-size:14px; margin-top:4px;">⛶</button>
+    <button class="zoom-btn" id="fullscreenBtn" title="Toggle Fullscreen" style="font-size:14px;">⛶</button>
   </div>
 
   <!-- Bottom Bar (hidden) -->
@@ -4792,6 +4794,28 @@ function drawConnectors() {
         document.getElementById('nodeLayer').appendChild(xBtn);
       }
     });
+  });
+
+  pflxDecrowdStations();
+}
+
+// ─── DE-CROWD: scale each station structure by distance to its nearest
+// neighbor so structures never overlap adjacent nodes/labels ───
+function pflxDecrowdStations() {
+  const list = Object.values(nodeElements);
+  list.forEach(ne => {
+    const x = parseFloat(ne.el.style.left), y = parseFloat(ne.el.style.top);
+    let nearest = Infinity;
+    list.forEach(other => {
+      if (other === ne) return;
+      const ox = parseFloat(other.el.style.left), oy = parseFloat(other.el.style.top);
+      const d = Math.hypot(x - ox, y - oy);
+      if (d < nearest) nearest = d;
+    });
+    // full structure at ≥300px spacing, floor at 45%
+    const s = nearest === Infinity ? 1 : Math.max(0.45, Math.min(1, nearest / 300));
+    const st = ne.el.querySelector('.station-structure');
+    if (st) st.style.transform = 'translate(-50%, -55%) scale(' + s.toFixed(2) + ')';
   });
 }
 

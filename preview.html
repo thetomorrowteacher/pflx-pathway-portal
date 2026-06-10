@@ -340,6 +340,22 @@
       transition: transform 0.3s;
     }
     .pathway-node:hover { transform: scale(1.06); }
+    /* ── de-crowd: shrink whole node groups (icon + arm + label) on smaller
+       viewports so label arms stop crossing each other / the player card ── */
+    .pathway-node { z-index: 4; }
+    .player-card { z-index: 30; }
+    @media (max-width: 1500px) {
+      .pathway-node { transform: scale(0.82); }
+      .pathway-node:hover { transform: scale(0.88); }
+    }
+    @media (max-width: 1180px) {
+      .pathway-node { transform: scale(0.66); }
+      .pathway-node:hover { transform: scale(0.71); }
+    }
+    @media (max-height: 760px) {
+      .pathway-node { transform: scale(0.72); }
+      .pathway-node:hover { transform: scale(0.78); }
+    }
     .pathway-node:hover .node-icon-ring { box-shadow: 0 0 30px var(--accent), 0 0 60px color-mix(in srgb, var(--accent) 40%, transparent); }
     .pathway-node:hover .node-title { color: var(--accent); text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 50%, transparent); }
     .pathway-node:hover .node-glow { opacity: 1; }
