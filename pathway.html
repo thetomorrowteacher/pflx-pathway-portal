@@ -152,6 +152,75 @@
     .skill-node[data-status="in_progress"] .osg-beam { animation-duration: 1.6s; }
     .skill-node.coming-soon .station-structure { opacity: 0.45; }
 
+    /* ========== CARGO HOLD (inventory) ========== */
+    #cargoBtn {
+      position: absolute; bottom: 204px; right: 20px; z-index: 100;
+      background: rgba(6,10,18,0.9); border: 1px solid rgba(0,212,255,0.3);
+      color: rgba(0,212,255,0.85); font-family: 'Orbitron'; font-size: 9px;
+      font-weight: 600; letter-spacing: 1px; padding: 8px 12px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    #cargoBtn:hover { background: rgba(0,212,255,0.15); color: #fff; }
+    #cargoBadge {
+      display: inline-block; min-width: 14px; margin-left: 4px;
+      color: #ffd166; font-size: 9px;
+    }
+    #cargoBadge.bump { animation: cargoBump 0.4s ease; }
+    @keyframes cargoBump { 30% { transform: scale(1.6); } }
+    #cargoPanel {
+      position: fixed; top: 70px; bottom: 70px; right: -380px; width: 340px;
+      background: rgba(4,10,20,0.96); border: 1px solid rgba(0,212,255,0.45);
+      clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+      z-index: 140; display: flex; flex-direction: column;
+      transition: right 0.3s cubic-bezier(0.22,1,0.36,1);
+      font-family: 'Rajdhani', sans-serif;
+    }
+    #cargoPanel.open { right: 16px; }
+    .cargo-head {
+      font-family: 'Orbitron'; font-size: 12px; font-weight: 700; color: var(--pflx-cyan, #00d4ff);
+      letter-spacing: 3px; padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(0,212,255,0.25);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cargo-close {
+      background: none; border: 1px solid rgba(0,212,255,0.3); color: rgba(0,212,255,0.7);
+      width: 22px; height: 22px; cursor: pointer; font-size: 11px;
+    }
+    .cargo-tabs { display: flex; border-bottom: 1px solid rgba(0,212,255,0.2); }
+    .cargo-tab {
+      flex: 1; background: none; border: none; border-right: 1px solid rgba(0,212,255,0.15);
+      color: rgba(0,212,255,0.55); font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      letter-spacing: 2px; padding: 9px 0; cursor: pointer;
+    }
+    .cargo-tab.active { color: #fff; background: rgba(0,212,255,0.12); }
+    .cargo-body { flex: 1; overflow-y: auto; padding: 8px 10px; }
+    .cargo-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 8px; border-bottom: 1px solid rgba(0,212,255,0.1);
+    }
+    .cargo-item.equipped { background: rgba(0,212,255,0.08); border-left: 2px solid var(--pflx-cyan, #00d4ff); }
+    .cargo-item[data-rarity="rare"] .ci-name { color: #ffd166; }
+    .cargo-item[data-rarity="uncommon"] .ci-name { color: #7fe8ff; }
+    .ci-icon { font-size: 20px; width: 28px; text-align: center; }
+    .ci-info { flex: 1; display: flex; flex-direction: column; }
+    .ci-name { font-size: 13px; font-weight: 700; color: rgba(230,245,255,0.95); letter-spacing: 1px; }
+    .ci-desc { font-size: 10.5px; color: rgba(160,200,230,0.55); }
+    .ci-count { font-family: 'Orbitron'; font-size: 12px; color: #ffd166; }
+    .cargo-empty { padding: 30px 16px; text-align: center; color: rgba(160,200,230,0.5); font-size: 12px; letter-spacing: 1px; line-height: 1.8; }
+    .cargo-section { font-family: 'Orbitron'; font-size: 9px; color: rgba(0,212,255,0.5); letter-spacing: 2px; padding: 10px 8px 4px; }
+    .cargo-foot {
+      border-top: 1px solid rgba(0,212,255,0.25); padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: rgba(160,200,230,0.7); letter-spacing: 1px;
+    }
+    .cargo-foot b { color: #ffd166; }
+    .cargo-shop {
+      background: rgba(0,212,255,0.12); border: 1px solid rgba(0,212,255,0.4);
+      color: var(--pflx-cyan, #00d4ff); font-family: 'Orbitron'; font-size: 9px; font-weight: 600;
+      letter-spacing: 1px; padding: 6px 10px; cursor: pointer;
+    }
+    .cargo-shop:hover { background: rgba(0,212,255,0.25); color: #fff; }
+
     .starfield { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
     .star {
       position: absolute; border-radius: 50%; background: white;
@@ -4024,6 +4093,53 @@ window.pflxSpace = (function () {
     delete chunks[key];
   }
 
+  // ---- comets — periodic events streaking across the camera region ----
+  let cometTimer = 50 + Math.random() * 90;
+  const comets = [];
+  function spawnComet() {
+    const camLX = (camera.position.x / L2G) + 1000;
+    const camLY = -(camera.position.y / L2G) + 1000;
+    const ang = Math.random() * 6.283;
+    const sx = camLX + Math.cos(ang) * 2400, sy = camLY + Math.sin(ang) * 2400;
+    const speed = 300 + Math.random() * 220;             // layer px / s
+    const dirAng = ang + Math.PI + (Math.random() - 0.5) * 0.6;
+    const head = haloSprite('200,240,255', 0.0, 0.95);
+    head.scale.set(72, 72, 1);
+    const trailMat = new THREE.LineBasicMaterial({ color: 0xbfe8ff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+    const trailGeo = new THREE.BufferGeometry();
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const trail = new THREE.Line(trailGeo, trailMat);
+    scene.add(head); scene.add(trail);
+    const obj = { type: 'comet', x: sx, y: sy, r: 170, chunkKey: '__comet',
+      vx: Math.cos(dirAng) * speed, vy: Math.sin(dirAng) * speed, life: 18,
+      head: head, trail: trail, trailGeo: trailGeo, trailMat: trailMat, collected: false };
+    comets.push(obj);
+    window.pflxSpaceObjects.push(obj);
+    if (typeof window.pflxSpaceEventNotice === 'function') window.pflxSpaceEventNotice('comet');
+  }
+  function updateComets(dt) {
+    cometTimer -= dt;
+    if (cometTimer <= 0) { spawnComet(); cometTimer = 90 + Math.random() * 150; }
+    for (let i = comets.length - 1; i >= 0; i--) {
+      const c = comets[i];
+      c.life -= dt; c.x += c.vx * dt; c.y += c.vy * dt;
+      const p = toGL(c.x, c.y);
+      c.head.position.set(p.x, p.y, -135);
+      const tp = toGL(c.x - c.vx * 0.45, c.y - c.vy * 0.45);
+      const a = c.trailGeo.attributes.position.array;
+      a[0] = tp.x; a[1] = tp.y; a[2] = -135; a[3] = p.x; a[4] = p.y; a[5] = -135;
+      c.trailGeo.attributes.position.needsUpdate = true;
+      const fade = Math.min(1, c.life / 3);
+      c.head.material.opacity = fade; c.trailMat.opacity = 0.8 * fade;
+      if (c.life <= 0 || c.collected) {
+        scene.remove(c.head); scene.remove(c.trail);
+        c.head.material.dispose(); c.trailGeo.dispose(); c.trailMat.dispose();
+        comets.splice(i, 1);
+        window.pflxSpaceObjects = window.pflxSpaceObjects.filter(function (o) { return o !== c; });
+      }
+    }
+  }
+
   let lastChunkX = null, lastChunkY = null;
   function ensureChunks(lcx, lcy) {
     const ccx = Math.floor(lcx / CHUNK), ccy = Math.floor(lcy / CHUNK);
@@ -4152,6 +4268,8 @@ window.pflxSpace = (function () {
       n.s.material.opacity = n.baseOp * (0.94 + Math.sin(t * 0.08 + n.ph) * 0.06);
     });
     spirals.forEach(function (g) { g.s.material.rotation += g.rs * dt; });
+
+    updateComets(dt);
 
     // endless-space chunk animation: rock tumble, accretion spin, beacon blink
     for (const key in chunks) {
@@ -9502,6 +9620,13 @@ function pflxLoadShipState() {
       if (state.equippedHull) pflxShip.upgrades._hullId = state.equippedHull;
       if (state.equippedEngine) pflxShip.upgrades._engineId = state.equippedEngine;
       if (state.equippedTrail) pflxShip.upgrades._trailId = state.equippedTrail;
+
+      // ── MODULE CONTRACT (X-Coin Ship Bay add-ons; optional array) ──
+      // Known ids: 'mining-laser' (faster mining, double yield),
+      // 'tractor-beam' (wider collection radius), 'deep-scanner'
+      // (events announced from farther away), 'shield-booster'
+      // (black-hole pull resistance without a T3+ hull).
+      pflxShip.upgrades.modules = Array.isArray(state.modules) ? state.modules : (pflxShip.upgrades.modules || []);
     }
   } catch(e) { console.warn('[Ship] Could not load ship state:', e); }
 
@@ -9521,6 +9646,331 @@ window.addEventListener('message', function(e) {
     }
   } catch(ex) {}
 });
+
+function pflxHasModule(id) {
+  return !!(pflxShip.upgrades.modules && pflxShip.upgrades.modules.indexOf(id) !== -1);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CARGO — inventory for items collected in open space + owned ships
+// localStorage + best-effort Supabase mirror (app_data KV row).
+// ═══════════════════════════════════════════════════════════════════
+const PFLX_ITEM_DEFS = {
+  'iron-ore':      { icon: '🪨', name: 'Iron Ore',       rarity: 'common',   desc: 'Mined from asteroid clusters.' },
+  'crystal-shard': { icon: '💠', name: 'Crystal Shard',  rarity: 'uncommon', desc: 'Refractive shard from deep-space rock.' },
+  'plasma-core':   { icon: '⚡', name: 'Plasma Core',    rarity: 'rare',     desc: 'Volatile core found in dense clusters.' },
+  'stardust':      { icon: '✨', name: 'Stardust',       rarity: 'uncommon', desc: 'Swept from the tail of a comet.' },
+  'salvage-scrap': { icon: '🔩', name: 'Salvage Scrap',  rarity: 'common',   desc: 'Recovered from derelict cargo pods.' },
+  'artifact':      { icon: '🛸', name: 'Alien Artifact', rarity: 'rare',     desc: 'Origin unknown. The scanner hums near it.' },
+};
+
+const pflxCargo = {
+  data: { items: {}, log: [], pendingXC: 0 },
+  _saveTimer: null,
+  playerId: (function () {
+    try {
+      const u = JSON.parse(localStorage.getItem('pflx_user') || '{}');
+      return u.id || u.brand || 'local';
+    } catch (e) { return 'local'; }
+  })(),
+  key() { return 'pflx_cargo_v1_' + this.playerId; },
+  load() {
+    try { const s = localStorage.getItem(this.key()); if (s) this.data = JSON.parse(s); } catch (e) {}
+    // cloud adopt (best effort): if local is empty and a cloud row exists, take it
+    const self = this;
+    try {
+      if (window._supabase && Object.keys(self.data.items).length === 0) {
+        window._supabase.from('app_data').select('data').eq('key', 'pflx_cargo_' + self.playerId).maybeSingle()
+          .then(function (res) {
+            if (res && res.data && res.data.data && res.data.data.items) {
+              self.data = res.data.data;
+              localStorage.setItem(self.key(), JSON.stringify(self.data));
+              pflxCargoUI.render();
+            }
+          }).catch(function () {});
+      }
+    } catch (e) {}
+  },
+  save() {
+    try { localStorage.setItem(this.key(), JSON.stringify(this.data)); } catch (e) {}
+    const self = this;
+    clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(function () {
+      try {
+        if (window._supabase) {
+          window._supabase.from('app_data').upsert(
+            { key: 'pflx_cargo_' + self.playerId, data: self.data },
+            { onConflict: 'key' }
+          ).then(function () {}).catch(function () {});
+        }
+      } catch (e) {}
+    }, 2000);
+  },
+  add(itemId, qty, source) {
+    this.data.items[itemId] = (this.data.items[itemId] || 0) + qty;
+    this.data.log.unshift({ t: new Date().toISOString(), item: itemId, qty: qty, source: source || '' });
+    if (this.data.log.length > 60) this.data.log.length = 60;
+    this.save();
+    pflxCargoUI.render();
+    pflxCargoUI.bumpBadge();
+  },
+  removeRandom() {
+    const ids = Object.keys(this.data.items).filter(id => this.data.items[id] > 0);
+    if (!ids.length) return null;
+    const id = ids[(Math.random() * ids.length) | 0];
+    this.data.items[id]--;
+    if (this.data.items[id] <= 0) delete this.data.items[id];
+    this.data.log.unshift({ t: new Date().toISOString(), item: id, qty: -1, source: 'black hole' });
+    this.save();
+    pflxCargoUI.render();
+    return id;
+  },
+  addXC(amount, reason) {
+    this.data.pendingXC = (this.data.pendingXC || 0) + amount;
+    this.save();
+    // Tell the Console — it can credit through the real XC authority
+    try { window.parent.postMessage({ type: 'pflx_space_xc', amount: amount, reason: reason, playerId: this.playerId }, '*'); } catch (e) {}
+  },
+};
+
+// ── space toast (reuses the discovery popup styling) ──
+function pflxSpaceToast(icon, title, desc, reward) {
+  const popup = document.getElementById('discoveryPopup');
+  if (!popup) return;
+  const pi = document.getElementById('popupIcon'), pt = document.getElementById('popupTitle'),
+        pd = document.getElementById('popupDesc'), pr = document.getElementById('popupReward');
+  if (pi) pi.textContent = icon;
+  if (pt) pt.textContent = title;
+  if (pd) pd.textContent = desc;
+  if (pr) pr.textContent = reward || '';
+  popup.classList.add('show');
+  clearTimeout(pflxSpaceToast._t);
+  pflxSpaceToast._t = setTimeout(function () { popup.classList.remove('show'); }, 3500);
+}
+
+// deep-scanner: announce events when they spawn
+window.pflxSpaceEventNotice = function (kind) {
+  if (!pflxHasModule('deep-scanner')) return;
+  if (kind === 'comet') pflxSpaceToast('☄️', 'DEEP SCAN CONTACT', 'A comet is crossing this sector. Intercept it for stardust.', 'SCANNER');
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// SPACE HAZARDS — the navigator must adjust & interact
+//   asteroids: hold position nearby to mine (mining-laser = fast + x2)
+//   black holes: gravitational pull (shield resists, escape or pay)
+//   derelicts: fly close to salvage  ·  comets: intercept for stardust
+// ═══════════════════════════════════════════════════════════════════
+const pflxSpaceHazards = {
+  _mining: null,        // { obj, progress }
+  _bhCooldown: 0,
+  collectRadius() { return pflxHasModule('tractor-beam') ? 240 : 150; },
+  shielded() { return !!(pflxShip.upgrades.shieldAura || pflxHasModule('shield-booster')); },
+
+  tick() {
+    if (typeof pflxShip === 'undefined' || !window.pflxSpaceObjects) return;
+    const dt = 1 / 60;
+    const sx = pflxShip.x, sy = pflxShip.y;
+    if (this._bhCooldown > 0) this._bhCooldown -= dt;
+    let miningThisFrame = null;
+
+    for (let i = 0; i < window.pflxSpaceObjects.length; i++) {
+      const o = window.pflxSpaceObjects[i];
+      const d = Math.hypot(o.x - sx, o.y - sy);
+
+      if (o.type === 'blackhole') {
+        if (d < o.r) {
+          // gravitational pull — stronger near the core; shields resist
+          const f = Math.pow(1 - d / o.r, 2) * 11 * (this.shielded() ? 0.35 : 1);
+          pflxShipVx += (o.x - sx) / (d || 1) * f;
+          pflxShipVy += (o.y - sy) / (d || 1) * f;
+          if (d < 80 && this._bhCooldown <= 0) {
+            this._bhCooldown = 6;
+            const lost = pflxCargo.removeRandom();
+            // hurled back to the last station
+            const home = (pflxShip.currentNodeId && nodeElements[pflxShip.currentNodeId]);
+            pflxShip.x = home ? parseFloat(home.el.style.left) : 1000;
+            pflxShip.y = home ? parseFloat(home.el.style.top) : 1000;
+            pflxShipVx = 0; pflxShipVy = 0;
+            pflxSpaceToast('🕳️', 'EVENT HORIZON', lost
+              ? 'The singularity tore ' + (PFLX_ITEM_DEFS[lost] ? PFLX_ITEM_DEFS[lost].name : lost) + ' from your hold before you escaped.'
+              : 'You were hurled back to the last station.', this.shielded() ? 'SHIELDS HELD' : 'NO SHIELDS');
+            if (typeof SFX !== 'undefined' && SFX.play) SFX.play('error');
+          }
+        }
+      } else if (o.type === 'asteroids' && !o.depleted) {
+        if (d < this.collectRadius() + 60) miningThisFrame = o;
+      } else if (o.type === 'derelict' && !o.collected) {
+        if (d < this.collectRadius()) {
+          o.collected = true;
+          if (o.gl) o.gl.visible = false;
+          pflxCargo.add('salvage-scrap', 2, 'derelict');
+          if (Math.random() < 0.5) pflxCargo.add('artifact', 1, 'derelict');
+          pflxCargo.addXC(50, 'derelict salvage');
+          pflxSpaceToast('🛸', 'DERELICT SALVAGED', 'Cargo pod cracked open. Contents transferred to your hold.', '+SALVAGE · +50 XC');
+          if (typeof SFX !== 'undefined' && SFX.play) SFX.play('unlock');
+        }
+      } else if (o.type === 'comet' && !o.collected) {
+        if (d < o.r) {
+          o.collected = true;
+          pflxCargo.add('stardust', 2, 'comet');
+          pflxCargo.addXC(25, 'comet intercept');
+          pflxSpaceToast('☄️', 'COMET INTERCEPTED', 'You swept stardust from the tail.', '+2 STARDUST · +25 XC');
+          if (typeof SFX !== 'undefined' && SFX.play) SFX.play('unlock');
+        }
+      }
+    }
+
+    // mining progress — hold position near a cluster
+    if (miningThisFrame) {
+      if (!this._mining || this._mining.obj !== miningThisFrame) {
+        this._mining = { obj: miningThisFrame, progress: 0 };
+        pflxSpaceToast('⛏️', 'MINING', pflxHasModule('mining-laser') ? 'Mining laser engaged.' : 'Extracting ore — hold position…', '');
+      }
+      const need = pflxHasModule('mining-laser') ? 0.6 : 1.6;
+      this._mining.progress += dt;
+      if (this._mining.progress >= need) {
+        const o = miningThisFrame;
+        o.depleted = true;
+        if (o.gl) o.gl.scale.set(0.35, 0.35, 0.35);
+        const mult = pflxHasModule('mining-laser') ? 2 : 1;
+        pflxCargo.add('iron-ore', (1 + ((Math.random() * 2) | 0)) * mult, 'asteroid');
+        if (Math.random() < 0.55) pflxCargo.add('crystal-shard', 1 * mult, 'asteroid');
+        if (Math.random() < 0.15) pflxCargo.add('plasma-core', 1, 'asteroid');
+        pflxSpaceToast('⛏️', 'CLUSTER MINED', 'Ore transferred to cargo hold.', mult > 1 ? 'MINING LASER ×2' : '+ORE');
+        if (typeof SFX !== 'undefined' && SFX.play) SFX.play('unlock');
+        this._mining = null;
+      }
+    } else {
+      this._mining = null;
+    }
+  },
+
+  // click-to-harvest from birds-eye: fly the ship there, collection
+  // happens automatically on arrival via tick()
+  flyToObject(o) {
+    if (typeof pflxShipFlyTo !== 'function' || pflxShip.flying) return;
+    pflxShipFlyTo(o.x, o.y, function () {
+      pflxSpaceHazards.tick();
+    });
+  },
+};
+window.pflxSpaceHazards = pflxSpaceHazards;
+
+// birds-eye click on a space object → fly there
+canvas.addEventListener('click', function (e) {
+  if (magMode || editMode) return;
+  if (document.body.classList.contains('connect-mode')) return;
+  if (e.target.closest('.skill-node') || e.target.closest('.detail-panel')) return;
+  if (!window.pflxSpaceObjects || !window.pflxSpaceObjects.length) return;
+  const rect = canvas.getBoundingClientRect();
+  const lx = (e.clientX - rect.left - panX) / zoom;
+  const ly = (e.clientY - rect.top - panY) / zoom;
+  let best = null, bestD = Infinity;
+  window.pflxSpaceObjects.forEach(function (o) {
+    if (o.depleted || o.collected || o.type === 'blackhole') return;
+    const d = Math.hypot(o.x - lx, o.y - ly);
+    if (d < Math.max(220, o.r) && d < bestD) { best = o; bestD = d; }
+  });
+  if (best) pflxSpaceHazards.flyToObject(best);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// CARGO PANEL UI
+// ═══════════════════════════════════════════════════════════════════
+const pflxCargoUI = {
+  open: false, tab: 'items',
+  init() {
+    const btn = document.createElement('button');
+    btn.id = 'cargoBtn';
+    btn.innerHTML = '📦 CARGO <span id="cargoBadge"></span>';
+    btn.title = 'Cargo hold — items & ships';
+    btn.addEventListener('click', function () { pflxCargoUI.toggle(); });
+    document.body.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.id = 'cargoPanel';
+    panel.innerHTML =
+      '<div class="cargo-head">⬢ CARGO HOLD' +
+        '<button class="cargo-close" id="cargoClose">✕</button></div>' +
+      '<div class="cargo-tabs">' +
+        '<button class="cargo-tab active" data-tab="items">ITEMS</button>' +
+        '<button class="cargo-tab" data-tab="ships">SHIPS</button>' +
+        '<button class="cargo-tab" data-tab="log">LOG</button>' +
+      '</div>' +
+      '<div class="cargo-body" id="cargoBody"></div>' +
+      '<div class="cargo-foot" id="cargoFoot"></div>';
+    document.body.appendChild(panel);
+    panel.querySelector('#cargoClose').addEventListener('click', function () { pflxCargoUI.toggle(false); });
+    panel.querySelectorAll('.cargo-tab').forEach(function (tb) {
+      tb.addEventListener('click', function () {
+        panel.querySelectorAll('.cargo-tab').forEach(function (x) { x.classList.remove('active'); });
+        tb.classList.add('active');
+        pflxCargoUI.tab = tb.dataset.tab;
+        pflxCargoUI.render();
+      });
+    });
+    this.render();
+  },
+  toggle(force) {
+    this.open = force !== undefined ? force : !this.open;
+    document.getElementById('cargoPanel').classList.toggle('open', this.open);
+    if (this.open) this.render();
+    if (typeof SFX !== 'undefined' && SFX.play) SFX.play('click');
+  },
+  bumpBadge() {
+    const b = document.getElementById('cargoBadge');
+    if (!b) return;
+    const total = Object.values(pflxCargo.data.items).reduce(function (a, v) { return a + v; }, 0);
+    b.textContent = total > 0 ? total : '';
+    b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump');
+  },
+  render() {
+    const body = document.getElementById('cargoBody');
+    const foot = document.getElementById('cargoFoot');
+    if (!body) return;
+    if (this.tab === 'items') {
+      const ids = Object.keys(pflxCargo.data.items);
+      body.innerHTML = ids.length ? ids.map(function (id) {
+        const def = PFLX_ITEM_DEFS[id] || { icon: '❔', name: id, rarity: '', desc: '' };
+        return '<div class="cargo-item" data-rarity="' + def.rarity + '">' +
+          '<span class="ci-icon">' + def.icon + '</span>' +
+          '<span class="ci-info"><span class="ci-name">' + def.name + '</span>' +
+          '<span class="ci-desc">' + def.desc + '</span></span>' +
+          '<span class="ci-count">×' + pflxCargo.data.items[id] + '</span></div>';
+      }).join('') : '<div class="cargo-empty">Hold is empty.<br>Mine asteroids, salvage derelicts, intercept comets.</div>';
+    } else if (this.tab === 'ships') {
+      const equipped = pflxShip.upgrades.equippedTier || 'ship-t1-scout';
+      body.innerHTML = Object.keys(SHIP_TIER_FEATURES).map(function (id) {
+        const f = SHIP_TIER_FEATURES[id];
+        const nm = id.replace('ship-', '').replace(/-/g, ' ').toUpperCase();
+        const eq = id === equipped;
+        return '<div class="cargo-item ship' + (eq ? ' equipped' : '') + '">' +
+          '<span class="ci-icon">🚀</span>' +
+          '<span class="ci-info"><span class="ci-name">' + nm + (eq ? ' · EQUIPPED' : '') + '</span>' +
+          '<span class="ci-desc">SPD ×' + f.speedMult + ' · RADAR ' + f.radarRange +
+          (f.hasShield ? ' · SHIELD' : '') + (f.hasWarp ? ' · WARP' : '') + '</span></span></div>';
+      }).join('') +
+      (pflxShip.upgrades.modules && pflxShip.upgrades.modules.length
+        ? '<div class="cargo-section">MODULES</div>' + pflxShip.upgrades.modules.map(function (m) {
+            return '<div class="cargo-item"><span class="ci-icon">🔧</span><span class="ci-info"><span class="ci-name">' + m.replace(/-/g, ' ').toUpperCase() + '</span></span></div>';
+          }).join('')
+        : '');
+    } else {
+      body.innerHTML = pflxCargo.data.log.length ? pflxCargo.data.log.map(function (l) {
+        const def = PFLX_ITEM_DEFS[l.item] || { icon: '❔', name: l.item };
+        return '<div class="cargo-item log"><span class="ci-icon">' + def.icon + '</span>' +
+          '<span class="ci-info"><span class="ci-name">' + (l.qty > 0 ? '+' : '') + l.qty + ' ' + def.name + '</span>' +
+          '<span class="ci-desc">' + l.source + ' · ' + l.t.slice(0, 16).replace('T', ' ') + '</span></span></div>';
+      }).join('') : '<div class="cargo-empty">No activity yet.</div>';
+    }
+    foot.innerHTML =
+      '<span>PENDING CREDIT: <b>' + (pflxCargo.data.pendingXC || 0) + ' XC</b></span>' +
+      '<button class="cargo-shop" onclick="pflxShipOpenUpgrades()">⬡ SHIP BAY</button>';
+    this.bumpBadge();
+  },
+};
+pflxCargo.load();
+pflxCargoUI.init();
 
 // Open marketplace redirect
 function pflxShipOpenUpgrades() {
@@ -9772,6 +10222,9 @@ function pflxKeyLoop() {
       }
     });
   }
+
+  // Space hazards: black-hole pull, mining, salvage, comet intercepts
+  if (window.pflxSpaceHazards) pflxSpaceHazards.tick();
 
   // Update cockpit HUD gauges
   pflxUpdateCockpitHud();
