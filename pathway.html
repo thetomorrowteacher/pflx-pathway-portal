@@ -120,6 +120,38 @@
     body.gl-active .space-depth-layer,
     body.gl-active .rotating-ring { display: none; }
 
+    /* ========== OPEN SPACE — station-city node structures (Phase 2) ========== */
+    .station-structure {
+      position: absolute; width: 240px; height: 240px;
+      left: 50%; top: 50%; transform: translate(-50%, -55%);
+      pointer-events: none;
+    }
+    .station-structure svg { width: 100%; height: 100%; overflow: visible; display: block; }
+    .osg-beam { animation: osgBeamPulse 3.2s ease-in-out infinite; }
+    @keyframes osgBeamPulse { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+    .osg-win { fill: rgba(255,205,130,0.75); }
+    .osg-beacon { fill: #00e5ff; animation: osgBlink 1.6s ease-in-out infinite; }
+    @keyframes osgBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+    .osg-holo { animation: osgDash 14s linear infinite; }
+    @keyframes osgDash { to { stroke-dashoffset: -140; } }
+    .osg-portal { animation: osgBeamPulse 2.4s ease-in-out infinite; }
+    .osg-alert { fill: #ff3366; animation: osgBlink 1.1s ease-in-out infinite; }
+    .osg-pulse {
+      animation: osgRingPulse 2.8s ease-out infinite;
+      transform-box: fill-box; transform-origin: center;
+    }
+    @keyframes osgRingPulse { 0% { transform: scale(0.4); opacity: 0.9; } 100% { transform: scale(1.7); opacity: 0; } }
+    /* status modifiers — locked stations are powered-down silhouettes */
+    .skill-node[data-status="locked"] .station-structure { filter: grayscale(1) brightness(0.5); }
+    .skill-node[data-status="locked"] .osg-beam { opacity: 0.08; animation: none; }
+    .skill-node[data-status="locked"] .osg-win { fill: rgba(140,160,190,0.18); }
+    .skill-node[data-status="locked"] .osg-beacon { animation: none; opacity: 0.25; }
+    .skill-node[data-status="locked"] .osg-pulse { animation: none; opacity: 0.15; }
+    .skill-node[data-status="completed"] .osg-beacon { fill: #4ade80; }
+    .skill-node[data-status="completed"] .osg-win { fill: rgba(255,215,140,0.95); }
+    .skill-node[data-status="in_progress"] .osg-beam { animation-duration: 1.6s; }
+    .skill-node.coming-soon .station-structure { opacity: 0.45; }
+
     .starfield { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
     .star {
       position: absolute; border-radius: 50%; background: white;
@@ -4303,6 +4335,126 @@ if (sessionStorage.getItem('pflx_fullscreen') === '1' && !document.fullscreenEle
   }, { once: true });
 }
 
+// ==================== OPEN SPACE STATION SILHOUETTES (Phase 2) ====================
+// One shared visual kit, distinct silhouette per node kind:
+//   course → station-city  · project → industrial yard with crane
+//   program → ringed citadel · quest → stargate · challenge → fortress
+//   (no nodeType) → jump beacon
+// Deterministic per-node variety from an id hash, so layouts are stable.
+function pflxStationDefs() {
+  if (document.getElementById('osgDefs')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = '<svg id="osgDefs" width="0" height="0" style="position:absolute"><defs>' +
+    '<linearGradient id="osgBeamG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="rgba(130,225,255,0.95)"/>' +
+      '<stop offset="55%" stop-color="rgba(0,160,255,0.35)"/>' +
+      '<stop offset="100%" stop-color="rgba(0,120,255,0)"/>' +
+    '</linearGradient>' +
+    '<linearGradient id="osgHullG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#142c47"/>' +
+      '<stop offset="60%" stop-color="#0a1828"/>' +
+      '<stop offset="100%" stop-color="#060f1a"/>' +
+    '</linearGradient>' +
+    '<radialGradient id="osgDeckG" cx="50%" cy="42%" r="62%">' +
+      '<stop offset="0%" stop-color="rgba(0,212,255,0.5)"/>' +
+      '<stop offset="45%" stop-color="rgba(0,90,160,0.32)"/>' +
+      '<stop offset="100%" stop-color="rgba(6,15,26,0.95)"/>' +
+    '</radialGradient>' +
+    '<radialGradient id="osgPortalG">' +
+      '<stop offset="0%" stop-color="rgba(180,130,255,0.9)"/>' +
+      '<stop offset="60%" stop-color="rgba(120,60,255,0.35)"/>' +
+      '<stop offset="100%" stop-color="rgba(80,0,200,0)"/>' +
+    '</radialGradient>' +
+  '</defs></svg>';
+  document.body.appendChild(wrap.firstChild);
+}
+
+function pflxStationHTML(n) {
+  pflxStationDefs();
+  const kind = n.nodeType || 'beacon';
+  let h = 2166136261;
+  const idStr = String(n.id || 'x');
+  for (let i = 0; i < idStr.length; i++) { h ^= idStr.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const rnd = function () { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
+
+  const beams = function (xs) {
+    return xs.map(function (x, i) {
+      return '<rect class="osg-beam" x="' + (x - 3.5) + '" y="160" width="7" height="62" fill="url(#osgBeamG)" style="animation-delay:' + (i * 0.7).toFixed(1) + 's"/>';
+    }).join('');
+  };
+  const winRects = function (tx, tw, ty, th) {
+    let w = '';
+    const rows = Math.max(2, Math.floor(th / 9));
+    for (let r = 0; r < rows; r++) {
+      if (rnd() < 0.62) w += '<rect class="osg-win" x="' + (tx + 2 + rnd() * (tw - 5)).toFixed(1) + '" y="' + (ty + 3 + r * 8).toFixed(1) + '" width="2" height="2"/>';
+    }
+    return w;
+  };
+  const towers = function (cx, count, maxH) {
+    let t = '', tallestX = cx, tallestTop = 156;
+    for (let i = 0; i < count; i++) {
+      const tw = 8 + rnd() * 12;
+      const th = 26 + rnd() * maxH;
+      const tx = cx - (count * 11) + i * 22 + rnd() * 6;
+      const ty = 156 - th;
+      if (ty < tallestTop) { tallestTop = ty; tallestX = tx + tw / 2; }
+      t += '<rect x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) + '" width="' + tw.toFixed(1) + '" height="' + th.toFixed(1) + '" rx="1" fill="url(#osgHullG)" stroke="rgba(0,212,255,0.3)" stroke-width="0.7"/>' + winRects(tx, tw, ty, th);
+    }
+    // antenna + beacon on the tallest spire
+    t += '<line x1="' + tallestX.toFixed(1) + '" y1="' + tallestTop.toFixed(1) + '" x2="' + tallestX.toFixed(1) + '" y2="' + (tallestTop - 14).toFixed(1) + '" stroke="rgba(0,212,255,0.6)" stroke-width="1"/>' +
+         '<circle class="osg-beacon" cx="' + tallestX.toFixed(1) + '" cy="' + (tallestTop - 16).toFixed(1) + '" r="2.2"/>';
+    return t;
+  };
+  const deck = function (rx) {
+    return '<ellipse cx="120" cy="158" rx="' + rx + '" ry="' + Math.round(rx * 0.25) + '" fill="url(#osgDeckG)" stroke="rgba(0,212,255,0.55)" stroke-width="1"/>' +
+      '<path d="M' + (120 - rx + 4) + ',161 L' + (120 - rx + 16) + ',176 L' + (120 + rx - 16) + ',176 L' + (120 + rx - 4) + ',161" fill="#07101c" stroke="rgba(0,212,255,0.22)" stroke-width="0.8"/>';
+  };
+  const holo = function (rx) {
+    return '<ellipse class="osg-holo" cx="120" cy="158" rx="' + rx + '" ry="' + Math.round(rx * 0.26) + '" fill="none" stroke="rgba(0,212,255,0.32)" stroke-width="1" stroke-dasharray="4 10"/>';
+  };
+
+  let body = '';
+  if (kind === 'course') {
+    body = beams([100, 120, 140]) + towers(120, 4, 58) + deck(60) + holo(74);
+  } else if (kind === 'project') {
+    body = beams([96, 120, 144]) + towers(102, 3, 44) + towers(150, 2, 32) +
+      '<path d="M168,150 L194,126 L194,120" fill="none" stroke="rgba(0,212,255,0.5)" stroke-width="1.4"/>' +
+      '<circle class="osg-beacon" cx="194" cy="118" r="2" style="animation-delay:0.4s"/>' +
+      deck(68) + holo(82);
+  } else if (kind === 'program') {
+    body = beams([92, 106, 120, 134, 148]) + towers(120, 5, 72) +
+      '<path d="M92,104 a28,22 0 0 1 56,0" fill="none" stroke="rgba(0,212,255,0.45)" stroke-width="1.2"/>' +
+      deck(64) + holo(80) +
+      '<ellipse class="osg-holo" cx="120" cy="158" rx="94" ry="24" fill="none" stroke="rgba(139,92,246,0.3)" stroke-width="1" stroke-dasharray="3 12" style="animation-duration:22s"/>';
+  } else if (kind === 'quest') {
+    body = beams([102, 138]) +
+      '<rect x="92" y="96" width="11" height="64" rx="1.5" fill="url(#osgHullG)" stroke="rgba(160,80,255,0.5)" stroke-width="0.8"/>' +
+      '<rect x="137" y="96" width="11" height="64" rx="1.5" fill="url(#osgHullG)" stroke="rgba(160,80,255,0.5)" stroke-width="0.8"/>' +
+      '<rect x="90" y="88" width="60" height="9" rx="2" fill="url(#osgHullG)" stroke="rgba(160,80,255,0.5)" stroke-width="0.8"/>' +
+      '<ellipse class="osg-portal" cx="120" cy="128" rx="17" ry="26" fill="url(#osgPortalG)"/>' +
+      '<circle class="osg-beacon" cx="120" cy="84" r="2.2" style="fill:#a855f7"/>' +
+      deck(52) + holo(66);
+  } else if (kind === 'challenge') {
+    body = beams([104, 136]) +
+      '<rect x="80" y="130" width="80" height="26" rx="2" fill="url(#osgHullG)" stroke="rgba(255,80,110,0.4)" stroke-width="0.8"/>' +
+      winRects(82, 76, 130, 26) +
+      '<path d="M92,130 L86,106 L90,106 L98,130" fill="url(#osgHullG)" stroke="rgba(255,80,110,0.35)" stroke-width="0.7"/>' +
+      '<path d="M148,130 L154,106 L150,106 L142,130" fill="url(#osgHullG)" stroke="rgba(255,80,110,0.35)" stroke-width="0.7"/>' +
+      '<circle class="osg-alert" cx="88" cy="103" r="1.8"/>' +
+      '<circle class="osg-alert" cx="152" cy="103" r="1.8" style="animation-delay:0.5s"/>' +
+      deck(58) + holo(72);
+  } else {
+    // jump beacon — slim pylon with expanding pulse rings
+    body = beams([120]) +
+      '<ellipse cx="120" cy="152" rx="24" ry="7" fill="url(#osgDeckG)" stroke="rgba(0,212,255,0.5)" stroke-width="0.9"/>' +
+      '<rect x="116" y="88" width="8" height="62" rx="2" fill="url(#osgHullG)" stroke="rgba(0,212,255,0.4)" stroke-width="0.8"/>' +
+      '<circle class="osg-beacon" cx="120" cy="84" r="3"/>' +
+      '<circle class="osg-pulse" cx="120" cy="96" r="14" fill="none" stroke="rgba(0,212,255,0.55)" stroke-width="1"/>' +
+      '<circle class="osg-pulse" cx="120" cy="96" r="14" fill="none" stroke="rgba(0,212,255,0.4)" stroke-width="1" style="animation-delay:1.4s"/>';
+  }
+  return '<div class="station-structure"><svg viewBox="0 0 240 240">' + body + '</svg></div>';
+}
+
 // ==================== RENDER NODES ====================
 const nodeElements = {};
 
@@ -4340,6 +4492,7 @@ pathway.nodes.forEach(n => {
   const xcRewardHTML = n.xcReward ? `<div class="node-xc-badge reward">${Number(n.xcReward).toLocaleString()} XC</div>` : '';
   const xcCostHTML = n.xcCost ? `<div class="node-xc-badge cost" style="bottom:-18px;">${Number(n.xcCost).toLocaleString()} XC FEE</div>` : '';
   el.innerHTML = `
+    ${pflxStationHTML(n)}
     <div class="node-target"><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-crosshair"></div><div class="node-target-scan"></div></div>
     <div class="node-ring">
       <div class="station-orbit"></div>
@@ -6149,6 +6302,7 @@ function rebuildNodes() {
       pitchTagHTML += `<div style="position:absolute;top:-8px;left:-8px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;font-size:7px;font-weight:900;padding:2px 6px;border-radius:8px;letter-spacing:0.05em;z-index:5;white-space:nowrap;box-shadow:0 0 8px rgba(59,130,246,0.3);">🤝 SPONSORED</div>`;
     }
     el.innerHTML = `
+      ${pflxStationHTML(n)}
       ${pitchTagHTML}
       <div class="node-target"><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-ring"></div><div class="node-target-crosshair"></div><div class="node-target-scan"></div></div>
       <div class="node-ring">
