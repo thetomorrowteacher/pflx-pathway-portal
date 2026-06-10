@@ -416,3 +416,283 @@ If you bootstrap a new chat by having Claude read this file, also flag:
 *End of handoff. This document was generated at the close of the previous
 session and is the single source of truth for resuming work on the cartridge
 system on a new machine.*
+
+---
+---
+
+# Session Update — June 2026 (Sonnet)
+
+This section appends to the original handoff above. It captures the work done
+in the production-hardening + UI cleanup pass between June 1 and June 2, 2026.
+**The cartridge system above is unchanged.** Read this section to know what's
+new before opening another sprint, especially if you're picking up Core
+Pathways "Open Space UI" work next.
+
+## What's new in production
+
+### Home Base redesign (preview.html)
+Home Base went from a stats-heavy dashboard to a Mission Hub launcher:
+
+- **Stat row removed.** The four stat tiles (Total XC / Rank / Quests / Position)
+  that sat under the player avatar are gone. The toolbar already surfaces XC,
+  Position, and Rank live.
+- **Launch Apps card** — large 5-tile launcher pinned to the top of Home Base.
+  Tiles: **Mission Control → X-Coin → Core Pathways → Battle Arena →
+  DarkCampus**. AI Center is intentionally excluded. Each tile has a 104×104
+  icon (with a per-app `iconScale` field for tuning), hover lift, and a
+  description chip that fades in. The chip copy is the canonical
+  short-description for each app — keep it in sync if you change names:
+  - **Mission Control** — "Your season pass and project and task management
+    center. Track the projects, jobs, and tasks assigned by your cohort or
+    organization."
+  - **X-Coin** — "Digital currency system that values your experience across
+    PFLX. Earn XC and badges, browse the upgrades and modifiers marketplace,
+    and navigate taxes and fines."
+  - **Core Pathways** — "Learning and professional development modules. Build
+    skills and earn digital badges, credentials, endorsements, and
+    certifications."
+  - **Battle Arena** — "Esports, challenges, and competitive games. Jump in
+    to earn quick XC, compete head-to-head, and rack up achievements."
+  - **DarkCampus** — "Global professional network for rising entrepreneurs
+    and creators. Network, collaborate, and communicate across cohorts."
+- **My Tasks** card (formerly Deadlines) — urgency-coded list of the active
+  player's tasks/projects/checkpoints with due dates. Red+slow-flash for
+  overdue, yellow for ≤5 days, green for >5 days. Optional `overdueFineXC`
+  field shows a `⚠ -N XC` chip. Click any row to deep-link into the
+  matching MC detail view. Host clicks open `mcEditCheckpoint/Task/Project`
+  on the right MC tab; player clicks route through `ppNav('task-detail', …)`
+  etc.
+- **Job Board** card replaces the old Goals card. Lists up to 5 open jobs
+  from `ppGetJobs()` filtered by the player's cohorts. Click to deep-link
+  into the Player Portal job board with the row scrolled into view and
+  pulse-highlighted via `data-job-row` attribute.
+- **Removed:** Recent Activity, Goals, Season Progress, Investment Summary,
+  Projects, and the small App Links tray at the bottom. `renderProjects()` /
+  `renderActivityFeed()` / `renderGoals()` / `renderInvestmentSummary()`
+  still exist in the file but aren't called by the dashboard build anymore.
+
+### Toolbar
+- **Removed:** Portfolio nav button, Settings nav button, the floating ♫
+  audio toggle. The audio panel DOM (`#se-player-panel`) stays in place; the
+  player-card dropdown's SOUND button toggles it via `seTogglePlayerPanel`.
+- **CHECKPOINT % indicator replaced with POSITION** — toolbar slot 2 now
+  shows the player's live leaderboard position (`#N / total`) derived from
+  PLAYERS sorted on `totalXcoin`. Hosts/admins show `—`. The id is
+  `toolbar-position` / `toolbar-position-bar`.
+
+### Player card dropdown (toolbar avatar click)
+Order is now: My Wallet → My Tasks → Leaderboard → View Portfolio → **Sound**
+→ **Settings** → Sign Out. Sound and Settings were lifted out of the toolbar.
+
+### Login screen
+- **Brand input is now a typeable `<input list="brand-datalist">`** with
+  autocomplete. `populateBrandSelect` fills the datalist instead of a
+  `<select>`. Imported-brand-select on the claim flow stayed a `<select>`.
+- **Remember-me row** under the LOGIN button. Stores `{brand, pin, ts}` in
+  `localStorage` under `pflx_remember_v1` on successful login (gated by the
+  "Keep me signed in on this device" checkbox, default checked). On next
+  visit both fields are pre-filled so the player just clicks LOGIN. A small
+  "Forget me" link wipes the row and clears the inputs. `pflxSignOut` also
+  clears `pflx_remember_v1` so signing out actually signs out.
+
+### Mission Control sidebar
+- Task Management order is now **Checkpoints → Projects → Tasks → Job Board
+  → Proposals**.
+- **Startup Studios removed** from sidebar. Panel + renderer stay in place
+  (still backs the Home Base studio card + portfolio studio view).
+- **Sessions removed** from sidebar. Reachable via Live Session under
+  System when active.
+- **Pitches → Proposals.** UI label and page title only; data key still
+  `pflx_mc_pitches`, render function still `mcRenderPitches`. The
+  Proposals page copy explains the reverse-task framing for future build:
+  player proposes a new project (MC) or new module/node (Pathways) → host
+  approves from this queue.
+
+### Battle Arena icon swap
+- New file: `public/PFLX Battle Arena Icon.png` (4 MB controller artwork)
+  added to both `pflx-platform-check/public/` and `pflx-arena-check/public/`.
+- All 6 references in preview.html updated. Battle Arena's own
+  `PlayGate.tsx` updated to `/PFLX%20Battle%20Arena%20Icon.png`.
+- **Global CSS scale rule** for any `img[src*="PFLX Battle Arena Icon"]`
+  applies `transform: scale(1.6)` to compensate for the artwork's transparent
+  padding. App Hub tile uses its own inline `iconScale: 1.8` which overrides.
+
+## Critical bug fixes shipped this session
+
+### P0 — Page Unresponsive freeze on Launch Apps click
+`navigateTo`'s cohort-access Promise gate replaced its sentinel with
+`Promise.resolve('ready')` which is still thenable. The recursive
+`navigateTo` re-entered the same `.then` branch infinitely. Microtask
+loop → browser thread blocked. Fix: sentinel is now the plain string
+`'ready'` which has no `.then`. See `navigateTo` around line 18766.
+
+### P0 — Sphinx Link Battle Arena "SYNCING WITH PLATFORM" trap
+Fresh self-signups had empty `activeSession.brand` when `buildAppURL` ran.
+The URL came out as `?sso=pflx&brand=&...` Battle Arena's PflxIframeGuard
+required both `sso=pflx` AND truthy brand — empty string is falsy. Player
+sat on a 3.5s safety spinner. Fix is two layers:
+
+1. **`buildAppURL`** now resolves `safeBrand` via fallback chain
+   `brand → brandName → name → id → "Player"`. URL param is never empty.
+2. **`PflxIframeGuard`** loosened to three fast-paths:
+   - `sso=pflx` alone reveals (brand truthy not required).
+   - Any localStorage hint (`pflx_user` / `pflx_identity` /
+     `pflx_active_session`) reveals.
+   - Referrer fallback — `document.referrer` includes prototypeflx.com /
+     pflx-platform → reveal.
+   Safety timer cut 3500ms → 1500ms. Retry cadence tightened 400/1000/2000
+   → 200/600/1200.
+
+### P0 — Cohort access gate (deny-wins)
+**`pflxPlayerCanAccessApp`** used a union rule — ANY cohort resolving to
+allow granted access. PlayerPool's default-open beat every explicit "off"
+toggle on other cohorts for multi-cohort players (which is everyone).
+Fix: `resolveCohortApp` now returns `null` for "no setting" and `false` /
+`true` for explicit settings. The outer loop short-circuits on the first
+`false`. ANY explicit deny → deny. Matches host intuition. Applies to
+every gated app (XC / Pathways / Arena / DarkCampus / Portfolio / AI /
+MC) and both entry paths (platform navigateTo gate + sub-app bootstrap
+`allowedApps` URL param).
+
+### X-Coin Marketplace + Leaderboard
+- **Marketplace "NOT ENOUGH"** for a player with 100k XC. The
+  `hasEnough` check was `user.xcoin >= cost && user.digitalBadges >= cost`.
+  Zero badges → eternal "NOT ENOUGH". Fix: single XC check.
+- **Duplicate XC chip** on upgrade cards removed. One chip shows
+  `costXcoin` in yellow; a second purple chip shows `costBadge` only
+  when non-zero.
+- **Leaderboard default sort → Evo Rank.** Rank level descending,
+  `totalXcoin` as tiebreaker. Same fix in both `app/player/leaderboard/`
+  and `app/admin/leaderboard/`.
+
+### X-Coin Job Board repopulating after wipe (root cause)
+`pflx-xcoin-check/app/lib/data.ts` exported `mockJobs` with 3 seed entries
+(Class Social Media Manager / Equipment Room Assistant / Peer Tutor —
+Adobe Creative Suite). Every X-Coin iframe boot pushed them back into the
+shared `mcJobs` collection via cloud sync. Even after wiping Supabase row
++ localStorage, X-Coin re-seeded within seconds. Fix: `mockJobs` is now
+`[]`. Job Board only ever holds jobs the host creates through MC.
+
+### Loading screen keyboard bypass
+Pressing Space during a loading screen activated whatever button had
+focus (a Launch Apps tile, etc.), triggering a scene change mid-load. The
+SFX/music kept playing under the new view. Fix: document-level keydown
+listener installed in `pflxLoadingScreen.init()` swallows Space/Enter/Tab/
+Arrows when the screen has `.active`. Plus `show()` blurs
+`document.activeElement` before adding `.active`.
+
+### Toolbar gate stopped telegraphing locked apps
+`pflxApplyCohortGatingToToolbar` previously appended "— locked for your
+cohort" to `btn.title` for denied apps and dimmed the tile. Hosts saw
+the stale tooltip after the role check finally passed because the title
+wasn't reset. Fix: no tooltip append, no dim styling, idempotent scrub
+removes any legacy "locked for your cohort" tail from `btn.title` on
+every gating refresh. Click-time Access Denied modal unchanged.
+
+### Self-signup record hardening
+`final-pin-btn` click handler at ~line 16920 now validates the onboarding
+`role` against `['Student','Creator','Educator','Explorer']`, normalizes
+via `normalizeRole` (always produces `player` for these inputs),
+stashes the display value as `roleDisplay`, and explicitly stamps
+`rankOverride: null`, `godTier: false`, `evoRank: 1`. Upstream defense
+for the Master Admin Evo Rank class of bug.
+
+## Sub-app bootstrap status
+The shared `pflx-app-bootstrap.js` lives at
+`pflx-pathway-portal/public/pflx-app-bootstrap.js` (served from the
+pathway-portal CDN). It reads tier / allowedApps / cohort / role from
+the SSO URL params, persists to localStorage, and renders a full-screen
+ACCESS DENIED overlay if the current app key isn't in allowedApps. Loaded
+via `<Script strategy="beforeInteractive">` in:
+
+- `pflx-arena-check/app/layout.tsx` (`window.PFLX_APP_KEY = 'arena'`)
+- `pflx-darkcampus-check/src/app/layout.tsx`
+  (`window.PFLX_APP_KEY = 'darkcampus'`)
+- `pflx-xcoin-check/app/layout.tsx` (`window.PFLX_APP_KEY = 'xcoin'`)
+
+Pathways is the source — pathway-portal hosts the script but also enforces
+the gate inline.
+
+## Latest commit hashes (session end, June 2 2026)
+
+| Repo | Latest |
+|------|--------|
+| `pflx-platform` | `51725be` (deny-wins cohort gate) |
+| `pflx-battle-arena` | `ad916b4` (PflxIframeGuard loosened) |
+| `pflx-xcoin-app` | `bd7f242` (marketplace + leaderboard) |
+| `pflx-darkcampus` | `ac1fce8` (bootstrap wired) |
+| `pflx-pathway-portal` | unchanged from prior session |
+
+## Open work / Known gaps
+
+1. **Core Pathways "Open Space UI"** — next session's focus. Pathway.html
+   currently renders a fixed node map. The open-space concept is a more
+   exploratory canvas where players can navigate freely. No code shipped
+   for this yet. Start from the existing `pathway.html` Detail Overlay
+   logic (entry video + tier picker + module launch flow already work).
+2. **Proposals workflow** — Sidebar renamed but the player-side submit
+   form isn't built yet. Spec: a "Propose" button on Player Home or in
+   Core Pathways opens a small form (title / description / target
+   checkpoint or pathway / suggested reward). Submit pushes onto
+   `mcPitches` with `status: 'pending'`. The MC Proposals queue already
+   renders pending items.
+3. **Bootstrap iframe-guard parity** — DarkCampus and X-Coin guards
+   should get the same loosened fast-paths Battle Arena got. Easy port —
+   copy the updated `PflxIframeGuard.tsx` logic. Not yet shipped to those
+   two.
+4. **X-Coin .git was previously corrupted** — fresh clone was swapped in.
+   Future edits should commit cleanly but watch for the `~7 entries vs
+   13` pattern in `.git/` listing. See
+   `~/Library/Application Support/Claude/.../memory/pflx-subapp-gits-and-clones.md`.
+5. **Recent Activity feed** — removed from Home Base. If you want a
+   replacement "Recent Wins" motivation feed (badges earned, checkpoints
+   completed, XC milestones), the dashboard build is in `renderHome`
+   right before the My Tasks card.
+
+## Key file locations for Core Pathways work
+
+```
+~/My Apps/PFLX Apps/Core Pathway Development/pflx-pathway-portal/
+├── pathway.html                          ← THE entry point
+├── public/
+│   ├── pflx-app-bootstrap.js             ← shared sub-app gate
+│   └── (module / node assets)
+├── docs/
+│   ├── HANDOFF.md                        ← this file
+│   ├── MODULE_STRUCTURE.md               ← tier-aware module spec
+│   └── (other specs)
+└── modules/                              ← module cartridges live here
+```
+
+`pathway.html` key search anchors for the next session:
+- `Detail Overlay` — the per-node panel with entry video / tier picker
+- `pflxModulePlayer` — the Connector wrapper for embedded modules
+- `_pflxNormalizeEntryVideo` — YouTube/Drive/Vimeo URL coercion
+- `pflx_mod_init` / `pflx_mod_progress` / `pflx_mod_save` — Connector
+  postMessage types
+- `detail-tier-btn` — tier picker buttons on the Detail Panel
+- `launchTierChip` — the tier confirmation chip on the warp screen
+- `_history[]` — module save slot history (cap 12)
+
+## Things to mention to the new Claude session
+
+- Production URL is **`https://prototypeflx.com`**. Vercel auto-deploys
+  every push to `main` for each repo within ~1 minute.
+- Working copies live in **`~/My Apps/PFLX Apps/`** NOT iCloud Drive.
+  iCloud's fileproviderd corrupts `.git/` (refs missing, only HEAD +
+  config left). If you see a `.git/` folder with only ~7 entries, do
+  a fresh clone to `~/git/<repo>` and swap the `.git/` back into the
+  working copy. See the memory note linked above.
+- Push commits via the **Control Your Mac MCP** (`osascript`)
+  `do shell script "..."` — runs as Ennis and uses his keychain. The
+  workspace bash CAN do `git add` + `git commit` but `find .git -name
+  '*.lock' -delete` is a frequent prereq.
+- Supabase project: **`hyxiagexyptzvetqjmnj`**. Key tables: `app_data`
+  (KV blob for cohort_overrides, pflx_mc_jobs, etc.), `users`,
+  `module_saves`. SQL fixes via the Supabase MCP `execute_sql` work.
+- The **shared cohort access gate** is now deny-wins. If you add a new
+  gated app, register it in the `gatedApps` map inside `navigateTo`
+  AND in the `allowedApps` loop inside `buildAppURL`.
+
+*End of June 2026 update. Hand off to next session — Fable, Core
+Pathways Open Space UI is yours.*
