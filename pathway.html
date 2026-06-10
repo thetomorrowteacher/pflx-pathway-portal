@@ -6,6 +6,8 @@
   <title>PFLX Pathway — Skill Tree</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Open Space UI: WebGL deep-space layer (pinned; legacy DOM starfield is the fallback if this fails to load) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     // Global error handler — catches uncaught JS errors
     window.onerror = function(msg, url, line, col, err) {
@@ -101,6 +103,23 @@
     }
 
     /* ========== STARFIELD ========== */
+    /* ========== OPEN SPACE — WebGL deep-space layer ========== */
+    #spaceGL {
+      position: absolute; inset: 0; z-index: 0;
+      display: block; pointer-events: none;
+    }
+    /* When the GL layer is live, the legacy DOM background systems stand down */
+    body.gl-active .starfield,
+    body.gl-active .galaxy-layer,
+    body.gl-active .aurora-layer,
+    body.gl-active .particle-layer,
+    body.gl-active .scan-line-layer,
+    body.gl-active .pulse-ring-layer,
+    body.gl-active .radial-bg,
+    body.gl-active .radial-ring,
+    body.gl-active .space-depth-layer,
+    body.gl-active .rotating-ring { display: none; }
+
     .starfield { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
     .star {
       position: absolute; border-radius: 50%; background: white;
@@ -2429,7 +2448,10 @@
 </head>
 <body>
 
-  <!-- Starfield -->
+  <!-- Open Space: WebGL deep-space canvas -->
+  <canvas id="spaceGL"></canvas>
+
+  <!-- Starfield (legacy fallback when WebGL is unavailable) -->
   <div class="starfield" id="starfield"></div>
 
   <!-- Moving Galaxies -->
@@ -3387,13 +3409,275 @@ document.getElementById('pathwayTitle').textContent = pathway.title;
 document.getElementById('pathwaySubtitle').textContent = pathway.subtitle;
 document.getElementById('pathwayIconImg').src = pathway.icon;
 
+// ════════════════════════════════════════════════════════════════════
+// OPEN SPACE — WebGL deep-space layer (Phase 1)
+// True 3D starfield + nebulae + galaxy spirals + dust, rendered at
+// devicePixelRatio. The GL camera dollies through the field as the
+// player pans/zooms the node map, so parallax is real depth, not CSS.
+// If THREE failed to load (offline / CDN), PFLX_GL_ACTIVE stays false
+// and every legacy DOM background system below boots as before.
+// ════════════════════════════════════════════════════════════════════
+window.PFLX_GL_ACTIVE = false;
+window.pflxSpace = (function () {
+  if (typeof THREE === 'undefined') return null;
+  const cv = document.getElementById('spaceGL');
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  } catch (err) { return null; }
+
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x020408, 1);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x020408, 0.00016);
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 16000);
+
+  // ---- procedural textures ------------------------------------------------
+  function starSprite() {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.8)');
+    g.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+  function nebulaTexture(colA, colB) {
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const x = c.getContext('2d');
+    x.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 48; i++) {
+      const px = 256 + (Math.random() - 0.5) * 310;
+      const py = 256 + (Math.random() - 0.5) * 310;
+      const r = 34 + Math.random() * 130;
+      const g = x.createRadialGradient(px, py, 0, px, py, r);
+      const col = Math.random() < 0.55 ? colA : colB;
+      g.addColorStop(0, 'rgba(' + col + ',' + (0.05 + Math.random() * 0.09).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+    }
+    const m = x.createRadialGradient(256, 256, 70, 256, 256, 256);
+    m.addColorStop(0, 'rgba(255,255,255,1)');
+    m.addColorStop(1, 'rgba(255,255,255,0)');
+    x.globalCompositeOperation = 'destination-in';
+    x.fillStyle = m; x.fillRect(0, 0, 512, 512);
+    return new THREE.CanvasTexture(c);
+  }
+  function spiralTexture(colA, colB) {
+    const c = document.createElement('canvas'); c.width = c.height = 512;
+    const x = c.getContext('2d');
+    x.translate(256, 256);
+    x.globalCompositeOperation = 'lighter';
+    for (let arm = 0; arm < 3; arm++) {
+      const off = arm * (Math.PI * 2 / 3);
+      for (let i = 0; i < 240; i++) {
+        const t = i / 240;
+        const ang = off + t * 4.4 + (Math.random() - 0.5) * 0.32;
+        const rad = 8 + t * 215 + (Math.random() - 0.5) * 18;
+        const px = Math.cos(ang) * rad, py = Math.sin(ang) * rad * 0.6;
+        const sz = ((1 - t) * 2.4 + 0.5) * 4;
+        const g = x.createRadialGradient(px, py, 0, px, py, sz);
+        g.addColorStop(0, 'rgba(' + (t < 0.35 ? colA : colB) + ',' + (0.45 * (1 - t) + 0.08).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        x.fillStyle = g; x.beginPath(); x.arc(px, py, sz, 0, 7); x.fill();
+      }
+    }
+    const core = x.createRadialGradient(0, 0, 0, 0, 0, 44);
+    core.addColorStop(0, 'rgba(255,244,214,0.95)');
+    core.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = core; x.beginPath(); x.arc(0, 0, 44, 0, 7); x.fill();
+    return new THREE.CanvasTexture(c);
+  }
+
+  const SPRITE = starSprite();
+  const SMALL = window.innerWidth < 800;
+
+  // ---- star bands (three z-depths = three parallax speeds) ----------------
+  const STAR_TINTS = [
+    [1, 1, 1], [1, 1, 1], [0.78, 0.91, 1], [0.62, 0.87, 1],   // whites + pale blues
+    [0.72, 0.62, 1], [1, 0.88, 0.72],                          // violet, warm
+  ];
+  function starCloud(count, zMin, zMax, size, opacity) {
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3]     = (Math.random() - 0.5) * 11000;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 8000;
+      pos[i * 3 + 2] = zMin + Math.random() * (zMax - zMin);
+      const t = STAR_TINTS[(Math.random() * STAR_TINTS.length) | 0];
+      const b = 0.55 + Math.random() * 0.45;
+      col[i * 3] = t[0] * b; col[i * 3 + 1] = t[1] * b; col[i * 3 + 2] = t[2] * b;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      map: SPRITE, size: size, vertexColors: true, transparent: true,
+      opacity: opacity, depthWrite: false, blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    });
+    const pts = new THREE.Points(geo, mat);
+    scene.add(pts);
+    return pts;
+  }
+  const farA  = starCloud(SMALL ? 900 : 1700, -5200, -2600, 16, 0.85);
+  const farB  = starCloud(SMALL ? 700 : 1300, -5200, -2600, 13, 0.7);   // counter-twinkle band
+  const mid   = starCloud(SMALL ? 500 : 950,  -2200, -700, 10, 0.9);
+  const dust  = starCloud(SMALL ? 160 : 320,  -350, 500, 7, 0.55);      // near-field dust, fastest parallax
+
+  // ---- nebulae + galaxy spirals -------------------------------------------
+  const NEB_PALETTE = [
+    ['0,180,255', '80,0,200'], ['139,92,246', '255,0,200'],
+    ['0,255,200', '0,100,255'], ['200,50,255', '0,212,255'],
+    ['255,100,180', '100,0,255'], ['0,212,255', '139,92,246'],
+  ];
+  const nebulae = [];
+  const NEB_COUNT = SMALL ? 4 : 7;
+  for (let i = 0; i < NEB_COUNT; i++) {
+    const pal = NEB_PALETTE[i % NEB_PALETTE.length];
+    const mat = new THREE.SpriteMaterial({
+      map: nebulaTexture(pal[0], pal[1]), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, opacity: 0.26 + Math.random() * 0.16,
+      rotation: Math.random() * Math.PI * 2,
+    });
+    const s = new THREE.Sprite(mat);
+    const sc = 2200 + Math.random() * 2600;
+    s.scale.set(sc, sc, 1);
+    s.position.set((Math.random() - 0.5) * 9000, (Math.random() - 0.5) * 6500, -4600 + Math.random() * 2800);
+    scene.add(s);
+    nebulae.push({ s: s, rs: (Math.random() - 0.5) * 0.012, vx: (Math.random() - 0.5) * 2.4, vy: (Math.random() - 0.5) * 1.8, baseOp: mat.opacity, ph: Math.random() * 6.28 });
+  }
+  const spirals = [];
+  for (let i = 0; i < 2; i++) {
+    const pal = NEB_PALETTE[(i * 2 + 1) % NEB_PALETTE.length];
+    const mat = new THREE.SpriteMaterial({
+      map: spiralTexture('255,235,200', pal[0]), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, opacity: 0.5, rotation: Math.random() * 6.28,
+    });
+    const s = new THREE.Sprite(mat);
+    const sc = 1300 + Math.random() * 900;
+    s.scale.set(sc, sc * 0.62, 1);
+    s.position.set((i === 0 ? -1 : 1) * (2600 + Math.random() * 1800), (Math.random() - 0.5) * 4200, -5600 - Math.random() * 1200);
+    scene.add(s);
+    spirals.push({ s: s, rs: 0.006 + Math.random() * 0.008 });
+  }
+
+  // ---- shooting stars -------------------------------------------------------
+  const shooters = [];
+  for (let i = 0; i < 5; i++) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0xcfeeff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    shooters.push({ line: line, mat: mat, life: 0, dur: 1, x: 0, y: 0, z: 0, dx: 0, dy: 0 });
+  }
+  let nextShot = 3 + Math.random() * 5;
+  function fireShooter(s) {
+    s.x = camera.position.x + (Math.random() - 0.5) * 5000;
+    s.y = camera.position.y + (Math.random() - 0.5) * 3500;
+    s.z = -1400 - Math.random() * 1800;
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 2200 + Math.random() * 1600;
+    s.dx = Math.cos(ang) * spd; s.dy = Math.sin(ang) * spd;
+    s.life = 0; s.dur = 0.7 + Math.random() * 0.5;
+  }
+
+  // ---- camera mapping -------------------------------------------------------
+  // Layer-space point under the viewport centre drives camera x/y;
+  // zoom drives a dolly on z. Lerped per-frame for cinematic ease.
+  const target = new THREE.Vector3(0, 0, 2400);
+  function sync(panX, panY, zoom) {
+    const cx = (window.innerWidth / 2 - panX) / zoom;    // layer px under centre
+    const cy = (window.innerHeight / 2 - panY) / zoom;
+    target.x = (cx - 1000) * 1.15;
+    target.y = -(cy - 1000) * 1.15;
+    target.z = Math.max(900, Math.min(5200, 2300 / zoom));
+  }
+  camera.position.copy(target);
+
+  // ---- loop -----------------------------------------------------------------
+  const clock = new THREE.Clock();
+  let running = true;
+  document.addEventListener('visibilitychange', function () { running = !document.hidden; if (running) { clock.getDelta(); tick(); } });
+
+  function tick() {
+    if (!running) return;
+    requestAnimationFrame(tick);
+    const dt = Math.min(clock.getDelta(), 0.1);
+    const t = clock.elapsedTime;
+
+    // cinematic camera ease
+    const k = 1 - Math.pow(0.002, dt);
+    camera.position.lerp(target, k);
+    // imperceptible ambient sway so space never feels frozen
+    camera.rotation.z = Math.sin(t * 0.05) * 0.004;
+
+    // counter-phased twinkle bands
+    farA.material.opacity = 0.72 + Math.sin(t * 0.9) * 0.18;
+    farB.material.opacity = 0.62 + Math.sin(t * 1.18 + 2.4) * 0.20;
+    dust.material.opacity = 0.45 + Math.sin(t * 0.6 + 1.1) * 0.14;
+    dust.rotation.z = t * 0.0035;
+    mid.rotation.z = t * 0.0014;
+
+    nebulae.forEach(function (n) {
+      n.s.material.rotation += n.rs * dt;
+      n.s.position.x += n.vx * dt;
+      n.s.position.y += n.vy * dt;
+      n.s.material.opacity = n.baseOp * (0.78 + Math.sin(t * 0.18 + n.ph) * 0.22);
+    });
+    spirals.forEach(function (g) { g.s.material.rotation += g.rs * dt; });
+
+    nextShot -= dt;
+    if (nextShot <= 0) {
+      const free = shooters.find(function (s) { return s.life >= s.dur; }) || shooters[0];
+      fireShooter(free);
+      nextShot = 4 + Math.random() * 7;
+    }
+    shooters.forEach(function (s) {
+      if (s.life >= s.dur) { s.mat.opacity = 0; return; }
+      s.life += dt;
+      const p = s.life / s.dur;
+      const hx = s.x + s.dx * s.life, hy = s.y + s.dy * s.life;
+      const a = s.line.geometry.attributes.position.array;
+      a[0] = hx - s.dx * 0.09; a[1] = hy - s.dy * 0.09; a[2] = s.z;
+      a[3] = hx; a[4] = hy; a[5] = s.z;
+      s.line.geometry.attributes.position.needsUpdate = true;
+      s.mat.opacity = p < 0.15 ? p / 0.15 * 0.9 : 0.9 * (1 - (p - 0.15) / 0.85);
+    });
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // initialize for life — sync to whatever pan/zoom is when first called
+  shooters.forEach(function (s) { s.life = s.dur; });
+  tick();
+
+  window.PFLX_GL_ACTIVE = true;
+  document.body.classList.add('gl-active');
+  return { sync: sync };
+})();
+
 // ==================== STARFIELD ====================
 const starfield = document.getElementById('starfield');
-for (let i = 0; i < 120; i++) {
-  const s = document.createElement('div');
-  s.className = 'star';
-  s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;width:${Math.random()*2+0.5}px;height:${Math.random()*2+0.5}px;--dur:${Math.random()*3+2}s;--max-op:${Math.random()*0.6+0.3};animation-delay:${Math.random()*3}s;`;
-  starfield.appendChild(s);
+if (!window.PFLX_GL_ACTIVE) {
+  for (let i = 0; i < 120; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;width:${Math.random()*2+0.5}px;height:${Math.random()*2+0.5}px;--dur:${Math.random()*3+2}s;--max-op:${Math.random()*0.6+0.3};animation-delay:${Math.random()*3}s;`;
+    starfield.appendChild(s);
+  }
 }
 
 // ==================== HUD BARS (JS-driven animation) ====================
@@ -3417,6 +3701,8 @@ setInterval(() => {
 }, 700);
 
 // ==================== FLOATING PARTICLES (dramatic, JS-driven) ====================
+// Legacy DOM systems below are skipped entirely when the WebGL space layer is live.
+if (!window.PFLX_GL_ACTIVE) {
 const particleLayer = document.getElementById('particleLayer');
 const particles = [];
 const PARTICLE_COLORS = [
@@ -3585,6 +3871,7 @@ function animateGalaxies() {
   requestAnimationFrame(animateGalaxies);
 }
 animateGalaxies();
+} // end legacy DOM background gate (!PFLX_GL_ACTIVE)
 
 // ==================== CANVAS STATE ====================
 const canvas = document.getElementById('nodeCanvas');
@@ -3669,6 +3956,9 @@ function applyTransform() {
     if (mid) mid.style.transform = `translate3d(${panX * 0.3}px, ${panY * 0.3}px, -150px) scale(${0.8 + zoom * 0.2})`;
     if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
   }
+
+  // Open Space GL camera follows the map camera (dolly on zoom, true parallax)
+  if (window.pflxSpace) window.pflxSpace.sync(panX, panY, zoom);
 }
 
 // Center on nodes initially
@@ -3697,25 +3987,101 @@ function centerView() {
   applyTransform();
 }
 
-// ==================== PAN ====================
+// ==================== PAN (with momentum + soft elastic bounds) ====================
 let isPanning = false, panStartX, panStartY;
+let panVelX = 0, panVelY = 0, panLastX = 0, panLastY = 0, panLastT = 0;
+let momentumRAF = null;
+
+function pflxPanBounds() {
+  // Keep the node cluster reachable: the cluster centre may drift at most
+  // BOUND_PAD px (layer space) past the viewport centre in any direction.
+  if (typeof nodeElements === 'undefined') return null;
+  const rendered = Object.values(nodeElements);
+  if (!rendered.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  rendered.forEach(ne => {
+    const px = parseFloat(ne.el.style.left), py = parseFloat(ne.el.style.top);
+    if (px < minX) minX = px; if (py < minY) minY = py;
+    if (px > maxX) maxX = px; if (py > maxY) maxY = py;
+  });
+  const pad = 480;
+  let loX = window.innerWidth / 2 - (maxX + pad) * zoom;
+  let hiX = window.innerWidth / 2 - (minX - pad) * zoom;
+  let loY = window.innerHeight / 2 - (maxY + pad) * zoom;
+  let hiY = window.innerHeight / 2 - (minY - pad) * zoom;
+  if (loX > hiX) { const m = (loX + hiX) / 2; loX = hiX = m; }
+  if (loY > hiY) { const m = (loY + hiY) / 2; loY = hiY = m; }
+  return { loX, hiX, loY, hiY };
+}
+
+function pflxStopMomentum() {
+  if (momentumRAF) { cancelAnimationFrame(momentumRAF); momentumRAF = null; }
+}
+
+function pflxStartMomentum() {
+  pflxStopMomentum();
+  let prev = performance.now();
+  function step(now) {
+    const dt = Math.min(3, (now - prev) / 16.7) || 1;
+    prev = now;
+    const friction = Math.pow(0.93, dt);
+    panVelX *= friction; panVelY *= friction;
+    panX += panVelX * dt;
+    panY += panVelY * dt;
+
+    // elastic pull-back if the camera drifted past the cluster bounds
+    let springing = false;
+    const b = pflxPanBounds();
+    if (b) {
+      if (panX < b.loX)      { panX += (b.loX - panX) * 0.14 * dt; panVelX *= 0.7; springing = springing || (b.loX - panX) > 0.5; }
+      else if (panX > b.hiX) { panX += (b.hiX - panX) * 0.14 * dt; panVelX *= 0.7; springing = springing || (panX - b.hiX) > 0.5; }
+      if (panY < b.loY)      { panY += (b.loY - panY) * 0.14 * dt; panVelY *= 0.7; springing = springing || (b.loY - panY) > 0.5; }
+      else if (panY > b.hiY) { panY += (b.hiY - panY) * 0.14 * dt; panVelY *= 0.7; springing = springing || (panY - b.hiY) > 0.5; }
+    }
+
+    applyTransform();
+    if (Math.abs(panVelX) > 0.04 || Math.abs(panVelY) > 0.04 || springing) {
+      momentumRAF = requestAnimationFrame(step);
+    } else {
+      momentumRAF = null;
+    }
+  }
+  momentumRAF = requestAnimationFrame(step);
+}
+
 canvas.addEventListener('mousedown', e => {
   if (e.target.closest('.skill-node')) return;
+  pflxStopMomentum();
   isPanning = true;
   panStartX = e.clientX - panX;
   panStartY = e.clientY - panY;
+  panVelX = 0; panVelY = 0;
+  panLastX = e.clientX; panLastY = e.clientY; panLastT = performance.now();
   canvas.classList.add('dragging-canvas');
 });
 window.addEventListener('mousemove', e => {
   if (isPanning) {
     panX = e.clientX - panStartX;
     panY = e.clientY - panStartY;
+    // exponential moving average of pointer velocity (px per ~frame)
+    const now = performance.now();
+    const dt = Math.max(1, now - panLastT);
+    const fvx = (e.clientX - panLastX) / dt * 16.7;
+    const fvy = (e.clientY - panLastY) / dt * 16.7;
+    panVelX = panVelX * 0.75 + fvx * 0.25;
+    panVelY = panVelY * 0.75 + fvy * 0.25;
+    panLastX = e.clientX; panLastY = e.clientY; panLastT = now;
     applyTransform();
   }
 });
 window.addEventListener('mouseup', () => {
-  isPanning = false;
-  canvas.classList.remove('dragging-canvas');
+  if (isPanning) {
+    isPanning = false;
+    canvas.classList.remove('dragging-canvas');
+    // release: glide with momentum (or just spring back inside bounds)
+    if (performance.now() - panLastT > 90) { panVelX = 0; panVelY = 0; }
+    pflxStartMomentum();
+  }
 });
 
 // ==================== ZOOM ====================
@@ -6795,7 +7161,9 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
   // Display settings
   document.getElementById('showConnectors').checked = document.getElementById('connectorSvg').style.display !== 'none';
   document.getElementById('showLabels').checked = !document.body.classList.contains('hide-labels');
-  document.getElementById('showStarfield').checked = document.getElementById('starfield').style.display !== 'none';
+  document.getElementById('showStarfield').checked = window.PFLX_GL_ACTIVE
+    ? document.getElementById('spaceGL').style.display !== 'none'
+    : document.getElementById('starfield').style.display !== 'none';
   settingsOverlay.classList.add('show');
 });
 
@@ -6829,6 +7197,7 @@ document.getElementById('settingsSave').addEventListener('click', () => {
   document.getElementById('starfield').style.display = sfShow;
   document.getElementById('particleLayer').style.display = sfShow;
   document.getElementById('pulseRingLayer').style.display = sfShow;
+  document.getElementById('spaceGL').style.display = sfShow;
 
   // Persist
   localStorage.setItem('pflx_pathway_settings', JSON.stringify({
@@ -6852,6 +7221,7 @@ document.getElementById('settingsSave').addEventListener('click', () => {
     document.getElementById('starfield').style.display = 'none';
     document.getElementById('particleLayer').style.display = 'none';
     document.getElementById('pulseRingLayer').style.display = 'none';
+    document.getElementById('spaceGL').style.display = 'none';
   }
 })();
 
@@ -8869,6 +9239,134 @@ document.addEventListener('keydown', function(e) {
     }
   }
 });
+
+// ════════════════════════════════════════════════════════════════════
+// OPEN SPACE PREVIEW STATION (Phase 1 — visible only with ?openspace=1)
+// A single placeholder station demonstrating the new node visual
+// language: structure silhouette, rotating habitat ring, dock lights,
+// Eve-style targeting brackets + monospace data card on hover.
+// Not wired to any real node data. Remove flag gate when Phase 2 lands.
+// ════════════════════════════════════════════════════════════════════
+if (new URLSearchParams(location.search).has('openspace')) (function () {
+  const css = document.createElement('style');
+  css.textContent = `
+    .os-station {
+      position: absolute; width: 150px; height: 150px;
+      transform: translate(-50%, -50%); cursor: pointer; z-index: 30;
+    }
+    .os-station svg { width: 100%; height: 100%; overflow: visible; display: block; }
+    .os-hull { fill: rgba(7,14,26,0.94); stroke: rgba(0,212,255,0.85); stroke-width: 1.4; }
+    .os-panel { fill: none; stroke: rgba(0,212,255,0.35); stroke-width: 0.8; }
+    .os-core {
+      fill: rgba(0,212,255,0.95);
+      filter: drop-shadow(0 0 6px rgba(0,212,255,0.9));
+      animation: osCorePulse 2.6s ease-in-out infinite;
+    }
+    @keyframes osCorePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+    .os-ring-wrap {
+      position: absolute; inset: 0;
+      animation: osRingSpin 26s linear infinite;
+    }
+    @keyframes osRingSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+    .os-dock {
+      position: absolute; width: 4px; height: 4px; border-radius: 50%;
+      background: rgba(0,212,255,0.9); box-shadow: 0 0 6px rgba(0,212,255,0.9);
+      animation: osDockBlink 1.8s ease-in-out infinite;
+    }
+    @keyframes osDockBlink { 0%,100% { opacity: 1; } 50% { opacity: 0.15; } }
+    .os-brackets { position: absolute; inset: -8px; opacity: 0; transition: opacity 0.18s, inset 0.22s cubic-bezier(0.22,1,0.36,1); pointer-events: none; }
+    .os-station:hover .os-brackets { opacity: 1; inset: -16px; }
+    .os-bracket {
+      position: absolute; width: 18px; height: 18px;
+      border: 1px solid rgba(0,212,255,0.95);
+      filter: drop-shadow(0 0 4px rgba(0,212,255,0.6));
+    }
+    .os-bracket.tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+    .os-bracket.tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+    .os-bracket.bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+    .os-bracket.br { bottom: 0; right: 0; border-left: none; border-top: none; }
+    .os-label {
+      position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+      font-family: 'Rajdhani', monospace; font-size: 11px; font-weight: 600;
+      letter-spacing: 3px; color: rgba(0,212,255,0.85); white-space: nowrap;
+      text-shadow: 0 0 8px rgba(0,212,255,0.5);
+    }
+    .os-datacard {
+      position: absolute; left: calc(100% + 26px); top: 50%; transform: translateY(-50%) translateX(-6px);
+      min-width: 215px; padding: 10px 14px 9px;
+      background: rgba(4,10,20,0.92);
+      border: 1px solid rgba(0,212,255,0.55);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 10.5px; line-height: 1.75; color: rgba(190,230,250,0.92);
+      letter-spacing: 0.8px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.16s, transform 0.22s cubic-bezier(0.22,1,0.36,1);
+    }
+    .os-station:hover .os-datacard { opacity: 1; transform: translateY(-50%) translateX(0); }
+    .os-datacard .os-dc-title {
+      color: #00d4ff; font-weight: 700; letter-spacing: 2px; font-size: 11px;
+      border-bottom: 1px solid rgba(0,212,255,0.3); padding-bottom: 4px; margin-bottom: 5px;
+    }
+    .os-datacard .os-dc-row { display: flex; justify-content: space-between; gap: 18px; }
+    .os-datacard .os-dc-k { color: rgba(0,212,255,0.6); }
+    .os-datacard .os-dc-v.ok { color: #4ade80; }
+    .os-datacard .os-dc-foot {
+      margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,212,255,0.3);
+      color: rgba(0,212,255,0.7); font-size: 9.5px; letter-spacing: 2px;
+      animation: osDockBlink 2.2s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(css);
+
+  const st = document.createElement('div');
+  st.className = 'os-station';
+  st.style.left = '1000px';
+  st.style.top = '330px';
+  st.innerHTML = `
+    <div class="os-ring-wrap">
+      <svg viewBox="0 0 150 150">
+        <ellipse cx="75" cy="75" rx="70" ry="70" fill="none" stroke="rgba(0,212,255,0.22)" stroke-width="1" stroke-dasharray="3 9"/>
+        <circle cx="75" cy="5" r="2.4" fill="rgba(0,212,255,0.9)"/>
+        <circle cx="75" cy="145" r="2.4" fill="rgba(139,92,246,0.8)"/>
+      </svg>
+    </div>
+    <svg viewBox="0 0 150 150">
+      <line x1="75" y1="26" x2="75" y2="8" stroke="rgba(0,212,255,0.7)" stroke-width="1.2"/>
+      <circle cx="75" cy="7" r="1.8" fill="#00d4ff"/>
+      <polygon class="os-hull" points="75,28 110,48 110,92 75,112 40,92 40,48"/>
+      <polygon class="os-panel" points="75,40 100,54 100,84 75,98 50,84 50,54"/>
+      <line class="os-panel" x1="40" y1="48" x2="50" y2="54"/>
+      <line class="os-panel" x1="110" y1="48" x2="100" y2="54"/>
+      <line class="os-panel" x1="40" y1="92" x2="50" y2="84"/>
+      <line class="os-panel" x1="110" y1="92" x2="100" y2="84"/>
+      <rect x="20" y="62" width="16" height="16" rx="1" fill="rgba(7,14,26,0.94)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+      <rect x="114" y="62" width="16" height="16" rx="1" fill="rgba(7,14,26,0.94)" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+      <line x1="36" y1="70" x2="40" y2="70" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+      <line x1="110" y1="70" x2="114" y2="70" stroke="rgba(0,212,255,0.5)" stroke-width="1"/>
+      <circle class="os-core" cx="75" cy="70" r="7"/>
+      <circle cx="75" cy="70" r="12" fill="none" stroke="rgba(0,212,255,0.4)" stroke-width="0.8"/>
+    </svg>
+    <div class="os-dock" style="top:17%;left:50%;"></div>
+    <div class="os-dock" style="top:73%;left:27%;animation-delay:0.6s;"></div>
+    <div class="os-dock" style="top:73%;left:72%;animation-delay:1.2s;"></div>
+    <div class="os-brackets">
+      <div class="os-bracket tl"></div><div class="os-bracket tr"></div>
+      <div class="os-bracket bl"></div><div class="os-bracket br"></div>
+    </div>
+    <div class="os-label">HELIOS RELAY</div>
+    <div class="os-datacard">
+      <div class="os-dc-title">⌖ HELIOS RELAY</div>
+      <div class="os-dc-row"><span class="os-dc-k">TYPE</span><span class="os-dc-v">COURSE MODULE</span></div>
+      <div class="os-dc-row"><span class="os-dc-k">TIER</span><span class="os-dc-v">NOVICE → PRO</span></div>
+      <div class="os-dc-row"><span class="os-dc-k">RWD</span><span class="os-dc-v">200 XC</span></div>
+      <div class="os-dc-row"><span class="os-dc-k">REQ</span><span class="os-dc-v">NONE</span></div>
+      <div class="os-dc-row"><span class="os-dc-k">STS</span><span class="os-dc-v ok">ONLINE</span></div>
+      <div class="os-dc-foot">▸ PREVIEW — PHASE 1 PLACEHOLDER</div>
+    </div>
+  `;
+  nodeLayer.appendChild(st);
+})();
 
 </script>
 <!-- Ship Mode Toggle -->
