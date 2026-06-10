@@ -3830,6 +3830,214 @@ window.pflxSpace = (function () {
     orbital.visible = (mode === 'cockpit' || mode === 'chase');
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // ENDLESS SPACE — deterministic procedural chunks
+  // As the camera travels, 2600px (layer-space) chunks spawn around it:
+  // distant planets / galaxies / nebulae as dressing, plus map-plane
+  // objects (asteroid clusters, black holes, derelict cargo) that are
+  // registered in window.pflxSpaceObjects for ship interaction.
+  // Chunks despawn + dispose when left behind. Same seed → same space.
+  // ═══════════════════════════════════════════════════════════════════
+  const CHUNK = 2600;
+  const L2G = 1.15;
+  const chunks = {};
+  window.pflxSpaceObjects = [];
+
+  function chunkRand(cx, cy) {
+    let h = (((cx * 73856093) ^ (cy * 19349663) ^ 0x9e3779b9) >>> 0) || 1;
+    return function () {
+      h ^= h << 13; h >>>= 0; h ^= h >> 17; h ^= h << 5; h >>>= 0;
+      return (h % 100000) / 100000;
+    };
+  }
+  function toGL(lx, ly) { return { x: (lx - 1000) * L2G, y: -(ly - 1000) * L2G }; }
+
+  function rockGeometry(r, rnd) {
+    const geo = new THREE.IcosahedronGeometry(r, 1);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const f = 0.72 + rnd() * 0.56;
+      pos.setXYZ(i, pos.getX(i) * f, pos.getY(i) * f, pos.getZ(i) * f);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
+  const ROCK_MATS = [
+    new THREE.MeshLambertMaterial({ color: 0x6b6157 }),
+    new THREE.MeshLambertMaterial({ color: 0x4d575f }),
+    new THREE.MeshLambertMaterial({ color: 0x5d4f45 }),
+  ];
+  function accretionTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.translate(128, 128);
+    for (let i = 0; i < 90; i++) {
+      const a0 = Math.random() * 6.283, rr = 26 + Math.random() * 86, len = 0.5 + Math.random() * 1.6;
+      x.strokeStyle = 'rgba(255,' + ((170 + Math.random() * 60) | 0) + ',' + ((90 + Math.random() * 60) | 0) + ',' + (0.05 + Math.random() * 0.16).toFixed(2) + ')';
+      x.lineWidth = 1 + Math.random() * 3;
+      x.beginPath(); x.arc(0, 0, rr, a0, a0 + len); x.stroke();
+    }
+    const g = x.createRadialGradient(0, 0, 16, 0, 0, 46);
+    g.addColorStop(0, 'rgba(255,245,230,0.9)');
+    g.addColorStop(0.5, 'rgba(255,170,80,0.5)');
+    g.addColorStop(1, 'rgba(255,120,40,0)');
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, 46, 0, 7); x.fill();
+    return new THREE.CanvasTexture(c);
+  }
+  const ACC_TEX = accretionTexture();
+  const FAR_PALS = [
+    ['#0a2c52', '#0e4a78', 'rgba(40,90,70,0.95)', 'rgba(120,110,70,0.9)'],
+    ['#3a1c10', '#5a2c18', 'rgba(200,120,60,0.9)', 'rgba(150,90,50,0.9)'],
+    ['#241048', '#3a2068', 'rgba(150,110,220,0.9)', 'rgba(110,70,180,0.9)'],
+    ['#0e3a30', '#16584a', 'rgba(90,180,150,0.9)', 'rgba(60,130,110,0.9)'],
+    ['#3c3340', '#544a58', 'rgba(140,130,150,0.9)', 'rgba(100,95,110,0.9)'],
+  ];
+
+  function spawnChunk(ccx, ccy) {
+    const key = ccx + ',' + ccy;
+    if (chunks[key]) return;
+    const rnd = chunkRand(ccx, ccy);
+    const group = new THREE.Group();
+    const rec = { group: group, dispose: [], spinners: [], objects: [] };
+    const baseLX = ccx * CHUNK, baseLY = ccy * CHUNK;
+
+    // skip gameplay objects near the node cluster (keep the map readable)
+    let allowGameplay = true;
+    if (typeof window.pflxNodeBounds === 'function') {
+      const nb = window.pflxNodeBounds();
+      if (nb && baseLX < nb.maxX && baseLX + CHUNK > nb.minX && baseLY < nb.maxY && baseLY + CHUNK > nb.minY) {
+        allowGameplay = false;
+      }
+    }
+    // never spawn gameplay in the home chunk region either
+    if (ccx === 0 && ccy === 0) allowGameplay = false;
+
+    // ---- distant dressing ----
+    if (rnd() < 0.38) {  // far planet
+      const r = 140 + rnd() * 320;
+      const pal = FAR_PALS[(rnd() * FAR_PALS.length) | 0];
+      const tex = planetTexture(pal[0], pal[1], pal[2], pal[3]);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20), new THREE.MeshLambertMaterial({ map: tex }));
+      const p = toGL(baseLX + rnd() * CHUNK, baseLY + rnd() * CHUNK);
+      m.position.set(p.x * 1.7, p.y * 1.7, -3200 - rnd() * 2600);
+      group.add(m); rec.dispose.push(m.geometry, m.material, tex);
+      rec.spinners.push({ m: m, rs: 0.002 + rnd() * 0.005 });
+    }
+    if (rnd() < 0.3) {   // extra nebula
+      const pal = NEB_PALETTE[(rnd() * NEB_PALETTE.length) | 0];
+      const tex = nebulaTexture(pal[0], pal[1]);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.2 + rnd() * 0.14, rotation: rnd() * 6.28 });
+      const s = new THREE.Sprite(mat);
+      const sc = 1800 + rnd() * 2200;
+      s.scale.set(sc, sc, 1);
+      const p = toGL(baseLX + rnd() * CHUNK, baseLY + rnd() * CHUNK);
+      s.position.set(p.x * 1.9, p.y * 1.9, -4200 - rnd() * 2000);
+      group.add(s); rec.dispose.push(mat, tex);
+    }
+    if (rnd() < 0.14) {  // distant galaxy spiral
+      const pal = NEB_PALETTE[(rnd() * NEB_PALETTE.length) | 0];
+      const tex = spiralTexture('255,235,200', pal[0]);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.45, rotation: rnd() * 6.28 });
+      const s = new THREE.Sprite(mat);
+      const sc = 900 + rnd() * 900;
+      s.scale.set(sc, sc * 0.62, 1);
+      const p = toGL(baseLX + rnd() * CHUNK, baseLY + rnd() * CHUNK);
+      s.position.set(p.x * 2.2, p.y * 2.2, -5400 - rnd() * 1400);
+      group.add(s); rec.dispose.push(mat, tex);
+      rec.spinners.push({ sprite: mat, rs: 0.004 + rnd() * 0.008 });
+    }
+
+    // ---- map-plane gameplay objects ----
+    if (allowGameplay) {
+      const roll = rnd();
+      if (roll < 0.45) {
+        // asteroid cluster
+        const clx = baseLX + 400 + rnd() * (CHUNK - 800);
+        const cly = baseLY + 400 + rnd() * (CHUNK - 800);
+        const rocksGroup = new THREE.Group();
+        const count = 5 + ((rnd() * 5) | 0);
+        for (let i = 0; i < count; i++) {
+          const rr = (14 + rnd() * 22) * L2G;
+          const geo = rockGeometry(rr, rnd);
+          const m = new THREE.Mesh(geo, ROCK_MATS[(rnd() * 3) | 0]);
+          const ang = rnd() * 6.283, rad = rnd() * 240;
+          const p = toGL(clx + Math.cos(ang) * rad, cly + Math.sin(ang) * rad);
+          m.position.set(p.x, p.y, -140 - rnd() * 80);
+          m.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+          m.userData.spin = 0.05 + rnd() * 0.2;
+          rocksGroup.add(m); rec.dispose.push(geo);
+        }
+        group.add(rocksGroup);
+        const obj = { type: 'asteroids', x: clx, y: cly, r: 300, chunkKey: key, gl: rocksGroup, depleted: false };
+        rec.objects.push(obj); window.pflxSpaceObjects.push(obj);
+      } else if (roll < 0.55) {
+        // black hole
+        const blx = baseLX + 600 + rnd() * (CHUNK - 1200);
+        const bly = baseLY + 600 + rnd() * (CHUNK - 1200);
+        const p = toGL(blx, bly);
+        const bhGroup = new THREE.Group();
+        const coreGeo = new THREE.CircleGeometry(44 * L2G, 32);
+        const core = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0x000000 }));
+        bhGroup.add(core); rec.dispose.push(coreGeo);
+        const diskMat = new THREE.SpriteMaterial({ map: ACC_TEX, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.95 });
+        const disk = new THREE.Sprite(diskMat);
+        disk.scale.set(300 * L2G, 300 * L2G, 1);
+        bhGroup.add(disk); rec.dispose.push(diskMat);
+        const ring = haloSprite('170,210,255', 0.3, 0.55);
+        ring.scale.set(130 * L2G, 130 * L2G, 1);
+        bhGroup.add(ring); rec.dispose.push(ring.material);
+        bhGroup.position.set(p.x, p.y, -150);
+        group.add(bhGroup);
+        const obj = { type: 'blackhole', x: blx, y: bly, r: 460, chunkKey: key, gl: bhGroup, disk: diskMat };
+        rec.objects.push(obj); window.pflxSpaceObjects.push(obj);
+      } else if (roll < 0.63) {
+        // derelict cargo pod
+        const dlx = baseLX + 400 + rnd() * (CHUNK - 800);
+        const dly = baseLY + 400 + rnd() * (CHUNK - 800);
+        const p = toGL(dlx, dly);
+        const podGroup = new THREE.Group();
+        const podGeo = new THREE.BoxGeometry(26, 14, 12);
+        const pod = new THREE.Mesh(podGeo, new THREE.MeshLambertMaterial({ color: 0x46505c }));
+        podGroup.add(pod); rec.dispose.push(podGeo);
+        const beacon = haloSprite('255,180,60', 0.0, 0.9);
+        beacon.scale.set(46, 46, 1);
+        beacon.position.set(0, 14, 2);
+        podGroup.add(beacon); rec.dispose.push(beacon.material);
+        podGroup.position.set(p.x, p.y, -130);
+        podGroup.userData.phase = rnd() * 6.28;
+        group.add(podGroup);
+        const obj = { type: 'derelict', x: dlx, y: dly, r: 130, chunkKey: key, gl: podGroup, beacon: beacon.material };
+        rec.objects.push(obj); window.pflxSpaceObjects.push(obj);
+      }
+    }
+
+    scene.add(group);
+    chunks[key] = rec;
+  }
+
+  function despawnChunk(key) {
+    const rec = chunks[key];
+    if (!rec) return;
+    scene.remove(rec.group);
+    rec.dispose.forEach(function (d) { if (d && d.dispose) d.dispose(); });
+    window.pflxSpaceObjects = window.pflxSpaceObjects.filter(function (o) { return o.chunkKey !== key; });
+    delete chunks[key];
+  }
+
+  let lastChunkX = null, lastChunkY = null;
+  function ensureChunks(lcx, lcy) {
+    const ccx = Math.floor(lcx / CHUNK), ccy = Math.floor(lcy / CHUNK);
+    if (ccx === lastChunkX && ccy === lastChunkY) return;
+    lastChunkX = ccx; lastChunkY = ccy;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) spawnChunk(ccx + dx, ccy + dy);
+    }
+    Object.keys(chunks).forEach(function (key) {
+      const parts = key.split(',');
+      if (Math.abs(parts[0] - ccx) > 3 || Math.abs(parts[1] - ccy) > 3) despawnChunk(key);
+    });
+  }
+
   // ---- nebulae + galaxy spirals -------------------------------------------
   const NEB_PALETTE = [
     ['0,180,255', '80,0,200'], ['139,92,246', '255,0,200'],
@@ -3898,6 +4106,7 @@ window.pflxSpace = (function () {
     target.x = (cx - 1000) * 1.15;
     target.y = -(cy - 1000) * 1.15;
     target.z = Math.max(900, Math.min(5200, 2300 / zoom));
+    ensureChunks(cx, cy);   // endless space follows the camera
   }
   camera.position.copy(target);
 
@@ -3943,6 +4152,24 @@ window.pflxSpace = (function () {
       n.s.material.opacity = n.baseOp * (0.94 + Math.sin(t * 0.08 + n.ph) * 0.06);
     });
     spirals.forEach(function (g) { g.s.material.rotation += g.rs * dt; });
+
+    // endless-space chunk animation: rock tumble, accretion spin, beacon blink
+    for (const key in chunks) {
+      const rec = chunks[key];
+      rec.spinners.forEach(function (sp) {
+        if (sp.m) sp.m.rotation.y += sp.rs * dt;
+        if (sp.sprite) sp.sprite.rotation += sp.rs * dt;
+      });
+      rec.objects.forEach(function (o) {
+        if (o.type === 'asteroids' && o.gl) {
+          o.gl.children.forEach(function (rock) { rock.rotation.y += rock.userData.spin * dt; rock.rotation.x += rock.userData.spin * 0.6 * dt; });
+        } else if (o.type === 'blackhole' && o.disk) {
+          o.disk.rotation += 1.4 * dt;
+        } else if (o.type === 'derelict' && o.beacon) {
+          o.beacon.opacity = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 3 + o.gl.userData.phase));
+        }
+      });
+    }
 
     nextShot -= dt;
     if (nextShot <= 0) {
@@ -4315,7 +4542,7 @@ function pflxPanBounds() {
     if (px < minX) minX = px; if (py < minY) minY = py;
     if (px > maxX) maxX = px; if (py > maxY) maxY = py;
   });
-  const pad = 480;
+  const pad = 2600;   // roomy — space should feel endless, Fit recovers you
   let loX = window.innerWidth / 2 - (maxX + pad) * zoom;
   let hiX = window.innerWidth / 2 - (minX - pad) * zoom;
   let loY = window.innerHeight / 2 - (maxY + pad) * zoom;
@@ -4798,6 +5025,20 @@ function drawConnectors() {
 
   pflxDecrowdStations();
 }
+
+// Node-cluster bounding box (layer px) — the GL chunk engine uses this to
+// keep gameplay hazards out of the authored map area.
+window.pflxNodeBounds = function () {
+  const list = Object.values(nodeElements || {});
+  if (!list.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  list.forEach(ne => {
+    const x = parseFloat(ne.el.style.left), y = parseFloat(ne.el.style.top);
+    if (x < minX) minX = x; if (y < minY) minY = y;
+    if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+  });
+  return { minX: minX - 500, minY: minY - 500, maxX: maxX + 500, maxY: maxY + 500 };
+};
 
 // ─── DE-CROWD: scale each station structure by distance to its nearest
 // neighbor so structures never overlap adjacent nodes/labels ───
@@ -9448,9 +9689,9 @@ function pflxKeyLoop() {
   pflxShip.x += pflxShipVx;
   pflxShip.y += pflxShipVy;
 
-  // Clamp to map bounds
-  pflxShip.x = Math.max(0, Math.min(MAP_W, pflxShip.x));
-  pflxShip.y = Math.max(0, Math.min(MAP_H, pflxShip.y));
+  // Space is endless — only a sanity clamp far beyond the authored map
+  pflxShip.x = Math.max(-40000, Math.min(40000, pflxShip.x));
+  pflxShip.y = Math.max(-40000, Math.min(40000, pflxShip.y));
 
   // Update ship rotation to face movement direction
   if (pflxShipSpeed > 0.5) {
