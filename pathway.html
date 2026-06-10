@@ -3432,7 +3432,10 @@ window.pflxSpace = (function () {
   renderer.setClearColor(0x020408, 1);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x020408, 0.00016);
+  // Near-zero fog: visible fog density made the whole field shift brightness
+  // as the camera dollied (read as flashing). Depth cueing now comes from
+  // per-band brightness instead.
+  scene.fog = new THREE.FogExp2(0x020408, 0.00003);
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 16000);
 
   // ---- procedural textures ------------------------------------------------
@@ -3525,10 +3528,149 @@ window.pflxSpace = (function () {
     scene.add(pts);
     return pts;
   }
-  const farA  = starCloud(SMALL ? 900 : 1700, -5200, -2600, 16, 0.85);
-  const farB  = starCloud(SMALL ? 700 : 1300, -5200, -2600, 13, 0.7);   // counter-twinkle band
-  const mid   = starCloud(SMALL ? 500 : 950,  -2200, -700, 10, 0.9);
-  const dust  = starCloud(SMALL ? 160 : 320,  -350, 500, 7, 0.55);      // near-field dust, fastest parallax
+  // Static layer opacities — NO whole-layer pulsing (that's what flashed).
+  const farA  = starCloud(SMALL ? 900 : 1700, -5200, -2600, 16, 0.8);
+  const farB  = starCloud(SMALL ? 700 : 1300, -5200, -2600, 13, 0.65);
+  const mid   = starCloud(SMALL ? 500 : 950,  -2200, -700, 10, 0.85);
+  const dust  = starCloud(SMALL ? 160 : 300,  -650, -120, 6, 0.5);      // near-field dust, fastest parallax
+
+  // ---- per-star twinkle (shader; each star has its own phase — the field
+  // itself never pulses) -----------------------------------------------------
+  const SPARK_N = SMALL ? 120 : 260;
+  const sparkPos = new Float32Array(SPARK_N * 3);
+  const sparkPhase = new Float32Array(SPARK_N);
+  const sparkSize = new Float32Array(SPARK_N);
+  for (let i = 0; i < SPARK_N; i++) {
+    sparkPos[i * 3]     = (Math.random() - 0.5) * 11000;
+    sparkPos[i * 3 + 1] = (Math.random() - 0.5) * 8000;
+    sparkPos[i * 3 + 2] = -4800 + Math.random() * 3800;
+    sparkPhase[i] = Math.random();
+    sparkSize[i]  = 18 + Math.random() * 26;
+  }
+  const sparkGeo = new THREE.BufferGeometry();
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+  sparkGeo.setAttribute('phase', new THREE.BufferAttribute(sparkPhase, 1));
+  sparkGeo.setAttribute('psize', new THREE.BufferAttribute(sparkSize, 1));
+  const sparkMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uTex: { value: SPRITE } },
+    vertexShader:
+      'attribute float phase; attribute float psize;\n' +
+      'uniform float uTime; varying float vA;\n' +
+      'void main(){\n' +
+      '  vA = 0.25 + 0.75 * (0.5 + 0.5 * sin(uTime * (0.7 + phase * 1.6) + phase * 6.2831));\n' +
+      '  vec4 mv = modelViewMatrix * vec4(position, 1.0);\n' +
+      '  gl_PointSize = psize * (1400.0 / -mv.z);\n' +
+      '  gl_Position = projectionMatrix * mv;\n' +
+      '}',
+    fragmentShader:
+      'uniform sampler2D uTex; varying float vA;\n' +
+      'void main(){\n' +
+      '  vec4 c = texture2D(uTex, gl_PointCoord);\n' +
+      '  gl_FragColor = vec4(0.85, 0.95, 1.0, c.a * vA);\n' +
+      '}',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const sparkles = new THREE.Points(sparkGeo, sparkMat);
+  scene.add(sparkles);
+
+  // ---- planets, moons, sun glow ---------------------------------------------
+  function planetTexture(ocean1, ocean2, land1, land2) {
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+    const x = c.getContext('2d');
+    const og = x.createLinearGradient(0, 0, 0, 512);
+    og.addColorStop(0, ocean1); og.addColorStop(0.5, ocean2); og.addColorStop(1, ocean1);
+    x.fillStyle = og; x.fillRect(0, 0, 1024, 512);
+    // continents: random-walk blob clusters
+    for (let k = 0; k < 7; k++) {
+      let px = Math.random() * 1024, py = 80 + Math.random() * 350;
+      x.fillStyle = Math.random() < 0.5 ? land1 : land2;
+      for (let i = 0; i < 46; i++) {
+        const r = 9 + Math.random() * 30;
+        x.globalAlpha = 0.5 + Math.random() * 0.4;
+        x.beginPath(); x.arc(px, py, r, 0, 7); x.fill();
+        px += (Math.random() - 0.5) * 56; py += (Math.random() - 0.5) * 34;
+      }
+    }
+    // cloud streaks
+    x.globalAlpha = 1;
+    for (let i = 0; i < 64; i++) {
+      const cy = Math.random() * 512;
+      const cx2 = Math.random() * 1024;
+      const w = 60 + Math.random() * 200, h = 6 + Math.random() * 16;
+      const g = x.createRadialGradient(cx2, cy, 0, cx2, cy, w / 2);
+      g.addColorStop(0, 'rgba(255,255,255,' + (0.10 + Math.random() * 0.16).toFixed(2) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g;
+      x.save(); x.translate(cx2, cy); x.scale(1, h / w); x.beginPath(); x.arc(0, 0, w / 2, 0, 7); x.fill(); x.restore();
+    }
+    // polar caps
+    const cap = x.createLinearGradient(0, 0, 0, 70);
+    cap.addColorStop(0, 'rgba(235,245,255,0.85)'); cap.addColorStop(1, 'rgba(235,245,255,0)');
+    x.fillStyle = cap; x.fillRect(0, 0, 1024, 70);
+    const cap2 = x.createLinearGradient(0, 512, 0, 442);
+    cap2.addColorStop(0, 'rgba(235,245,255,0.8)'); cap2.addColorStop(1, 'rgba(235,245,255,0)');
+    x.fillStyle = cap2; x.fillRect(0, 442, 1024, 70);
+    const tex = new THREE.CanvasTexture(c);
+    return tex;
+  }
+  function haloSprite(rgb, innerStop, peakA) {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0, 'rgba(' + rgb + ',0)');
+    g.addColorStop(innerStop, 'rgba(' + rgb + ',0)');
+    g.addColorStop(Math.min(innerStop + 0.06, 0.99), 'rgba(' + rgb + ',' + peakA + ')');
+    g.addColorStop(Math.min(innerStop + 0.2, 1), 'rgba(' + rgb + ',' + (peakA * 0.25).toFixed(2) + ')');
+    g.addColorStop(1, 'rgba(' + rgb + ',0)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    const m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    return new THREE.Sprite(m);
+  }
+  // ambient + key light for the planet spheres
+  scene.add(new THREE.AmbientLight(0x223344, 1.1));
+  const sunLight = new THREE.DirectionalLight(0xfff4dd, 1.25);
+  sunLight.position.set(0.6, 0.8, 0.3);
+  scene.add(sunLight);
+
+  const planets = [];
+  // big horizon planet — bottom-left, looming like the reference shots
+  const bigPlanet = new THREE.Mesh(
+    new THREE.SphereGeometry(3000, 56, 36),
+    new THREE.MeshLambertMaterial({ map: planetTexture('#0a2c52', '#0e4a78', 'rgba(40,90,70,0.95)', 'rgba(120,110,70,0.9)') })
+  );
+  bigPlanet.position.set(-4600, -4400, -7200);
+  scene.add(bigPlanet);
+  // glow ring starts just inside the limb (planet r=3000 / sprite half=3650 ≈ 0.82)
+  const bigAtmo = haloSprite('90,190,255', 0.78, 0.6);
+  bigAtmo.scale.set(7300, 7300, 1);
+  bigAtmo.position.copy(bigPlanet.position);
+  scene.add(bigAtmo);
+  planets.push({ m: bigPlanet, rs: 0.0035 });
+
+  // dusky moon — upper right
+  const moonA = new THREE.Mesh(
+    new THREE.SphereGeometry(420, 36, 24),
+    new THREE.MeshLambertMaterial({ map: planetTexture('#2a2530', '#3a3340', 'rgba(90,80,90,0.9)', 'rgba(60,55,65,0.9)') })
+  );
+  moonA.position.set(4600, 3400, -5600);
+  scene.add(moonA);
+  planets.push({ m: moonA, rs: 0.006 });
+
+  // small teal moon — mid left
+  const moonB = new THREE.Mesh(
+    new THREE.SphereGeometry(210, 28, 20),
+    new THREE.MeshLambertMaterial({ map: planetTexture('#13384a', '#1d5a6a', 'rgba(70,140,140,0.9)', 'rgba(40,90,100,0.9)') })
+  );
+  moonB.position.set(-3800, 1900, -4300);
+  scene.add(moonB);
+  planets.push({ m: moonB, rs: 0.009 });
+
+  // distant sunrise glow over the planet horizon
+  const sunGlow = haloSprite('255,214,150', 0.0, 0.55);
+  sunGlow.scale.set(5200, 5200, 1);
+  sunGlow.position.set(900, 2600, -7900);
+  sunGlow.material.opacity = 0.5;
+  scene.add(sunGlow);
 
   // ---- nebulae + galaxy spirals -------------------------------------------
   const NEB_PALETTE = [
@@ -3615,21 +3757,20 @@ window.pflxSpace = (function () {
     // cinematic camera ease
     const k = 1 - Math.pow(0.002, dt);
     camera.position.lerp(target, k);
-    // imperceptible ambient sway so space never feels frozen
-    camera.rotation.z = Math.sin(t * 0.05) * 0.004;
 
-    // counter-phased twinkle bands
-    farA.material.opacity = 0.72 + Math.sin(t * 0.9) * 0.18;
-    farB.material.opacity = 0.62 + Math.sin(t * 1.18 + 2.4) * 0.20;
-    dust.material.opacity = 0.45 + Math.sin(t * 0.6 + 1.1) * 0.14;
+    // per-star twinkle only — layer opacities are static so the field never flashes
+    sparkMat.uniforms.uTime.value = t;
     dust.rotation.z = t * 0.0035;
     mid.rotation.z = t * 0.0014;
+
+    planets.forEach(function (p) { p.m.rotation.y += p.rs * dt; });
 
     nebulae.forEach(function (n) {
       n.s.material.rotation += n.rs * dt;
       n.s.position.x += n.vx * dt;
       n.s.position.y += n.vy * dt;
-      n.s.material.opacity = n.baseOp * (0.78 + Math.sin(t * 0.18 + n.ph) * 0.22);
+      // barely-there breathing (±6%, 40s period) — drift, not pulse
+      n.s.material.opacity = n.baseOp * (0.94 + Math.sin(t * 0.08 + n.ph) * 0.06);
     });
     spirals.forEach(function (g) { g.s.material.rotation += g.rs * dt; });
 
@@ -3637,7 +3778,7 @@ window.pflxSpace = (function () {
     if (nextShot <= 0) {
       const free = shooters.find(function (s) { return s.life >= s.dur; }) || shooters[0];
       fireShooter(free);
-      nextShot = 4 + Math.random() * 7;
+      nextShot = 6 + Math.random() * 9;
     }
     shooters.forEach(function (s) {
       if (s.life >= s.dur) { s.mat.opacity = 0; return; }
@@ -3648,7 +3789,7 @@ window.pflxSpace = (function () {
       a[0] = hx - s.dx * 0.09; a[1] = hy - s.dy * 0.09; a[2] = s.z;
       a[3] = hx; a[4] = hy; a[5] = s.z;
       s.line.geometry.attributes.position.needsUpdate = true;
-      s.mat.opacity = p < 0.15 ? p / 0.15 * 0.9 : 0.9 * (1 - (p - 0.15) / 0.85);
+      s.mat.opacity = p < 0.15 ? p / 0.15 * 0.7 : 0.7 * (1 - (p - 0.15) / 0.85);
     });
 
     renderer.render(scene, camera);
