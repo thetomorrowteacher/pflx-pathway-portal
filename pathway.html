@@ -2087,10 +2087,41 @@
     body.cam-chase .node-layer {
       transform-style: preserve-3d;
     }
-    body.cam-chase #pflxShip {
-      /* Counter-rotate ship to face camera */
-      backface-visibility: hidden;
+    /* In chase view the map-plane ship is replaced by the screen-fixed hero ship */
+    body.cam-chase #pflxShip { display: none; }
+
+    /* ── Chase hero ship — seen from behind, fixed to the screen ── */
+    #chaseShip {
+      position: fixed; left: 50%; bottom: 9%;
+      width: 380px; height: 230px;
+      transform: translateX(-50%);
+      z-index: 85; pointer-events: none; display: none;
+      --thrust: 0.6;
+      transition: transform 0.25s ease-out;
+      filter: drop-shadow(0 18px 40px rgba(0,0,0,0.65));
+      animation: chaseBob 5s ease-in-out infinite;
     }
+    body.cam-chase #chaseShip { display: block; }
+    @keyframes chaseBob {
+      0%,100% { margin-bottom: 0; } 50% { margin-bottom: 14px; }
+    }
+    #chaseShip .cs-flame {
+      transform-box: fill-box; transform-origin: 50% 0%;
+      transform: scaleY(var(--thrust));
+      animation: csFlicker 0.18s ease-in-out infinite alternate;
+    }
+    @keyframes csFlicker { from { opacity: 0.85; } to { opacity: 1; } }
+    #chaseShip .cs-glow {
+      transform-box: fill-box; transform-origin: center;
+      transform: scale(var(--thrust));
+    }
+    .chase-vignette {
+      position: fixed; inset: 0; z-index: 80; pointer-events: none; display: none;
+      background:
+        radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(2,4,8,0.55) 100%),
+        linear-gradient(180deg, rgba(2,4,8,0.35) 0%, transparent 18%, transparent 70%, rgba(2,4,8,0.5) 100%);
+    }
+    body.cam-chase .chase-vignette { display: block; }
 
     /* ── Cockpit Mode — deep 3D perspective ── */
     body.cam-cockpit {
@@ -2134,8 +2165,8 @@
       background: linear-gradient(180deg, rgba(30,50,80,0.8), rgba(15,25,45,0.6), rgba(30,50,80,0.8));
       box-shadow: 0 0 8px rgba(0,0,0,0.5);
     }
-    .canopy-strut.left { left: 28%; }
-    .canopy-strut.right { right: 28%; }
+    .canopy-strut.left { left: 24%; transform: rotate(10deg); transform-origin: bottom center; }
+    .canopy-strut.right { right: 24%; transform: rotate(-10deg); transform-origin: bottom center; }
     .canopy-strut.center { left: 50%; transform: translateX(-50%); width: 2px; opacity: 0.4; }
     /* Horizontal strut */
     .canopy-strut-h {
@@ -2145,14 +2176,59 @@
 
     /* ── Dashboard — full instrument panel ── */
     .cockpit-dash {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 220px;
+      position: absolute; bottom: 0; left: 0; right: 0; height: 230px;
       background: linear-gradient(180deg,
         transparent 0%,
-        rgba(8,14,28,0.7) 15%,
-        rgba(8,14,28,0.92) 35%,
-        rgba(6,10,20,0.98) 60%,
-        #060a14 100%);
-      border-top: 1px solid rgba(0,212,255,0.12);
+        rgba(12,26,52,0.72) 14%,
+        rgba(14,30,60,0.94) 34%,
+        rgba(10,22,46,0.98) 58%,
+        #0a1830 100%);
+      border-top: 1px solid rgba(80,170,255,0.35);
+      box-shadow: 0 -6px 30px rgba(0,90,200,0.18), inset 0 14px 40px rgba(40,120,255,0.08);
+    }
+    /* glowing console edge strip, like the lit dash in the reference */
+    .cockpit-dash::before {
+      content: ''; position: absolute; top: -3px; left: 8%; right: 8%; height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(90,190,255,0.85) 18%, rgba(90,190,255,0.85) 82%, transparent);
+      box-shadow: 0 0 14px rgba(80,180,255,0.8), 0 0 34px rgba(60,150,255,0.4);
+      border-radius: 2px;
+    }
+    /* ── Control sticks — left & right HOTAS silhouettes ── */
+    .cockpit-stick {
+      position: absolute; bottom: 6px; width: 120px; height: 150px;
+      pointer-events: none;
+    }
+    .cockpit-stick.left  { left: 14%; transform: rotate(-4deg); }
+    .cockpit-stick.right { right: 14%; transform: rotate(4deg); }
+    .cockpit-stick .stick-base {
+      position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 110px; height: 34px; border-radius: 10px 10px 4px 4px;
+      background: linear-gradient(180deg, #1c3354, #0c1c34);
+      border: 1px solid rgba(90,170,255,0.3);
+      box-shadow: inset 0 2px 6px rgba(120,200,255,0.15), 0 4px 14px rgba(0,0,0,0.5);
+    }
+    .cockpit-stick .stick-shaft {
+      position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%) ;
+      width: 18px; height: 64px; border-radius: 8px;
+      background: linear-gradient(90deg, #0a1626, #243f66 45%, #0a1626);
+      border: 1px solid rgba(90,170,255,0.25);
+    }
+    .cockpit-stick .stick-grip {
+      position: absolute; bottom: 82px; left: 50%; transform: translateX(-50%);
+      width: 44px; height: 62px; border-radius: 16px 16px 10px 10px;
+      background: linear-gradient(180deg, #2a4a78, #11243f 70%);
+      border: 1px solid rgba(110,190,255,0.4);
+      box-shadow: inset 0 3px 8px rgba(140,210,255,0.2), 0 6px 16px rgba(0,0,0,0.55);
+    }
+    .cockpit-stick .stick-grip::before {
+      content: ''; position: absolute; top: 7px; left: 50%; transform: translateX(-50%);
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ff3b30; box-shadow: 0 0 8px rgba(255,60,50,0.9);
+    }
+    .cockpit-stick .stick-grip::after {
+      content: ''; position: absolute; top: 22px; left: 7px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #34d2ff; box-shadow: 0 0 7px rgba(60,210,255,0.9), 22px 0 0 #2a7dff, 22px 0 8px rgba(60,130,255,0.8);
     }
     /* Center console ridge */
     .dash-center-console {
@@ -2165,11 +2241,14 @@
     /* ── Instrument screens ── */
     .cockpit-screen {
       position: absolute;
-      background: rgba(0,8,20,0.9);
-      border: 1px solid rgba(0,212,255,0.2);
-      border-radius: 4px;
+      background: rgba(2,12,30,0.94);
+      border: 1px solid rgba(90,180,255,0.45);
+      border-radius: 5px;
       overflow: hidden;
-      box-shadow: inset 0 0 20px rgba(0,10,30,0.8), 0 0 6px rgba(0,0,0,0.5);
+      box-shadow:
+        inset 0 0 20px rgba(0,30,70,0.8),
+        0 0 12px rgba(50,140,255,0.35),
+        0 0 32px rgba(30,100,220,0.15);
     }
     .cockpit-screen::before {
       content: ''; position: absolute; inset: 0;
@@ -3704,6 +3783,51 @@ window.pflxSpace = (function () {
   sunGlow.material.opacity = 0.5;
   scene.add(sunGlow);
 
+  // ---- orbital command map — the cockpit's window view -----------------------
+  // Glowing sun core + colored orbit rings + small planets riding them,
+  // like a star-system chart floating ahead. Visible in chase/cockpit only.
+  const orbital = new THREE.Group();
+  (function buildOrbital() {
+    const core = haloSprite('255,190,110', 0.0, 0.95);
+    core.scale.set(2400, 2400, 1);
+    orbital.add(core);
+    const ringDefs = [
+      { r: 1300, c: 'rgb(255,150,80)',  pal: ['#5a2c10', '#8a4218', 'rgba(200,120,60,0.9)', 'rgba(150,80,40,0.9)'] },
+      { r: 2100, c: 'rgb(255,95,160)',  pal: ['#4a1030', '#6a2048', 'rgba(190,90,140,0.9)', 'rgba(140,60,110,0.9)'] },
+      { r: 2900, c: 'rgb(154,107,255)', pal: ['#241048', '#3a2068', 'rgba(140,110,220,0.9)', 'rgba(100,70,180,0.9)'] },
+      { r: 3700, c: 'rgb(0,212,255)',   pal: ['#0a2c52', '#0e4a78', 'rgba(60,140,160,0.9)', 'rgba(40,100,130,0.9)'] },
+      { r: 4500, c: 'rgb(107,255,206)', pal: ['#0e3a30', '#16584a', 'rgba(80,180,150,0.9)', 'rgba(50,130,110,0.9)'] },
+    ];
+    orbital.userData.planets = [];
+    ringDefs.forEach(function (rd) {
+      const pts = [];
+      for (let a = 0; a <= 128; a++) {
+        const th = a / 128 * Math.PI * 2;
+        pts.push(new THREE.Vector3(Math.cos(th) * rd.r, Math.sin(th) * rd.r, 0));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color: new THREE.Color(rd.c), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false });
+      orbital.add(new THREE.Line(geo, mat));
+      const pr = 70 + Math.random() * 90;
+      const pm = new THREE.Mesh(
+        new THREE.SphereGeometry(pr, 20, 14),
+        new THREE.MeshLambertMaterial({ map: planetTexture(rd.pal[0], rd.pal[1], rd.pal[2], rd.pal[3]) })
+      );
+      orbital.add(pm);
+      orbital.userData.planets.push({ m: pm, r: rd.r, a: Math.random() * Math.PI * 2, w: 0.035 + Math.random() * 0.05 });
+    });
+    orbital.rotation.x = -1.05;   // tilted disc, seen from a shallow angle
+    orbital.visible = false;
+    scene.add(orbital);
+  })();
+
+  // camera pitch per view mode — chase/cockpit look toward the horizon
+  let pitchTarget = 0;
+  function setMode(mode) {
+    pitchTarget = mode === 'cockpit' ? 0.34 : mode === 'chase' ? 0.2 : 0;
+    orbital.visible = (mode === 'cockpit' || mode === 'chase');
+  }
+
   // ---- nebulae + galaxy spirals -------------------------------------------
   const NEB_PALETTE = [
     ['0,180,255', '80,0,200'], ['139,92,246', '255,0,200'],
@@ -3789,6 +3913,18 @@ window.pflxSpace = (function () {
     // cinematic camera ease
     const k = 1 - Math.pow(0.002, dt);
     camera.position.lerp(target, k);
+    camera.rotation.x += (pitchTarget - camera.rotation.x) * Math.min(1, dt * 2.2);
+
+    // orbital command map: trail the camera, planets ride their rings
+    if (orbital.visible) {
+      orbital.position.set(camera.position.x, camera.position.y + 2400, camera.position.z - 11000);
+      orbital.rotation.z += 0.008 * dt;
+      orbital.userData.planets.forEach(function (p) {
+        p.a += p.w * dt;
+        p.m.position.set(Math.cos(p.a) * p.r, Math.sin(p.a) * p.r, 0);
+        p.m.rotation.y += 0.2 * dt;
+      });
+    }
 
     // per-star twinkle only — layer opacities are static so the field never flashes
     sparkMat.uniforms.uTime.value = t;
@@ -3839,7 +3975,7 @@ window.pflxSpace = (function () {
 
   window.PFLX_GL_ACTIVE = true;
   document.body.classList.add('gl-active');
-  return { sync: sync };
+  return { sync: sync, setMode: setMode };
 })();
 
 // ==================== STARFIELD ====================
@@ -4058,9 +4194,9 @@ function applyTransform() {
   let tiltX = 0; // rotateX for 3D depth
 
   if (camMode === 'chase') {
-    tiltX = 18; // moderate forward tilt
+    tiltX = 38; // strong forward tilt — map reads as a ground plane to the horizon
   } else if (camMode === 'cockpit') {
-    tiltX = 40; // deep tilt — flying into the map
+    tiltX = 55; // deep tilt — flying into the map
   }
 
   // The 3D tilt pivots around the point currently centred on screen, not
@@ -9159,6 +9295,9 @@ function pflxSetCamera(mode) {
   document.body.classList.remove('cam-birdseye', 'cam-chase', 'cam-cockpit');
   document.body.classList.add('cam-' + mode);
 
+  // GL space layer: pitch toward the horizon + show the orbital command map
+  if (window.pflxSpace && window.pflxSpace.setMode) window.pflxSpace.setMode(mode);
+
   // Arrow key hint
   const hint = document.getElementById('arrowKeyHint');
   if (hint) {
@@ -9185,7 +9324,8 @@ function pflxSetCamera(mode) {
     const camZoom = mode === 'cockpit' ? pflxCamera.cockpitZoom : pflxCamera.chaseZoom;
     zoom = camZoom;
     panX = (window.innerWidth / 2) - pflxShip.x * zoom;
-    panY = (window.innerHeight / 2) - pflxShip.y * zoom;
+    // chase view: ship sits low on screen, world recedes ahead of it
+    panY = (window.innerHeight * (mode === 'chase' ? 0.62 : 0.5)) - pflxShip.y * zoom;
     applyTransform();
   }
 
@@ -9301,8 +9441,8 @@ function pflxKeyLoop() {
 
     // Apply rotation + billboard counter-rotation in 3D camera modes
     var camTilt = 0;
-    if (pflxCamera.mode === 'chase') camTilt = -18;
-    else if (pflxCamera.mode === 'cockpit') camTilt = -40;
+    if (pflxCamera.mode === 'chase') camTilt = -38;
+    else if (pflxCamera.mode === 'cockpit') camTilt = -55;
 
     if (camTilt !== 0) {
       shipEl.style.transform = 'rotateX(' + camTilt + 'deg) rotate(' + pflxShipAngle + 'deg)';
@@ -9334,8 +9474,16 @@ function pflxKeyLoop() {
 
   // Camera follow for chase/cockpit
   panX = (window.innerWidth / 2) - pflxShip.x * zoom;
-  panY = (window.innerHeight / 2) - pflxShip.y * zoom;
+  panY = (window.innerHeight * (pflxCamera.mode === 'chase' ? 0.62 : 0.5)) - pflxShip.y * zoom;
   applyTransform();
+
+  // Chase-view hero ship: bank with steering, thrust scales with speed
+  var chaseEl = document.getElementById('chaseShip');
+  if (chaseEl && pflxCamera.mode === 'chase') {
+    var bank = Math.max(-16, Math.min(16, pflxShipVx * 1.6));
+    chaseEl.style.transform = 'translateX(-50%) rotate(' + bank.toFixed(1) + 'deg)';
+    chaseEl.style.setProperty('--thrust', (0.55 + Math.min(1, pflxShipSpeed / 14) * 0.95).toFixed(2));
+  }
 
   // Spawn trail particles while moving
   if (pflxShipSpeed > 1.5) {
@@ -9664,6 +9812,71 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
 })();
 
 </script>
+<!-- Chase view: dark-edge vignette + hero ship seen from behind -->
+<div class="chase-vignette"></div>
+<svg id="chaseShip" viewBox="0 0 380 230" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="csHull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a5878"/>
+      <stop offset="35%" stop-color="#1d3450"/>
+      <stop offset="100%" stop-color="#0a1726"/>
+    </linearGradient>
+    <linearGradient id="csWing" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#27425f"/>
+      <stop offset="100%" stop-color="#081320"/>
+    </linearGradient>
+    <radialGradient id="csNozzle">
+      <stop offset="0%" stop-color="#eafcff"/>
+      <stop offset="28%" stop-color="#7fe8ff"/>
+      <stop offset="62%" stop-color="#0090e0"/>
+      <stop offset="100%" stop-color="rgba(0,60,160,0)"/>
+    </radialGradient>
+    <linearGradient id="csFlameG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(170,240,255,0.95)"/>
+      <stop offset="45%" stop-color="rgba(60,170,255,0.55)"/>
+      <stop offset="100%" stop-color="rgba(120,60,255,0)"/>
+    </linearGradient>
+    <filter id="csBlur"><feGaussianBlur stdDeviation="2.2"/></filter>
+  </defs>
+
+  <!-- swept main wings -->
+  <path d="M190,96 L42,150 L18,166 L52,160 L154,128 Z" fill="url(#csWing)" stroke="rgba(90,180,255,0.35)" stroke-width="1"/>
+  <path d="M190,96 L338,150 L362,166 L328,160 L226,128 Z" fill="url(#csWing)" stroke="rgba(90,180,255,0.35)" stroke-width="1"/>
+  <!-- wing edge lights -->
+  <circle cx="22" cy="164" r="3" fill="#ff3b5c"><animate attributeName="opacity" values="1;0.25;1" dur="1.3s" repeatCount="indefinite"/></circle>
+  <circle cx="358" cy="164" r="3" fill="#39ff7a"><animate attributeName="opacity" values="1;0.25;1" dur="1.3s" repeatCount="indefinite"/></circle>
+
+  <!-- tail fins -->
+  <path d="M158,108 L142,52 L150,50 L172,104 Z" fill="url(#csWing)" stroke="rgba(90,180,255,0.3)" stroke-width="0.8"/>
+  <path d="M222,108 L238,52 L230,50 L208,104 Z" fill="url(#csWing)" stroke="rgba(90,180,255,0.3)" stroke-width="0.8"/>
+  <circle cx="145" cy="52" r="2.2" fill="#7fe8ff"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.9s" repeatCount="indefinite"/></circle>
+  <circle cx="235" cy="52" r="2.2" fill="#7fe8ff"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.9s" begin="0.45s" repeatCount="indefinite"/></circle>
+
+  <!-- central fuselage, seen from astern -->
+  <path d="M138,96 Q138,74 158,68 L222,68 Q242,74 242,96 L242,138 Q242,154 222,158 L158,158 Q138,154 138,138 Z"
+        fill="url(#csHull)" stroke="rgba(110,200,255,0.5)" stroke-width="1.2"/>
+  <!-- dorsal cockpit hump w/ glass glow -->
+  <path d="M166,68 Q190,46 214,68 Z" fill="#13263d" stroke="rgba(110,200,255,0.4)" stroke-width="1"/>
+  <path d="M174,66 Q190,52 206,66 Z" fill="rgba(120,230,255,0.6)"/>
+  <!-- hull panel lines -->
+  <line x1="150" y1="100" x2="230" y2="100" stroke="rgba(120,200,255,0.18)" stroke-width="1"/>
+  <line x1="150" y1="116" x2="230" y2="116" stroke="rgba(120,200,255,0.12)" stroke-width="1"/>
+  <rect x="183" y="74" width="14" height="8" rx="2" fill="rgba(120,200,255,0.18)"/>
+
+  <!-- engine block -->
+  <rect x="146" y="128" width="88" height="28" rx="8" fill="#0c1b2e" stroke="rgba(110,200,255,0.4)" stroke-width="1"/>
+  <!-- twin nozzle glows -->
+  <circle class="cs-glow" cx="168" cy="142" r="15" fill="url(#csNozzle)"/>
+  <circle class="cs-glow" cx="212" cy="142" r="15" fill="url(#csNozzle)"/>
+  <circle cx="168" cy="142" r="9" fill="#eafcff"/>
+  <circle cx="212" cy="142" r="9" fill="#eafcff"/>
+  <!-- thrust flames, scaled by --thrust -->
+  <path class="cs-flame" d="M158,152 Q168,214 168,224 Q172,214 178,152 Z" fill="url(#csFlameG)" filter="url(#csBlur)"/>
+  <path class="cs-flame" d="M202,152 Q212,214 212,224 Q216,214 222,152 Z" fill="url(#csFlameG)" filter="url(#csBlur)" style="animation-delay:0.09s"/>
+  <!-- wing-root thrusters -->
+  <circle class="cs-glow" cx="120" cy="136" r="7" fill="url(#csNozzle)"/>
+  <circle class="cs-glow" cx="260" cy="136" r="7" fill="url(#csNozzle)"/>
+</svg>
 <!-- Ship Mode Toggle -->
 <div class="ship-mode-toggle">
   <button class="ship-mode-btn active" id="shipModeGuided" onclick="pflxShipSetMode('guided')">Guided</button>
@@ -9733,6 +9946,14 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
   <!-- ── Full Dashboard ── -->
   <div class="cockpit-dash">
     <div class="dash-center-console"></div>
+
+    <!-- HOTAS control sticks -->
+    <div class="cockpit-stick left">
+      <div class="stick-base"></div><div class="stick-shaft"></div><div class="stick-grip"></div>
+    </div>
+    <div class="cockpit-stick right">
+      <div class="stick-base"></div><div class="stick-shaft"></div><div class="stick-grip"></div>
+    </div>
 
     <!-- Left screen — Navigation / Radar -->
     <div class="cockpit-screen screen-left">
