@@ -3647,6 +3647,13 @@ window.pflxSpace = (function () {
   renderer.setPixelRatio(DPR);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x020408, 1);
+  // Cinematic color pipeline — filmic tone mapping + sRGB output gives
+  // planets/nebulae proper highlight rolloff instead of clipped neon
+  try {
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+  } catch (e) {}
 
   const scene = new THREE.Scene();
   // Near-zero fog: visible fog density made the whole field shift brightness
@@ -8848,11 +8855,18 @@ function showLaunchOverlay(node) {
                     xc: { balance: 0 },
                     badges: [],
                     save: savedState,
-                    context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo', tier: CLOUD_SAVE_CTX.tier },
-                    // Host node settings: co-op availability + party cap
-                    coop: { sessionId: null, role: null, peers: [],
-                            enabled: !!node.coopEnabled,
-                            maxPlayers: Math.max(2, Math.min(4, node.coopMax || 4)) }
+                    context: { pathwaySlug: pathwaySlug, nodeId: node.id,
+                      entryMode: (window.pflxCoop && pflxCoop.activeFor(node.id)) ? 'coop' : 'solo',
+                      tier: CLOUD_SAVE_CTX.tier },
+                    // Host node settings + live co-op party (pflxCoop)
+                    coop: (window.pflxCoop && pflxCoop.activeFor(node.id))
+                      ? { sessionId: pflxCoop.session.sessionId, role: pflxCoop.session.role,
+                          peers: pflxCoop.peerBrands(),
+                          enabled: true,
+                          maxPlayers: Math.max(2, Math.min(4, node.coopMax || 4)) }
+                      : { sessionId: null, role: null, peers: [],
+                          enabled: !!node.coopEnabled,
+                          maxPlayers: Math.max(2, Math.min(4, node.coopMax || 4)) }
                   }
                 }, '*');
                 _cloudInitDelivered = true;
@@ -8869,6 +8883,10 @@ function showLaunchOverlay(node) {
               // persist per (player, node) so the Detail Panel shows
               // saved progress next time this player opens the node
               try { localStorage.setItem(pflxNodePlayerProgressKey(node.id), String(mp)); } catch (eP) {}
+              // co-op party: share live progress + keep the party bar fresh
+              try {
+                if (window.pflxCoop && pflxCoop.activeFor(node.id)) { pflxCoop.reportProgress(mp); pflxCoop.renderBar(); }
+              } catch (eC) {}
             }
             if (d.type === 'pflx_mod_checkpoint' && d.payload) {
               node._lastCheckpoint = d.payload.checkpointId || '';
@@ -10524,14 +10542,18 @@ const pflxCrew = {
         if (curN && curN.coopEnabled) coopNodeId = curN.id;
         else if (curN && !curN.coopEnabled) pflxSpaceToast('🧑‍🚀', 'SINGLE PLAYER NODE', 'This station is set to single player by the host — sending a rendezvous invite instead.', '');
       } catch (e) {}
+      // co-op node → mint a real shared session and join it as leader
+      var coopSessionId = coopNodeId ? ('coop-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)) : '';
       try {
         self.channel.send({ type: 'broadcast', event: 'pflx_coop_invite', payload: {
           to: k, fromBrand: self.me.brand,
           x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
           nodeId: coopNodeId,
+          sessionId: coopSessionId,
         } });
       } catch (e) {}
-      pflxSpaceToast('🤝', 'INVITE SENT', (d.brand || 'Explorer') + ' has been invited to rendezvous with you.', '');
+      if (coopNodeId && window.pflxCoop) pflxCoop.start(coopSessionId, coopNodeId, 'leader');
+      pflxSpaceToast('🤝', 'INVITE SENT', (d.brand || 'Explorer') + ' has been invited to ' + (coopNodeId ? 'your co-op session.' : 'rendezvous with you.'), '');
       close();
     });
   },
@@ -10567,10 +10589,12 @@ const pflxCrew = {
     box.querySelector('#invDecline').addEventListener('click', function () { box.remove(); });
     box.querySelector('#invAccept').addEventListener('click', function () {
       box.remove();
+      // join the shared co-op session immediately (cap enforced inside)
+      if (p.nodeId && p.sessionId && window.pflxCoop) pflxCoop.start(p.sessionId, p.nodeId, 'member');
       if (typeof pflxShipFlyTo === 'function' && typeof p.x === 'number' && typeof p.y === 'number') {
         pflxShipFlyTo(p.x, p.y, function () {
           pflxSpaceToast('🤝', 'RENDEZVOUS', p.nodeId
-            ? 'You\'ve arrived. Open the station to join the Co-Op session.'
+            ? 'You\'ve arrived. Open the station and hit START — you\'ll enter as a co-op party.'
             : 'You\'ve arrived at the rendezvous point.', '');
         });
       }
@@ -10595,6 +10619,117 @@ const pflxCrew = {
 };
 pflxCrew.init();
 window.pflxCrew = pflxCrew;
+
+// ═══════════════════════════════════════════════════════════════════
+// CO-OP SESSIONS v1 — a crew invite at a co-op node now creates a real
+// shared session. Both players join Supabase channel pflx-coop-<id>
+// (party cap enforced from the node's coopMax), the module launches
+// with entryMode 'coop' + the session in its Connector init, and a
+// CO-OP PARTY bar inside the module header shows every member's live
+// progress. Rewards stay individual and approval-gated.
+// ═══════════════════════════════════════════════════════════════════
+const pflxCoop = {
+  session: null,    // { sessionId, nodeId, role }
+  channel: null,
+  peersState: {},
+  meKey: '', meBrand: '', cap: 4,
+
+  start(sessionId, nodeId, role) {
+    if (!window._supabase) { pflxSpaceToast('🤝', 'CO-OP UNAVAILABLE', 'Multiplayer needs a cloud connection.', ''); return; }
+    this.leave();
+    var me = (typeof pflxModulePlayer === 'function') ? pflxModulePlayer() : { id: '', brand: 'Explorer' };
+    this.meKey = String(me.id || me.brand || ('p-' + Math.random().toString(36).slice(2, 8)));
+    this.meBrand = me.brand || 'Explorer';
+    var node = null;
+    try { node = pathway.nodes.find(function (n) { return n.id === nodeId; }); } catch (e) {}
+    this.cap = Math.max(2, Math.min(4, (node && node.coopMax) || 4));
+    this.session = { sessionId: sessionId, nodeId: nodeId, role: role };
+    this.peersState = {};
+    var self = this;
+    var ch = window._supabase.channel('pflx-coop-' + sessionId, { config: { presence: { key: this.meKey } } });
+    this.channel = ch;
+    ch.on('presence', { event: 'sync' }, function () { self.sync(); })
+      .subscribe(function (status) {
+        if (status !== 'SUBSCRIBED') return;
+        setTimeout(function () {
+          try {
+            var n = Object.keys(ch.presenceState()).length;
+            if (n >= self.cap && !ch.presenceState()[self.meKey]) {
+              pflxSpaceToast('🚫', 'PARTY FULL', 'This co-op session is capped at ' + self.cap + ' players.', '');
+              self.leave();
+              return;
+            }
+            ch.track({ brand: self.meBrand, progress: 0, t: Date.now() });
+            pflxSpaceToast('🤝', 'CO-OP PARTY ACTIVE', 'Session ' + String(sessionId).slice(-4).toUpperCase() + ' — dock at the station and START to work together.', role === 'leader' ? 'PARTY LEADER' : 'PARTY MEMBER');
+          } catch (e) {}
+        }, 600);
+      });
+  },
+
+  activeFor(nodeId) { return !!(this.session && this.channel && this.session.nodeId === nodeId); },
+
+  peerBrands() {
+    var out = [];
+    var st = this.peersState || {};
+    Object.keys(st).forEach(function (k) { if (st[k] && st[k].brand) out.push({ brand: st[k].brand }); });
+    return out;
+  },
+
+  sync() {
+    if (!this.channel) return;
+    var state = this.channel.presenceState();
+    var ps = {};
+    Object.keys(state).forEach(function (k) {
+      var metas = state[k];
+      var d = metas && metas[metas.length - 1];
+      if (d) ps[k] = { brand: d.brand || 'Explorer', progress: parseInt(d.progress, 10) || 0 };
+    });
+    this.peersState = ps;
+    this.renderBar();
+  },
+
+  reportProgress(pct) {
+    if (!this.channel) return;
+    try { this.channel.track({ brand: this.meBrand, progress: Math.min(100, Math.max(0, pct | 0)), t: Date.now() }); } catch (e) {}
+  },
+
+  renderBar() {
+    var header = document.getElementById('courseContentHeader');
+    var old = document.getElementById('coopPartyBar');
+    if (!header || !this.session) { if (old) old.remove(); return; }
+    var bar = old;
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'coopPartyBar';
+      bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0 10px;height:30px;border-radius:8px;' +
+        'background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.3);';
+      var progBar = document.getElementById('courseProgressBar');
+      header.insertBefore(bar, progBar || null);
+    }
+    var self = this;
+    var chips = Object.keys(this.peersState).map(function (k) {
+      var p = self.peersState[k];
+      var meTag = k === self.meKey ? ' (you)' : '';
+      return '<span style="display:inline-flex;align-items:center;gap:5px;font-family:Rajdhani,sans-serif;font-size:11px;font-weight:700;color:#c4b5fd;white-space:nowrap;">' +
+        '🧑‍🚀 ' + String(p.brand).replace(/</g, '&lt;') + meTag +
+        '<span style="color:#7df9ff;font-family:Orbitron,sans-serif;font-size:9px;">' + p.progress + '%</span></span>';
+    }).join('<span style="color:rgba(167,139,250,0.35);">·</span>');
+    bar.innerHTML =
+      '<span style="font-family:Orbitron,sans-serif;font-size:8px;font-weight:800;letter-spacing:0.16em;color:#a78bfa;white-space:nowrap;">🤝 CO-OP</span>' +
+      chips +
+      '<button onclick="pflxCoop.leave()" title="Leave the co-op session" style="margin-left:2px;background:none;border:1px solid rgba(255,90,90,0.3);color:rgba(255,120,120,0.8);border-radius:5px;font-size:9px;padding:2px 7px;cursor:pointer;">LEAVE</button>';
+  },
+
+  leave() {
+    if (this.channel) { try { window._supabase.removeChannel(this.channel); } catch (e) {} }
+    this.channel = null;
+    this.session = null;
+    this.peersState = {};
+    var bar = document.getElementById('coopPartyBar');
+    if (bar) bar.remove();
+  },
+};
+window.pflxCoop = pflxCoop;
 
 // ═══════════════════════════════════════════════════════════════════
 // GALAXY CLUSTERS — host-built node-cluster sites in deep space.

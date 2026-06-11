@@ -1114,6 +1114,40 @@ pathway.html chase/cockpit controls are now a real flight model:
   human eyeball (if the stars turn the wrong way vs the map, flip the
   sign of rollTarget in pflxSpace.sync).
 
+### CO-OP SESSIONS v1 (June 11) — `pflxCoop` in pathway.html
+A crew invite at a co-op-enabled node now mints a real shared session:
+- Inviter generates `coop-<id>`, joins Supabase channel
+  `pflx-coop-<id>` as leader; accepter joins as member on accept.
+  Party cap from node.coopMax enforced at join (PARTY FULL toast).
+- `pflx_mod_init` carries `entryMode: 'coop'` + `coop.sessionId/role/
+  peers` when a session is active for that node — the Connector
+  contract the Module spec defined.
+- CO-OP PARTY bar injected into the module header: every member's
+  brand + LIVE progress % (presence re-track on pflx_mod_progress),
+  LEAVE button. Rewards stay individual + approval-gated.
+- v2 ideas: shared activity-field state inside modules (needs viewer
+  support), party voice/text via DarkCampus channel auto-creation.
+
+### GRAPHICS → "PS5 LEVEL" ROADMAP (June 11)
+Shipped now: ACES filmic tone mapping + sRGB output + exposure 1.15 on
+the GL renderer (filmic highlight rolloff — planets/nebulae stop
+clipping to neon), on top of today's rotating chase cam, boost
+streaks, per-pathway horizon worlds, and HUD declutter.
+The honest ceiling of the current architecture is that NODES + ship
+are DOM/CSS sprites composited over a WebGL backdrop. The real PS5
+push is the staged Three.js migration (docs/THREEJS_MIGRATION_PLAN.md
++ the src/pflx3d TypeScript scaffold already in the repo):
+ P1. 3D hero ship (GLTF) replacing the CSS #chaseShip, engine
+     particles, camera shake/lag.
+ P2. Station nodes as real 3D structures in the GL scene (DOM keeps
+     only the click targets + labels).
+ P3. Postprocessing: UnrealBloomPass (needs three examples bundle via
+     esbuild — the scripts/build-3d.mjs pipeline exists), god rays on
+     the sun, film grain.
+ P4. Asteroid/blaster impacts as GPU particles; volumetric nebulae.
+Each phase needs iterative in-browser testing on Ennis's machine —
+plan one phase per session, P1 first (biggest visible win).
+
 ### Cohort app gating — hardened (June 11, "DarkCampus still works when off")
 Two silent fail-open paths found and closed in pflx-platform preview.html:
 1. **Name drift** — a player session cohort string that didn't EXACTLY
