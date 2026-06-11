@@ -1009,6 +1009,19 @@ Root causes fixed:
   re-checking returns to Novice-as-source. Import sets auto off when a
   manifest ships its own starter/pro. Verified in Node (12/12 derivation
   assertions).
+- **AI ASSIST (shipped June 11):** ✨ buttons throughout the Builder —
+  module subtitle+description, per-phase assist (title/essence/UbD
+  understandings/essential questions from the phase's own content),
+  per-block write/improve (markdown, callout, activity, reflection,
+  diagnostic, submission), approval-criteria suggestions. Transport:
+  `/api/pflx-ai` Vercel serverless proxy (NEW FILE `api/pflx-ai.js`;
+  model claude-sonnet-4-6, override via PFLX_AI_MODEL) — **REQUIRES
+  Ennis to set `ANTHROPIC_API_KEY` in the Vercel project env** for the
+  shared path. Fallback: the Builder prompts for an Anthropic key and
+  stores it in localStorage (`pflx_builder_ai_key`, browser-only,
+  direct CORS call). Strict-JSON prompting with defensive parsing
+  (fences/chatter stripped). All AI output lands in the normal editors
+  — host reviews everything before export.
 - The AI difficulty layer that `aiAdaptation` scaffolds (per-player
   runtime adaptation — the auto-tier engine handles authoring-time).
 - A tools registry for branded tool cards (open question 14.8 #4).

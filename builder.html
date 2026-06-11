@@ -1388,6 +1388,252 @@ document.getElementById('ingestInput').onchange = function(){
      .catch(function(e){ console.error(e); toast('Ingest failed: ' + e.message); });
 };
 
+/* ═══════════════════════════════════════════════════════════════════
+   AI ASSIST — generate and improve the writing throughout the Builder.
+   Transport, in order of preference:
+     1. /api/pflx-ai (Vercel serverless; set ANTHROPIC_API_KEY in the
+        Vercel project env — key never reaches the browser)
+     2. Direct Anthropic call with a key the host pastes once; stored
+        ONLY in this browser's localStorage (pflx_builder_ai_key).
+   All prompts demand strict JSON; replies are parsed defensively.
+   ═══════════════════════════════════════════════════════════════════ */
+var AI = {
+  endpointOk: null,   // null = unknown, true/false after probe
+  SYSTEM: 'You are the PFLX Module Builder writing assistant. You write learner-facing educational content for a gamified learning platform built on the FLX framework (Future Learning Protocol: Engagement → Development → Enhancement → Fulfillment). Voice: clear, energizing, respectful of teen and young-adult learners — never condescending, never corporate. Markdown is allowed inside content strings (## headings, **bold**, [links](url), - lists). CRITICAL: respond with ONLY valid JSON matching the requested shape. No markdown fences. No commentary.',
+
+  probe: function(){
+    var self = this;
+    return fetch('api/pflx-ai').then(function(r){ return r.json(); })
+      .then(function(j){ self.endpointOk = !!(j && j.ok && j.hasKey); return self.endpointOk; })
+      .catch(function(){ self.endpointOk = false; return false; });
+  },
+  localKey: function(){ try { return localStorage.getItem('pflx_builder_ai_key') || ''; } catch(e){ return ''; } },
+  askForKey: function(){
+    var k = prompt('AI Assist needs a key.\n\nEither set ANTHROPIC_API_KEY on the Vercel project (recommended), or paste an Anthropic API key here — it is stored only in THIS browser:');
+    if (k && k.trim()) { try { localStorage.setItem('pflx_builder_ai_key', k.trim()); } catch(e){} return k.trim(); }
+    return '';
+  },
+  call: function(prompt, maxTokens){
+    var self = this;
+    var viaEndpoint = function(){
+      return fetch('api/pflx-ai', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: self.SYSTEM, prompt: prompt, maxTokens: maxTokens || 1500 })
+      }).then(function(r){
+        if (r.status === 503) { self.endpointOk = false; throw { fallback: true }; }
+        return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || 'AI endpoint error'); return j.text; });
+      });
+    };
+    var viaBrowser = function(){
+      var key = self.localKey() || self.askForKey();
+      if (!key) throw new Error('No AI key configured');
+      return fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: maxTokens || 1500,
+          system: self.SYSTEM, messages: [{ role: 'user', content: prompt }] })
+      }).then(function(r){ return r.json().then(function(j){
+        if (!r.ok) {
+          if (r.status === 401) { try { localStorage.removeItem('pflx_builder_ai_key'); } catch(e){} }
+          throw new Error((j.error && j.error.message) || 'Anthropic error');
+        }
+        return (j.content || []).filter(function(c){ return c.type === 'text'; }).map(function(c){ return c.text; }).join('');
+      }); });
+    };
+    var first = (this.endpointOk === false) ? Promise.reject({ fallback: true }) : viaEndpoint();
+    return first.catch(function(e){
+      if (e && e.fallback) { return viaBrowser(); }
+      throw e;
+    });
+  },
+  json: function(prompt, maxTokens){
+    return this.call(prompt, maxTokens).then(function(text){
+      var t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+      var a = t.indexOf('{'), b = t.lastIndexOf('}');
+      if (a !== -1 && b !== -1) t = t.slice(a, b + 1);
+      return JSON.parse(t);
+    });
+  },
+};
+AI.probe();
+
+function aiBusy(btn, on){
+  if (!btn) return;
+  if (on) { btn.dataset.label = btn.textContent; btn.textContent = '✨ thinking…'; btn.disabled = true; btn.style.opacity = '0.6'; }
+  else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; btn.style.opacity = '1'; }
+}
+function moduleContextLine(){
+  return 'Module: "' + (S.meta.name || 'Untitled') + '" (' + S.meta.moduleType + '). Description: ' + (S.meta.description || '(none yet)');
+}
+function phaseText(p, cap){
+  var all = p.segments ? p.segments.reduce(function(a,s){ return a.concat(s.blocks); }, []) : (p.blocks || []);
+  var txt = all.map(function(b){
+    if (b.kind === 'markdown' || b.kind === 'callout') return b.content || '';
+    if (b.kind === 'activity') return (b.title || '') + ': ' + (b.instructions || '');
+    if (b.kind === 'reflection') return (b.prompts || []).map(function(x){ return x.prompt; }).join(' ');
+    if (b.kind === 'diagnostic') return b.prompt || '';
+    return '';
+  }).join('\n').trim();
+  return txt.slice(0, cap || 3000);
+}
+
+/* ---- module info: subtitle + description ---- */
+(function(){
+  var descEl = document.getElementById('mDesc');
+  var btn = document.createElement('button');
+  btn.className = 'tbtn ghost';
+  btn.style.cssText = 'margin-top:6px;width:100%;';
+  btn.textContent = '✨ Generate subtitle & description';
+  btn.onclick = function(){
+    if (!S.meta.name.trim()) { toast('Name the module first'); return; }
+    aiBusy(btn, true);
+    AI.json('Module name: "' + S.meta.name + '" (type: ' + S.meta.moduleType + ').'
+      + (S.meta.description ? ' Current description draft: ' + S.meta.description : '')
+      + (phaseText(S.tiers.novice.phases[0], 800) ? ' Sample of phase content: ' + phaseText(S.tiers.novice.phases[0], 800) : '')
+      + '\n\nWrite a one-line subtitle (max 90 chars, no period) and a 2–3 sentence learner-facing description.'
+      + '\nReturn JSON: {"subtitle": string, "description": string}', 500)
+    .then(function(j){
+      if (j.subtitle) S.meta.subtitle = j.subtitle;
+      if (j.description) S.meta.description = j.description;
+      bindMeta(); autosave(); toast('Subtitle & description written');
+    })
+    .catch(function(e){ toast('AI: ' + e.message); })
+    .then(function(){ aiBusy(btn, false); });
+  };
+  descEl.parentNode.insertBefore(btn, descEl.nextSibling);
+})();
+
+/* ---- criteria suggestions ---- */
+(function(){
+  var bar = document.getElementById('addCrit').parentNode;
+  var btn = document.createElement('button');
+  btn.textContent = '✨ Suggest';
+  btn.onclick = function(){
+    aiBusy(btn, true);
+    AI.json(moduleContextLine()
+      + '\nFulfillment deliverable context: ' + phaseText(S.tiers.novice.phases[S.tiers.novice.phases.length - 1], 800)
+      + '\n\nWrite 4 approval criteria a host scores 1–5 when reviewing the learner\'s final submission. Each criterion: one sentence, concrete and observable.'
+      + '\nReturn JSON: {"criteria": [string, string, string, string]}', 600)
+    .then(function(j){
+      (j.criteria || []).forEach(function(c){ if (c && c.trim()) S.taskCriteria.push({ label: c.trim(), required: true }); });
+      renderCriteria(); autosave(); toast('Criteria suggested — prune what you don\'t want');
+    })
+    .catch(function(e){ toast('AI: ' + e.message); })
+    .then(function(){ aiBusy(btn, false); });
+  };
+  bar.appendChild(btn);
+})();
+
+/* ---- phase assist: title/essence/UbD from this phase's content ---- */
+var _origRenderEditor = renderEditor;
+renderEditor = function(){
+  _origRenderEditor();
+  var p = tier().phases[S.curPhase];
+  if (!p) return;
+  var head = document.querySelector('#phaseEditor .card');
+  if (!head) return;
+  var btn = document.createElement('button');
+  btn.className = 'tbtn';
+  btn.style.cssText = 'margin-top:10px;';
+  btn.textContent = '✨ AI Assist Phase (essence · understandings · questions)';
+  btn.onclick = function(){
+    aiBusy(btn, true);
+    AI.json(moduleContextLine()
+      + '\nFLX phase: ' + p.kind.toUpperCase() + ' — current title: "' + p.title + '".'
+      + '\nPhase content:\n' + (phaseText(p, 3000) || '(no content yet — write for what this strand SHOULD do in this module)')
+      + '\n\nWrite: a sharper phase title (max 6 words), a one-sentence host-facing essence of what the learner does, 2 UbD Understandings, and 2 Essential Questions.'
+      + '\nReturn JSON: {"title": string, "essence": string, "understandings": [string, string], "essentialQuestions": [string, string]}', 700)
+    .then(function(j){
+      if (j.title) p.title = j.title;
+      if (j.essence) p.essence = j.essence;
+      if (Array.isArray(j.understandings) && j.understandings.length) p.desiredResults.understandings = j.understandings;
+      if (Array.isArray(j.essentialQuestions) && j.essentialQuestions.length) p.desiredResults.essentialQuestions = j.essentialQuestions;
+      renderAll(); autosave(); toast('Phase polished');
+    })
+    .catch(function(e){ toast('AI: ' + e.message); aiBusy(btn, false); });
+  };
+  head.appendChild(btn);
+};
+
+/* ---- block assist: ✨ button in every supported block header ---- */
+var AI_BLOCK_PROMPTS = {
+  markdown: function(b, p){
+    return 'Rewrite/expand this ' + p.kind + '-phase content block into polished learner-facing markdown (keep any ## headings, links, and lists; expand thin bullet-notes into real teaching prose; max ~250 words). Current content:\n' + (b.content || '(empty — write an opening content block for this phase)')
+      + '\nReturn JSON: {"content": string}';
+  },
+  callout: function(b, p){
+    return 'Rewrite this callout as one punchy emphasized note for learners (max 50 words). Current: ' + (b.content || '(empty)')
+      + '\nReturn JSON: {"content": string}';
+  },
+  activity: function(b, p){
+    return 'Write/improve this hands-on activity for the ' + p.kind + ' phase. Current title: "' + (b.title || '') + '", instructions: "' + (b.instructions || '(none)') + '".'
+      + '\nReturn JSON: {"title": string, "instructions": string (2-4 sentences, concrete), "fields": [{"label": string, "long": boolean}] (1-3 response fields)}';
+  },
+  reflection: function(b, p){
+    return 'Write 2 reflection prompts for the ' + p.kind + ' phase of this module. Existing: ' + JSON.stringify((b.prompts || []).map(function(x){ return x.prompt; }))
+      + '\nReturn JSON: {"title": string, "prompts": [string, string]}';
+  },
+  diagnostic: function(b, p){
+    return 'Write a confidence diagnostic for the start of this module (it places the learner, never fails them). Current prompt: "' + (b.prompt || '') + '".'
+      + '\nReturn JSON: {"prompt": string, "items": [5-8 short skill/topic labels drawn from the module content]}';
+  },
+  submission: function(b, p){
+    return 'Write the final submission instructions for this module\'s Fulfillment phase, plus a short hint telling the learner what to say in their submission description.'
+      + '\nReturn JSON: {"title": string, "instructions": string, "descriptionHint": string}';
+  },
+};
+var _origRenderBlockList = renderBlockList;
+renderBlockList = function(holder, blocks){
+  _origRenderBlockList(holder, blocks);
+  var cards = holder.children;
+  for (var i = 0; i < cards.length; i++) {
+    (function(card, b){
+      if (!AI_BLOCK_PROMPTS[b.kind]) return;
+      var h = card.querySelector('.blk-h');
+      var btn = document.createElement('button');
+      btn.textContent = '✨';
+      btn.title = 'AI: write / improve this block';
+      btn.style.color = '#f5c842';
+      h.insertBefore(btn, h.children[1]);
+      btn.onclick = function(){
+        var p = tier().phases[S.curPhase];
+        aiBusy(btn, true);
+        AI.json(moduleContextLine() + '\n' + AI_BLOCK_PROMPTS[b.kind](b, p), 900)
+        .then(function(j){
+          if (b.kind === 'markdown' || b.kind === 'callout') { if (j.content) b.content = j.content; }
+          else if (b.kind === 'activity') {
+            if (j.title) b.title = j.title;
+            if (j.instructions) b.instructions = j.instructions;
+            if (Array.isArray(j.fields) && j.fields.length) b.fields = j.fields.map(function(f, k){
+              return { id: 'f-' + slug(String(f.label || 'field')).slice(0, 20) + '-' + k, label: String(f.label || 'Response'), type: f.long ? 'textarea' : 'text' };
+            });
+          }
+          else if (b.kind === 'reflection') {
+            if (j.title) b.title = j.title;
+            if (Array.isArray(j.prompts) && j.prompts.length) b.prompts = j.prompts.map(function(pr, k){ return { id: 'r-' + k, prompt: String(pr) }; });
+          }
+          else if (b.kind === 'diagnostic') {
+            if (j.prompt) b.prompt = j.prompt;
+            if (Array.isArray(j.items) && j.items.length) b.items = j.items.map(function(lab, k){ return { id: 'd-' + slug(String(lab)).slice(0, 20) + '-' + k, label: String(lab) }; });
+          }
+          else if (b.kind === 'submission') {
+            if (j.title) b.title = j.title;
+            if (j.instructions) b.instructions = j.instructions;
+            if (j.descriptionHint) b.descriptionHint = j.descriptionHint;
+          }
+          renderEditor(); autosave(); toast('Block written ✨');
+        })
+        .catch(function(e){ toast('AI: ' + e.message); aiBusy(btn, false); });
+      };
+    })(cards[i], blocks[i]);
+  }
+};
+
 renderAll();
 </script>
 </body>
