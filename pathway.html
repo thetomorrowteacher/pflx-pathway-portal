@@ -124,6 +124,10 @@
     body.gl-active .rotating-ring { display: none; }
     /* Graphics P1: the GL 3D hero ship replaces the flat CSS chase ship */
     body.gl-hero #chaseShip { display: none !important; }
+    /* Graphics P2: in flight modes the GL 3D stations replace the flat
+       SVG silhouettes — DOM keeps the ring, label, and click target */
+    body.gl-active.cam-chase .station-structure,
+    body.gl-active.cam-cockpit .station-structure { display: none !important; }
 
     /* ========== OPEN SPACE — station-city node structures (Phase 2) ========== */
     .station-structure {
@@ -4018,10 +4022,151 @@ window.pflxSpace = (function () {
     camera.add(heroShip);
   })();
 
+  // ═══════════════════════════════════════════════════════════════════
+  // 3D STATION STRUCTURES (Graphics P2) — every node renders as a real
+  // structure in the GL scene during flight: course = station city,
+  // project = industrial yard, program = ringed citadel, quest =
+  // stargate, challenge = fortress, untyped = jump beacon. Status
+  // drives lighting (locked = powered-down gray, completed = warm
+  // windows + green beacon, in_progress = amber pulse). The DOM node
+  // keeps the click target + label; its flat SVG silhouette hides in
+  // flight modes via CSS. Synced from pflxDecrowdStations.
+  // ═══════════════════════════════════════════════════════════════════
+  const stationsRoot = new THREE.Group();
+  stationsRoot.visible = false;
+  scene.add(stationsRoot);
+  const stations = {};   // nodeId -> { group, dispose[], spins[], beacons[], sig }
+  const ST_HULL = new THREE.MeshStandardMaterial({ color: 0x8fa6b8, metalness: 0.7, roughness: 0.42 });
+  const ST_DARK = new THREE.MeshStandardMaterial({ color: 0x2e3744, metalness: 0.55, roughness: 0.6 });
+  const ST_LOCKED = new THREE.MeshStandardMaterial({ color: 0x383d44, metalness: 0.25, roughness: 0.92 });
+  const ST_WIN_WARM = new THREE.MeshBasicMaterial({ color: 0xffcd82 });
+  const ST_WIN_CYAN = new THREE.MeshBasicMaterial({ color: 0x4fe3ff });
+  function stationRand(id) {
+    let h = 2166136261;
+    const s = String(id || 'node');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return function () { h ^= h << 13; h >>>= 0; h ^= h >> 17; h ^= h << 5; h >>>= 0; return (h % 100000) / 100000; };
+  }
+  function buildStation(n) {
+    const rnd = stationRand(n.id);
+    const locked = n.status === 'locked';
+    const hull = locked ? ST_LOCKED : ST_HULL;
+    const dark = locked ? ST_LOCKED : ST_DARK;
+    const win = locked ? ST_LOCKED : (n.status === 'completed' ? ST_WIN_WARM : ST_WIN_CYAN);
+    const g = new THREE.Group();
+    const rec = { group: g, dispose: [], spins: [], beacons: [], sig: '' };
+    function mesh(geo, mat) { const m = new THREE.Mesh(geo, mat); g.add(m); rec.dispose.push(geo); return m; }
+    const type = n.nodeType || '';
+
+    if (type === 'project') {
+      // industrial yard — platform, gantries, cargo blocks
+      mesh(new THREE.BoxGeometry(78, 7, 56), dark).position.y = 3;
+      [-22, 0, 22].forEach(function (x) {
+        const frame = mesh(new THREE.BoxGeometry(4, 34, 4), hull); frame.position.set(x, 20, -18);
+        const arm = mesh(new THREE.BoxGeometry(4, 3, 40), hull); arm.position.set(x, 36, 0);
+      });
+      for (let i = 0; i < 5; i++) {
+        const b = mesh(new THREE.BoxGeometry(10, 8, 10), i % 2 ? hull : dark);
+        b.position.set(-26 + rnd() * 52, 11, -8 + rnd() * 24);
+      }
+    } else if (type === 'program') {
+      // ringed citadel
+      mesh(new THREE.SphereGeometry(20, 24, 16), hull).position.y = 18;
+      mesh(new THREE.ConeGeometry(4, 34, 8), hull).position.y = 48;
+      const ring = mesh(new THREE.TorusGeometry(34, 2.2, 10, 40), dark);
+      ring.position.y = 18; ring.rotation.x = Math.PI / 2 - 0.22;
+      rec.spins.push(ring);
+      for (let i = 0; i < 4; i++) {
+        const w = mesh(new THREE.BoxGeometry(2.6, 2.6, 2.6), win);
+        const a = i * Math.PI / 2 + 0.4;
+        w.position.set(Math.cos(a) * 14, 18 + Math.sin(i) * 5, Math.sin(a) * 14);
+      }
+    } else if (type === 'quest') {
+      // stargate
+      const gate = mesh(new THREE.TorusGeometry(30, 3.2, 12, 40), hull);
+      gate.position.y = 34;
+      rec.spins.push(gate);
+      [-1, 1].forEach(function (s) { mesh(new THREE.BoxGeometry(8, 26, 8), dark).position.set(s * 26, 12, 0); });
+      if (!locked) {
+        const portal = haloSprite('150,110,255', 0.0, 0.9);
+        portal.scale.set(52, 52, 1); portal.position.y = 34;
+        g.add(portal); rec.dispose.push(portal.material); rec.beacons.push(portal.material);
+      }
+    } else if (type === 'challenge') {
+      // fortress
+      const base = mesh(new THREE.CylinderGeometry(30, 36, 16, 4), dark); base.position.y = 8;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + Math.PI / 4;
+        const t = mesh(new THREE.CylinderGeometry(5, 6, 30, 6), hull);
+        t.position.set(Math.cos(a) * 24, 22, Math.sin(a) * 24);
+      }
+      mesh(new THREE.CylinderGeometry(8, 10, 38, 6), hull).position.y = 28;
+    } else if (type === 'course' || !type) {
+      // station city (course) / jump beacon (untyped) share a platform
+      const isCity = type === 'course';
+      mesh(new THREE.CylinderGeometry(isCity ? 36 : 18, isCity ? 40 : 22, 6, 6), dark).position.y = 3;
+      if (isCity) {
+        mesh(new THREE.CylinderGeometry(6, 9, 52, 8), hull).position.y = 30;
+        [-1, 1].forEach(function (s) {
+          mesh(new THREE.CylinderGeometry(4, 6, 30 + rnd() * 10, 6), hull).position.set(s * 16, 18, s * 6);
+        });
+        for (let i = 0; i < 5; i++) {
+          const w = mesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), win);
+          w.position.set(-14 + rnd() * 28, 12 + rnd() * 36, -8 + rnd() * 16);
+        }
+        const ring = mesh(new THREE.TorusGeometry(33, 1.4, 8, 36), dark);
+        ring.position.y = 26; ring.rotation.x = Math.PI / 2;
+        rec.spins.push(ring);
+      } else {
+        mesh(new THREE.CylinderGeometry(1.8, 2.6, 46, 6), hull).position.y = 26;
+      }
+    }
+    // status beacon light above the structure
+    if (!locked) {
+      const beaconColor = n.status === 'completed' ? '110,255,150'
+                        : n.status === 'in_progress' ? '255,200,90' : '0,212,255';
+      const bk = haloSprite(beaconColor, 0.0, 0.95);
+      bk.scale.set(26, 26, 1);
+      bk.position.y = (type === 'quest') ? 72 : 62;
+      g.add(bk); rec.dispose.push(bk.material); rec.beacons.push(bk.material);
+    }
+    // place on the map plane, standing toward the camera
+    const p = toGL(n.x, n.y);
+    g.position.set(p.x, p.y, -150);
+    g.rotation.x = Math.PI / 2;
+    g.scale.setScalar(1.15);
+    return rec;
+  }
+  function removeStation(id) {
+    const rec = stations[id];
+    if (!rec) return;
+    stationsRoot.remove(rec.group);
+    rec.dispose.forEach(function (d) { if (d && d.dispose) d.dispose(); });
+    delete stations[id];
+  }
+  function syncStations(list) {
+    const seen = {};
+    (list || []).forEach(function (n) {
+      if (!n || !n.id) return;
+      seen[n.id] = true;
+      const sig = [n.x, n.y, n.status || '', n.nodeType || ''].join('|');
+      let rec = stations[n.id];
+      if (rec && rec.sig !== sig) { removeStation(n.id); rec = null; }
+      if (!rec) {
+        rec = buildStation(n);
+        rec.sig = sig;
+        stations[n.id] = rec;
+        stationsRoot.add(rec.group);
+      }
+    });
+    Object.keys(stations).forEach(function (id) { if (!seen[id]) removeStation(id); });
+  }
+
   function setMode(mode) {
     pitchTarget = mode === 'cockpit' ? 0.34 : mode === 'chase' ? 0.2 : 0;
     orbital.visible = (mode === 'cockpit' || mode === 'chase');
     heroShip.visible = (mode === 'chase');
+    stationsRoot.visible = (mode === 'cockpit' || mode === 'chase');
     try { document.body.classList.toggle('gl-hero', mode === 'chase'); } catch (e) {}
   }
 
@@ -4412,6 +4557,17 @@ window.pflxSpace = (function () {
       });
     }
 
+    // station life: rings spin, beacons breathe
+    if (stationsRoot.visible) {
+      Object.keys(stations).forEach(function (id) {
+        const rec = stations[id];
+        rec.spins.forEach(function (m) { m.rotation.z += dt * 0.35; });
+        rec.beacons.forEach(function (mat, bi) {
+          mat.opacity = 0.55 + Math.sin(t * 2.2 + bi * 1.7 + rec.group.position.x * 0.01) * 0.35;
+        });
+      });
+    }
+
     // orbital command map: trail the camera, planets ride their rings
     if (orbital.visible) {
       orbital.position.set(camera.position.x, camera.position.y + 2400, camera.position.z - 11000);
@@ -4492,7 +4648,7 @@ window.pflxSpace = (function () {
 
   window.PFLX_GL_ACTIVE = true;
   document.body.classList.add('gl-active');
-  return { sync: sync, setMode: setMode };
+  return { sync: sync, setMode: setMode, syncStations: syncStations };
 })();
 
 // ==================== STARFIELD ====================
@@ -5383,6 +5539,22 @@ function pflxDecrowdStations() {
       bdg.style.transformOrigin = 'center';
     }
   });
+
+  // Graphics P2: mirror the live node set into the GL scene as 3D
+  // structures (cheap — syncStations is signature-cached per node)
+  try {
+    if (window.pflxSpace && window.pflxSpace.syncStations) {
+      window.pflxSpace.syncStations(list.map(function (ne) {
+        return {
+          id: ne.node.id,
+          x: parseFloat(ne.el.style.left) || 0,
+          y: parseFloat(ne.el.style.top) || 0,
+          status: ne.node.status || '',
+          nodeType: ne.node.nodeType || ''
+        };
+      }));
+    }
+  } catch (e) {}
 }
 
 drawConnectors();

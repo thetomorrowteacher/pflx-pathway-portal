@@ -1146,8 +1146,21 @@ brake/reverse. Bird's-eye keeps classic zoom-at-cursor.
   thrust, engine flames scale/flicker with thrust+boost, idle bob,
   subtle full-burn shake. `body.gl-hero` hides the CSS #chaseShip
   (CSS ship remains as the no-WebGL fallback).
-- NEXT GRAPHICS PHASES: P2 stations in-scene, P3 postprocessing bloom
-  (needs esbuild bundle), P4 GPU particles — see roadmap below.
+- **Graphics P2 SHIPPED (same session):** 3D station structures in the
+  GL scene (`stationsRoot` / `buildStation` / `syncStations` in the
+  pflxSpace IIFE). Per-nodeType kits: course = station city (towers +
+  spinning ring + lit windows), project = industrial yard (gantries +
+  cargo), program = ringed citadel, quest = stargate (spinning torus +
+  violet portal), challenge = fortress, untyped = jump beacon. Status
+  drives materials + beacon color (locked = powered-down gray, no
+  beacon; completed = warm windows + green; in_progress = amber).
+  Synced from pflxDecrowdStations (signature-cached per node, so drags/
+  edits/status changes rebuild only the changed station). Visible in
+  chase/cockpit; the flat DOM SVG silhouettes hide there via
+  `body.gl-active.cam-chase .station-structure` CSS (bird's-eye keeps
+  the SVG look). Beacons breathe + rings spin in tick().
+- NEXT GRAPHICS PHASES: P3 postprocessing bloom (needs esbuild
+  bundle), P4 GPU particles — see roadmap below.
 
 ### GRAPHICS → "PS5 LEVEL" ROADMAP (June 11)
 Shipped now: ACES filmic tone mapping + sRGB output + exposure 1.15 on
