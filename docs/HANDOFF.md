@@ -1024,4 +1024,31 @@ Root causes fixed:
   — host reviews everything before export.
 - The AI difficulty layer that `aiAdaptation` scaffolds (per-player
   runtime adaptation — the auto-tier engine handles authoring-time).
+
+### Platform AI layer (June 11, after Ennis: "keys not saving, X-Bot not working")
+- `api/pflx-ai.js` is now **multi-provider**: GET reports
+  `providers:{anthropic,openai,gemini}`; POST takes
+  `{provider, system, prompt|messages[], maxTokens}`. Env keys:
+  ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY (+ model
+  overrides). **Server-side keys are THE fix for "keys not saving" —
+  they work on every device/browser.** Ennis must set them in the
+  pflx-pathway-portal Vercel project.
+- Console (pflx-platform repo) XBOT_AI upgrades: (1) proxy transport —
+  cloud engines are available via the proxy even with no browser key
+  (each callX falls through to `callProxy(provider)`); (2) **Local AI
+  provider** — any OpenAI-compatible URL (Ollama/LM Studio on the Mac,
+  Apple on-device servers); auto-routing prefers Local for
+  greetings/quick/short queries so basics are free; (3) localStorage
+  backup row `pflx_xbot_ai_keys_bak` restored when the primary is
+  missing; (4) UI: Local AI fields + LOCAL engine card + proxy status
+  lines in both the X-Bot side panel and the full settings page.
+- NOTE: the "Locally AI" iPhone app (locallyai.app) has NO network API
+  server — it can't be called by the Console. Apps that DO: "Local LLM
+  Server" / "ai.local" (iPhone), Ollama / LM Studio / apple-to-openai
+  (Mac). Browser mixed-content rules mean the hosted https Console can
+  only reach LOCALHOST endpoints — so the practical setup is a model
+  running on the same computer as the browser.
+- ElevenLabs TTS key unchanged (browser localStorage,
+  `pflx_xbot_elevenlabs_key`); proxying TTS audio is a possible
+  follow-up.
 - A tools registry for branded tool cards (open question 14.8 #4).
