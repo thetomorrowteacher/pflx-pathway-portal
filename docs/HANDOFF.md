@@ -1128,6 +1128,13 @@ A crew invite at a co-op-enabled node now mints a real shared session:
 - v2 ideas: shared activity-field state inside modules (needs viewer
   support), party voice/text via DarkCampus channel auto-creation.
 
+### TRACKPAD THROTTLE (June 11, Ennis feedback)
+In chase/cockpit the two-finger swipe is no longer zoom — it IS the
+throttle: the old zoom-in gesture direction = forward thrust along the
+heading (decaying burst, continuous swipe = continuous thrust,
+`window._pflxWheelThrust` consumed in pflxKeyLoop), reverse swipe =
+brake/reverse. Bird's-eye keeps classic zoom-at-cursor.
+
 ### GRAPHICS → "PS5 LEVEL" ROADMAP (June 11)
 Shipped now: ACES filmic tone mapping + sRGB output + exposure 1.15 on
 the GL renderer (filmic highlight rolloff — planets/nebulae stop

@@ -4837,6 +4837,20 @@ window.addEventListener('mouseup', () => {
 // ==================== ZOOM ====================
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
+
+  // ── FLIGHT THROTTLE (chase/cockpit) ──────────────────────────────
+  // The two-finger swipe that used to zoom IS the forward feeling —
+  // so in flight modes it now IS forward. Swipe forward (the old
+  // zoom-in direction) = thrust deeper into space along your heading;
+  // swipe back = brake / reverse. Bird's-eye keeps classic zoom.
+  if (typeof pflxCamera !== 'undefined' && pflxCamera.mode !== 'birdseye') {
+    const d = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 80);
+    // zoom-in gesture (deltaY < 0) → positive thrust impulse
+    window._pflxWheelThrust = Math.max(-1, Math.min(1.6, (window._pflxWheelThrust || 0) - d * 0.02));
+    if (!pflxKeyAnimFrame) pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+    return;
+  }
+
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
   const my = e.clientY - rect.top;
@@ -11198,10 +11212,18 @@ function pflxKeyLoop() {
   window.pflxShipHeading += turn * 0.042;
   window._pflxLastTurn = turn;
 
-  // thrust input: UP = forward along heading, DOWN = brake / slow reverse
+  // thrust input: UP = forward along heading, DOWN = brake / slow reverse,
+  // and the trackpad throttle (two-finger swipe) layered on top — a swipe
+  // gives a decaying burst, continuous swiping = continuous thrust
   let thrust = 0;
   if (pflxKeys.up) thrust += 1;
   if (pflxKeys.down) thrust -= 0.55;
+  if (window._pflxWheelThrust) {
+    thrust += window._pflxWheelThrust;
+    window._pflxWheelThrust *= 0.90;                      // burst decay
+    if (Math.abs(window._pflxWheelThrust) < 0.02) window._pflxWheelThrust = 0;
+  }
+  thrust = Math.max(-1, Math.min(1.6, thrust));
 
   const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
   const tierMult = pflxShip.upgrades._speedMult || 1;
@@ -11872,7 +11894,7 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
 </div>
 
 <!-- Arrow Key Hint -->
-<div class="arrow-key-hint" id="arrowKeyHint">↑ thrust forward · ↓ brake · steer with ←/→ or your mouse · SHIFT boost · SPACE fire</div>
+<div class="arrow-key-hint" id="arrowKeyHint">swipe / ↑ to thrust forward · ↓ brake · steer with ←/→ or your mouse · SHIFT boost · SPACE fire</div>
 
 <!-- Boost speed streaks + vignette (game feel; opacity driven by pflxKeyLoop) -->
 <div id="speedStreaks"></div>
