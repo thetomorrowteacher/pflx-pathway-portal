@@ -696,3 +696,110 @@ the gate inline.
 
 *End of June 2026 update. Hand off to next session — Fable, Core
 Pathways Open Space UI is yours.*
+
+---
+---
+
+# Session Update — June 10-11 2026 (Fable) — Open Space UI Phases 1-3 + Endless Space
+
+Seven commits shipped to `pflx-pathway-portal` `main`, all deployed and
+verified live on the production URL. Working tree clean at session end.
+
+## Commits (chronological)
+
+| Hash | What |
+|------|------|
+| `f4f9654` | Phase 1: WebGL deep-space layer (Three.js r128, pinned cdnjs CDN), camera momentum + elastic bounds, `?openspace=1` preview station |
+| `9376749` | Flash fix (per-star shader twinkle, static layer opacities, near-zero fog) + horizon planet w/ atmosphere limb glow, 2 moons, sun glow |
+| `3bd8a25` | Phase 2: station-city silhouettes on every real node via `pflxStationHTML(n)` |
+| `9ba124a` | Phase 3a: true astern chase ship + cockpit orbital command map + blue-lit dashboard w/ HOTAS sticks |
+| `edbdf61` | De-crowd: right control rail restack, station auto-scale (`pflxDecrowdStations`), selection-screen responsive shrink (preview.html) |
+| `acf6400` | Endless procedural universe: deterministic 2600px chunks (planets/nebulae/spirals + asteroid clusters/black holes/derelicts), bounds widened, ship clamp lifted to ±40k |
+| `40f3879` | Hazard gameplay + comet events + CARGO HOLD inventory + X-Coin module contract |
+
+## Architecture decisions (locked with Ennis)
+
+1. **Engine:** Three.js r128 global build from cdnjs, no build step. The GL
+   layer is `#spaceGL` (z-index 0); ALL nodes stay DOM/SVG above it. If THREE
+   fails to load, `PFLX_GL_ACTIVE` stays false and the legacy DOM background
+   (still in the file, gated) boots as fallback.
+2. **Camera:** free-form pan/zoom (no orbit). GL camera dollies via
+   `pflxSpace.sync(panX, panY, zoom)` called at the end of `applyTransform`.
+   `pflxSpace.setMode(mode)` (called from `pflxSetCamera`) pitches the GL
+   camera and toggles the cockpit orbital map.
+3. **Node visuals:** distinct silhouettes per `nodeType`, one shared kit —
+   course=station-city, project=industrial yard, program=ringed citadel,
+   quest=stargate, challenge=fortress, untyped=jump beacon. Deterministic
+   per-node-id hash; status drives lighting (locked=powered-down grayscale,
+   completed=warm windows + green beacon, in_progress=fast beams).
+4. **Hazard rewards are ITEMS + pending XC** — real XC crediting awaits a
+   Console-side `pflx_space_xc` handler (NOT yet built). Popup/log shows
+   "+N XC · PENDING CREDIT". This respects the approval-gated economy.
+5. **Reference art** (Ennis supplied 3 images): floating station cities w/
+   engine-glow pillars · cockpit w/ orbital rings outside windshield ·
+   capital ship from astern over a planet. Match these, don't drift.
+
+## What exists now in pathway.html (search anchors)
+
+- `OPEN SPACE — WebGL deep-space layer` — the whole GL IIFE (`window.pflxSpace`)
+- `ENDLESS SPACE — deterministic procedural chunks` — `spawnChunk` /
+  `despawnChunk` / `ensureChunks` (5×5 ring, despawn >3 chunks, full disposal)
+- `window.pflxSpaceObjects` — live registry of map-plane hazards
+  ({type:'asteroids'|'blackhole'|'derelict', x, y, r, chunkKey, gl…})
+- `pflxSpaceHazards` — gameplay tick (black-hole pull w/ shield mitigation,
+  asteroid mining timer, derelict pickup, comet events); hooked into
+  `pflxKeyLoop`; birds-eye click-to-collect via canvas click → guided flight
+- `pflxCargo` — inventory: localStorage `pflx_cargo_<playerId>` + debounced
+  Supabase mirror to `app_data` key `pflx_cargo_<playerId>`; CARGO button in
+  right rail opens drawer w/ ITEMS / SHIPS / LOG tabs + pending-XC footer
+- `SHIP_TIER_FEATURES` + `pflxLoadShipState` — now also reads
+  `pflx_ship_state.modules[]`: `mining-laser`, `tractor-beam`,
+  `deep-scanner`, `shield-booster` (helper `hasModule(id)`)
+- `pflxStationHTML` / `pflxStationDefs` — node structure generator
+- `pflxDecrowdStations` — neighbor-distance auto-scale, runs in every
+  `drawConnectors` pass
+- `#chaseShip` — screen-fixed astern hero ship (banks via `--thrust` /
+  transform set in `pflxKeyLoop`); map-plane `#pflxShip` hidden in chase only
+- `buildOrbital` — cockpit/chase orbital command map in the GL scene
+
+## Open work (priority order)
+
+1. **X-Coin Ship Bay items for the module contract** — add mining-laser /
+   tractor-beam / deep-scanner / shield-booster purchasables to
+   `pflx-xcoin-check` (`app/lib/data.ts` SHIP_TIERS area + marketplace UI)
+   and write `modules[]` into the `pflx_ship_state` broadcast. The pathway
+   side already honors them.
+2. **Console handler for `pflx_space_xc`** — `pflx-platform-check/preview.html`
+   should catch it and credit via `PflxDataBus.award` (or route into the
+   Approvals Queue if Ennis prefers host sign-off), then ack so the cargo
+   footer clears PENDING.
+3. **Original Phase 3 polish still pending:** warp-lane energy beams between
+   stations (replace dashed SVG connectors), HUD hover data cards +
+   target-lock reticle on real nodes (the `?openspace=1` preview shows the
+   intended language), subtle hover/select audio.
+4. **Phase 4:** Detail Overlay restyle to HUD language (inputs/outputs are
+   FROZEN — only the skin may change), HANDOFF refresh, full live smoke test
+   of pathway → module → approval round-trip after all UI work.
+5. **Live verification of this session's work by a human** — Ennis confirmed
+   smoother + approved direction, but black-hole pull / mining / cargo sync
+   have NOT been play-tested end-to-end in a real browser yet.
+
+## Verification facts for the next session
+
+- Test page: `https://pflx-pathway-portal.vercel.app/pathway.html`
+  (public, no Vercel auth) — branch-alias URLs are 401-protected.
+- Syntax gate that caught every error this session: extract inline
+  `<script>` blocks and run `node --check` on each (python one-liner in repo
+  history). Run it BEFORE every commit.
+- Automated in-browser checks are blocked on this machine: Chrome's "Allow
+  JavaScript from Apple Events" is OFF and screencapture lacks Screen
+  Recording permission. Don't burn time there; ask Ennis to eyeball.
+- Sandbox git: `git add`/`commit` work but `.git` lock/tmp files can't be
+  unlinked from the sandbox — run the lock cleanup + commit + push through
+  the Control Your Mac osascript pattern (see §14 above).
+- IMAGE UPLOADS from Ennis often arrive corrupt through chat. His macOS
+  screenshots are HEIC bytes with .png names. He has asked: DO NOT attempt
+  image conversion workflows. If a screenshot fails to load, just ask him
+  to describe the issue in words.
+
+*End of June 10-11 2026 update.*
