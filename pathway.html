@@ -3850,15 +3850,34 @@ window.pflxSpace = (function () {
   scene.add(sunLight);
 
   const planets = [];
-  // big horizon planet — bottom-left, looming like the reference shots
+  // ── PER-PATHWAY IDENTITY ── the looming horizon planet is each
+  // pathway's signature: its palette, atmosphere color, and which side
+  // of the sky it owns are all derived from the pathway slug, so
+  // Content Creator's sky reads instantly different from 3D Modeler's.
+  const HSEED = (function () {
+    var s = (typeof pathwaySlug !== 'undefined' && pathwaySlug) ? String(pathwaySlug) : 'default';
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  })();
+  const HORIZON_PALS = [
+    ['#0a2c52', '#0e4a78', 'rgba(40,90,70,0.95)',   'rgba(120,110,70,0.9)',  '90,190,255'],   // ocean world
+    ['#3a140a', '#5a2410', 'rgba(220,120,50,0.95)', 'rgba(160,70,30,0.9)',   '255,140,70'],   // magma world
+    ['#241048', '#3a2068', 'rgba(150,110,220,0.9)', 'rgba(110,70,180,0.9)',  '170,130,255'],  // violet gas giant
+    ['#0e3a30', '#16584a', 'rgba(90,200,150,0.92)', 'rgba(50,140,110,0.9)',  '110,255,200'],  // emerald world
+    ['#4a3410', '#6a4c18', 'rgba(220,180,90,0.92)', 'rgba(170,130,60,0.9)',  '255,220,140'],  // desert world
+    ['#3c1030', '#5a1c48', 'rgba(220,110,170,0.9)', 'rgba(160,70,130,0.9)',  '255,130,200'],  // rose nebula world
+  ];
+  const HP = HORIZON_PALS[HSEED % HORIZON_PALS.length];
+  const HSIDE = ((HSEED >>> 5) % 2 === 0) ? -1 : 1;   // which side of the sky
   const bigPlanet = new THREE.Mesh(
     new THREE.SphereGeometry(3000, 56, 36),
-    new THREE.MeshLambertMaterial({ map: planetTexture('#0a2c52', '#0e4a78', 'rgba(40,90,70,0.95)', 'rgba(120,110,70,0.9)') })
+    new THREE.MeshLambertMaterial({ map: planetTexture(HP[0], HP[1], HP[2], HP[3]) })
   );
-  bigPlanet.position.set(-4600, -4400, -7200);
+  bigPlanet.position.set(HSIDE * 4600, -4400, -7200 - ((HSEED >>> 9) % 1200));
   scene.add(bigPlanet);
   // glow ring starts just inside the limb (planet r=3000 / sprite half=3650 ≈ 0.82)
-  const bigAtmo = haloSprite('90,190,255', 0.78, 0.6);
+  const bigAtmo = haloSprite(HP[4], 0.78, 0.6);
   bigAtmo.scale.set(7300, 7300, 1);
   bigAtmo.position.copy(bigPlanet.position);
   scene.add(bigAtmo);
@@ -4270,12 +4289,14 @@ window.pflxSpace = (function () {
   // Layer-space point under the viewport centre drives camera x/y;
   // zoom drives a dolly on z. Lerped per-frame for cinematic ease.
   const target = new THREE.Vector3(0, 0, 2400);
-  function sync(panX, panY, zoom) {
+  let rollTarget = 0;   // camera roll matches the map's flight rotation
+  function sync(panX, panY, zoom, viewRotDeg) {
     const cx = (window.innerWidth / 2 - panX) / zoom;    // layer px under centre
     const cy = (window.innerHeight / 2 - panY) / zoom;
     target.x = (cx - 1000) * 1.15;
     target.y = -(cy - 1000) * 1.15;
     target.z = Math.max(900, Math.min(5200, 2300 / zoom));
+    rollTarget = (viewRotDeg || 0) * Math.PI / 180;
     ensureChunks(cx, cy);   // endless space follows the camera
   }
   camera.position.copy(target);
@@ -4295,6 +4316,8 @@ window.pflxSpace = (function () {
     const k = 1 - Math.pow(0.002, dt);
     camera.position.lerp(target, k);
     camera.rotation.x += (pitchTarget - camera.rotation.x) * Math.min(1, dt * 2.2);
+    // roll with the flight rotation so the stars turn as you bank
+    camera.rotation.z += (rollTarget - camera.rotation.z) * Math.min(1, dt * 3.2);
 
     // orbital command map: trail the camera, planets ride their rings
     if (orbital.visible) {
@@ -4605,30 +4628,39 @@ function applyTransform() {
   // rotateX swing the whole map — the "camera glitching / hard to navigate"
   // symptom. ox/oy is the layer-space point under the viewport centre, so
   // the tilt now rotates around what the player is actually looking at.
+  // World ROTATION (flight model): in chase/cockpit the map spins around
+  // the ship so the heading always points up-screen — pressing UP flies
+  // you deeper into space no matter which way you've turned.
+  const viewRot = (camMode !== 'birdseye' && typeof window.pflxViewRotDeg === 'number') ? window.pflxViewRotDeg : 0;
+  const rotSeg = (viewRot && typeof pflxShip !== 'undefined')
+    ? ` translate(${pflxShip.x}px, ${pflxShip.y}px) rotate(${viewRot.toFixed(2)}deg) translate(${-pflxShip.x}px, ${-pflxShip.y}px)`
+    : '';
   if (tiltX > 0) {
     const ox = (window.innerWidth / 2 - panX) / zoom;
     const oy = (window.innerHeight / 2 - panY) / zoom;
-    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${ox}px, ${oy}px) rotateX(${tiltX}deg) translate(${-ox}px, ${-oy}px)`;
+    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${ox}px, ${oy}px) rotateX(${tiltX}deg) translate(${-ox}px, ${-oy}px)` + rotSeg;
   } else {
-    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    nodeLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})` + rotSeg;
   }
   updateMinimap();
 
   // Billboard: counter-rotate nodes so they face the camera
   if (tiltX > 0) {
-    if (!applyTransform._lastTilt || applyTransform._lastTilt !== tiltX) {
-      applyTransform._lastTilt = tiltX;
-      // Apply counter-rotation to all skill nodes
+    // counter-rotate nodes for BOTH the tilt and the world rotation so
+    // station labels stay upright while the world spins behind the ship
+    const tiltKey = tiltX + '|' + Math.round(viewRot * 2);
+    if (applyTransform._lastTiltKey !== tiltKey) {
+      applyTransform._lastTiltKey = tiltKey;
       const allNodes = document.querySelectorAll('.skill-node');
       const counterTilt = -tiltX;
       const nodeScale = camMode === 'cockpit' ? 1.3 : 1;
       allNodes.forEach(function(n) {
-        n.style.transform = 'rotateX(' + counterTilt + 'deg) scale(' + nodeScale + ')';
+        n.style.transform = 'rotate(' + (-viewRot).toFixed(1) + 'deg) rotateX(' + counterTilt + 'deg) scale(' + nodeScale + ')';
         n.style.transformStyle = 'preserve-3d';
       });
     }
-  } else if (applyTransform._lastTilt) {
-    applyTransform._lastTilt = 0;
+  } else if (applyTransform._lastTiltKey) {
+    applyTransform._lastTiltKey = null;
     // Reset node transforms back to normal
     const allNodes = document.querySelectorAll('.skill-node');
     allNodes.forEach(function(n) {
@@ -4643,9 +4675,9 @@ function applyTransform() {
     if (tiltX > 0) {
       const dox = (window.innerWidth / 2 - panX) / zoom;
       const doy = (window.innerHeight / 2 - panY) / zoom;
-      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${dox}px, ${doy}px) rotateX(${tiltX}deg) translate(${-dox}px, ${-doy}px)`;
+      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom}) translate(${dox}px, ${doy}px) rotateX(${tiltX}deg) translate(${-dox}px, ${-doy}px)` + rotSeg;
     } else {
-      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+      discLayer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})` + rotSeg;
     }
   }
 
@@ -4667,8 +4699,9 @@ function applyTransform() {
     if (near) near.style.transform = `translate3d(${panX * 0.8}px, ${panY * 0.8}px, -30px) scale(${0.95 + zoom * 0.05})`;
   }
 
-  // Open Space GL camera follows the map camera (dolly on zoom, true parallax)
-  if (window.pflxSpace) window.pflxSpace.sync(panX, panY, zoom);
+  // Open Space GL camera follows the map camera (dolly on zoom, true
+  // parallax, and ROLL so the deep-space backdrop turns with the ship)
+  if (window.pflxSpace) window.pflxSpace.sync(panX, panY, zoom, viewRot);
 }
 
 // Center on nodes initially
@@ -10775,7 +10808,7 @@ const pflxTour = {
   KEY: 'pflx_pathway_tour_v1',
   steps: [
     { sel: '.skill-node', title: 'STATION NODES', body: 'Every station is a course, project, or challenge. Click one to open its briefing — entry video, requirements, your saved progress — then hit START to dock and launch the module. Complete it for XC and badges.' },
-    { sel: '.camera-toggle', title: 'CAMERA MODES', body: 'BIRD\'S-EYE is your star map — pan, zoom, and click anything in space for intel. Switch to CHASE or COCKPIT to take the stick: WASD or arrows to fly, SHIFT to boost, SPACE to fire at asteroid fields for XC and ore.' },
+    { sel: '.camera-toggle', title: 'CAMERA MODES', body: 'BIRD\'S-EYE is your star map — pan, zoom, and click anything in space for intel. Switch to CHASE or COCKPIT to take the stick: ↑ thrusts you forward into deep space, ↓ brakes, steer with ←/→ or your mouse, SHIFT boosts, SPACE fires at asteroid fields for XC and ore.' },
     { sel: '#cargoBtn', title: 'CARGO HOLD', body: 'Everything you collect out there — ore, crystals, salvage, stardust — lands here, along with your pending XC. The SHIP BAY link takes you to the X-Coin Marketplace for stronger hulls and ship systems.' },
     { sel: '.minimap', title: 'MINIMAP', body: 'Your sector at a glance. Click or drag anywhere on it to jump the camera across the map.' },
     { sel: '.progress-bar-container', title: 'PATHWAY PROGRESS', body: 'How many stations you\'ve completed on this pathway. Finish them all to master the discipline — and watch for distant galaxy clusters only warp-capable ships can reach.' },
@@ -10886,7 +10919,19 @@ function pflxSetCamera(mode) {
   pflxCamera.mode = mode;
 
   // Force billboard recalculation on next applyTransform
-  applyTransform._lastTilt = null;
+  applyTransform._lastTiltKey = null;
+
+  // ── Flight-model handoff ──
+  if (mode === 'birdseye') {
+    window.pflxViewRotDeg = 0;          // map is upright in overview
+    window._pflxMouseSteer = 0;
+  } else {
+    // pick up the heading from wherever the ship is pointing and start
+    // the flight loop so steering works immediately (even while parked)
+    window.pflxShipHeading = (pflxShipAngle - 90) * Math.PI / 180;
+    window.pflxViewRotDeg = -90 - window.pflxShipHeading * (180 / Math.PI);
+    if (!pflxKeyAnimFrame) pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
+  }
 
   // Update button states
   document.getElementById('camBirdseye').classList.toggle('active', mode === 'birdseye');
@@ -10944,6 +10989,31 @@ function pflxSetCamera(mode) {
 // ═══════════════════════════════════════════════════════════
 
 const pflxKeys = { up: false, down: false, left: false, right: false, shift: false, fire: false };
+
+// ── FLIGHT MODEL (June 2026 rework) ──
+// In chase/cockpit the ship flies like a real spacecraft:
+//   UP / W      → thrust FORWARD along the ship's heading (deeper into space)
+//   DOWN / S    → brake, then slow reverse
+//   LEFT/RIGHT  → turn the heading
+//   MOUSE / TRACKPAD → steer: move the pointer toward a screen edge to
+//     bank the ship that way (center ≈ dead zone, flies straight)
+// The WORLD rotates around the ship so your heading is always up-screen.
+window.pflxShipHeading = -Math.PI / 2;   // radians; -90° = "north"
+window.pflxViewRotDeg = 0;               // world rotation applied in applyTransform
+window._pflxMouseSteer = 0;
+window._pflxLastTurn = 0;
+document.addEventListener('mousemove', function (e) {
+  try {
+    if (typeof pflxCamera === 'undefined' || pflxCamera.mode === 'birdseye') { window._pflxMouseSteer = 0; return; }
+    // pointer over UI → don't steer
+    if (e.target && e.target.closest && e.target.closest('.detail-panel, #cargoPanel, button, select, input, .node-editor, #pflxEncounterPrompt, .camera-toggle, .ship-mode-toggle, .minimap')) {
+      window._pflxMouseSteer = 0; return;
+    }
+    var nx = (e.clientX / window.innerWidth) * 2 - 1;   // -1 … 1
+    var dead = 0.16;
+    window._pflxMouseSteer = Math.abs(nx) < dead ? 0 : Math.sign(nx) * Math.min(1, (Math.abs(nx) - dead) / 0.55);
+  } catch (er) {}
+});
 let pflxKeyAnimFrame = null;
 let pflxShipAngle = 0;      // current heading in degrees (0 = up)
 let pflxShipSpeed = 0;       // current speed for cockpit gauge
@@ -10983,17 +11053,25 @@ function pflxKeyLoop() {
   if (pflxCamera.mode === 'birdseye') { pflxKeyAnimFrame = null; return; }
   if (pflxShip.flying) { pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop); return; }
 
-  const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
-  let ax = 0, ay = 0;
-  if (pflxKeys.up)    ay -= SHIP_ACCEL;
-  if (pflxKeys.down)  ay += SHIP_ACCEL;
-  if (pflxKeys.left)  ax -= SHIP_ACCEL;
-  if (pflxKeys.right) ax += SHIP_ACCEL;
+  // ── HEADING + THRUST flight model ──
+  // turn input: arrow keys + mouse/trackpad steering combined
+  let turn = 0;
+  if (pflxKeys.left) turn -= 1;
+  if (pflxKeys.right) turn += 1;
+  turn += (window._pflxMouseSteer || 0);
+  turn = Math.max(-1.4, Math.min(1.4, turn));
+  window.pflxShipHeading += turn * 0.042;
+  window._pflxLastTurn = turn;
 
-  // Apply speed multiplier from ship tier
+  // thrust input: UP = forward along heading, DOWN = brake / slow reverse
+  let thrust = 0;
+  if (pflxKeys.up) thrust += 1;
+  if (pflxKeys.down) thrust -= 0.55;
+
+  const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
   const tierMult = pflxShip.upgrades._speedMult || 1;
-  ax *= tierMult;
-  ay *= tierMult;
+  let ax = Math.cos(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
+  let ay = Math.sin(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
 
   pflxShipVx += ax;
   pflxShipVy += ay;
@@ -11005,25 +11083,17 @@ function pflxKeyLoop() {
     pflxShipVy = (pflxShipVy / spd) * maxSpd * tierMult;
   }
 
-  // Friction when no keys pressed
-  if (!pflxKeys.up && !pflxKeys.down) pflxShipVy *= SHIP_FRICTION;
-  if (!pflxKeys.left && !pflxKeys.right) pflxShipVx *= SHIP_FRICTION;
+  // Friction when not thrusting (drag applies to the whole velocity
+  // vector — turning no longer bleeds speed on one axis only)
+  if (!pflxKeys.up && !pflxKeys.down) { pflxShipVx *= SHIP_FRICTION; pflxShipVy *= SHIP_FRICTION; }
 
   // Stop if very slow
   pflxShipSpeed = Math.sqrt(pflxShipVx * pflxShipVx + pflxShipVy * pflxShipVy);
-  if (pflxShipSpeed < 0.15 && ax === 0 && ay === 0) {
+  if (pflxShipSpeed < 0.15 && thrust === 0) {
+    // parked — zero out drift but FALL THROUGH so steering, the world
+    // rotation, the blaster, and the HUD all stay live (the old early
+    // return froze the view and made turning-in-place impossible)
     pflxShipVx = 0; pflxShipVy = 0; pflxShipSpeed = 0;
-    // Remove banking classes when stopped
-    const shipEl = document.getElementById('pflxShip');
-    if (shipEl) { shipEl.classList.remove('banking-left', 'banking-right'); }
-    // Stationary fire: the blaster still works while parked
-    if (window.pflxBlaster) pflxBlaster.tick(1 / 60);
-    pflxKeyAnimFrame = null;
-    // Continue loop to check for new key presses (or held trigger)
-    if (pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right || pflxKeys.fire) {
-      pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
-    }
-    return;
   }
 
   // Move ship
@@ -11054,10 +11124,10 @@ function pflxKeyLoop() {
     }
   }
 
-  // Update ship rotation to face movement direction
-  if (pflxShipSpeed > 0.5) {
-    pflxShipAngle = Math.atan2(pflxShipVy, pflxShipVx) * (180 / Math.PI) + 90;
-  }
+  // Ship faces its HEADING (not its drift) — flight-model behavior
+  pflxShipAngle = window.pflxShipHeading * (180 / Math.PI) + 90;
+  // World rotation: heading is always up-screen in chase/cockpit
+  window.pflxViewRotDeg = -90 - window.pflxShipHeading * (180 / Math.PI);
 
   const shipEl = document.getElementById('pflxShip');
   if (shipEl) {
@@ -11103,12 +11173,19 @@ function pflxKeyLoop() {
   panY = (window.innerHeight * (pflxCamera.mode === 'chase' ? 0.62 : 0.5)) - pflxShip.y * zoom;
   applyTransform();
 
-  // Chase-view hero ship: bank with steering, thrust scales with speed
+  // Chase-view hero ship: bank with TURN input (not drift), thrust scales with speed
   var chaseEl = document.getElementById('chaseShip');
   if (chaseEl && pflxCamera.mode === 'chase') {
-    var bank = Math.max(-16, Math.min(16, pflxShipVx * 1.6));
+    var bank = Math.max(-18, Math.min(18, (window._pflxLastTurn || 0) * 14));
     chaseEl.style.transform = 'translateX(-50%) rotate(' + bank.toFixed(1) + 'deg)';
     chaseEl.style.setProperty('--thrust', (0.55 + Math.min(1, pflxShipSpeed / 14) * 0.95).toFixed(2));
+  }
+
+  // Boost vignette + speed streak intensity (game feel)
+  var streaks = document.getElementById('speedStreaks');
+  if (streaks) {
+    var boostN = Math.max(0, Math.min(1, (pflxShipSpeed - SHIP_MAX_SPEED * 0.8) / (SHIP_BOOST_MAX * 0.9)));
+    streaks.style.opacity = (pflxCamera.mode === 'birdseye') ? '0' : boostN.toFixed(2);
   }
 
   // Spawn trail particles while moving
@@ -11660,7 +11737,39 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
 </div>
 
 <!-- Arrow Key Hint -->
-<div class="arrow-key-hint" id="arrowKeyHint">Use arrow keys to pilot your ship</div>
+<div class="arrow-key-hint" id="arrowKeyHint">↑ thrust forward · ↓ brake · steer with ←/→ or your mouse · SHIFT boost · SPACE fire</div>
+
+<!-- Boost speed streaks + vignette (game feel; opacity driven by pflxKeyLoop) -->
+<div id="speedStreaks"></div>
+<style>
+  #speedStreaks {
+    position: fixed; inset: 0; pointer-events: none; z-index: 84;
+    opacity: 0; transition: opacity 0.25s ease;
+    background: radial-gradient(ellipse at 50% 60%, transparent 40%, rgba(0,212,255,0.05) 64%, rgba(2,8,16,0.55) 100%);
+  }
+  #speedStreaks::before {
+    content: ''; position: absolute; inset: -20%;
+    background: repeating-conic-gradient(from 0deg at 50% 60%,
+      rgba(150,230,255,0) 0deg 5deg, rgba(150,230,255,0.07) 5.6deg 6deg);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 60%, transparent 32%, black 78%);
+    mask-image: radial-gradient(ellipse at 50% 60%, transparent 32%, black 78%);
+    animation: streakShimmer 1.4s linear infinite;
+  }
+  @keyframes streakShimmer { to { transform: rotate(6deg); } }
+
+  /* ── FLIGHT HUD DECLUTTER ── chase/cockpit hide overview chrome so
+     the pilot sees space, the ship, and only flight-relevant UI. The
+     bird's-eye keeps the full management surface. */
+  body.cam-chase .welcome-panel,   body.cam-cockpit .welcome-panel,
+  body.cam-chase .welcome-restore, body.cam-cockpit .welcome-restore,
+  body.cam-chase .progress-bar-container, body.cam-cockpit .progress-bar-container,
+  body.cam-chase .zoom-controls,   body.cam-cockpit .zoom-controls,
+  body.cam-chase #pflxTourBtn,     body.cam-cockpit #pflxTourBtn,
+  body.cam-chase .bottom-bar,      body.cam-cockpit .bottom-bar,
+  body.cam-chase .powered-by,      body.cam-cockpit .powered-by {
+    display: none !important;
+  }
+</style>
 
 <script src="pflx-ai-chat.js"></script>
 

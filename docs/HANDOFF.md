@@ -1079,9 +1079,40 @@ The half-built Proposals feature is now end-to-end (pflx-platform):
   cargo hold, minimap, progress, zoom), auto-runs once per browser
   (`pflx_pathway_tour_v1`), ? replay button bottom-right next to the
   minimap.
-- STILL TO DO: in-app tours for X-Coin, Battle Arena, DarkCampus
-  (Next.js apps — each needs its own small tour component; reuse the
-  pflxTour pattern).
+- ~~In-app tours for X-Coin, Battle Arena, DarkCampus~~ — **SHIPPED
+  June 11**: self-contained `PflxTour.tsx` in each app (xcoin
+  app/components, arena app/components, darkcampus src/app/components),
+  mounted in each layout.tsx. First-visit auto-run per browser
+  (pflx_tour_<app>_v1), ? replay button bottom-left, steps with missing
+  selectors degrade to centered cards so the tours never break, X-Coin
+  tour suppressed in ?embed=mc mode.
+
+### FLIGHT MODEL REWORK (June 11, Ennis: "up should go forward, not up")
+pathway.html chase/cockpit controls are now a real flight model:
+- UP/W = thrust FORWARD along the ship's heading (deep into space);
+  DOWN/S = brake then slow reverse; LEFT/RIGHT = turn; MOUSE/TRACKPAD
+  steers (horizontal position past a 16% center dead-zone banks the
+  ship; pointer over UI is ignored).
+- THE WORLD ROTATES around the ship (`window.pflxViewRotDeg`, applied
+  in applyTransform as a rotate() about the ship's map position) so the
+  heading is always up-screen; station labels counter-rotate to stay
+  readable; the GL backdrop rolls in sync (pflxSpace.sync 4th arg →
+  camera.rotation.z lerp). Bird's-eye is unchanged/upright.
+- The key loop no longer early-returns when parked — steering, the
+  blaster, and the HUD stay live; the loop is started by pflxSetCamera
+  when entering a flight mode.
+- Game feel: hero ship banks with TURN input; #speedStreaks boost
+  vignette + conic streaks fade in above ~80% max speed.
+- PER-PATHWAY IDENTITY: the big horizon planet's palette (6 worlds:
+  ocean/magma/violet/emerald/desert/rose), atmosphere color, and sky
+  side are derived from the pathway slug (HSEED), so each pathway's
+  sky reads distinct on arrival. (Chunk dressing was already seeded.)
+- FLIGHT HUD DECLUTTER: chase/cockpit hide welcome panel, progress
+  bar, zoom controls, tour button, bottom bar, powered-by — pilots see
+  space + flight UI only. Bird's-eye keeps the management surface.
+- NOT YET PLAY-TESTED: world-rotation sign vs GL roll sign needs a
+  human eyeball (if the stars turn the wrong way vs the map, flip the
+  sign of rollTarget in pflxSpace.sync).
 
 ### Cohort app gating — hardened (June 11, "DarkCampus still works when off")
 Two silent fail-open paths found and closed in pflx-platform preview.html:
