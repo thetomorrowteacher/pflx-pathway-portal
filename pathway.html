@@ -3368,6 +3368,37 @@
             </label>
           </div>
         </div>
+        <div class="ne-field" style="border:1px solid rgba(167,139,250,0.2);border-radius:6px;padding:12px;background:rgba(167,139,250,0.04);">
+          <label class="ne-label" style="color:#a78bfa;margin-bottom:8px;">Multiplayer &amp; Entry Requirements (Host)</label>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,0.6);cursor:pointer;">
+              <input type="checkbox" id="neCoopEnabled" style="width:14px;height:14px;"> Allow Co-Op play in this node
+            </label>
+            <div class="ne-row">
+              <div class="ne-field">
+                <label class="ne-label">Max Co-Op Players (2–4)</label>
+                <input class="ne-input" id="neCoopMax" type="number" min="2" max="4" step="1" placeholder="4">
+              </div>
+              <div class="ne-field">
+                <label class="ne-label">Min XC Balance to Enter</label>
+                <input class="ne-input" id="neEntryMinXC" type="number" min="0" step="10" placeholder="0">
+              </div>
+            </div>
+            <div class="ne-row">
+              <div class="ne-field">
+                <label class="ne-label">Required Entry Badge</label>
+                <select class="ne-select" id="neEntryBadge">
+                  <option value="">— None —</option>
+                </select>
+              </div>
+              <div class="ne-field">
+                <label class="ne-label">XC per Module Progress Point</label>
+                <input class="ne-input" id="neCheckpointXC" type="number" min="0" step="5" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:6px;display:block;">Co-Op is capped at 4 players platform-wide. Entry requirements are checked when a player tries to launch the node. Progress-point XC pays instantly (small amounts) each time the Module reports a completed phase — the big completion reward still goes through Approvals.</span>
+        </div>
         <button class="ne-save" id="neSave" type="button">Save Node</button>
       </div>
     </div>
@@ -5542,6 +5573,21 @@ function showDetail(n) {
   if (n.xcCost && n.xcCost > 0) {
     reqHTML += (reqHTML ? '<br>' : '') + '🎟️ Entry Fee: <span style="color:#22c55e;font-weight:700;">' + n.xcCost + ' XC</span>';
   }
+  // ── Host-set entry requirements + multiplayer mode ──
+  if (n.entryMinXC && n.entryMinXC > 0) {
+    reqHTML += (reqHTML ? '<br>' : '') + '🔐 Min Balance to Enter: <span style="color:#f5c842;font-weight:700;">' + n.entryMinXC + ' XC</span>';
+  }
+  if (n.entryBadge) {
+    reqHTML += (reqHTML ? '<br>' : '') + '🔐 Entry Badge Required: <span style="color:#f5c842;font-weight:700;">' + n.entryBadge + '</span>';
+  }
+  if (n.coopEnabled) {
+    reqHTML += (reqHTML ? '<br>' : '') + '🤝 Mode: <span style="color:#34d399;font-weight:700;">CO-OP (up to ' + Math.max(2, Math.min(4, n.coopMax || 4)) + ' players)</span>';
+  } else if (n.coopEnabled === false) {
+    reqHTML += (reqHTML ? '<br>' : '') + '🧑‍🚀 Mode: <span style="color:#7df9ff;font-weight:700;">SINGLE PLAYER</span>';
+  }
+  if (n.checkpointXC && n.checkpointXC > 0) {
+    reqHTML += (reqHTML ? '<br>' : '') + '⚡ Progress Point Bonus: <span style="color:#a78bfa;font-weight:700;">+' + n.checkpointXC + ' XC per phase</span>';
+  }
   // Add pitched-node info (XC value, creator credit, entry fee, NFT value, sponsor)
   if (n.isPitchedNode) {
     reqHTML += (reqHTML ? '<br>' : '') + '💡 <span style="color:#f59e0b;font-weight:700;">Player-Pitched Course</span>';
@@ -5574,6 +5620,25 @@ function showDetail(n) {
   }
   reqEl.innerHTML = reqHTML;
   reqEl.style.display = reqHTML ? 'block' : 'none';
+
+  // ── YOUR PROGRESS — the Node reads the player's saved Module
+  // progress (cartridge read-out) and shows it before launch ──
+  (function () {
+    var pct = pflxNodePlayerProgress(n.id);
+    var old = document.getElementById('detailModProgress');
+    if (old) old.remove();
+    if (pct === null) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'detailModProgress';
+    wrap.style.cssText = 'margin:10px 0 4px;padding:10px 12px;border:1px solid rgba(0,212,255,0.2);border-radius:8px;background:rgba(0,212,255,0.04);';
+    wrap.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<span style="font-family:Orbitron;font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.6);text-transform:uppercase;">Your Saved Progress</span>' +
+        '<span style="font-family:Orbitron;font-size:11px;font-weight:700;color:#7df9ff;">' + pct + '%</span></div>' +
+      '<div style="height:7px;background:rgba(255,255,255,0.06);border:1px solid rgba(0,212,255,0.15);border-radius:4px;overflow:hidden;">' +
+        '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#00d4ff,#7c3aed);border-radius:4px;"></div></div>';
+    reqEl.parentNode.insertBefore(wrap, reqEl.nextSibling);
+  })();
 
   // Render MC + X-Coin data section
   renderDetailMCData(n);
@@ -5735,6 +5800,25 @@ function showDetail(n) {
     }
   }
 
+  // ── HOST ENTRY GATES — min XC balance / required badge ──
+  // Wraps whatever launch handler was just installed. Hosts and edit
+  // mode bypass; players are checked at click time with current data.
+  (function () {
+    var orig = btn.onclick;
+    if (!orig) return;
+    btn.onclick = function (ev) {
+      if (!editMode && !(typeof isHostViewActive === 'function' && isHostViewActive())) {
+        var blocked = pflxNodeEntryGate(n);
+        if (blocked) {
+          showSaveToast(blocked);
+          if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
+          return;
+        }
+      }
+      return orig.call(this, ev);
+    };
+  })();
+
   // Show overlay + panel with slight delay for zoom
   setTimeout(() => {
     SFX.detailOpen();
@@ -5744,6 +5828,57 @@ function showDetail(n) {
       detailPanel.classList.add('active');
     });
   }, 200);
+}
+
+// ── Per-player module progress read-out ──
+// The Node persists the latest pflx_mod_progress percent per
+// (player, node) so the Detail Panel can show saved progress before
+// launch. Returns 0–100 or null if this player has never started.
+function pflxNodePlayerProgressKey(nodeId) {
+  var pid = 'local';
+  try {
+    var u = JSON.parse(localStorage.getItem('pflxUser') || localStorage.getItem('pflx_user') || '{}');
+    pid = u.id || u.brand || 'local';
+  } catch (e) {}
+  return 'pflx_modprog_' + nodeId + '_' + pid;
+}
+function pflxNodePlayerProgress(nodeId) {
+  try {
+    var v = localStorage.getItem(pflxNodePlayerProgressKey(nodeId));
+    if (v === null) return null;
+    return Math.min(100, Math.max(0, parseInt(v, 10) || 0));
+  } catch (e) { return null; }
+}
+
+// ── Host entry gate check — returns a block message or null ──
+// Reads the freshest player snapshot (pflxUser localStorage, then live
+// pflxData.users). Checks the host-set minimum XC balance and required
+// entry badge configured in the node editor.
+function pflxNodeEntryGate(n) {
+  if (!n) return null;
+  var u = {};
+  try { u = JSON.parse(localStorage.getItem('pflxUser') || '{}') || {}; } catch (e) {}
+  try {
+    if (pflxData && pflxData.users && u.id) {
+      var live = pflxData.users.find(function (x) { return x.id === u.id; });
+      if (live) u = Object.assign({}, u, live);
+    }
+  } catch (e) {}
+  if (n.entryMinXC && n.entryMinXC > 0) {
+    var bal = (typeof u.xc === 'number') ? u.xc : (typeof u.xcoin === 'number' ? u.xcoin : 0);
+    if (bal < n.entryMinXC) {
+      return '🔐 This node requires a balance of ' + n.entryMinXC + ' XC to enter. You have ' + bal + ' XC.';
+    }
+  }
+  if (n.entryBadge) {
+    var list = Array.isArray(u.badges) ? u.badges : [];
+    var has = list.some(function (b) {
+      if (typeof b === 'string') return b === n.entryBadge;
+      return b && (b.id === n.entryBadge || b.name === n.entryBadge);
+    });
+    if (!has) return '🔐 Entry requires the "' + n.entryBadge + '" badge. Earn it first!';
+  }
+  return null;
 }
 
 function closeDetail() {
@@ -7151,6 +7286,22 @@ function openNodeEditor(node, isNew) {
   document.getElementById('neSubHtml').checked = node.submission ? !!node.submission.html : false;
   document.getElementById('neSubDesc').checked = node.submission ? !!node.submission.description : false;
   document.getElementById('neHasProgressBar').checked = node.hasProgressBar || false;
+  // ── Multiplayer & entry requirements (Host) ──
+  document.getElementById('neCoopEnabled').checked = !!node.coopEnabled;
+  document.getElementById('neCoopMax').value = node.coopMax || '';
+  document.getElementById('neEntryMinXC').value = node.entryMinXC || '';
+  document.getElementById('neCheckpointXC').value = node.checkpointXC || '';
+  // entry badge select mirrors the main badge list (already populated above)
+  var __entryBadgeSel = document.getElementById('neEntryBadge');
+  if (__entryBadgeSel) {
+    var __opts = '<option value="">— None —</option>';
+    for (var __bi = 0; __bi < badgeSelect.options.length; __bi++) {
+      var __o = badgeSelect.options[__bi];
+      if (__o.value) __opts += '<option value="' + __o.value + '">' + __o.textContent + '</option>';
+    }
+    __entryBadgeSel.innerHTML = __opts;
+    __entryBadgeSel.value = node.entryBadge || '';
+  }
   // Tagged badges
   _neTaggedBadges = node.taggedBadges ? [...node.taggedBadges] : [];
   _neRenderTaggedBadges();
@@ -7212,6 +7363,13 @@ function _doSaveNode() {
       description: document.getElementById('neSubDesc').checked
     };
     editorNode.hasProgressBar = document.getElementById('neHasProgressBar').checked;
+    // ── Multiplayer & entry requirements (Host) ──
+    editorNode.coopEnabled = document.getElementById('neCoopEnabled').checked;
+    // platform-wide co-op cap is 4 (locked decision); host picks 2–4
+    editorNode.coopMax = Math.max(2, Math.min(4, parseInt(document.getElementById('neCoopMax').value) || 4));
+    editorNode.entryMinXC = parseInt(document.getElementById('neEntryMinXC').value) || 0;
+    editorNode.entryBadge = (document.getElementById('neEntryBadge') || {}).value || '';
+    editorNode.checkpointXC = parseInt(document.getElementById('neCheckpointXC').value) || 0;
     editorNode.taggedBadges = _neTaggedBadges.length > 0 ? [..._neTaggedBadges] : [];
     console.log('[PFLX] Node updated:', editorNode.title, 'type:', editorNode.nodeType, 'url:', editorNode.url);
 
@@ -8657,7 +8815,10 @@ function showLaunchOverlay(node) {
                     badges: [],
                     save: savedState,
                     context: { pathwaySlug: pathwaySlug, nodeId: node.id, entryMode: 'solo', tier: CLOUD_SAVE_CTX.tier },
-                    coop: { sessionId: null, role: null, peers: [] }
+                    // Host node settings: co-op availability + party cap
+                    coop: { sessionId: null, role: null, peers: [],
+                            enabled: !!node.coopEnabled,
+                            maxPlayers: Math.max(2, Math.min(4, node.coopMax || 4)) }
                   }
                 }, '*');
                 _cloudInitDelivered = true;
@@ -8671,9 +8832,34 @@ function showLaunchOverlay(node) {
                 document.getElementById('courseProgressLabel').textContent = mp + '%';
               }
               node._courseProgress = { total: 100, completed: mp, pct: mp };
+              // persist per (player, node) so the Detail Panel shows
+              // saved progress next time this player opens the node
+              try { localStorage.setItem(pflxNodePlayerProgressKey(node.id), String(mp)); } catch (eP) {}
             }
             if (d.type === 'pflx_mod_checkpoint' && d.payload) {
               node._lastCheckpoint = d.payload.checkpointId || '';
+              // ── PROGRESS-POINT XC ── host-set per-node bonus, paid
+              // instantly through the Console XC authority. Each
+              // checkpointId pays once per player (dupe-guarded).
+              try {
+                var cpXC = parseInt(node.checkpointXC, 10) || 0;
+                var cpId = d.payload.checkpointId || '';
+                if (cpXC > 0 && cpId) {
+                  var cpKey = 'pflx_modcp_' + node.id + '_' + (pflxModulePlayer().id || 'local');
+                  var paid = [];
+                  try { paid = JSON.parse(localStorage.getItem(cpKey) || '[]'); } catch (eC) {}
+                  if (paid.indexOf(cpId) === -1) {
+                    paid.push(cpId);
+                    localStorage.setItem(cpKey, JSON.stringify(paid));
+                    if (typeof pflxCargo !== 'undefined') {
+                      pflxCargo.addXC(cpXC, 'module progress point: ' + node.title + ' / ' + cpId);
+                    }
+                    if (typeof pflxSpaceToast === 'function') {
+                      pflxSpaceToast('⚡', 'PROGRESS POINT', 'Checkpoint reached in ' + node.title + '.', '+' + cpXC + ' XC');
+                    }
+                  }
+                }
+              } catch (eCp) {}
             }
             if (d.type === 'pflx_mod_save' && d.payload) {
               var __state = d.payload.state || {};
@@ -9656,7 +9842,11 @@ function pflxLoadShipState() {
       if (state.equippedEngine) pflxShip.upgrades._engineId = state.equippedEngine;
       if (state.equippedTrail) pflxShip.upgrades._trailId = state.equippedTrail;
 
-      // ── MODULE CONTRACT (X-Coin Ship Bay add-ons; optional array) ──
+      // ── SHIP SYSTEMS CONTRACT (X-Coin Ship Bay hardware add-ons) ──
+      // NOTE on terminology: these are ship SYSTEMS, not Modules.
+      // "Module" is reserved for the cartridge (course/project) that
+      // plugs into a Node (MODULE_STRUCTURE.md). The wire/storage key
+      // stays `modules` for cross-app compat only.
       // Known ids: 'mining-laser' (faster mining, double yield),
       // 'tractor-beam' (wider collection radius), 'deep-scanner'
       // (events announced from farther away), 'shield-booster'
@@ -10180,7 +10370,8 @@ pflxCargoUI.init();
 // Every player on the same pathway page joins a Supabase Realtime
 // presence channel. You see their ships move live, can WAVE at them,
 // and can invite them to rendezvous / co-op at a node. Privacy rule
-// (CONNECTOR §7): brand + initials only — never a real name.
+// (CONNECTOR §7, tightened June 2026): BRAND NAME ONLY — no initials,
+// never a real name.
 // ═══════════════════════════════════════════════════════════════════
 const pflxCrew = {
   channel: null,
@@ -10209,7 +10400,7 @@ const pflxCrew = {
   trackNow() {
     if (!this.channel) return;
     const payload = {
-      brand: this.me.brand, initials: this.me.initials,
+      brand: this.me.brand,
       x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
       mode: (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye',
       nodeId: pflxShip.currentNodeId || '',
@@ -10256,9 +10447,7 @@ const pflxCrew = {
       el.innerHTML =
         '<div style="width:34px;height:34px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
           'background:radial-gradient(circle at 35% 30%,rgba(167,139,250,0.5),rgba(0,212,255,0.18));' +
-          'border:1.5px solid rgba(167,139,250,0.8);box-shadow:0 0 14px rgba(167,139,250,0.55);' +
-          'font-size:12px;font-weight:800;color:#e6dcff;text-shadow:0 0 6px rgba(167,139,250,0.8);">' +
-          (d.initials || '??') + '</div>' +
+          'border:1.5px solid rgba(167,139,250,0.8);box-shadow:0 0 14px rgba(167,139,250,0.55);font-size:16px;">🚀</div>' +
         '<div class="crew-label" style="margin-top:3px;font-size:9px;font-weight:700;letter-spacing:0.08em;color:rgba(207,238,254,0.85);' +
           'text-shadow:0 0 6px rgba(0,0,0,0.9);white-space:nowrap;">' + (d.brand || 'Explorer') + '</div>';
       const self = this;
@@ -10293,11 +10482,19 @@ const pflxCrew = {
       close();
     });
     m.querySelector('#crewInvite').addEventListener('click', function () {
+      // honor the host's node setting: co-op invites only carry a nodeId
+      // when the current node actually allows co-op play
+      var coopNodeId = '';
+      try {
+        var curN = pflxShip.currentNodeId && pathway.nodes.find(function (x) { return x.id === pflxShip.currentNodeId; });
+        if (curN && curN.coopEnabled) coopNodeId = curN.id;
+        else if (curN && !curN.coopEnabled) pflxSpaceToast('🧑‍🚀', 'SINGLE PLAYER NODE', 'This station is set to single player by the host — sending a rendezvous invite instead.', '');
+      } catch (e) {}
       try {
         self.channel.send({ type: 'broadcast', event: 'pflx_coop_invite', payload: {
           to: k, fromBrand: self.me.brand,
           x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
-          nodeId: pflxShip.currentNodeId || '',
+          nodeId: coopNodeId,
         } });
       } catch (e) {}
       pflxSpaceToast('🤝', 'INVITE SENT', (d.brand || 'Explorer') + ' has been invited to rendezvous with you.', '');
@@ -10364,6 +10561,208 @@ const pflxCrew = {
 };
 pflxCrew.init();
 window.pflxCrew = pflxCrew;
+
+// ═══════════════════════════════════════════════════════════════════
+// GALAXY CLUSTERS — host-built node-cluster sites in deep space.
+// Hosts (and players with host-like Evo Rank 5+) can found a cluster
+// site in a distant galaxy. It renders as a stargate beacon on the map
+// plane, persists per pathway (localStorage + Supabase app_data), and
+// the cockpit HUD shows a bearing indicator to the nearest one.
+// Reaching it requires a warp-capable ship (see WARP RANGE GATE).
+// ═══════════════════════════════════════════════════════════════════
+const pflxClusters = {
+  list: [],
+  _els: {},
+
+  key() { return 'pflx_clusters_' + pathwaySlug; },
+
+  canCreate() {
+    try { if (typeof isHostViewActive === 'function' && isHostViewActive()) return true; } catch (e) {}
+    try {
+      var u = JSON.parse(localStorage.getItem('pflxUser') || '{}');
+      var r = getCurrentRank(u.totalXcoin || 0);
+      return !!(r && r.level >= 5);   // host-like ranking
+    } catch (e) { return false; }
+  },
+
+  load() {
+    try { this.list = JSON.parse(localStorage.getItem(this.key()) || '[]'); } catch (e) { this.list = []; }
+    var self = this;
+    try {
+      if (window._supabase) {
+        window._supabase.from('app_data').select('data').eq('key', self.key()).maybeSingle()
+          .then(function (res) {
+            if (res && res.data && Array.isArray(res.data.data)) {
+              self.list = res.data.data;
+              try { localStorage.setItem(self.key(), JSON.stringify(self.list)); } catch (e) {}
+              self.render();
+            }
+          }).catch(function () {});
+      }
+    } catch (e) {}
+    this.render();
+    this.buildButton();
+  },
+
+  save() {
+    try { localStorage.setItem(this.key(), JSON.stringify(this.list)); } catch (e) {}
+    try {
+      if (window._supabase) {
+        window._supabase.from('app_data').upsert(
+          { key: this.key(), data: this.list }, { onConflict: 'key' }
+        ).then(function () {}).catch(function () {});
+      }
+    } catch (e) {}
+  },
+
+  create() {
+    if (!this.canCreate()) {
+      pflxSpaceToast('🔐', 'CLUSTER FOUNDING LOCKED', 'Founding new node clusters requires Host status or Evo Rank 5+.', '');
+      return;
+    }
+    var name = prompt('Name this galaxy cluster site:', 'New Frontier');
+    if (!name) return;
+    var ang = Math.random() * 6.283;
+    var dist = 8000 + Math.random() * 6000;   // beyond the no-warp range wall
+    var c = {
+      id: 'cl-' + Date.now().toString(36),
+      name: name.slice(0, 40),
+      x: Math.round(1000 + Math.cos(ang) * dist),
+      y: Math.round(1000 + Math.sin(ang) * dist),
+      createdAt: new Date().toISOString(),
+    };
+    this.list.push(c);
+    this.save();
+    this.render();
+    pflxSpaceToast('✦', 'CLUSTER FOUNDED', '"' + c.name + '" has been charted in a distant galaxy. Warp-capable ships can reach it; nodes can be built there.', 'DEEP SPACE');
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+  },
+
+  remove(id) {
+    this.list = this.list.filter(function (c) { return c.id !== id; });
+    if (this._els[id]) { try { this._els[id].remove(); } catch (e) {} delete this._els[id]; }
+    this.save();
+    this.render();
+  },
+
+  render() {
+    var self = this;
+    this.list.forEach(function (c) {
+      var el = self._els[c.id];
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'galaxy-cluster-site';
+        el.style.cssText = 'position:absolute;width:150px;height:150px;margin:-75px 0 0 -75px;z-index:4;cursor:pointer;text-align:center;';
+        el.innerHTML =
+          '<div style="width:96px;height:96px;margin:0 auto;border-radius:50%;border:2px dashed rgba(125,249,255,0.7);' +
+            'box-shadow:0 0 30px rgba(0,212,255,0.45),inset 0 0 24px rgba(0,212,255,0.18);' +
+            'display:flex;align-items:center;justify-content:center;font-size:34px;' +
+            'animation:osgRingPulseSlow 4s linear infinite;">✦</div>' +
+          '<div style="margin-top:6px;font-family:Orbitron,sans-serif;font-size:10px;font-weight:800;letter-spacing:0.14em;color:#7df9ff;' +
+            'text-shadow:0 0 10px rgba(0,212,255,0.8);white-space:nowrap;">' + c.name.toUpperCase() + '</div>' +
+          '<div style="font-size:8px;letter-spacing:0.18em;color:rgba(207,238,254,0.5);font-family:Orbitron,sans-serif;">NODE CLUSTER SITE</div>';
+        el.addEventListener('click', function (ev) { ev.stopPropagation(); self.dialog(c); });
+        canvas.appendChild(el);
+        self._els[c.id] = el;
+      }
+      el.style.left = c.x + 'px';
+      el.style.top = c.y + 'px';
+    });
+  },
+
+  dialog(c) {
+    var box = document.getElementById('pflxEncounterPrompt');
+    if (box) box.remove();
+    var d = Math.round(Math.hypot(c.x - pflxShip.x, c.y - pflxShip.y));
+    var hasWarp = !!pflxShip.upgrades.warpDrive;
+    box = document.createElement('div');
+    box.id = 'pflxEncounterPrompt';
+    box.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9500;' +
+      'min-width:340px;max-width:480px;padding:18px 20px 14px;border-radius:14px;' +
+      'background:linear-gradient(160deg,rgba(4,14,24,0.96),rgba(6,20,34,0.96));' +
+      'border:1px solid rgba(0,212,255,0.45);box-shadow:0 0 30px rgba(0,212,255,0.25);color:#cfeefe;';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
+        '<span style="font-size:26px;">✦</span>' +
+        '<span style="font-size:14px;font-weight:800;letter-spacing:0.12em;color:#7df9ff;">' + c.name.toUpperCase() + ' — CLUSTER SITE</span></div>' +
+      '<div style="font-size:12px;line-height:1.55;color:rgba(207,238,254,0.8);margin-bottom:14px;">A founded node-cluster site in a distant galaxy, ' +
+        d.toLocaleString() + 'u from your position. ' +
+        (hasWarp ? 'Your warp drive can jump there instantly.' : 'Your ship has no warp drive — upgrade to a Tier 4+ hull in the X-Coin Ship Bay to reach it.') + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        (this.canCreate() ? '<button id="clRemove" style="padding:7px 12px;border-radius:8px;cursor:pointer;background:rgba(255,60,60,0.08);border:1px solid rgba(255,60,60,0.35);color:rgba(255,120,120,0.9);font-size:11px;font-weight:700;">✕ REMOVE</button>' : '') +
+        '<button id="clDismiss" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;">DISMISS</button>' +
+        '<button id="clWarp" ' + (hasWarp ? '' : 'disabled ') + 'style="padding:7px 16px;border-radius:8px;cursor:' + (hasWarp ? 'pointer' : 'not-allowed') + ';' +
+          'background:rgba(0,212,255,' + (hasWarp ? '0.14' : '0.04') + ');border:1px solid rgba(0,212,255,' + (hasWarp ? '0.5' : '0.15') + ');' +
+          'color:' + (hasWarp ? '#7df9ff' : 'rgba(125,249,255,0.3)') + ';font-size:11px;font-weight:800;">🌀 WARP THERE</button></div>';
+    document.body.appendChild(box);
+    var self = this;
+    box.querySelector('#clDismiss').addEventListener('click', function () { box.remove(); });
+    var rm = box.querySelector('#clRemove');
+    if (rm) rm.addEventListener('click', function () { box.remove(); if (confirm('Remove cluster site "' + c.name + '"?')) self.remove(c.id); });
+    if (hasWarp) {
+      box.querySelector('#clWarp').addEventListener('click', function () {
+        box.remove();
+        pflxShip.x = c.x + 120; pflxShip.y = c.y + 120;
+        pflxShipVx = 0; pflxShipVy = 0;
+        if (typeof pflxCamera !== 'undefined' && pflxCamera.mode === 'birdseye' && typeof pflxSetCamera === 'function') pflxSetCamera('chase');
+        pflxSpaceToast('🌀', 'WARP COMPLETE', 'You\'ve arrived at ' + c.name + '.', 'DEEP SPACE');
+        if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+      });
+    }
+  },
+
+  buildButton() {
+    if (!this.canCreate() || document.getElementById('clusterBtn')) return;
+    var b = document.createElement('button');
+    b.id = 'clusterBtn';
+    b.textContent = '✦ CLUSTER';
+    b.title = 'Found a new node cluster site in a distant galaxy';
+    b.style.cssText = 'position:absolute;bottom:242px;right:20px;z-index:100;background:rgba(6,10,18,0.9);' +
+      'border:1px solid rgba(125,249,255,0.35);color:rgba(125,249,255,0.85);font-family:Orbitron,sans-serif;' +
+      'font-size:9px;font-weight:600;letter-spacing:1px;padding:8px 12px;cursor:pointer;transition:all 0.2s;';
+    b.addEventListener('click', function () { pflxClusters.create(); });
+    var cargoBtn = document.getElementById('cargoBtn');
+    (cargoBtn && cargoBtn.parentNode ? cargoBtn.parentNode : document.body).appendChild(b);
+  },
+
+  // cockpit/chase bearing indicator to the nearest cluster
+  updateIndicator() {
+    var chip = document.getElementById('clusterBearing');
+    var inFlight = (typeof pflxCamera !== 'undefined' && (pflxCamera.mode === 'chase' || pflxCamera.mode === 'cockpit'));
+    if (!this.list.length || !inFlight) { if (chip) chip.style.display = 'none'; return; }
+    var best = null, bestD = Infinity;
+    this.list.forEach(function (c) {
+      var d = Math.hypot(c.x - pflxShip.x, c.y - pflxShip.y);
+      if (d < bestD) { best = c; bestD = d; }
+    });
+    if (!best) { if (chip) chip.style.display = 'none'; return; }
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'clusterBearing';
+      chip.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:9400;' +
+        'padding:5px 14px;border-radius:18px;background:rgba(4,14,24,0.85);border:1px solid rgba(125,249,255,0.35);' +
+        'color:#7df9ff;font-family:Orbitron,sans-serif;font-size:9px;font-weight:700;letter-spacing:0.12em;' +
+        'display:flex;align-items:center;gap:8px;box-shadow:0 0 14px rgba(0,212,255,0.18);';
+      chip.innerHTML = '<span id="clBearArrow" style="display:inline-block;font-size:12px;">⮕</span><span id="clBearText"></span>';
+      document.body.appendChild(chip);
+    }
+    chip.style.display = 'flex';
+    var ang = Math.atan2(best.y - pflxShip.y, best.x - pflxShip.x) * 180 / Math.PI;
+    var arrow = document.getElementById('clBearArrow');
+    if (arrow) arrow.style.transform = 'rotate(' + ang.toFixed(0) + 'deg)';
+    var txt = document.getElementById('clBearText');
+    if (txt) txt.textContent = '✦ ' + best.name.toUpperCase() + ' — ' + Math.round(bestD).toLocaleString() + 'u' +
+      (pflxShip.upgrades.warpDrive ? '' : ' · WARP REQUIRED');
+  },
+};
+// slow pulse keyframes for the cluster stargate ring
+(function () {
+  var st = document.createElement('style');
+  st.textContent = '@keyframes osgRingPulseSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+  document.head.appendChild(st);
+})();
+pflxClusters.load();
+window.pflxClusters = pflxClusters;
 
 // Open marketplace redirect
 function pflxShipOpenUpgrades() {
@@ -10540,6 +10939,26 @@ function pflxKeyLoop() {
   pflxShip.x = Math.max(-40000, Math.min(40000, pflxShip.x));
   pflxShip.y = Math.max(-40000, Math.min(40000, pflxShip.y));
 
+  // ── WARP RANGE GATE ── deep space (distant galaxy clusters) needs a
+  // warp-capable hull (Tier 4+, which is itself Evo-rank gated in the
+  // X-Coin Ship Bay). Non-warp ships hit a soft range wall and bounce.
+  if (!pflxShip.upgrades.warpDrive) {
+    var __wdx = pflxShip.x - 1000, __wdy = pflxShip.y - 1000;
+    var __wd = Math.hypot(__wdx, __wdy);
+    if (__wd > 6000) {
+      pflxShip.x = 1000 + (__wdx / __wd) * 6000;
+      pflxShip.y = 1000 + (__wdy / __wd) * 6000;
+      pflxShipVx *= -0.4; pflxShipVy *= -0.4;
+      if (!pflxKeyLoop._warpWarned || Date.now() - pflxKeyLoop._warpWarned > 6000) {
+        pflxKeyLoop._warpWarned = Date.now();
+        if (typeof pflxSpaceToast === 'function') {
+          pflxSpaceToast('🌀', 'WARP DRIVE REQUIRED', 'Deep space is beyond this hull\'s range. Upgrade to a warp-capable ship (Tier 4+) in the X-Coin Ship Bay — higher Evo Ranks unlock higher tiers.', 'RANGE LIMIT');
+        }
+        if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
+      }
+    }
+  }
+
   // Update ship rotation to face movement direction
   if (pflxShipSpeed > 0.5) {
     pflxShipAngle = Math.atan2(pflxShipVy, pflxShipVx) * (180 / Math.PI) + 90;
@@ -10625,6 +11044,9 @@ function pflxKeyLoop() {
 
   // Blaster: SPACE fires at the nearest asteroid cluster
   if (window.pflxBlaster) pflxBlaster.tick(1 / 60);
+
+  // Cluster bearing indicator (cockpit/chase navigation aid)
+  if (window.pflxClusters) pflxClusters.updateIndicator();
 
   // Update cockpit HUD gauges
   pflxUpdateCockpitHud();

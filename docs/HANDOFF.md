@@ -876,3 +876,56 @@ this session resumed from this handoff). All three repos touched.
    settings.
 
 *End of June 11 2026 update.*
+
+---
+
+## June 11 2026 — round 2 (same session, after Ennis feedback)
+
+### Terminology — LOCKED
+- **"Module" is RESERVED for the cartridge** (course/project/quest) that
+  plugs into a Node. The Node is the console, the Module is the cartridge,
+  the Connector is the slot. Ship hardware add-ons are **"Ship Systems"**
+  (renamed everywhere user-facing; X-Coin exports are now `SHIP_SYSTEMS` /
+  `ShipSystem`). The wire/storage key inside `pflx_ship_state` REMAINS
+  `modules[]` for cross-app compat only — do not rename it casually.
+- **Crew presence shows BRAND NAME ONLY** — no initials, never real names.
+
+### Shipped in round 2 (pflx-pathway-portal)
+1. **Node host settings** (node editor → "Multiplayer & Entry Requirements"):
+   `coopEnabled`, `coopMax` (2–4, platform cap 4), `entryMinXC`,
+   `entryBadge`, `checkpointXC`. Detail Panel lists them; entry gates are
+   enforced at launch click (`pflxNodeEntryGate`, hosts/edit-mode bypass);
+   `pflx_mod_init` now carries `coop.enabled` + `coop.maxPlayers`; crew
+   co-op invites only carry a nodeId when the node allows co-op.
+2. **Per-player module progress on the Node** — `pflx_mod_progress` percent
+   persists per (player, node) (`pflx_modprog_<nodeId>_<playerId>`); Detail
+   Panel shows a "YOUR SAVED PROGRESS" bar (`pflxNodePlayerProgress`).
+3. **Progress-point XC** — on `pflx_mod_checkpoint`, if the host set
+   `checkpointXC`, the node pays it instantly via the `pflx_space_xc`
+   instant-credit path (dupe-guarded per checkpointId per player). The big
+   completion reward STILL goes through the Approvals Queue (locked
+   decision #7 intact).
+4. **Galaxy clusters** — `pflxClusters` (search anchor). Hosts and Evo
+   Rank 5+ players can found cluster sites in deep space (8–14k units
+   out), rendered as stargate beacons, persisted per pathway
+   (localStorage + app_data `pflx_clusters_<pathwaySlug>`). Click beacon →
+   info dialog with WARP THERE (warp ships only) and REMOVE (founders).
+   Cockpit/chase HUD shows a bearing chip to the nearest cluster.
+5. **Warp range gate** — non-warp hulls bounce off a soft wall 6000u from
+   map center with an upgrade toast. Warp comes with Tier 4+ ships, which
+   are already Evo-rank gated in the Ship Bay — that's the leveling loop.
+
+### Known broken / next major build (from Ennis, this session)
+- **Node difficulty functions are NOT working correctly.** Root cause:
+  modules aren't built to a common template, so the node's difficulty
+  settings have nothing consistent to act on.
+- **NEXT MAJOR BUILD: the Module Creation Template app/dashboard** (the
+  Builder from locked decision #12). Every module gets authored through
+  it so it functions correctly in any node: standard manifest, phase
+  structure, AND a difficulty contract — modules adjust to the node's
+  difficulty settings and use AI functions to adapt per player. This
+  supersedes/absorbs the old "Builder UI" roadmap item.
+- Galaxy cluster sites don't yet host actual nodes — node placement at a
+  cluster site (host drag/create in deep space) is the follow-up.
+- Co-op invite → shared module session (true synchronous co-op via the
+  Connector coop context) still pending; cap/enabled flags now flow.
