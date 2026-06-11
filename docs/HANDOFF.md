@@ -1051,4 +1051,25 @@ Root causes fixed:
 - ElevenLabs TTS key unchanged (browser localStorage,
   `pflx_xbot_elevenlabs_key`); proxying TTS audio is a possible
   follow-up.
+
+### Cohort app gating — hardened (June 11, "DarkCampus still works when off")
+Two silent fail-open paths found and closed in pflx-platform preview.html:
+1. **Name drift** — a player session cohort string that didn't EXACTLY
+   match a COHORTS key fell back to PlayerPool (open) → access granted.
+   Resolution is now case/whitespace-insensitive vs keys AND display
+   names (`pflxCohortByName` / `pflxNormCohortName`).
+2. **Registry drift** — cloud/local overrides were only merged into
+   cohorts present in the build's hard-coded COHORTS; denies for other
+   cohorts were dropped. The raw saved map
+   (`PFLX_COHORT_OVERRIDES_RAW`) is now consulted FIRST by the gate.
+Plus: **re-gate after cloud overrides land** — if the player is already
+inside an app that's now denied, they're kicked to Home with the
+ACCESS DENIED modal (`window._pflxCurrentGatedView` tracking).
+**EVO RANK BYPASS** (new): platform-wide per-app thresholds in the
+Cohort Manager (🏆 panel under the app toggles; stored as
+`__rankBypass` in the cohort_overrides blob, cloud-synced). A player at
+or above the rank passes the cohort deny; the ACCESS DENIED modal shows
+"Reach Evolution Rank N to unlock early (you are Rank X)". 0 = absolute
+block. Verified in Node: 9/9 gate scenarios incl. drift, multi-cohort
+deny-wins, registry drift, bypass, bypass-removal, host exemption.
 - A tools registry for branded tool cards (open question 14.8 #4).
