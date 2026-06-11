@@ -998,5 +998,17 @@ Root causes fixed:
   activity, reflection stub, and default objectives so gates and
   validation work immediately. Google Slides path = export as .pptx.
   Parsers verified against synthetic OOXML in Node (jszip+xmldom).
-- The AI difficulty layer that `aiAdaptation` scaffolds.
+- **AUTO-TIERS (shipped June 11):** "⚡ Auto-build Starter & Pro from
+  Novice" — default ON. The host authors Novice only; `deriveTier()`
+  generates the other difficulty levels at export/preview per the §14.1
+  semantics: Starter = +Practice Round phase, scaffold callouts, activity
+  hints, 1.35x time, 0.5x XC; Pro = Enhancement dropped, Development
+  segments collapsed, callouts stripped, markdown trimmed to lead blocks,
+  diagnostics capped at 5 items, 0.65x time, 1.75x XC. Unchecking auto
+  MATERIALIZES the derived tiers into the editor for hand-editing;
+  re-checking returns to Novice-as-source. Import sets auto off when a
+  manifest ships its own starter/pro. Verified in Node (12/12 derivation
+  assertions).
+- The AI difficulty layer that `aiAdaptation` scaffolds (per-player
+  runtime adaptation — the auto-tier engine handles authoring-time).
 - A tools registry for branded tool cards (open question 14.8 #4).

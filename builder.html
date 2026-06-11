@@ -169,8 +169,13 @@
 
     <div class="sec-h">Tiers — Difficulty Levels</div>
     <div class="hint" style="margin-bottom:6px;">Tiers are the difficulty contract: same outcome, different scaffolding. Novice is always on.</div>
-    <label class="chk"><input type="checkbox" id="tierStarterOn"> Starter — heavy scaffolding, more phases</label>
-    <label class="chk"><input type="checkbox" id="tierProOn"> Pro — minimal scaffolding, replayable</label>
+    <label class="chk" style="border:1px solid rgba(245,200,66,0.3);border-radius:8px;padding:8px;background:rgba(245,200,66,0.05);">
+      <input type="checkbox" id="tierAuto"> <span>⚡ <b>Auto-build Starter &amp; Pro from Novice</b> — author Novice only; the Builder derives the other difficulty levels at export &amp; preview</span>
+    </label>
+    <div id="manualTierToggles">
+      <label class="chk"><input type="checkbox" id="tierStarterOn"> Starter — heavy scaffolding, more phases</label>
+      <label class="chk"><input type="checkbox" id="tierProOn"> Pro — minimal scaffolding, replayable</label>
+    </div>
     <div class="tier-tabs" id="tierTabs"></div>
     <div class="row2">
       <div><label class="f">Est. Minutes</label><input type="number" id="tMinutes" min="5" step="5"></div>
@@ -298,11 +303,19 @@ function freshState(){
     taskCriteria: [ { label:'The final deliverable meets the brief and shows intentional craft', required:true } ],
     tiersOn: { starter:false, novice:true, pro:false },
     tiers: { novice: newTier('Novice', 90, 200) },
+    autoTiers: true,   // author Novice once; Starter & Pro derive automatically
     curTier: 'novice', curPhase: 0
   };
 }
 var S = freshState();
-try { var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if (d && d.meta) S = d; } catch(e){}
+try {
+  var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+  if (d && d.meta) {
+    S = d;
+    // older drafts: turn auto on unless the host had hand-built tiers
+    if (S.autoTiers === undefined) S.autoTiers = !(S.tiersOn && (S.tiersOn.starter || S.tiersOn.pro));
+  }
+} catch(e){}
 
 var _saveT = null;
 function autosave(){
@@ -332,8 +345,11 @@ function bindMeta(){
   document.getElementById('mFramework').value = m.framework;
   document.getElementById('mAI').checked = !!m.aiAdaptation;
   document.getElementById('midHint').textContent = 'moduleId: ' + moduleId();
+  document.getElementById('tierAuto').checked = !!S.autoTiers;
+  document.getElementById('manualTierToggles').style.display = S.autoTiers ? 'none' : 'block';
   document.getElementById('tierStarterOn').checked = !!S.tiersOn.starter;
   document.getElementById('tierProOn').checked = !!S.tiersOn.pro;
+  if (S.autoTiers && S.curTier !== 'novice') S.curTier = 'novice';
 }
 function tier(){ return S.tiers[S.curTier]; }
 
@@ -342,9 +358,12 @@ function renderTierTabs(){
   holder.innerHTML = '';
   ['starter','novice','pro'].forEach(function(t){
     var b = document.createElement('button');
-    b.className = 'tier-tab t-' + t + (S.curTier === t ? ' on' : '') + (S.tiersOn[t] ? '' : ' disabled');
-    b.textContent = t;
+    var enabled = S.autoTiers ? (t === 'novice') : S.tiersOn[t];
+    b.className = 'tier-tab t-' + t + (S.curTier === t ? ' on' : '') + (enabled ? '' : ' disabled');
+    b.textContent = (S.autoTiers && t !== 'novice') ? t + ' ⚡' : t;
+    if (S.autoTiers && t !== 'novice') b.title = 'Derived automatically from Novice at export — uncheck Auto-build to hand-edit';
     b.onclick = function(){
+      if (S.autoTiers && t !== 'novice') { toast('Auto mode: ' + t + ' derives from Novice — uncheck Auto-build to hand-edit'); return; }
       if (!S.tiersOn[t]) return;
       S.curTier = t; S.curPhase = 0;
       renderAll();
@@ -631,6 +650,89 @@ function renderEditor(){
 
 function renderAll(){ bindMeta(); renderTierTabs(); renderPhaseList(); renderCriteria(); renderEditor(); }
 
+/* ═══════════ AUTO-TIER ENGINE ═══════════
+   Derives Starter and Pro from the authored Novice tier so the host
+   never authors difficulty levels by hand (MODULE_STRUCTURE.md §14.1):
+   STARTER — same arc + a Practice Round phase after Engagement, a
+   scaffold callout opening every phase, hint lines on activities,
+   ~1.35x time, ~0.5x suggested XC.
+   PRO — Enhancement dropped, Development's two segments collapsed to
+   one, scaffolding stripped (callouts removed, instructional markdown
+   trimmed to the lead blocks, diagnostics shortened), ~0.65x time,
+   ~1.75x suggested XC. Same Fulfillment deliverable on every tier.   */
+function cloneDeep(o){ return JSON.parse(JSON.stringify(o)); }
+var STARTER_SCAFFOLD = {
+  engagement:  '**STARTER PATH** — take this one block at a time. There are no wrong answers in this phase; it exists to place you, not grade you.',
+  development: '**STARTER PATH** — follow the steps in order and keep your first version small. Rough and finished beats polished and abandoned.',
+  enhancement: '**STARTER PATH** — feedback is fuel, not judgment. Pick ONE thing to improve and do just that before anything else.',
+  fulfillment: '**STARTER PATH** — your submission does not need to be perfect. It needs to be yours, complete, and explained.'
+};
+function deriveTier(which){
+  var nov = S.tiers.novice;
+  var phases = cloneDeep(nov.phases);
+  var t = {
+    name: which === 'starter' ? 'Starter' : 'Pro',
+    estimatedMinutes: Math.max(15, Math.round((nov.estimatedMinutes || 90) * (which === 'starter' ? 1.35 : 0.65) / 5) * 5),
+    suggestedReward: {
+      xc: Math.max(0, Math.round((nov.suggestedReward.xc || 0) * (which === 'starter' ? 0.5 : 1.75) / 10) * 10),
+      badgeIds: (nov.suggestedReward.badgeIds || []).slice()
+    },
+    phases: phases
+  };
+
+  if (which === 'starter') {
+    // scaffold callout opens every phase; activities get a reassurance hint
+    phases.forEach(function(p){
+      var scaffold = { kind:'callout', tone:'info', content: STARTER_SCAFFOLD[p.kind] || STARTER_SCAFFOLD.engagement };
+      if (p.segments) p.segments[0].blocks.unshift(scaffold);
+      else p.blocks.unshift(scaffold);
+      var all = p.segments ? p.segments.reduce(function(a,s){ return a.concat(s.blocks); }, []) : p.blocks;
+      all.forEach(function(b){
+        if (b.kind === 'activity' && b.instructions && b.instructions.indexOf('Hint:') === -1) {
+          b.instructions += '\n\nHint: if you get stuck, re-read the block above this one — the answer pattern is in there.';
+        }
+      });
+    });
+    // Practice Round after Engagement — guided low-stakes pass
+    var eng = phases[0];
+    phases.splice(1, 0, {
+      id: 'practice-round', kind: 'engagement', title: 'Practice Round',
+      essence: 'A guided practice pass before the real build — worked example plus a low-stakes try.',
+      flxObjectives: (eng.flxObjectives || []).slice(),
+      desiredResults: { understandings: ['Trying a rough version first makes the real attempt easier.'], essentialQuestions: ['What does a finished example teach me before I start my own?'] },
+      blocks: [
+        { kind:'callout', tone:'info', content:'**PRACTICE ROUND** — extra reps before the main build. Nothing here is graded; quick and messy is the goal.' },
+        { kind:'markdown', content:'## Worked Example\n\nStudy how a finished example of this module’s work comes together before you try your own. As you look, note the choices being made at each step — you’ll make the same choices in Development.' },
+        { kind:'activity', id:'act-practice', title:'Low-stakes try',
+          instructions:'Make a small, rough version of what this module builds. Spend ten minutes, not an hour — the real thing happens in Development.',
+          fields:[ { id:'f-try', label:'What I tried', type:'textarea' }, { id:'f-stuck', label:'Where I got stuck (if anywhere)', type:'textarea' } ] }
+      ]
+    });
+  } else {
+    // PRO — fewer phases, no hand-holding
+    phases = phases.filter(function(p){ return p.kind !== 'enhancement'; });
+    phases.forEach(function(p){
+      if (p.segments) {
+        // collapse Ideation + Creation into one run
+        p.blocks = p.segments.reduce(function(a, s){ return a.concat(s.blocks); }, []);
+        delete p.segments;
+      }
+      var mdKept = 0;
+      p.blocks = p.blocks.filter(function(b){
+        if (b.kind === 'callout') return false;                       // scaffolding out
+        if (b.kind === 'markdown') { mdKept++; return mdKept <= 2; }  // lead content only
+        return true;
+      });
+      p.blocks.forEach(function(b){
+        if (b.kind === 'diagnostic' && Array.isArray(b.items) && b.items.length > 5) b.items = b.items.slice(0, 5);
+      });
+      if (!p.blocks.length) p.blocks.push({ kind:'markdown', content:'## ' + p.title + '\n\nYou know the drill. Execute.' });
+    });
+    t.phases = phases;
+  }
+  return t;
+}
+
 /* ═══════════ manifest generation ═══════════ */
 function gateFor(p){
   if (p.kind === 'fulfillment') {
@@ -651,7 +753,19 @@ function tidyPhase(p){
 }
 function buildManifest(){
   var tiers = {};
-  ['starter','novice','pro'].forEach(function(t){
+  if (S.autoTiers) {
+    // AUTO MODE — Novice is the single source; Starter & Pro derive
+    var srcs = { starter: deriveTier('starter'), novice: S.tiers.novice, pro: deriveTier('pro') };
+    Object.keys(srcs).forEach(function(t){
+      var tv = srcs[t];
+      tiers[t] = {
+        name: tv.name || (t.charAt(0).toUpperCase() + t.slice(1)),
+        estimatedMinutes: tv.estimatedMinutes || 90,
+        suggestedReward: { xc: tv.suggestedReward.xc || 0, badgeIds: tv.suggestedReward.badgeIds || [] },
+        phases: tv.phases.map(tidyPhase)
+      };
+    });
+  } else ['starter','novice','pro'].forEach(function(t){
     if (!S.tiersOn[t] || !S.tiers[t]) return;
     var tv = S.tiers[t];
     tiers[t] = {
@@ -691,6 +805,7 @@ function validate(){
   var errs = [];
   if (!S.meta.name.trim()) errs.push('Module name is required.');
   Object.keys(S.tiers).forEach(function(t){
+    if (S.autoTiers && t !== 'novice') return;   // derived tiers come from a valid Novice
     if (!S.tiersOn[t]) return;
     S.tiers[t].phases.forEach(function(p){
       var all = p.segments ? p.segments.reduce(function(a,s){return a.concat(s.blocks);},[]) : (p.blocks||[]);
@@ -839,6 +954,22 @@ document.getElementById('tBadges').oninput = function(){
   tier().suggestedReward.badgeIds = this.value.split(',').map(function(s){return s.trim();}).filter(Boolean);
   autosave();
 };
+document.getElementById('tierAuto').onchange = function(){
+  if (this.checked) {
+    // back to auto — Novice becomes the single source again
+    S.autoTiers = true;
+    S.curTier = 'novice'; S.curPhase = 0;
+    toast('Auto mode on — Starter & Pro now derive from Novice');
+  } else {
+    // materialize the derived tiers so the host can hand-edit them
+    S.autoTiers = false;
+    S.tiers.starter = deriveTier('starter');
+    S.tiers.pro = deriveTier('pro');
+    S.tiersOn.starter = true; S.tiersOn.pro = true;
+    toast('Auto mode off — Starter & Pro materialized for hand-editing');
+  }
+  renderAll(); autosave();
+};
 document.getElementById('tierStarterOn').onchange = function(){
   S.tiersOn.starter = this.checked;
   if (this.checked && !S.tiers.starter) S.tiers.starter = newTier('Starter', 120, Math.round((S.tiers.novice.suggestedReward.xc||200) * 0.5));
@@ -900,6 +1031,8 @@ document.getElementById('importInput').onchange = function(){
           }) };
       });
       if (!S.tiers.novice) { var k = Object.keys(S.tiers)[0]; S.tiers.novice = S.tiers[k]; S.tiersOn.novice = true; }
+      // a module that ships its own Starter/Pro was hand-tiered — respect it
+      S.autoTiers = !(S.tiersOn.starter || S.tiersOn.pro);
       S.curTier = 'novice'; S.curPhase = 0;
       renderAll(); autosave();
       toast('Imported "' + (manifest.name||'module') + '"');
