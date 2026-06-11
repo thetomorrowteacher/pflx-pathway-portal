@@ -1294,6 +1294,7 @@
   function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function inline(s){
     return esc(s)
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--cyan,#00d4ff);text-decoration:underline;">$1</a>')
       .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g,'<em>$1</em>');
   }
@@ -1740,10 +1741,11 @@
         session.displayName = p.player.brand || p.player.displayName || session.displayName;
         session.initials = p.player.initials || session.initials;
       }
-      // Tier from Node (when tier picker lands) overrides URL/default.
-      // Only valid values; unknown tier falls back via tierPhases().
-      if(p.tier && ['starter','novice','pro'].indexOf(p.tier) >= 0 && p.tier !== CURRENT_TIER){
-        CURRENT_TIER = p.tier;
+      // Tier from Node overrides URL/default. The Node sends it inside
+      // context (pathway.html: context.tier); accept payload.tier too.
+      var initTier = p.tier || (p.context && p.context.tier);
+      if(initTier && ['starter','novice','pro'].indexOf(initTier) >= 0 && initTier !== CURRENT_TIER){
+        CURRENT_TIER = initTier;
         PHASES = tierPhases(CURRENT_TIER);
         // Reset phase pointer if the new tier has fewer phases than current state expects.
         if(state.currentPhase >= PHASES.length) state.currentPhase = 0;

@@ -929,3 +929,47 @@ this session resumed from this handoff). All three repos touched.
   cluster site (host drag/create in deep space) is the follow-up.
 - Co-op invite → shared module session (true synchronous co-op via the
   Connector coop context) still pending; cap/enabled flags now flow.
+
+---
+
+## June 11 2026 — round 3: the MODULE CREATION DASH (builder.html) ships
+
+The Builder from locked decision #12 / the round-2 roadmap now exists:
+**`builder.html`** at the repo root (live at /builder.html on the portal
+deploy). Linked from the node editor's Course Package row ("⬡ BUILDER").
+
+### How it works
+- Full FLX (Future Learning Protocol) authoring: 4 strands, Development
+  with Ideation+Creation segments, per-phase FLX objective tagging (all
+  15 codes with text), UbD Desired Results, host essence lines, approval
+  criteria, optional Starter/Pro tiers (the difficulty model), optional
+  Practice phases, `aiAdaptation` manifest scaffold for the future AI
+  per-player layer.
+- Content blocks: markdown (with **links** — viewer now renders
+  `[text](url)`), callout, **YouTube video embed** (any watch/share/embed
+  URL), **image** (URL or file-upload → embedded dataURL), tool card,
+  diagnostic, activity, reflection, submission. Move/delete/reorder.
+- Export: fetches the proven runtime templates
+  (`modules/storybuilding-storyboarding/viewer.html` + `host.html` — both
+  fully manifest-driven), injects the generated schemaVersion-3 manifest
+  (JSON `</`-escaped), patches host OBJ/XWALK to the complete 15-code
+  crosswalk, zips `manifest.json + viewer.html + host.html` →
+  `<moduleId>.pflx` via JSZip (cdnjs). "⬇ manifest.json" exports JSON only.
+- Preview: in-dash iframe (player view per tier + host view); the Builder
+  answers `pflx_mod_ready` with a synthetic `pflx_mod_init` so the module
+  behaves exactly as it will in a Node.
+- Drafts autosave to localStorage (`pflx_builder_draft_v1`); Import
+  accepts manifest.json or a whole `.pflx`.
+
+### Template fixes made (affect the live Storybuilding module too)
+1. `inline()` in viewer.html now renders markdown links.
+2. The init handler accepts the tier from `payload.context.tier` (what
+   pathway.html actually sends) as well as `payload.tier` — the tier
+   picker was silently falling back to Novice in embedded runs.
+3. `modules/storybuilding-storyboarding.pflx` re-zipped in sync.
+
+### Builder follow-ups
+- Ingest existing material (Google Slides exports, legacy course.json)
+  into draft phases — the original Open Question #2 ambition.
+- The AI difficulty layer that `aiAdaptation` scaffolds.
+- A tools registry for branded tool cards (open question 14.8 #4).

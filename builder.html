@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PFLX Module Builder — Module Creation Dash</title>
+<!--
+  ════════════════════════════════════════════════════════════════════
+  PFLX MODULE CREATION DASH (the Builder)
+  ════════════════════════════════════════════════════════════════════
+  Authors .pflx cartridges that plug into Core Pathways Nodes.
+  Anchored to the FLX framework (Future Learning Protocol):
+  Engagement → Development (Ideation + Creation) → Enhancement →
+  Fulfillment, per MODULE_STRUCTURE.md v0.2 + v0.3 (tiers).
+
+  How it works:
+  1. The host fills in module info, tiers, phases, and content blocks
+     (markdown w/ links, callouts, IMAGES, YOUTUBE VIDEO EMBEDS, tools,
+     diagnostics, activities, reflections, submission).
+  2. The Builder generates the canonical manifest.json (schemaVersion 3).
+  3. On export it fetches the proven runtime templates
+     (modules/storybuilding-storyboarding/viewer.html + host.html, which
+     are fully manifest-driven), injects the new manifest, and zips
+     manifest.json + viewer.html + host.html into <moduleId>.pflx.
+  4. Upload the .pflx to any Node via the node editor — it speaks the
+     Connector (CONNECTOR_CONTRACT.md v0.4) out of the box.
+
+  Difficulty contract: tiers ARE the difficulty model (Starter/Novice/
+  Pro). The manifest also carries an aiAdaptation scaffold for the
+  per-player AI adjustment layer (future build).
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+  :root {
+    --cyan: #00d4ff; --purple: #8b5cf6; --gold: #f5c842; --green: #10e090;
+    --bg: #050810; --panel: rgba(8,14,26,0.96); --line: rgba(0,212,255,0.18);
+    --text: #cfeefe; --muted: rgba(207,238,254,0.55);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Rajdhani', sans-serif; min-height: 100vh; }
+  body::before { content:''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 20% 0%, rgba(0,212,255,0.06), transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(139,92,246,0.06), transparent 50%); }
+  .topbar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 14px;
+    padding: 12px 20px; background: rgba(5,8,16,0.95); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
+  .topbar h1 { font-family: Orbitron; font-size: 14px; font-weight: 900; letter-spacing: 0.18em; color: var(--cyan);
+    text-shadow: 0 0 14px rgba(0,212,255,0.5); }
+  .topbar .flp { font-size: 10px; letter-spacing: 0.14em; color: var(--muted); font-family: Orbitron; }
+  .topbar .spacer { flex: 1; }
+  .tbtn { font-family: Orbitron; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; cursor: pointer;
+    padding: 8px 14px; border-radius: 6px; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.3);
+    color: var(--cyan); transition: all 0.2s; text-transform: uppercase; }
+  .tbtn:hover { background: rgba(0,212,255,0.18); }
+  .tbtn.primary { background: linear-gradient(135deg,#00b8d4,#7c3aed); color: #fff; border: 0; }
+  .tbtn.ghost { background: transparent; border-color: rgba(255,255,255,0.15); color: var(--muted); }
+  .layout { position: relative; z-index: 1; display: grid; grid-template-columns: 320px 1fr; gap: 0; min-height: calc(100vh - 53px); }
+  .side { border-right: 1px solid var(--line); background: var(--panel); padding: 16px; overflow-y: auto; max-height: calc(100vh - 53px); position: sticky; top: 53px; }
+  .main { padding: 20px 24px 80px; max-width: 980px; }
+  .sec-h { font-family: Orbitron; font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: rgba(0,212,255,0.6);
+    text-transform: uppercase; margin: 18px 0 8px; }
+  .sec-h:first-child { margin-top: 0; }
+  label.f { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); margin: 10px 0 3px; text-transform: uppercase; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; background: rgba(5,10,20,0.8); border: 1px solid var(--line); border-radius: 6px;
+    color: var(--text); font-family: 'Rajdhani'; font-size: 14px; padding: 8px 10px; outline: none; }
+  input:focus, textarea:focus, select:focus { border-color: rgba(0,212,255,0.55); box-shadow: 0 0 10px rgba(0,212,255,0.15); }
+  textarea { resize: vertical; min-height: 64px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 8px 0; cursor: pointer; }
+  .tier-tabs { display: flex; gap: 6px; margin: 8px 0 4px; }
+  .tier-tab { flex: 1; font-family: Orbitron; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; padding: 8px 4px;
+    text-align: center; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; color: var(--muted);
+    background: transparent; transition: all 0.2s; text-transform: uppercase; }
+  .tier-tab.on { color: #fff; }
+  .tier-tab.t-starter.on { background: rgba(139,92,246,0.25); border-color: var(--purple); box-shadow: 0 0 12px rgba(139,92,246,0.3); }
+  .tier-tab.t-novice.on  { background: rgba(0,212,255,0.18); border-color: var(--cyan); box-shadow: 0 0 12px rgba(0,212,255,0.3); }
+  .tier-tab.t-pro.on     { background: rgba(245,200,66,0.18); border-color: var(--gold); box-shadow: 0 0 12px rgba(245,200,66,0.3); }
+  .tier-tab.disabled { opacity: 0.35; }
+  .phase-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .phase-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--line); cursor: pointer; transition: all 0.2s; background: rgba(5,10,20,0.5); }
+  .phase-item:hover { border-color: rgba(0,212,255,0.4); }
+  .phase-item.sel { border-color: var(--cyan); background: rgba(0,212,255,0.08); box-shadow: 0 0 12px rgba(0,212,255,0.15); }
+  .ph-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .ph-name { font-size: 13px; font-weight: 700; flex: 1; }
+  .ph-kind { font-family: Orbitron; font-size: 7px; letter-spacing: 0.14em; color: var(--muted); }
+  .ph-del { background: none; border: 0; color: rgba(255,80,80,0.6); cursor: pointer; font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-family: Orbitron; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--cyan); margin-bottom: 8px; text-transform: uppercase; }
+  .obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 6px; }
+  .obj-chk { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; color: var(--muted); cursor: pointer; padding: 3px 0; }
+  .obj-chk b { color: var(--cyan); font-family: Orbitron; font-size: 9px; letter-spacing: 0.06em; }
+  .obj-chk input { margin-top: 3px; }
+  .blocks { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+  .blk { border: 1px solid var(--line); border-radius: 10px; background: rgba(5,10,20,0.6); overflow: hidden; }
+  .blk-h { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(0,212,255,0.05); border-bottom: 1px solid var(--line); }
+  .blk-kind { font-family: Orbitron; font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--cyan); flex: 1; text-transform: uppercase; }
+  .blk-h button { background: none; border: 1px solid rgba(255,255,255,0.12); color: var(--muted); border-radius: 4px;
+    cursor: pointer; font-size: 11px; padding: 2px 8px; }
+  .blk-h button:hover { color: #fff; border-color: rgba(0,212,255,0.4); }
+  .blk-h button.del { color: rgba(255,90,90,0.7); }
+  .blk-b { padding: 12px; }
+  .addbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .addbar button { font-family: Orbitron; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; padding: 7px 10px;
+    border-radius: 6px; border: 1px dashed rgba(0,212,255,0.35); background: transparent; color: rgba(0,212,255,0.8);
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .addbar button:hover { background: rgba(0,212,255,0.1); border-style: solid; }
+  .hint { font-size: 11px; color: rgba(207,238,254,0.4); margin-top: 3px; line-height: 1.4; }
+  .seg-h { font-family: Orbitron; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; margin: 18px 0 4px; padding: 6px 10px;
+    border-left: 3px solid var(--purple); color: #c4b5fd; background: rgba(139,92,246,0.06); }
+  .crit-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .crit-row input[type=text] { flex: 1; }
+  .pill { display: inline-block; font-family: Orbitron; font-size: 8px; letter-spacing: 0.12em; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid var(--line); color: var(--muted); margin-right: 6px; }
+  #previewWrap { position: fixed; inset: 0; z-index: 200; background: rgba(2,5,10,0.92); display: none; flex-direction: column; }
+  #previewWrap.show { display: flex; }
+  #previewBar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: rgba(5,8,16,0.98); border-bottom: 1px solid var(--line); }
+  #previewFrame { flex: 1; border: 0; background: #050810; }
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 300;
+    background: linear-gradient(135deg,#00d4ff,#7c3aed); color: #fff; padding: 10px 26px; border-radius: 8px;
+    font-family: Orbitron; font-size: 10px; letter-spacing: 0.14em; opacity: 0; transition: opacity 0.3s; pointer-events: none; text-transform: uppercase; }
+  .statusline { font-size: 11px; color: var(--muted); }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .side { position: static; max-height: none; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>⬡ MODULE CREATION DASH</h1>
+  <span class="flp">FLX · FUTURE LEARNING PROTOCOL</span>
+  <span class="spacer"></span>
+  <span class="statusline" id="autosaveStatus">draft autosaves locally</span>
+  <button class="tbtn ghost" id="btnImport">⬆ Import</button>
+  <input type="file" id="importInput" accept=".json,.pflx,.zip" style="display:none">
+  <button class="tbtn ghost" id="btnNew">✦ New</button>
+  <button class="tbtn" id="btnPreview">▶ Preview</button>
+  <button class="tbtn" id="btnManifest">⬇ manifest.json</button>
+  <button class="tbtn primary" id="btnExport">⬇ Export .pflx</button>
+</div>
+
+<div class="layout">
+  <!-- ════════ SIDEBAR — module meta + tiers + phase nav ════════ -->
+  <div class="side">
+    <div class="sec-h">Module Info</div>
+    <label class="f">Module Name</label>
+    <input type="text" id="mName" placeholder="e.g. Intro to 3D Modeling">
+    <div class="hint" id="midHint">moduleId: —</div>
+    <label class="f">Subtitle</label>
+    <input type="text" id="mSubtitle" placeholder="One-line tagline shown under the title">
+    <label class="f">Description</label>
+    <textarea id="mDesc" rows="3" placeholder="What will players learn or build?"></textarea>
+    <div class="row2">
+      <div>
+        <label class="f">Type</label>
+        <select id="mType">
+          <option value="course">Course — learn a skill</option>
+          <option value="project">Project — build &amp; ship</option>
+        </select>
+      </div>
+      <div>
+        <label class="f">Framework</label>
+        <select id="mFramework"><option value="FLX">FLX</option><option value="DIX">DIX</option></select>
+      </div>
+    </div>
+    <label class="chk"><input type="checkbox" id="mAI"> AI difficulty adaptation (scaffold — adapts per player when the AI layer ships)</label>
+
+    <div class="sec-h">Tiers — Difficulty Levels</div>
+    <div class="hint" style="margin-bottom:6px;">Tiers are the difficulty contract: same outcome, different scaffolding. Novice is always on.</div>
+    <label class="chk"><input type="checkbox" id="tierStarterOn"> Starter — heavy scaffolding, more phases</label>
+    <label class="chk"><input type="checkbox" id="tierProOn"> Pro — minimal scaffolding, replayable</label>
+    <div class="tier-tabs" id="tierTabs"></div>
+    <div class="row2">
+      <div><label class="f">Est. Minutes</label><input type="number" id="tMinutes" min="5" step="5"></div>
+      <div><label class="f">Suggested XC</label><input type="number" id="tXC" min="0" step="10"></div>
+    </div>
+    <label class="f">Badge IDs (comma-sep)</label>
+    <input type="text" id="tBadges" placeholder="visual-storyteller">
+
+    <div class="sec-h">Phases — FLX Strands</div>
+    <div class="phase-list" id="phaseList"></div>
+    <div class="addbar">
+      <button id="addPractice">+ Practice Phase</button>
+    </div>
+
+    <div class="sec-h">Approval Criteria</div>
+    <div id="critList"></div>
+    <div class="addbar"><button id="addCrit">+ Criterion</button></div>
+  </div>
+
+  <!-- ════════ MAIN — phase editor ════════ -->
+  <div class="main" id="phaseEditor"></div>
+</div>
+
+<!-- preview overlay -->
+<div id="previewWrap">
+  <div id="previewBar">
+    <span style="font-family:Orbitron;font-size:10px;letter-spacing:0.14em;color:var(--cyan);">MODULE PREVIEW — PLAYER VIEW</span>
+    <select id="previewTier" style="width:auto;padding:5px 10px;font-size:12px;"></select>
+    <button class="tbtn ghost" id="previewHost">HOST VIEW</button>
+    <span class="spacer" style="flex:1"></span>
+    <button class="tbtn" id="previewClose">✕ CLOSE</button>
+  </div>
+  <iframe id="previewFrame"></iframe>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ═══════════ FLX reference data (Future Learning Protocol) ═══════════ */
+var FLX_OBJ = {
+  "CN": { strand: "Engagement", name: "Connection", objectives: {
+    "FLX.CN.1": "Use empathetic understanding to inform and shape solution development.",
+    "FLX.CN.2": "Generate and communicate precise questions to define the problem.",
+    "FLX.CN.3": "Research relevant information across cultural, societal, and environmental contexts." } },
+  "ID": { strand: "Development", name: "Ideation", objectives: {
+    "FLX.ID.1": "Engage in divergent thinking; brainstorm a broad range of solutions.",
+    "FLX.ID.2": "Collaborate with partners and stakeholders to clarify and ideate.",
+    "FLX.ID.3": "Develop and organize a clear, detailed plan of execution." } },
+  "CR": { strand: "Development", name: "Creation", objectives: {
+    "FLX.CR.1": "Construct physical or digital representations of multiple solutions.",
+    "FLX.CR.2": "Develop and leverage skills in various prototyping methods and tools.",
+    "FLX.CR.3": "Iterate and improve on prototypes based on feedback and self-reflection." } },
+  "RE": { strand: "Enhancement", name: "Reflection", objectives: {
+    "FLX.RE.1": "Conduct comprehensive testing; gather feedback and self-evaluation.",
+    "FLX.RE.2": "Refine and improve the solution based on feedback and testing.",
+    "FLX.RE.3": "Showcase a reflective understanding of the learning process." } },
+  "PR": { strand: "Fulfillment", name: "Production", objectives: {
+    "FLX.PR.1": "Complete the final solution for real-world implementation on a timeline.",
+    "FLX.PR.2": "Develop and execute a presentation method showing concept-to-product.",
+    "FLX.PR.3": "Determine and manage financial implications and marketing strategy." } }
+};
+var ALL_OBJ_TEXT = {};
+Object.keys(FLX_OBJ).forEach(function(sd){ Object.keys(FLX_OBJ[sd].objectives).forEach(function(c){ ALL_OBJ_TEXT[c] = FLX_OBJ[sd].objectives[c]; }); });
+/* crosswalk (PFLX reference data) — [21st-Century, ISTE, Arts, UDL, CASEL] */
+var XWALK = {
+  "FLX.CN.1": ["Communication & Collaboration","Empowered Learner","Creating","Multiple Means of Engagement","Self-awareness"],
+  "FLX.CN.2": ["Critical Thinking & Problem Solving","Digital Citizen","Responding","Multiple Means of Representation","Social Awareness"],
+  "FLX.CN.3": ["Information Literacy","Knowledge Constructor","Responding","Multiple Means of Representation","Social Awareness"],
+  "FLX.ID.1": ["Creativity & Innovation","Innovative Designer","Creating","Multiple Means of Engagement","Self-management"],
+  "FLX.ID.2": ["Communication & Collaboration","Global Collaborator","Connecting","Multiple Means of Engagement","Relationship Skills"],
+  "FLX.ID.3": ["Leadership & Responsibility","Creative Communicator","Connecting","Multiple Means of Action & Expression","Responsible Decision-Making"],
+  "FLX.CR.1": ["Creativity & Innovation","Computational Thinker","Creating","Multiple Means of Engagement","Self-management"],
+  "FLX.CR.2": ["Flexibility & Adaptability","Innovative Designer","Responding","Multiple Means of Representation","Social Awareness"],
+  "FLX.CR.3": ["Flexibility & Adaptability","Innovative Designer","Creating","Multiple Means of Action & Expression","Self-management"],
+  "FLX.RE.1": ["Critical Thinking & Problem Solving","Empowered Learner","Responding","Multiple Means of Representation","Self-awareness"],
+  "FLX.RE.2": ["Creativity & Innovation","Creative Communicator","Creating","Multiple Means of Engagement","Self-management"],
+  "FLX.RE.3": ["Communication & Collaboration","Global Collaborator","Connecting","Multiple Means of Action & Expression","Self-awareness"],
+  "FLX.PR.1": ["Critical Thinking & Problem Solving","Innovative Designer","Creating","Multiple Means of Action & Expression","Responsible Decision-Making"],
+  "FLX.PR.2": ["Communication & Collaboration","Creative Communicator","Responding","Multiple Means of Representation","Social Awareness"],
+  "FLX.PR.3": ["Initiative & Self-Direction","Digital Citizen","Connecting","Multiple Means of Action & Expression","Responsible Decision-Making"]
+};
+var STRAND_COLOR = { engagement:'#00d4ff', development:'#8b5cf6', enhancement:'#ffa500', fulfillment:'#10e090' };
+var KIND_DEFAULT_OBJ = { engagement:['CN'], development:['ID','CR'], enhancement:['RE'], fulfillment:['PR'] };
+var TEMPLATE_BASE = 'modules/storybuilding-storyboarding/';
+var DRAFT_KEY = 'pflx_builder_draft_v1';
+
+/* ═══════════ state ═══════════ */
+var _uid = 0;
+function uid(p){ _uid++; return (p||'b') + '-' + Date.now().toString(36) + '-' + _uid; }
+
+function newPhase(kind, title){
+  var p = {
+    id: kind === 'engagement' && title ? uid('phase') : kind,
+    kind: kind,
+    title: title || ({engagement:'Engage & Discover', development:'Ideate & Build', enhancement:'Test & Refine', fulfillment:'Finalize & Present'})[kind],
+    essence: '',
+    flxObjectives: [],
+    desiredResults: { understandings: [], essentialQuestions: [] }
+  };
+  if (kind === 'development') {
+    p.segments = [
+      { id:'ideation', subDomain:'ID', title:'Ideation', blocks: [] },
+      { id:'creation', subDomain:'CR', title:'Creation', blocks: [] }
+    ];
+  } else {
+    p.blocks = [];
+  }
+  if (kind === 'fulfillment') {
+    p.blocks.push({ kind:'submission', id:'act-submit', title:'Submit for approval',
+      instructions:'Submit your finished work. Your host will review it against the module criteria and award XC and your badge on approval.',
+      acceptFile:true, acceptLink:true, descriptionRequired:true, descriptionMinLength:50,
+      descriptionHint:'In a few sentences: what should your host look closely at?' });
+  }
+  return p;
+}
+function newTier(name, mins, xc){
+  return { name: name, estimatedMinutes: mins, suggestedReward: { xc: xc, badgeIds: [] },
+    phases: [ newPhase('engagement'), newPhase('development'), newPhase('enhancement'), newPhase('fulfillment') ] };
+}
+function freshState(){
+  return {
+    meta: { name:'', subtitle:'', description:'', moduleType:'course', framework:'FLX', version:'1.0.0', aiAdaptation:false },
+    taskCriteria: [ { label:'The final deliverable meets the brief and shows intentional craft', required:true } ],
+    tiersOn: { starter:false, novice:true, pro:false },
+    tiers: { novice: newTier('Novice', 90, 200) },
+    curTier: 'novice', curPhase: 0
+  };
+}
+var S = freshState();
+try { var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if (d && d.meta) S = d; } catch(e){}
+
+var _saveT = null;
+function autosave(){
+  clearTimeout(_saveT);
+  _saveT = setTimeout(function(){
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(S)); } catch(e){}
+    var el = document.getElementById('autosaveStatus');
+    el.textContent = 'draft saved ' + new Date().toLocaleTimeString();
+  }, 600);
+}
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ t.style.opacity = '0'; }, 2600);
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function slug(s){ return String(s||'').toLowerCase().trim().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || 'untitled-module'; }
+function moduleId(){ return slug(S.meta.name); }
+
+/* ═══════════ sidebar render ═══════════ */
+function bindMeta(){
+  var m = S.meta;
+  document.getElementById('mName').value = m.name;
+  document.getElementById('mSubtitle').value = m.subtitle;
+  document.getElementById('mDesc').value = m.description;
+  document.getElementById('mType').value = m.moduleType;
+  document.getElementById('mFramework').value = m.framework;
+  document.getElementById('mAI').checked = !!m.aiAdaptation;
+  document.getElementById('midHint').textContent = 'moduleId: ' + moduleId();
+  document.getElementById('tierStarterOn').checked = !!S.tiersOn.starter;
+  document.getElementById('tierProOn').checked = !!S.tiersOn.pro;
+}
+function tier(){ return S.tiers[S.curTier]; }
+
+function renderTierTabs(){
+  var holder = document.getElementById('tierTabs');
+  holder.innerHTML = '';
+  ['starter','novice','pro'].forEach(function(t){
+    var b = document.createElement('button');
+    b.className = 'tier-tab t-' + t + (S.curTier === t ? ' on' : '') + (S.tiersOn[t] ? '' : ' disabled');
+    b.textContent = t;
+    b.onclick = function(){
+      if (!S.tiersOn[t]) return;
+      S.curTier = t; S.curPhase = 0;
+      renderAll();
+    };
+    holder.appendChild(b);
+  });
+  var tv = tier();
+  document.getElementById('tMinutes').value = tv.estimatedMinutes;
+  document.getElementById('tXC').value = tv.suggestedReward.xc;
+  document.getElementById('tBadges').value = (tv.suggestedReward.badgeIds || []).join(', ');
+}
+
+function renderPhaseList(){
+  var holder = document.getElementById('phaseList');
+  holder.innerHTML = '';
+  tier().phases.forEach(function(p, i){
+    var div = document.createElement('div');
+    div.className = 'phase-item' + (i === S.curPhase ? ' sel' : '');
+    var removable = (p.kind === 'enhancement' && S.curTier === 'pro') || (p.id !== p.kind && p.kind === 'engagement');
+    div.innerHTML = '<span class="ph-dot" style="background:' + STRAND_COLOR[p.kind] + ';box-shadow:0 0 8px ' + STRAND_COLOR[p.kind] + '"></span>'
+      + '<span style="flex:1"><span class="ph-name">' + esc(p.title) + '</span><br><span class="ph-kind">' + p.kind.toUpperCase() + '</span></span>'
+      + (removable ? '<button class="ph-del" title="Remove phase">✕</button>' : '');
+    div.onclick = function(e){
+      if (e.target.classList.contains('ph-del')) {
+        if (confirm('Remove phase "' + p.title + '" from the ' + S.curTier + ' tier?')) {
+          tier().phases.splice(i, 1);
+          S.curPhase = Math.max(0, S.curPhase - (i <= S.curPhase ? 1 : 0));
+          renderAll(); autosave();
+        }
+        return;
+      }
+      S.curPhase = i; renderAll();
+    };
+    holder.appendChild(div);
+  });
+}
+
+function renderCriteria(){
+  var holder = document.getElementById('critList');
+  holder.innerHTML = '';
+  S.taskCriteria.forEach(function(c, i){
+    var row = document.createElement('div');
+    row.className = 'crit-row';
+    row.innerHTML = '<input type="text" value="' + esc(c.label) + '" placeholder="Criterion the host scores 1–5">'
+      + '<button class="ph-del" title="Remove">✕</button>';
+    row.querySelector('input').oninput = function(){ c.label = this.value; autosave(); };
+    row.querySelector('button').onclick = function(){ S.taskCriteria.splice(i,1); renderCriteria(); autosave(); };
+    holder.appendChild(row);
+  });
+}
+
+/* ═══════════ block editors ═══════════ */
+function blockFields(b){
+  function f(label, key, type, hint, rows){
+    var v = b[key] == null ? '' : b[key];
+    return '<label class="f">' + label + '</label>'
+      + (type === 'textarea'
+        ? '<textarea data-k="' + key + '" rows="' + (rows||3) + '">' + esc(v) + '</textarea>'
+        : '<input type="' + (type||'text') + '" data-k="' + key + '" value="' + esc(v) + '">')
+      + (hint ? '<div class="hint">' + hint + '</div>' : '');
+  }
+  function lines(label, key, hint){
+    var v = (b[key] || []).join('\n');
+    return '<label class="f">' + label + '</label><textarea data-lines="' + key + '" rows="3">' + esc(v) + '</textarea>'
+      + (hint ? '<div class="hint">' + hint + '</div>' : '');
+  }
+  switch (b.kind) {
+    case 'markdown':
+      return f('Content (Markdown)', 'content', 'textarea',
+        'Supports <b>**bold**</b>, <b>*italic*</b>, ## headings, lists, and <b>[links](https://example.com)</b>.', 6);
+    case 'callout':
+      return '<label class="f">Tone</label><select data-k="tone"><option value="info"' + (b.tone!=='warn'?' selected':'') + '>Info (cyan)</option><option value="warn"' + (b.tone==='warn'?' selected':'') + '>Warning (amber)</option></select>'
+        + f('Callout Text', 'content', 'textarea', 'Short emphasized note. Markdown inline styles + links work.', 2);
+    case 'video':
+      return f('YouTube URL', 'url', 'text', 'Paste any YouTube link — watch, share (youtu.be), or embed. It renders as an embedded player.')
+        + f('Caption (optional)', 'caption', 'text');
+    case 'image':
+      return f('Image URL', 'url', 'text', 'Paste an image URL, or use Upload to embed the file directly into the cartridge (small images only — it inflates the .pflx).')
+        + '<button class="tbtn ghost" data-imgupload style="margin-top:6px">⬆ Upload image file</button>'
+        + f('Alt text', 'alt', 'text');
+    case 'tool':
+      return f('Tool Name', 'name', 'text')
+        + f('Category Tag', 'categoryTag', 'text', 'e.g. web-based, desktop, mobile')
+        + f('Description', 'description', 'textarea', '', 2)
+        + f('Launch URL (link)', 'launchUrl', 'text')
+        + f('Tutorial Note (optional)', 'tutorialNote', 'text');
+    case 'diagnostic':
+      return f('Prompt', 'prompt', 'textarea', 'A diagnostic places the learner — it never fails them.', 2)
+        + '<label class="f">Confidence Scale (comma-separated)</label><input type="text" data-scale value="' + esc((b.scale||[]).join(', ')) + '">'
+        + '<label class="f">Items (one per line)</label><textarea data-diagitems rows="4">' + esc((b.items||[]).map(function(it){return it.label;}).join('\n')) + '</textarea>';
+    case 'activity':
+      return f('Title', 'title', 'text')
+        + f('Instructions', 'instructions', 'textarea', '', 3)
+        + '<label class="f">Fields (one per line — add * for a long answer box)</label>'
+        + '<textarea data-actfields rows="3">' + esc((b.fields||[]).map(function(fd){return fd.label + (fd.type==='textarea'?' *':'');}).join('\n')) + '</textarea>'
+        + '<div class="hint">e.g. <b>The story</b> ⏎ <b>What made it unforgettable *</b></div>';
+    case 'reflection':
+      return f('Title', 'title', 'text')
+        + '<label class="f">Reflection Prompts (one per line)</label>'
+        + '<textarea data-refprompts rows="3">' + esc((b.prompts||[]).map(function(p){return p.prompt;}).join('\n')) + '</textarea>';
+    case 'submission':
+      return f('Title', 'title', 'text')
+        + f('Instructions', 'instructions', 'textarea', '', 3)
+        + '<label class="chk"><input type="checkbox" data-bool="acceptLink"' + (b.acceptLink?' checked':'') + '> Accept link submission</label>'
+        + '<label class="chk"><input type="checkbox" data-bool="acceptFile"' + (b.acceptFile?' checked':'') + '> Accept file upload</label>'
+        + '<label class="chk"><input type="checkbox" data-bool="descriptionRequired"' + (b.descriptionRequired?' checked':'') + '> Require description</label>'
+        + f('Min description length', 'descriptionMinLength', 'number')
+        + f('Description hint', 'descriptionHint', 'text');
+    default: return '<div class="hint">Unknown block.</div>';
+  }
+}
+
+function wireBlock(card, b){
+  card.querySelectorAll('[data-k]').forEach(function(el){
+    el.oninput = function(){ b[el.dataset.k] = el.type === 'number' ? (parseInt(el.value)||0) : el.value; autosave(); };
+    el.onchange = el.oninput;
+  });
+  card.querySelectorAll('[data-bool]').forEach(function(el){
+    el.onchange = function(){ b[el.dataset.bool] = el.checked; autosave(); };
+  });
+  var sc = card.querySelector('[data-scale]');
+  if (sc) sc.oninput = function(){ b.scale = sc.value.split(',').map(function(s){return s.trim();}).filter(Boolean); autosave(); };
+  var di = card.querySelector('[data-diagitems]');
+  if (di) di.oninput = function(){
+    b.items = di.value.split('\n').map(function(s){return s.trim();}).filter(Boolean)
+      .map(function(lab, i){ return { id: 'd-' + slug(lab).slice(0,20) + '-' + i, label: lab }; });
+    autosave();
+  };
+  var af = card.querySelector('[data-actfields]');
+  if (af) af.oninput = function(){
+    b.fields = af.value.split('\n').map(function(s){return s.trim();}).filter(Boolean).map(function(lab, i){
+      var long = /\*$/.test(lab); lab = lab.replace(/\s*\*$/, '');
+      return { id: 'f-' + slug(lab).slice(0,20) + '-' + i, label: lab, type: long ? 'textarea' : 'text' };
+    });
+    autosave();
+  };
+  var rp = card.querySelector('[data-refprompts]');
+  if (rp) rp.oninput = function(){
+    b.prompts = rp.value.split('\n').map(function(s){return s.trim();}).filter(Boolean)
+      .map(function(p, i){ return { id: 'r-' + i, prompt: p }; });
+    autosave();
+  };
+  var up = card.querySelector('[data-imgupload]');
+  if (up) up.onclick = function(){
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = function(){
+      var file = inp.files[0]; if (!file) return;
+      if (file.size > 400 * 1024 && !confirm('This image is ' + Math.round(file.size/1024) + ' KB — it will be embedded in the cartridge and make the .pflx large. Continue?')) return;
+      var r = new FileReader();
+      r.onload = function(){ b.url = r.result; autosave(); renderEditor(); toast('Image embedded'); };
+      r.readAsDataURL(file);
+    };
+    inp.click();
+  };
+}
+
+function renderBlockList(holder, blocks){
+  holder.innerHTML = '';
+  blocks.forEach(function(b, i){
+    var card = document.createElement('div');
+    card.className = 'blk';
+    var icon = { markdown:'📝', callout:'💡', video:'▶️', image:'🖼️', tool:'🛠️', diagnostic:'🎯', activity:'⚡', reflection:'🪞', submission:'📤' }[b.kind] || '▪';
+    card.innerHTML = '<div class="blk-h"><span class="blk-kind">' + icon + ' ' + b.kind + '</span>'
+      + '<button data-mv="-1" title="Move up">↑</button><button data-mv="1" title="Move down">↓</button>'
+      + '<button class="del" data-del title="Delete block">✕</button></div>'
+      + '<div class="blk-b">' + blockFields(b) + '</div>';
+    card.querySelector('[data-del]').onclick = function(){
+      if (b.kind === 'submission' && tier().phases[S.curPhase].kind === 'fulfillment') { toast('Fulfillment needs its submission block'); return; }
+      blocks.splice(i, 1); renderEditor(); autosave();
+    };
+    card.querySelectorAll('[data-mv]').forEach(function(btn){
+      btn.onclick = function(){
+        var j = i + parseInt(btn.dataset.mv);
+        if (j < 0 || j >= blocks.length) return;
+        var tmp = blocks[i]; blocks[i] = blocks[j]; blocks[j] = tmp;
+        renderEditor(); autosave();
+      };
+    });
+    wireBlock(card, b);
+    holder.appendChild(card);
+  });
+}
+
+function addBar(blocks){
+  var bar = document.createElement('div');
+  bar.className = 'addbar';
+  [['markdown','+ Text / Links'],['callout','+ Callout'],['video','+ YouTube Video'],['image','+ Image'],['tool','+ Tool Card'],
+   ['diagnostic','+ Diagnostic'],['activity','+ Activity'],['reflection','+ Reflection'],['submission','+ Submission']].forEach(function(pair){
+    var btn = document.createElement('button');
+    btn.textContent = pair[1];
+    btn.onclick = function(){
+      var b = { kind: pair[0] };
+      if (pair[0]==='markdown') b.content='';
+      if (pair[0]==='callout'){ b.tone='info'; b.content=''; }
+      if (pair[0]==='video'){ b.url=''; b.caption=''; }
+      if (pair[0]==='image'){ b.url=''; b.alt=''; }
+      if (pair[0]==='tool'){ b.name=''; b.categoryTag='web-based'; b.description=''; b.launchUrl=''; }
+      if (pair[0]==='diagnostic'){ b.id=uid('dx'); b.prompt=''; b.scale=['New to me','Some idea','Pretty comfortable','I’ve got this']; b.items=[]; }
+      if (pair[0]==='activity'){ b.id=uid('act'); b.title=''; b.instructions=''; b.fields=[]; }
+      if (pair[0]==='reflection'){ b.id=uid('act'); b.title='Reflect'; b.prompts=[]; }
+      if (pair[0]==='submission'){ b.id=uid('act'); b.title='Submit for approval'; b.instructions=''; b.acceptLink=true; b.acceptFile=true; b.descriptionRequired=true; b.descriptionMinLength=50; }
+      blocks.push(b);
+      renderEditor(); autosave();
+    };
+    bar.appendChild(btn);
+  });
+  return bar;
+}
+
+/* ═══════════ phase editor (main panel) ═══════════ */
+function renderEditor(){
+  var p = tier().phases[S.curPhase];
+  var main = document.getElementById('phaseEditor');
+  if (!p) { main.innerHTML = ''; return; }
+  main.innerHTML = '';
+
+  var head = document.createElement('div');
+  head.className = 'card';
+  head.innerHTML = '<h2 style="color:' + STRAND_COLOR[p.kind] + '">' + p.kind.toUpperCase() + ' — ' + esc(FLX_OBJ[(KIND_DEFAULT_OBJ[p.kind]||['CN'])[0]].strand === p.kind ? '' : '') + esc({engagement:'Connection (CN)',development:'Ideation (ID) + Creation (CR)',enhancement:'Reflection (RE)',fulfillment:'Production (PR)'}[p.kind]) + '</h2>'
+    + '<span class="pill">TIER: ' + S.curTier.toUpperCase() + '</span><span class="pill">GATE: ' + (p.kind === 'fulfillment' ? 'SUBMISSION (node-enforced)' : 'ACTIVITY (module-internal)') + '</span>'
+    + '<label class="f">Phase Title</label><input type="text" id="phTitle" value="' + esc(p.title) + '">'
+    + '<label class="f">Host Summary (essence — shown on the host dashboard)</label><input type="text" id="phEssence" value="' + esc(p.essence||'') + '" placeholder="One sentence: what the learner does in this phase">';
+  main.appendChild(head);
+  head.querySelector('#phTitle').oninput = function(){ p.title = this.value; renderPhaseList(); autosave(); };
+  head.querySelector('#phEssence').oninput = function(){ p.essence = this.value; autosave(); };
+
+  /* objectives */
+  var objCard = document.createElement('div');
+  objCard.className = 'card';
+  var subs = KIND_DEFAULT_OBJ[p.kind] || ['CN'];
+  var grid = '';
+  subs.forEach(function(sd){
+    Object.keys(FLX_OBJ[sd].objectives).forEach(function(code){
+      var on = (p.flxObjectives||[]).indexOf(code) !== -1;
+      grid += '<label class="obj-chk"><input type="checkbox" data-obj="' + code + '"' + (on?' checked':'') + '><span><b>' + code + '</b> ' + esc(FLX_OBJ[sd].objectives[code]) + '</span></label>';
+    });
+  });
+  objCard.innerHTML = '<h2>FLX Objectives — this phase</h2><div class="hint">Tagged per phase; PFLX auto-crosswalks to ISTE, CASEL, 21st-Century, UDL, Arts, MYP Design.</div><div class="obj-grid">' + grid + '</div>';
+  main.appendChild(objCard);
+  objCard.querySelectorAll('[data-obj]').forEach(function(cb){
+    cb.onchange = function(){
+      p.flxObjectives = p.flxObjectives || [];
+      var c = cb.dataset.obj, ix = p.flxObjectives.indexOf(c);
+      if (cb.checked && ix === -1) p.flxObjectives.push(c);
+      if (!cb.checked && ix !== -1) p.flxObjectives.splice(ix, 1);
+      autosave();
+    };
+  });
+
+  /* UbD desired results */
+  var ubd = document.createElement('div');
+  ubd.className = 'card';
+  ubd.innerHTML = '<h2>UbD — Desired Results</h2>'
+    + '<label class="f">Understandings (one per line)</label><textarea id="ubdU" rows="2">' + esc((p.desiredResults.understandings||[]).join('\n')) + '</textarea>'
+    + '<label class="f">Essential Questions (one per line)</label><textarea id="ubdQ" rows="2">' + esc((p.desiredResults.essentialQuestions||[]).join('\n')) + '</textarea>';
+  main.appendChild(ubd);
+  ubd.querySelector('#ubdU').oninput = function(){ p.desiredResults.understandings = this.value.split('\n').map(function(s){return s.trim();}).filter(Boolean); autosave(); };
+  ubd.querySelector('#ubdQ').oninput = function(){ p.desiredResults.essentialQuestions = this.value.split('\n').map(function(s){return s.trim();}).filter(Boolean); autosave(); };
+
+  /* content blocks */
+  var content = document.createElement('div');
+  content.className = 'card';
+  content.innerHTML = '<h2>Content Blocks</h2><div class="hint">The learner works top to bottom. Diagnostics, activities, and reflections count toward the phase gate.</div>';
+  if (p.segments) {
+    p.segments.forEach(function(seg){
+      var sh = document.createElement('div');
+      sh.className = 'seg-h';
+      sh.textContent = 'SEGMENT — ' + seg.title.toUpperCase() + ' (' + seg.subDomain + ')';
+      content.appendChild(sh);
+      var holder = document.createElement('div'); holder.className = 'blocks';
+      renderBlockList(holder, seg.blocks);
+      content.appendChild(holder);
+      content.appendChild(addBar(seg.blocks));
+    });
+  } else {
+    var holder = document.createElement('div'); holder.className = 'blocks';
+    renderBlockList(holder, p.blocks);
+    content.appendChild(holder);
+    content.appendChild(addBar(p.blocks));
+  }
+  main.appendChild(content);
+}
+
+function renderAll(){ bindMeta(); renderTierTabs(); renderPhaseList(); renderCriteria(); renderEditor(); }
+
+/* ═══════════ manifest generation ═══════════ */
+function gateFor(p){
+  if (p.kind === 'fulfillment') {
+    var sub = (p.blocks||[]).filter(function(b){ return b.kind === 'submission'; })[0];
+    return { type: 'submission', blockId: sub ? sub.id : 'act-submit' };
+  }
+  var all = p.segments ? p.segments.reduce(function(a,s){ return a.concat(s.blocks); }, []) : (p.blocks||[]);
+  var n = all.filter(function(b){ return ['diagnostic','activity','reflection'].indexOf(b.kind) !== -1; }).length;
+  return { type: 'activity', requiredCount: Math.max(1, n) };
+}
+function tidyPhase(p){
+  var out = { id: p.id, kind: p.kind, title: p.title,
+    flxObjectives: (p.flxObjectives||[]).slice(),
+    desiredResults: p.desiredResults, gate: gateFor(p) };
+  if (p.segments) out.segments = p.segments.map(function(s){ return { id:s.id, subDomain:s.subDomain, title:s.title, blocks:s.blocks }; });
+  else out.blocks = p.blocks;
+  return out;
+}
+function buildManifest(){
+  var tiers = {};
+  ['starter','novice','pro'].forEach(function(t){
+    if (!S.tiersOn[t] || !S.tiers[t]) return;
+    var tv = S.tiers[t];
+    tiers[t] = {
+      name: tv.name || (t.charAt(0).toUpperCase() + t.slice(1)),
+      estimatedMinutes: tv.estimatedMinutes || 90,
+      suggestedReward: { xc: tv.suggestedReward.xc || 0, badgeIds: tv.suggestedReward.badgeIds || [] },
+      phases: tv.phases.map(tidyPhase)
+    };
+  });
+  var nov = S.tiers.novice;
+  return {
+    schemaVersion: 3,
+    moduleId: moduleId(),
+    moduleType: S.meta.moduleType,
+    name: S.meta.name || 'Untitled Module',
+    subtitle: S.meta.subtitle || '',
+    version: S.meta.version || '1.0.0',
+    protocolVersion: 1,
+    saveVersion: 1,
+    framework: S.meta.framework || 'FLX',
+    description: S.meta.description || '',
+    estimatedMinutes: nov.estimatedMinutes || 90,
+    capabilities: { progress:true, stats:true, checkpoints:true,
+      coop: S.meta.moduleType === 'project', submission:true, hostDashboard:true },
+    suggestedReward: { xc: nov.suggestedReward.xc || 0, badgeIds: nov.suggestedReward.badgeIds || [] },
+    taskCriteria: S.taskCriteria.filter(function(c){ return c.label.trim(); }).map(function(c, i){
+      return { id: 'tc' + (i+1), label: c.label.trim(), scale: '1-5', required: c.required !== false };
+    }),
+    objectiveText: ALL_OBJ_TEXT,
+    difficulty: { model: 'tiers', levels: Object.keys(tiers) },
+    aiAdaptation: { enabled: !!S.meta.aiAdaptation,
+      note: 'Scaffold for the PFLX AI difficulty layer: when enabled and the layer ships, block scaffolding depth and gate thresholds adjust per player.' },
+    structure: { tiers: tiers }
+  };
+}
+function validate(){
+  var errs = [];
+  if (!S.meta.name.trim()) errs.push('Module name is required.');
+  Object.keys(S.tiers).forEach(function(t){
+    if (!S.tiersOn[t]) return;
+    S.tiers[t].phases.forEach(function(p){
+      var all = p.segments ? p.segments.reduce(function(a,s){return a.concat(s.blocks);},[]) : (p.blocks||[]);
+      if (!all.length) errs.push('[' + t + '] "' + p.title + '" has no content blocks.');
+      if (p.kind === 'fulfillment' && !all.some(function(b){return b.kind==='submission';}))
+        errs.push('[' + t + '] Fulfillment phase needs a submission block.');
+      if (!(p.flxObjectives||[]).length) errs.push('[' + t + '] "' + p.title + '" tags no FLX objectives.');
+    });
+  });
+  return errs;
+}
+
+/* ═══════════ template injection + export ═══════════ */
+function safeJson(obj){
+  return JSON.stringify(obj, null, 2).replace(/</g, '\\u003c');
+}
+var _tpl = {};
+function fetchTemplate(name){
+  if (_tpl[name]) return Promise.resolve(_tpl[name]);
+  return fetch(TEMPLATE_BASE + name).then(function(r){
+    if (!r.ok) throw new Error('template fetch failed: ' + name);
+    return r.text();
+  }).then(function(t){ _tpl[name] = t; return t; });
+}
+function injectManifest(html, manifest, title){
+  return html
+    .replace(/<title>[\s\S]*?<\/title>/, '<title>' + esc(title) + '</title>')
+    .replace(/(<script type="application\/json" id="module-manifest">)[\s\S]*?(<\/script>)/,
+      function(_, a, b){ return a + '\n' + safeJson(manifest) + '\n' + b; });
+}
+function hostManifest(manifest){
+  var nov = manifest.structure.tiers.novice || manifest.structure.tiers[Object.keys(manifest.structure.tiers)[0]];
+  return {
+    moduleId: manifest.moduleId, name: manifest.name, subtitle: manifest.subtitle,
+    version: manifest.version, moduleType: manifest.moduleType, framework: manifest.framework,
+    estimatedMinutes: manifest.estimatedMinutes, suggestedReward: manifest.suggestedReward,
+    taskCriteria: manifest.taskCriteria,
+    phases: nov.phases.map(function(p){
+      var src = null;
+      Object.keys(S.tiers).forEach(function(t){
+        (S.tiers[t].phases||[]).forEach(function(sp){ if (sp.id === p.id && sp.essence) src = sp.essence; });
+      });
+      return { id: p.id, kind: p.kind, title: p.title,
+        essence: src || ('The learner works through the ' + p.kind + ' strand.'),
+        flxObjectives: p.flxObjectives };
+    })
+  };
+}
+function patchHostRefData(html){
+  // replace the template's partial OBJ/XWALK with the complete FLX maps
+  var objSrc = 'var OBJ = ' + safeJson(ALL_OBJ_TEXT) + ';';
+  var xwSrc = 'var XWALK = ' + safeJson(XWALK) + ';';
+  return html
+    .replace(/var OBJ = \{[\s\S]*?\};/, objSrc)
+    .replace(/var XWALK = \{[\s\S]*?\};/, xwSrc);
+}
+function buildViewerHtml(manifest){
+  return fetchTemplate('viewer.html').then(function(tpl){
+    return injectManifest(tpl, manifest, manifest.name + ' — PFLX Module');
+  });
+}
+function buildHostHtml(manifest){
+  return fetchTemplate('host.html').then(function(tpl){
+    return patchHostRefData(injectManifest(tpl, hostManifest(manifest), manifest.name + ' — Host View'));
+  });
+}
+function download(blob, filename){
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+
+document.getElementById('btnExport').onclick = function(){
+  var errs = validate();
+  if (errs.length && !confirm('Heads up:\n\n• ' + errs.join('\n• ') + '\n\nExport anyway?')) return;
+  var manifest = buildManifest();
+  Promise.all([buildViewerHtml(manifest), buildHostHtml(manifest)]).then(function(parts){
+    var zip = new JSZip();
+    zip.file('manifest.json', safeJson(manifest));
+    zip.file('viewer.html', parts[0]);
+    zip.file('host.html', parts[1]);
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function(blob){
+    download(blob, manifest.moduleId + '.pflx');
+    toast('.pflx exported — upload it to a node');
+  }).catch(function(e){
+    console.error(e);
+    toast('Export failed: ' + e.message);
+  });
+};
+document.getElementById('btnManifest').onclick = function(){
+  var manifest = buildManifest();
+  download(new Blob([safeJson(manifest)], { type: 'application/json' }), manifest.moduleId + '.manifest.json');
+};
+
+/* ═══════════ preview ═══════════ */
+var previewFrame = document.getElementById('previewFrame');
+document.getElementById('btnPreview').onclick = function(){ openPreview(false); };
+document.getElementById('previewHost').onclick = function(){ openPreview(true); };
+document.getElementById('previewClose').onclick = function(){
+  document.getElementById('previewWrap').classList.remove('show');
+  previewFrame.srcdoc = '';
+};
+function openPreview(host){
+  var manifest = buildManifest();
+  var sel = document.getElementById('previewTier');
+  sel.innerHTML = Object.keys(manifest.structure.tiers).map(function(t){
+    return '<option value="' + t + '"' + (t === (sel.value || 'novice') ? ' selected' : '') + '>' + t.toUpperCase() + '</option>';
+  }).join('');
+  sel.onchange = function(){ openPreview(false); };
+  var build = host ? buildHostHtml(manifest) : buildViewerHtml(manifest);
+  build.then(function(html){
+    previewFrame.srcdoc = html;
+    document.getElementById('previewWrap').classList.add('show');
+  }).catch(function(e){ toast('Preview failed: ' + e.message); });
+}
+/* answer the preview viewer's Connector handshake so it behaves like a node */
+window.addEventListener('message', function(e){
+  var msg = e.data || {};
+  if (msg.type === 'pflx_mod_ready' && previewFrame.contentWindow) {
+    var t = document.getElementById('previewTier').value || 'novice';
+    previewFrame.contentWindow.postMessage({ v:1, type:'pflx_mod_init', payload: {
+      player: { id:'preview', brand:'Preview Player' },
+      xc: { balance: 0 }, badges: [], save: {},
+      context: { pathwaySlug:'builder-preview', nodeId:'preview-node', entryMode:'solo', tier: t },
+      coop: { sessionId:null, role:null, peers:[], enabled:false, maxPlayers:4 }
+    } }, '*');
+  }
+  if (msg.type === 'pflx_mod_save' && previewFrame.contentWindow) {
+    previewFrame.contentWindow.postMessage({ v:1, type:'pflx_mod_save_ack', payload:{} }, '*');
+  }
+});
+
+/* ═══════════ top bar / sidebar wiring ═══════════ */
+document.getElementById('mName').oninput = function(){ S.meta.name = this.value; document.getElementById('midHint').textContent = 'moduleId: ' + moduleId(); autosave(); };
+document.getElementById('mSubtitle').oninput = function(){ S.meta.subtitle = this.value; autosave(); };
+document.getElementById('mDesc').oninput = function(){ S.meta.description = this.value; autosave(); };
+document.getElementById('mType').onchange = function(){ S.meta.moduleType = this.value; autosave(); };
+document.getElementById('mFramework').onchange = function(){ S.meta.framework = this.value; autosave(); };
+document.getElementById('mAI').onchange = function(){ S.meta.aiAdaptation = this.checked; autosave(); };
+document.getElementById('tMinutes').oninput = function(){ tier().estimatedMinutes = parseInt(this.value)||0; autosave(); };
+document.getElementById('tXC').oninput = function(){ tier().suggestedReward.xc = parseInt(this.value)||0; autosave(); };
+document.getElementById('tBadges').oninput = function(){
+  tier().suggestedReward.badgeIds = this.value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  autosave();
+};
+document.getElementById('tierStarterOn').onchange = function(){
+  S.tiersOn.starter = this.checked;
+  if (this.checked && !S.tiers.starter) S.tiers.starter = newTier('Starter', 120, Math.round((S.tiers.novice.suggestedReward.xc||200) * 0.5));
+  if (!this.checked && S.curTier === 'starter') { S.curTier = 'novice'; S.curPhase = 0; }
+  renderAll(); autosave();
+};
+document.getElementById('tierProOn').onchange = function(){
+  S.tiersOn.pro = this.checked;
+  if (this.checked && !S.tiers.pro) S.tiers.pro = newTier('Pro', 60, Math.round((S.tiers.novice.suggestedReward.xc||200) * 1.75));
+  if (!this.checked && S.curTier === 'pro') { S.curTier = 'novice'; S.curPhase = 0; }
+  renderAll(); autosave();
+};
+document.getElementById('addPractice').onclick = function(){
+  var p = newPhase('engagement', 'Practice Round');
+  p.id = uid('practice');
+  var ph = tier().phases;
+  ph.splice(1, 0, p);   // after Engagement
+  S.curPhase = 1;
+  renderAll(); autosave();
+};
+document.getElementById('addCrit').onclick = function(){
+  S.taskCriteria.push({ label:'', required:true });
+  renderCriteria(); autosave();
+};
+document.getElementById('btnNew').onclick = function(){
+  if (!confirm('Start a new module? The current draft will be replaced (it was autosaved up to now).')) return;
+  S = freshState();
+  localStorage.removeItem(DRAFT_KEY);
+  renderAll();
+};
+document.getElementById('btnImport').onclick = function(){ document.getElementById('importInput').click(); };
+document.getElementById('importInput').onchange = function(){
+  var file = this.files[0]; if (!file) return;
+  this.value = '';
+  function adopt(manifest){
+    try {
+      var tiers = (manifest.structure && manifest.structure.tiers) || null;
+      if (!tiers && manifest.structure && manifest.structure.phases) tiers = { novice: { name:'Novice', estimatedMinutes: manifest.estimatedMinutes||90, suggestedReward: manifest.suggestedReward||{xc:0,badgeIds:[]}, phases: manifest.structure.phases } };
+      if (!tiers) throw new Error('no structure.tiers / structure.phases');
+      S = freshState();
+      S.meta = { name: manifest.name||'', subtitle: manifest.subtitle||'', description: manifest.description||'',
+        moduleType: manifest.moduleType||'course', framework: manifest.framework||'FLX',
+        version: manifest.version||'1.0.0', aiAdaptation: !!(manifest.aiAdaptation && manifest.aiAdaptation.enabled) };
+      S.taskCriteria = (manifest.taskCriteria||[]).map(function(c){ return { label:c.label||'', required:c.required!==false }; });
+      S.tiers = {}; S.tiersOn = { starter:false, novice:false, pro:false };
+      Object.keys(tiers).forEach(function(t){
+        var tv = tiers[t];
+        S.tiersOn[t] = true;
+        S.tiers[t] = { name: tv.name||t, estimatedMinutes: tv.estimatedMinutes||90,
+          suggestedReward: tv.suggestedReward||{xc:0,badgeIds:[]},
+          phases: (tv.phases||[]).map(function(p){
+            var np = JSON.parse(JSON.stringify(p));
+            np.essence = np.essence || '';
+            np.desiredResults = np.desiredResults || { understandings:[], essentialQuestions:[] };
+            np.desiredResults.understandings = np.desiredResults.understandings || [];
+            np.desiredResults.essentialQuestions = np.desiredResults.essentialQuestions || [];
+            if (!np.segments && !np.blocks) np.blocks = [];
+            return np;
+          }) };
+      });
+      if (!S.tiers.novice) { var k = Object.keys(S.tiers)[0]; S.tiers.novice = S.tiers[k]; S.tiersOn.novice = true; }
+      S.curTier = 'novice'; S.curPhase = 0;
+      renderAll(); autosave();
+      toast('Imported "' + (manifest.name||'module') + '"');
+    } catch(e){ console.error(e); toast('Import failed: ' + e.message); }
+  }
+  if (/\.(pflx|zip)$/i.test(file.name)) {
+    JSZip.loadAsync(file).then(function(zip){
+      var mf = zip.file('manifest.json');
+      if (!mf) throw new Error('no manifest.json in package');
+      return mf.async('string');
+    }).then(function(txt){ adopt(JSON.parse(txt)); })
+      .catch(function(e){ toast('Import failed: ' + e.message); });
+  } else {
+    var r = new FileReader();
+    r.onload = function(){ try { adopt(JSON.parse(r.result)); } catch(e){ toast('Not valid manifest JSON'); } };
+    r.readAsText(file);
+  }
+};
+
+renderAll();
+</script>
+</body>
+</html>
