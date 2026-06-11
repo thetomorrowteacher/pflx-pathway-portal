@@ -1052,6 +1052,37 @@ Root causes fixed:
   `pflx_xbot_elevenlabs_key`); proxying TTS audio is a possible
   follow-up.
 
+### Mission Control: Proposals FULL LOOP (June 11)
+The half-built Proposals feature is now end-to-end (pflx-platform):
+- Player side: 💡 PROPOSE button on the Home Base My Tasks card opens a
+  modal (type: MC Project | Pathway Node, target checkpoint/pathway,
+  suggested XC) + a MY PROPOSALS status list with host notes and
+  REVISE & RESUBMIT for returned items.
+- Host side: Proposals queue gained a RETURNED tab and a Return-for-
+  Edits action with a note. **Approve now CREATES the real thing**:
+  'project' → a real mcProjects entry (proposer on team, suggested XC);
+  'pathway-node' → a record in the X-Coin `projectPitches` collection,
+  which pathway.html ALREADY injects as a live node and pays the
+  creator 10% residual XC per completion. Also fixed a real bug:
+  approve/reject acted on the FILTERED list index, hitting the wrong
+  proposal whenever a tab filter was active.
+
+### Tutorials / tours (June 11, Ennis: "improve the tour, each app needs one")
+- Console tour v2 (pflx-platform): steps are now ROLE-AWARE (player
+  tour vs host tour — host steps cover Approvals, Cohort Manager +
+  Evo Rank Bypass, the Builder, X-Bot engines/mimic), copy refreshed to
+  the June-2026 reality (open space, Ship Bay, PROPOSE, X-Bot), steps
+  with missing/gated targets are filtered at start and skipped at
+  runtime. Engine, first-login trigger, ? replay button unchanged.
+- Core Pathways tour (NEW, pathway.html): `pflxTour` — 6-step spotlight
+  walkthrough (station nodes, camera modes + flight/blast controls,
+  cargo hold, minimap, progress, zoom), auto-runs once per browser
+  (`pflx_pathway_tour_v1`), ? replay button bottom-right next to the
+  minimap.
+- STILL TO DO: in-app tours for X-Coin, Battle Arena, DarkCampus
+  (Next.js apps — each needs its own small tour component; reuse the
+  pflxTour pattern).
+
 ### Cohort app gating — hardened (June 11, "DarkCampus still works when off")
 Two silent fail-open paths found and closed in pflx-platform preview.html:
 1. **Name drift** — a player session cohort string that didn't EXACTLY

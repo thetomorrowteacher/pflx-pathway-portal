@@ -10765,6 +10765,100 @@ const pflxClusters = {
 pflxClusters.load();
 window.pflxClusters = pflxClusters;
 
+// ═══════════════════════════════════════════════════════════════════
+// PATHWAY TOUR — first-visit spotlight walkthrough of the open-space
+// UI (station nodes, flight controls, cargo, minimap). Auto-runs once
+// per browser (pflx_pathway_tour_v1); replay via the ? button in the
+// bottom-right rail. Steps with missing targets are skipped.
+// ═══════════════════════════════════════════════════════════════════
+const pflxTour = {
+  KEY: 'pflx_pathway_tour_v1',
+  steps: [
+    { sel: '.skill-node', title: 'STATION NODES', body: 'Every station is a course, project, or challenge. Click one to open its briefing — entry video, requirements, your saved progress — then hit START to dock and launch the module. Complete it for XC and badges.' },
+    { sel: '.camera-toggle', title: 'CAMERA MODES', body: 'BIRD\'S-EYE is your star map — pan, zoom, and click anything in space for intel. Switch to CHASE or COCKPIT to take the stick: WASD or arrows to fly, SHIFT to boost, SPACE to fire at asteroid fields for XC and ore.' },
+    { sel: '#cargoBtn', title: 'CARGO HOLD', body: 'Everything you collect out there — ore, crystals, salvage, stardust — lands here, along with your pending XC. The SHIP BAY link takes you to the X-Coin Marketplace for stronger hulls and ship systems.' },
+    { sel: '.minimap', title: 'MINIMAP', body: 'Your sector at a glance. Click or drag anywhere on it to jump the camera across the map.' },
+    { sel: '.progress-bar-container', title: 'PATHWAY PROGRESS', body: 'How many stations you\'ve completed on this pathway. Finish them all to master the discipline — and watch for distant galaxy clusters only warp-capable ships can reach.' },
+    { sel: '.zoom-controls', title: 'ZOOM & MAGNIFIER', body: 'Zoom the map in and out, or use the magnifier for a close look. That\'s the briefing, pilot — your ship is waiting.' }
+  ],
+  idx: 0,
+  _els: null,
+  start() {
+    this.idx = 0;
+    this.build();
+    this.show();
+  },
+  build() {
+    if (this._els) return;
+    const dim = document.createElement('div');
+    dim.id = 'pflxTourRing';
+    dim.style.cssText = 'position:fixed;z-index:99990;border:2px solid rgba(0,212,255,0.9);border-radius:14px;' +
+      'box-shadow:0 0 0 9999px rgba(2,6,12,0.82), 0 0 24px rgba(0,212,255,0.5);pointer-events:none;transition:all 0.35s cubic-bezier(0.22,1,0.36,1);';
+    const tip = document.createElement('div');
+    tip.id = 'pflxTourTip';
+    tip.style.cssText = 'position:fixed;z-index:99991;width:min(340px,90vw);padding:16px 18px;border-radius:12px;' +
+      'background:linear-gradient(160deg,rgba(6,14,24,0.98),rgba(8,18,32,0.98));border:1px solid rgba(0,212,255,0.45);' +
+      'box-shadow:0 12px 40px rgba(0,0,0,0.6);color:#cfeefe;font-family:Rajdhani,sans-serif;';
+    document.body.appendChild(dim);
+    document.body.appendChild(tip);
+    this._els = { dim, tip };
+  },
+  show() {
+    // skip steps whose target doesn't exist
+    while (this.idx < this.steps.length && !document.querySelector(this.steps[this.idx].sel)) this.idx++;
+    if (this.idx >= this.steps.length) { this.end(); return; }
+    const st = this.steps[this.idx];
+    const t = document.querySelector(st.sel).getBoundingClientRect();
+    const { dim, tip } = this._els;
+    const pad = 10;
+    dim.style.left = (t.left - pad) + 'px';
+    dim.style.top = (t.top - pad) + 'px';
+    dim.style.width = (t.width + pad * 2) + 'px';
+    dim.style.height = (t.height + pad * 2) + 'px';
+    tip.innerHTML =
+      '<div style="font-family:Orbitron,sans-serif;font-size:8px;letter-spacing:0.2em;color:rgba(0,212,255,0.6);margin-bottom:4px;">TOUR · ' + (this.idx + 1) + ' / ' + this.steps.length + '</div>' +
+      '<div style="font-family:Orbitron,sans-serif;font-size:13px;font-weight:800;letter-spacing:0.1em;color:#7df9ff;margin-bottom:8px;">' + st.title + '</div>' +
+      '<div style="font-size:13px;line-height:1.55;color:rgba(207,238,254,0.85);margin-bottom:14px;">' + st.body + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button onclick="pflxTour.end()" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:11px;font-weight:700;letter-spacing:0.08em;">SKIP</button>' +
+        (this.idx > 0 ? '<button onclick="pflxTour.idx--;pflxTour.show()" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.7);font-size:11px;font-weight:700;letter-spacing:0.08em;">BACK</button>' : '') +
+        '<button onclick="pflxTour.idx++;pflxTour.show()" style="padding:7px 18px;border-radius:8px;cursor:pointer;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.5);color:#7df9ff;font-size:11px;font-weight:800;letter-spacing:0.08em;">' + (this.idx === this.steps.length - 1 ? 'FINISH ▶' : 'NEXT ▶') + '</button>' +
+      '</div>';
+    // position the tip near the target, clamped to the viewport
+    const tw = Math.min(340, window.innerWidth * 0.9), th = 210;
+    let tl = t.left + t.width / 2 - tw / 2;
+    let tt = t.bottom + pad + 14;
+    if (tt + th > window.innerHeight - 12) tt = t.top - th - pad - 8;
+    if (tt < 12) tt = Math.max(12, window.innerHeight / 2 - th / 2);
+    tl = Math.max(12, Math.min(window.innerWidth - tw - 12, tl));
+    tip.style.left = tl + 'px';
+    tip.style.top = tt + 'px';
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  },
+  end() {
+    try { localStorage.setItem(this.KEY, 'seen'); } catch (e) {}
+    if (this._els) { this._els.dim.remove(); this._els.tip.remove(); this._els = null; }
+  },
+};
+window.pflxTour = pflxTour;
+// replay button — bottom rail, left of the minimap
+(function () {
+  const b = document.createElement('button');
+  b.id = 'pflxTourBtn';
+  b.title = 'Replay the tour';
+  b.textContent = '?';
+  b.style.cssText = 'position:absolute;bottom:20px;right:170px;z-index:100;width:32px;height:32px;border-radius:50%;' +
+    'background:rgba(6,10,18,0.9);border:1px solid rgba(0,212,255,0.3);color:rgba(0,212,255,0.8);' +
+    'font-family:Orbitron,sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;';
+  b.addEventListener('click', function () { pflxTour.start(); });
+  const mm = document.getElementById('minimap');
+  (mm && mm.parentNode ? mm.parentNode : document.body).appendChild(b);
+})();
+// auto-run once per browser, after the UI settles
+setTimeout(function () {
+  try { if (!localStorage.getItem(pflxTour.KEY)) pflxTour.start(); } catch (e) {}
+}, 2200);
+
 // Open marketplace redirect
 function pflxShipOpenUpgrades() {
   // Navigate to X-Coin marketplace Ship Bay
