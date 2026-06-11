@@ -21,6 +21,9 @@
     const SUPABASE_URL = 'https://hyxiagexyptzvetqjmnj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY';
     const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Expose on window — subsystems (cargo cloud mirror, crew presence)
+    // check window._supabase; a bare top-level const never lands there.
+    window._supabase = _supabase;
   </script>
   <style>
     :root {
@@ -3912,8 +3915,26 @@ window.pflxSpace = (function () {
   const chunks = {};
   window.pflxSpaceObjects = [];
 
+  // ── Per-pathway universe seed — every pathway gets its OWN space. ──
+  // FNV-1a hash of the pathway slug feeds the chunk PRNG and biases the
+  // dressing palettes/densities, so Content Creator's sky never looks
+  // like Digital Artist's.
+  const PATH_SEED = (function () {
+    const s = (typeof pathwaySlug !== 'undefined' && pathwaySlug) ? String(pathwaySlug) : 'default';
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  })();
+  // Pathway character: densities vary per pathway (deterministic)
+  const PVAR = {
+    planet:    0.30 + ((PATH_SEED >>> 4)  % 20) / 100,   // 0.30–0.49
+    nebula:    0.22 + ((PATH_SEED >>> 8)  % 18) / 100,   // 0.22–0.39
+    galaxy:    0.10 + ((PATH_SEED >>> 12) % 10) / 100,   // 0.10–0.19
+    asteroids: 0.38 + ((PATH_SEED >>> 16) % 14) / 100,   // 0.38–0.51
+  };
+
   function chunkRand(cx, cy) {
-    let h = (((cx * 73856093) ^ (cy * 19349663) ^ 0x9e3779b9) >>> 0) || 1;
+    let h = (((cx * 73856093) ^ (cy * 19349663) ^ PATH_SEED ^ 0x9e3779b9) >>> 0) || 1;
     return function () {
       h ^= h << 13; h >>>= 0; h ^= h >> 17; h ^= h << 5; h >>>= 0;
       return (h % 100000) / 100000;
@@ -3982,9 +4003,10 @@ window.pflxSpace = (function () {
     if (ccx === 0 && ccy === 0) allowGameplay = false;
 
     // ---- distant dressing ----
-    if (rnd() < 0.38) {  // far planet
+    if (rnd() < PVAR.planet) {  // far planet
       const r = 140 + rnd() * 320;
-      const pal = FAR_PALS[(rnd() * FAR_PALS.length) | 0];
+      // 55% home palette (pathway signature color), else any
+      const pal = (rnd() < 0.55) ? FAR_PALS[PATH_SEED % FAR_PALS.length] : FAR_PALS[(rnd() * FAR_PALS.length) | 0];
       const tex = planetTexture(pal[0], pal[1], pal[2], pal[3]);
       const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 20), new THREE.MeshLambertMaterial({ map: tex }));
       const p = toGL(baseLX + rnd() * CHUNK, baseLY + rnd() * CHUNK);
@@ -3992,8 +4014,8 @@ window.pflxSpace = (function () {
       group.add(m); rec.dispose.push(m.geometry, m.material, tex);
       rec.spinners.push({ m: m, rs: 0.002 + rnd() * 0.005 });
     }
-    if (rnd() < 0.3) {   // extra nebula
-      const pal = NEB_PALETTE[(rnd() * NEB_PALETTE.length) | 0];
+    if (rnd() < PVAR.nebula) {   // extra nebula
+      const pal = (rnd() < 0.5) ? NEB_PALETTE[(PATH_SEED >>> 3) % NEB_PALETTE.length] : NEB_PALETTE[(rnd() * NEB_PALETTE.length) | 0];
       const tex = nebulaTexture(pal[0], pal[1]);
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.2 + rnd() * 0.14, rotation: rnd() * 6.28 });
       const s = new THREE.Sprite(mat);
@@ -4003,7 +4025,7 @@ window.pflxSpace = (function () {
       s.position.set(p.x * 1.9, p.y * 1.9, -4200 - rnd() * 2000);
       group.add(s); rec.dispose.push(mat, tex);
     }
-    if (rnd() < 0.14) {  // distant galaxy spiral
+    if (rnd() < PVAR.galaxy) {  // distant galaxy spiral
       const pal = NEB_PALETTE[(rnd() * NEB_PALETTE.length) | 0];
       const tex = spiralTexture('255,235,200', pal[0]);
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.45, rotation: rnd() * 6.28 });
@@ -4019,7 +4041,7 @@ window.pflxSpace = (function () {
     // ---- map-plane gameplay objects ----
     if (allowGameplay) {
       const roll = rnd();
-      if (roll < 0.45) {
+      if (roll < PVAR.asteroids) {
         // asteroid cluster
         const clx = baseLX + 400 + rnd() * (CHUNK - 800);
         const cly = baseLY + 400 + rnd() * (CHUNK - 800);
@@ -4037,9 +4059,9 @@ window.pflxSpace = (function () {
           rocksGroup.add(m); rec.dispose.push(geo);
         }
         group.add(rocksGroup);
-        const obj = { type: 'asteroids', x: clx, y: cly, r: 300, chunkKey: key, gl: rocksGroup, depleted: false };
+        const obj = { type: 'asteroids', x: clx, y: cly, r: 300, chunkKey: key, gl: rocksGroup, depleted: false, hp: count };
         rec.objects.push(obj); window.pflxSpaceObjects.push(obj);
-      } else if (roll < 0.55) {
+      } else if (roll < PVAR.asteroids + 0.10) {
         // black hole
         const blx = baseLX + 600 + rnd() * (CHUNK - 1200);
         const bly = baseLY + 600 + rnd() * (CHUNK - 1200);
@@ -4059,7 +4081,7 @@ window.pflxSpace = (function () {
         group.add(bhGroup);
         const obj = { type: 'blackhole', x: blx, y: bly, r: 460, chunkKey: key, gl: bhGroup, disk: diskMat };
         rec.objects.push(obj); window.pflxSpaceObjects.push(obj);
-      } else if (roll < 0.63) {
+      } else if (roll < PVAR.asteroids + 0.18) {
         // derelict cargo pod
         const dlx = baseLX + 400 + rnd() * (CHUNK - 800);
         const dly = baseLY + 400 + rnd() * (CHUNK - 800);
@@ -5175,6 +5197,19 @@ function pflxDecrowdStations() {
     const s = nearest === Infinity ? 1 : Math.max(0.45, Math.min(1, nearest / 300));
     const st = ne.el.querySelector('.station-structure');
     if (st) st.style.transform = 'translate(-50%, -55%) scale(' + s.toFixed(2) + ')';
+    // labels + badges crowd before structures do — shrink them too when
+    // neighbors are inside 170px so text never sits on the next station
+    const s2 = nearest === Infinity ? 1 : Math.max(0.6, Math.min(1, nearest / 170));
+    const lbl = ne.el.querySelector('.node-label');
+    if (lbl) {
+      lbl.style.transform = s2 < 1 ? 'scale(' + s2.toFixed(2) + ')' : '';
+      lbl.style.transformOrigin = 'center top';
+    }
+    const bdg = ne.el.querySelector('.node-badge');
+    if (bdg) {
+      bdg.style.transform = s2 < 1 ? 'scale(' + s2.toFixed(2) + ')' : '';
+      bdg.style.transformOrigin = 'center';
+    }
   });
 }
 
@@ -9625,7 +9660,9 @@ function pflxLoadShipState() {
       // Known ids: 'mining-laser' (faster mining, double yield),
       // 'tractor-beam' (wider collection radius), 'deep-scanner'
       // (events announced from farther away), 'shield-booster'
-      // (black-hole pull resistance without a T3+ hull).
+      // (black-hole pull resistance without a T3+ hull),
+      // 'blaster-mk2' (faster fire rate + 2 dmg per bolt when
+      // blasting asteroids with SPACE in chase/cockpit view).
       pflxShip.upgrades.modules = Array.isArray(state.modules) ? state.modules : (pflxShip.upgrades.modules || []);
     }
   } catch(e) { console.warn('[Ship] Could not load ship state:', e); }
@@ -9643,6 +9680,10 @@ window.addEventListener('message', function(e) {
     if (msg.type === 'pflx_ship_state_update' && msg.state) {
       localStorage.setItem('pflx_ship_state', JSON.stringify(msg.state));
       pflxLoadShipState();
+    }
+    // Console credited space XC into the player's X-Coin account
+    if (msg.type === 'pflx_space_xc_ack' && typeof msg.amount === 'number') {
+      pflxCargo.creditAck(msg.amount);
     }
   } catch(ex) {}
 });
@@ -9728,8 +9769,15 @@ const pflxCargo = {
   addXC(amount, reason) {
     this.data.pendingXC = (this.data.pendingXC || 0) + amount;
     this.save();
-    // Tell the Console — it can credit through the real XC authority
+    // Tell the Console — it credits through PflxDataBus (the XC
+    // authority), which maps straight into the player's X-Coin
+    // account and fans out to the Platform toolbar + every sub-app.
     try { window.parent.postMessage({ type: 'pflx_space_xc', amount: amount, reason: reason, playerId: this.playerId }, '*'); } catch (e) {}
+  },
+  creditAck(amount) {
+    this.data.pendingXC = Math.max(0, (this.data.pendingXC || 0) - amount);
+    this.save();
+    try { pflxCargoUI.render(); } catch (e) {}
   },
 };
 
@@ -9824,7 +9872,7 @@ const pflxSpaceHazards = {
     if (miningThisFrame) {
       if (!this._mining || this._mining.obj !== miningThisFrame) {
         this._mining = { obj: miningThisFrame, progress: 0 };
-        pflxSpaceToast('⛏️', 'MINING', pflxHasModule('mining-laser') ? 'Mining laser engaged.' : 'Extracting ore — hold position…', '');
+        pflxSpaceToast('⛏️', 'MINING', pflxHasModule('mining-laser') ? 'Mining laser engaged.' : 'Extracting ore — hold position… or hit SPACE to blast.', '');
       }
       const need = pflxHasModule('mining-laser') ? 0.6 : 1.6;
       this._mining.progress += dt;
@@ -9856,7 +9904,158 @@ const pflxSpaceHazards = {
 };
 window.pflxSpaceHazards = pflxSpaceHazards;
 
-// birds-eye click on a space object → fly there
+// ═══════════════════════════════════════════════════════════════════
+// BLASTER — SPACE bar fires at the nearest asteroid cluster.
+// Rocks break one by one; each hit pays a small XC bounty + ore
+// chance. Destroying the whole cluster pays a bonus. 'blaster-mk2'
+// module (X-Coin Ship Bay) = faster fire rate + 2 damage per bolt.
+// ═══════════════════════════════════════════════════════════════════
+const pflxBlaster = {
+  cooldown: 0,
+  range: 460,
+  fireRate() { return pflxHasModule('blaster-mk2') ? 0.22 : 0.5; },
+  damage() { return pflxHasModule('blaster-mk2') ? 2 : 1; },
+
+  tick(dt) {
+    if (this.cooldown > 0) this.cooldown -= dt;
+    if (!pflxKeys.fire || this.cooldown > 0) return;
+    if (typeof pflxShip === 'undefined' || pflxShip.flying) return;
+    this.cooldown = this.fireRate();
+    // target: nearest live asteroid cluster in range
+    let best = null, bestD = Infinity;
+    (window.pflxSpaceObjects || []).forEach(function (o) {
+      if (o.type !== 'asteroids' || o.depleted) return;
+      const d = Math.hypot(o.x - pflxShip.x, o.y - pflxShip.y);
+      if (d < pflxBlaster.range && d < bestD) { best = o; bestD = d; }
+    });
+    if (best) {
+      this.boltFX(pflxShip.x, pflxShip.y, best.x, best.y, best);
+    } else {
+      // no target — fire straight ahead anyway (feels alive)
+      const a = ((pflxShipAngle || 0) - 90) * Math.PI / 180;
+      this.boltFX(pflxShip.x, pflxShip.y, pflxShip.x + Math.cos(a) * 320, pflxShip.y + Math.sin(a) * 320, null);
+    }
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  },
+
+  boltFX(sx, sy, tx, ty, target) {
+    const bolt = document.createElement('div');
+    const ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
+    bolt.style.cssText = 'position:absolute;width:26px;height:3px;border-radius:2px;' +
+      'background:linear-gradient(90deg,rgba(0,212,255,0),#7df9ff,#fff);' +
+      'box-shadow:0 0 8px rgba(0,212,255,0.9);pointer-events:none;z-index:6;' +
+      'transform-origin:0 50%;transform:rotate(' + ang.toFixed(1) + 'deg);';
+    bolt.style.left = sx + 'px';
+    bolt.style.top = sy + 'px';
+    canvas.appendChild(bolt);
+    const t0 = performance.now(), dur = 160;
+    function step(now) {
+      const k = Math.min(1, (now - t0) / dur);
+      bolt.style.left = (sx + (tx - sx) * k) + 'px';
+      bolt.style.top = (sy + (ty - sy) * k) + 'px';
+      if (k < 1) { requestAnimationFrame(step); return; }
+      bolt.remove();
+      if (target && !target.depleted) pflxBlaster.hit(target, tx, ty);
+      else pflxBlaster.flash(tx, ty, false);
+    }
+    requestAnimationFrame(step);
+  },
+
+  flash(x, y, big) {
+    const f = document.createElement('div');
+    const s = big ? 90 : 26;
+    f.style.cssText = 'position:absolute;width:' + s + 'px;height:' + s + 'px;margin:-' + (s / 2) + 'px 0 0 -' + (s / 2) + 'px;' +
+      'border-radius:50%;background:radial-gradient(circle,#fff,rgba(255,190,80,0.85) 35%,rgba(255,120,40,0) 70%);' +
+      'pointer-events:none;z-index:6;transition:transform 0.3s ease-out,opacity 0.3s ease-out;';
+    f.style.left = x + 'px'; f.style.top = y + 'px';
+    canvas.appendChild(f);
+    requestAnimationFrame(function () { f.style.transform = 'scale(' + (big ? 2.2 : 1.6) + ')'; f.style.opacity = '0'; });
+    setTimeout(function () { f.remove(); }, 340);
+  },
+
+  hit(o, x, y) {
+    const dmg = this.damage();
+    for (let k = 0; k < dmg && o.hp > 0; k++) {
+      o.hp--;
+      // knock one rock out of the GL cluster
+      if (o.gl && o.gl.children.length) o.gl.remove(o.gl.children[o.gl.children.length - 1]);
+      // small XC bounty per rock — instant-credit path via the Console
+      pflxCargo.addXC(3, 'asteroid blasted');
+      if (Math.random() < 0.35) pflxCargo.add('iron-ore', 1, 'blasted rock');
+      if (Math.random() < 0.10) pflxCargo.add('crystal-shard', 1, 'blasted rock');
+    }
+    this.flash(x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 60, false);
+    if (o.hp <= 0) {
+      o.depleted = true;
+      if (o.gl) o.gl.visible = false;
+      this.flash(o.x, o.y, true);
+      pflxCargo.add('iron-ore', 2, 'cluster destroyed');
+      if (Math.random() < 0.25) pflxCargo.add('plasma-core', 1, 'cluster destroyed');
+      pflxCargo.addXC(10, 'cluster destroyed');
+      pflxSpaceToast('💥', 'CLUSTER DESTROYED', 'The asteroid field is dust. Debris swept into the hold.', '+ORE · +XC');
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+    }
+  },
+};
+window.pflxBlaster = pflxBlaster;
+
+// ═══════════════════════════════════════════════════════════════════
+// RPG INTERACTION PROMPTS — bird's-eye is OVERVIEW/MAPPING ONLY.
+// Clicking a space object up there doesn't auto-collect: it raises an
+// RPG-style encounter prompt. The player must switch to CHASE or
+// COCKPIT view to actually use the ship's functions and interact.
+// ═══════════════════════════════════════════════════════════════════
+const PFLX_ENCOUNTERS = {
+  asteroids: { icon: '🪨', title: 'ASTEROID FIELD DETECTED',
+    body: 'A dense rock cluster is drifting in this sector. Blast it with your cannons (SPACE) or hold position to mine it — flight view required.' },
+  blackhole: { icon: '🕳️', title: 'GRAVITATIONAL ANOMALY',
+    body: 'A black hole is warping this sector. Flying near it will drag your ship in and can tear cargo from your hold. Shields or a Shield Booster module reduce the pull. Proceed with caution — or plot a course around it.' },
+  derelict:  { icon: '🛸', title: 'DERELICT SIGNAL',
+    body: 'A cargo pod is drifting nearby, beacon still blinking. Fly within range in flight view to crack it open and salvage the contents.' },
+  comet:     { icon: '☄️', title: 'COMET CROSSING',
+    body: 'A comet is streaking through the sector. Intercept its tail in flight view to sweep stardust before it leaves.' },
+};
+
+function pflxSpacePrompt(o) {
+  let box = document.getElementById('pflxEncounterPrompt');
+  if (box) box.remove();
+  const enc = PFLX_ENCOUNTERS[o.type] || { icon: '✨', title: 'UNKNOWN CONTACT', body: 'Something is out there. Switch to flight view to investigate.' };
+  box = document.createElement('div');
+  box.id = 'pflxEncounterPrompt';
+  box.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9500;' +
+    'min-width:340px;max-width:480px;padding:18px 20px 14px;border-radius:14px;' +
+    'background:linear-gradient(160deg,rgba(4,14,24,0.96),rgba(6,20,34,0.96));' +
+    'border:1px solid rgba(0,212,255,0.45);box-shadow:0 0 30px rgba(0,212,255,0.25),inset 0 0 24px rgba(0,212,255,0.05);' +
+    'color:#cfeefe;font-family:inherit;backdrop-filter:blur(6px);';
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
+      '<span style="font-size:26px;">' + enc.icon + '</span>' +
+      '<span style="font-size:14px;font-weight:800;letter-spacing:0.12em;color:#7df9ff;text-shadow:0 0 10px rgba(0,212,255,0.6);">' + enc.title + '</span>' +
+    '</div>' +
+    '<div style="font-size:12px;line-height:1.55;color:rgba(207,238,254,0.8);margin-bottom:14px;">' + enc.body + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+      '<button id="encDismiss" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;letter-spacing:0.08em;">✕ DISMISS</button>' +
+      '<button id="encCockpit" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.4);color:#a78bfa;font-size:11px;font-weight:700;letter-spacing:0.08em;">🧑‍🚀 COCKPIT VIEW</button>' +
+      '<button id="encEngage" style="padding:7px 16px;border-radius:8px;cursor:pointer;background:rgba(0,212,255,0.14);border:1px solid rgba(0,212,255,0.5);color:#7df9ff;font-size:11px;font-weight:800;letter-spacing:0.08em;box-shadow:0 0 14px rgba(0,212,255,0.2);">⚔ ENGAGE — CHASE VIEW</button>' +
+    '</div>';
+  document.body.appendChild(box);
+  function close() { box.remove(); }
+  box.querySelector('#encDismiss').addEventListener('click', close);
+  box.querySelector('#encEngage').addEventListener('click', function () {
+    close();
+    if (typeof pflxSetCamera === 'function') pflxSetCamera('chase');
+  });
+  box.querySelector('#encCockpit').addEventListener('click', function () {
+    close();
+    if (typeof pflxSetCamera === 'function') pflxSetCamera('cockpit');
+  });
+  clearTimeout(pflxSpacePrompt._t);
+  pflxSpacePrompt._t = setTimeout(close, 14000);
+}
+window.pflxSpacePrompt = pflxSpacePrompt;
+
+// click on a space object → bird's-eye raises an encounter prompt;
+// chase/cockpit flies you there for the actual interaction
 canvas.addEventListener('click', function (e) {
   if (magMode || editMode) return;
   if (document.body.classList.contains('connect-mode')) return;
@@ -9865,13 +10064,17 @@ canvas.addEventListener('click', function (e) {
   const rect = canvas.getBoundingClientRect();
   const lx = (e.clientX - rect.left - panX) / zoom;
   const ly = (e.clientY - rect.top - panY) / zoom;
+  const birdseye = (typeof pflxCamera !== 'undefined' && pflxCamera.mode === 'birdseye');
   let best = null, bestD = Infinity;
   window.pflxSpaceObjects.forEach(function (o) {
-    if (o.depleted || o.collected || o.type === 'blackhole') return;
+    if (o.depleted || o.collected) return;
+    if (!birdseye && o.type === 'blackhole') return; // never auto-fly into one
     const d = Math.hypot(o.x - lx, o.y - ly);
     if (d < Math.max(220, o.r) && d < bestD) { best = o; bestD = d; }
   });
-  if (best) pflxSpaceHazards.flyToObject(best);
+  if (!best) return;
+  if (birdseye) { pflxSpacePrompt(best); return; }
+  if (best.type !== 'blackhole') pflxSpaceHazards.flyToObject(best);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -9972,6 +10175,196 @@ const pflxCargoUI = {
 pflxCargo.load();
 pflxCargoUI.init();
 
+// ═══════════════════════════════════════════════════════════════════
+// CREW — multiplayer presence in THIS pathway's space (v1).
+// Every player on the same pathway page joins a Supabase Realtime
+// presence channel. You see their ships move live, can WAVE at them,
+// and can invite them to rendezvous / co-op at a node. Privacy rule
+// (CONNECTOR §7): brand + initials only — never a real name.
+// ═══════════════════════════════════════════════════════════════════
+const pflxCrew = {
+  channel: null,
+  me: null,
+  peers: {},          // presenceKey -> { el, data }
+  _posTimer: null,
+  _lastSent: { x: -1, y: -1, mode: '' },
+
+  init() {
+    if (!window._supabase) return;
+    try {
+      this.me = (typeof pflxModulePlayer === 'function') ? pflxModulePlayer() : { id: '', brand: 'Explorer', initials: 'EX' };
+      if (!this.me.id) this.me.id = (this.me.brand || 'explorer').replace(/\s+/g, '-').toLowerCase() + '-' + Math.random().toString(36).slice(2, 7);
+      const key = String(this.me.id);
+      const self = this;
+      this.channel = window._supabase.channel('pflx-space-' + pathwaySlug, { config: { presence: { key: key } } });
+      this.channel
+        .on('presence', { event: 'sync' }, function () { self.syncPeers(); })
+        .on('broadcast', { event: 'pflx_wave' }, function (m) { self.onWave(m.payload || {}); })
+        .on('broadcast', { event: 'pflx_coop_invite' }, function (m) { self.onInvite(m.payload || {}); })
+        .subscribe(function (status) { if (status === 'SUBSCRIBED') self.trackNow(); });
+      this._posTimer = setInterval(function () { self.maybeTrack(); }, 700);
+    } catch (e) { console.warn('[Crew] presence init failed', e); }
+  },
+
+  trackNow() {
+    if (!this.channel) return;
+    const payload = {
+      brand: this.me.brand, initials: this.me.initials,
+      x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
+      mode: (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye',
+      nodeId: pflxShip.currentNodeId || '',
+      t: Date.now(),
+    };
+    this._lastSent = { x: payload.x, y: payload.y, mode: payload.mode };
+    try { this.channel.track(payload); } catch (e) {}
+  },
+
+  maybeTrack() {
+    if (!this.channel) return;
+    const mx = Math.round(pflxShip.x), my = Math.round(pflxShip.y);
+    const mode = (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye';
+    if (Math.abs(mx - this._lastSent.x) > 4 || Math.abs(my - this._lastSent.y) > 4 || mode !== this._lastSent.mode) this.trackNow();
+  },
+
+  syncPeers() {
+    if (!this.channel) return;
+    const state = this.channel.presenceState();
+    const meKey = String(this.me.id);
+    const seen = {};
+    const self = this;
+    Object.keys(state).forEach(function (k) {
+      if (k === meKey) return;
+      const metas = state[k];
+      const d = metas && metas[metas.length - 1];
+      if (!d) return;
+      seen[k] = true;
+      self.upsertPeer(k, d);
+    });
+    Object.keys(this.peers).forEach(function (k) {
+      if (!seen[k]) { try { self.peers[k].el.remove(); } catch (e) {} delete self.peers[k]; }
+    });
+    this.updateCount(Object.keys(seen).length);
+  },
+
+  upsertPeer(k, d) {
+    let p = this.peers[k];
+    if (!p) {
+      const el = document.createElement('div');
+      el.className = 'crew-peer';
+      el.style.cssText = 'position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;z-index:5;cursor:pointer;' +
+        'transition:left 0.7s linear,top 0.7s linear;text-align:center;pointer-events:auto;';
+      el.innerHTML =
+        '<div style="width:34px;height:34px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;' +
+          'background:radial-gradient(circle at 35% 30%,rgba(167,139,250,0.5),rgba(0,212,255,0.18));' +
+          'border:1.5px solid rgba(167,139,250,0.8);box-shadow:0 0 14px rgba(167,139,250,0.55);' +
+          'font-size:12px;font-weight:800;color:#e6dcff;text-shadow:0 0 6px rgba(167,139,250,0.8);">' +
+          (d.initials || '??') + '</div>' +
+        '<div class="crew-label" style="margin-top:3px;font-size:9px;font-weight:700;letter-spacing:0.08em;color:rgba(207,238,254,0.85);' +
+          'text-shadow:0 0 6px rgba(0,0,0,0.9);white-space:nowrap;">' + (d.brand || 'Explorer') + '</div>';
+      const self = this;
+      el.addEventListener('click', function (e) { e.stopPropagation(); self.peerMenu(k, d, e); });
+      canvas.appendChild(el);
+      p = this.peers[k] = { el: el, data: d };
+    }
+    p.data = d;
+    p.el.style.left = d.x + 'px';
+    p.el.style.top = d.y + 'px';
+  },
+
+  peerMenu(k, d, ev) {
+    let m = document.getElementById('crewPeerMenu');
+    if (m) m.remove();
+    m = document.createElement('div');
+    m.id = 'crewPeerMenu';
+    m.style.cssText = 'position:fixed;z-index:9600;left:' + Math.min(window.innerWidth - 220, ev.clientX + 10) + 'px;top:' + Math.min(window.innerHeight - 140, ev.clientY - 10) + 'px;' +
+      'min-width:200px;padding:12px;border-radius:12px;background:rgba(5,16,28,0.97);border:1px solid rgba(167,139,250,0.45);' +
+      'box-shadow:0 0 24px rgba(167,139,250,0.25);color:#e6dcff;';
+    m.innerHTML =
+      '<div style="font-size:12px;font-weight:800;letter-spacing:0.08em;margin-bottom:10px;color:#c4b5fd;">🧑‍🚀 ' + (d.brand || 'Explorer') + '</div>' +
+      '<button id="crewWave" style="display:block;width:100%;margin-bottom:6px;padding:8px;border-radius:8px;cursor:pointer;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.35);color:#7df9ff;font-size:11px;font-weight:700;letter-spacing:0.06em;">👋 WAVE</button>' +
+      '<button id="crewInvite" style="display:block;width:100%;padding:8px;border-radius:8px;cursor:pointer;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.4);color:#c4b5fd;font-size:11px;font-weight:700;letter-spacing:0.06em;">🤝 INVITE TO CO-OP</button>';
+    document.body.appendChild(m);
+    const self = this;
+    function close() { m.remove(); document.removeEventListener('click', close); }
+    setTimeout(function () { document.addEventListener('click', close); }, 50);
+    m.querySelector('#crewWave').addEventListener('click', function () {
+      try { self.channel.send({ type: 'broadcast', event: 'pflx_wave', payload: { to: k, fromBrand: self.me.brand } }); } catch (e) {}
+      pflxSpaceToast('👋', 'WAVE SENT', 'You waved at ' + (d.brand || 'Explorer') + '.', '');
+      close();
+    });
+    m.querySelector('#crewInvite').addEventListener('click', function () {
+      try {
+        self.channel.send({ type: 'broadcast', event: 'pflx_coop_invite', payload: {
+          to: k, fromBrand: self.me.brand,
+          x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
+          nodeId: pflxShip.currentNodeId || '',
+        } });
+      } catch (e) {}
+      pflxSpaceToast('🤝', 'INVITE SENT', (d.brand || 'Explorer') + ' has been invited to rendezvous with you.', '');
+      close();
+    });
+  },
+
+  onWave(p) {
+    if (!p || String(p.to) !== String(this.me.id)) return;
+    pflxSpaceToast('👋', 'INCOMING WAVE', (p.fromBrand || 'A fellow explorer') + ' waved at you!', '');
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  },
+
+  onInvite(p) {
+    if (!p || String(p.to) !== String(this.me.id)) return;
+    const self = this;
+    let box = document.getElementById('pflxEncounterPrompt');
+    if (box) box.remove();
+    box = document.createElement('div');
+    box.id = 'pflxEncounterPrompt';
+    box.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9500;' +
+      'min-width:340px;max-width:480px;padding:18px 20px 14px;border-radius:14px;' +
+      'background:linear-gradient(160deg,rgba(14,8,28,0.96),rgba(20,10,40,0.96));' +
+      'border:1px solid rgba(167,139,250,0.5);box-shadow:0 0 30px rgba(167,139,250,0.28);color:#e6dcff;';
+    box.innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
+        '<span style="font-size:26px;">🤝</span>' +
+        '<span style="font-size:14px;font-weight:800;letter-spacing:0.12em;color:#c4b5fd;">CO-OP INVITE</span></div>' +
+      '<div style="font-size:12px;line-height:1.55;color:rgba(230,220,255,0.8);margin-bottom:14px;">' +
+        (p.fromBrand || 'A fellow explorer') + ' wants you to rendezvous' +
+        (p.nodeId ? ' at their station for a Co-Op session' : ' at their position') + '. Fly over?</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button id="invDecline" style="padding:7px 14px;border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.55);font-size:11px;font-weight:700;">✕ DECLINE</button>' +
+        '<button id="invAccept" style="padding:7px 16px;border-radius:8px;cursor:pointer;background:rgba(167,139,250,0.18);border:1px solid rgba(167,139,250,0.55);color:#e6dcff;font-size:11px;font-weight:800;">🚀 FLY TO THEM</button></div>';
+    document.body.appendChild(box);
+    box.querySelector('#invDecline').addEventListener('click', function () { box.remove(); });
+    box.querySelector('#invAccept').addEventListener('click', function () {
+      box.remove();
+      if (typeof pflxShipFlyTo === 'function' && typeof p.x === 'number' && typeof p.y === 'number') {
+        pflxShipFlyTo(p.x, p.y, function () {
+          pflxSpaceToast('🤝', 'RENDEZVOUS', p.nodeId
+            ? 'You\'ve arrived. Open the station to join the Co-Op session.'
+            : 'You\'ve arrived at the rendezvous point.', '');
+        });
+      }
+    });
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+  },
+
+  updateCount(n) {
+    let chip = document.getElementById('crewChip');
+    if (!chip) {
+      chip = document.createElement('div');
+      chip.id = 'crewChip';
+      // left: 240 — clears the 200px progress bar that owns bottom-left
+      chip.style.cssText = 'position:fixed;left:240px;bottom:20px;z-index:9400;padding:6px 12px;border-radius:20px;' +
+        'background:rgba(5,16,28,0.85);border:1px solid rgba(167,139,250,0.4);color:#c4b5fd;' +
+        'font-size:10px;font-weight:800;letter-spacing:0.1em;box-shadow:0 0 14px rgba(167,139,250,0.2);';
+      document.body.appendChild(chip);
+    }
+    chip.textContent = '🧑‍🚀 CREW IN SECTOR: ' + n;
+    chip.style.display = n > 0 ? 'block' : 'none';
+  },
+};
+pflxCrew.init();
+window.pflxCrew = pflxCrew;
+
 // Open marketplace redirect
 function pflxShipOpenUpgrades() {
   // Navigate to X-Coin marketplace Ship Bay
@@ -10056,7 +10449,7 @@ function pflxSetCamera(mode) {
 // ██  ARROW KEY SHIP CONTROLS — continuous movement        ██
 // ═══════════════════════════════════════════════════════════
 
-const pflxKeys = { up: false, down: false, left: false, right: false, shift: false };
+const pflxKeys = { up: false, down: false, left: false, right: false, shift: false, fire: false };
 let pflxKeyAnimFrame = null;
 let pflxShipAngle = 0;      // current heading in degrees (0 = up)
 let pflxShipSpeed = 0;       // current speed for cockpit gauge
@@ -10076,6 +10469,7 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { pflxKeys.left = true; handled = true; }
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { pflxKeys.right = true; handled = true; }
   if (e.key === 'Shift') { pflxKeys.shift = true; handled = true; }
+  if (e.key === ' ' || e.code === 'Space') { pflxKeys.fire = true; handled = true; }
   if (handled) {
     e.preventDefault();
     if (!pflxKeyAnimFrame) pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
@@ -10088,6 +10482,7 @@ document.addEventListener('keyup', function(e) {
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') pflxKeys.left = false;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') pflxKeys.right = false;
   if (e.key === 'Shift') pflxKeys.shift = false;
+  if (e.key === ' ' || e.code === 'Space') pflxKeys.fire = false;
 });
 
 function pflxKeyLoop() {
@@ -10127,9 +10522,11 @@ function pflxKeyLoop() {
     // Remove banking classes when stopped
     const shipEl = document.getElementById('pflxShip');
     if (shipEl) { shipEl.classList.remove('banking-left', 'banking-right'); }
+    // Stationary fire: the blaster still works while parked
+    if (window.pflxBlaster) pflxBlaster.tick(1 / 60);
     pflxKeyAnimFrame = null;
-    // Continue loop to check for new key presses
-    if (pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right) {
+    // Continue loop to check for new key presses (or held trigger)
+    if (pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right || pflxKeys.fire) {
       pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop);
     }
     return;
@@ -10225,6 +10622,9 @@ function pflxKeyLoop() {
 
   // Space hazards: black-hole pull, mining, salvage, comet intercepts
   if (window.pflxSpaceHazards) pflxSpaceHazards.tick();
+
+  // Blaster: SPACE fires at the nearest asteroid cluster
+  if (window.pflxBlaster) pflxBlaster.tick(1 / 60);
 
   // Update cockpit HUD gauges
   pflxUpdateCockpitHud();

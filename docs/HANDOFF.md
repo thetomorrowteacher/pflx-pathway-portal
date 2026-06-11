@@ -803,3 +803,76 @@ verified live on the production URL. Working tree clean at session end.
   to describe the issue in words.
 
 *End of June 10-11 2026 update.*
+
+---
+---
+
+# Session Update — June 11 2026 (Fable) — Per-pathway universes, blasting, RPG prompts, crew presence
+
+Continuation of the Open Space sprint (the prior chat died on an API error;
+this session resumed from this handoff). All three repos touched.
+
+## What shipped
+
+### pflx-pathway-portal
+1. **Per-pathway distinct space** — `PATH_SEED` (FNV-1a of `pathwaySlug`) is
+   XOR'd into `chunkRand` and biases `PVAR` densities + home palettes
+   (FAR_PALS / NEB_PALETTE). Every pathway now generates its own endless
+   universe instead of all sharing one.
+2. **Asteroid blasting** — `pflxBlaster` (search anchor). SPACE fires in
+   chase/cockpit at the nearest live cluster in 460px; each bolt knocks a
+   rock out of the GL group, pays **+3 XC** (instant-credit path) + ore
+   chance; destroying the cluster pays +10 XC + bonus ore. `blaster-mk2`
+   module = 2 dmg + 0.22s fire rate. Asteroid objects now carry `hp`.
+   Stationary fire works (keyLoop stop-block ticks the blaster and keeps
+   looping while `pflxKeys.fire`).
+3. **RPG encounter prompts** — bird's-eye is overview/mapping ONLY now.
+   Clicking a space object up there raises `pflxSpacePrompt` (PFLX_ENCOUNTERS
+   copy per type) with ENGAGE — CHASE VIEW / COCKPIT VIEW / DISMISS buttons.
+   Collection/flight interactions require chase or cockpit. Black holes are
+   never auto-flown into.
+4. **Crew presence v1 (multiplayer)** — `pflxCrew` (search anchor). Supabase
+   Realtime presence channel `pflx-space-<pathwaySlug>`; sees other players'
+   ships live (brand + initials only — CONNECTOR §7 privacy), WAVE and
+   INVITE TO CO-OP broadcasts, invite prompt flies the accepter to the
+   sender (and points at the station for co-op). "CREW IN SECTOR: N" chip
+   bottom-left (left:240 to clear the progress bar). NOTE: full co-op node
+   entry handoff (auto-open Detail Panel as co-op party) is the next step.
+5. **Bug fix:** `window._supabase` was never assigned (top-level const isn't
+   a window prop) so the cargo cloud mirror silently no-op'd. Now exposed.
+6. **De-crowd round 2** — `pflxDecrowdStations` also shrinks `.node-label` /
+   `.node-badge` inside 170px neighbor distance; selection screen
+   (preview.html) custom pathways no longer default to y:100%+ (off-map,
+   piling on the bottom bar) — they fill `CUSTOM_SLOTS` inside the map box.
+7. XC ack — `pflx_space_xc_ack` from the Console clears the CARGO HOLD
+   PENDING CREDIT figure (`pflxCargo.creditAck`).
+
+### pflx-platform (pflx-platform-check)
+- **`pflx_space_xc` handler** (next to `pflx_pathway_node_complete`). DECIDED
+  BY ENNIS: **instant credit** — straight through `PflxDataBus.award` so XC
+  maps into the player's X-Coin account and fans out to Platform toolbar +
+  all sub-apps. Clamped to ≤200 XC per message. Mirrors into mcPlayers,
+  acks `pflx_space_xc_ack` to the source iframe.
+
+### pflx-xcoin-app (pflx-xcoin-check)
+- **SHIP_MODULES** in `app/lib/data.ts`: blaster-mk2 (400), tractor-beam
+  (500, R2), deep-scanner (450, R2), mining-laser (600), shield-booster
+  (800, R2). `PlayerShipState.modules?: string[]` (+ default []).
+- Marketplace Ship Bay tab: SHIP MODULES purchase grid; `purchaseModule`
+  deducts XC, records the transaction, and `saveShipState` broadcasts
+  `pflx_ship_state_update` with `modules[]` — pathway side already honors it.
+
+## Open work (priority)
+1. **Co-op node entry handoff** — invite accept should carry into the node's
+   Detail Panel and start a co-op session (cap 4, project modules only per
+   MODULE_STRUCTURE v0.3). Presence + invite plumbing is in; the entry
+   wiring is not.
+2. **Live human play-test** — blasting, presence (needs 2 browsers), instant
+   XC credit round-trip, RPG prompts. None play-tested end-to-end.
+3. Warp-lane energy beams, HUD hover cards / target-lock reticle, Detail
+   Overlay HUD restyle (Phase 4) — still pending from the prior list.
+4. Supabase Realtime presence requires the channel feature enabled on the
+   project (hyxiagexyptzvetqjmnj) — if peers never appear, check Realtime
+   settings.
+
+*End of June 11 2026 update.*

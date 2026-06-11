@@ -1119,17 +1119,32 @@
     function saveCustomPathways(list) {
       localStorage.setItem('pflx_custom_pathways', JSON.stringify(list));
     }
-    const customNodes = loadCustomPathways().map((p, i) => ({
-      title: p.title,
-      slug: p.slug,
-      icon: p.icon || 'public/icons/core-pathway-logo.png',
-      accent: p.accent || '#60a5fa',
-      x: p.x || ((i % 2 === 0 ? 20 : 60) + '%'),
-      y: p.y || (100 + i * 18) + '%',
-      side: i % 2 === 0 ? 'left' : 'right',
-      projects: p.projects || 0,
-      custom: true,
-    }));
+    // Custom pathways slot INSIDE the map box. The old default
+    // (y: 100% + i*18%) pushed every custom node below the map where
+    // they piled onto the bottom bar and each other. Open slots in the
+    // base layout: y≈14% right column, y≈76% right column, then a
+    // bottom row at y≈90% alternating columns.
+    const CUSTOM_SLOTS = [
+      { x: '60%', y: '14%', side: 'right' },
+      { x: '58%', y: '76%', side: 'right' },
+      { x: '12%', y: '90%', side: 'left'  },
+      { x: '58%', y: '90%', side: 'right' },
+      { x: '35%', y: '90%', side: 'left'  },
+    ];
+    const customNodes = loadCustomPathways().map((p, i) => {
+      const slot = CUSTOM_SLOTS[i % CUSTOM_SLOTS.length];
+      return {
+        title: p.title,
+        slug: p.slug,
+        icon: p.icon || 'public/icons/core-pathway-logo.png',
+        accent: p.accent || '#60a5fa',
+        x: p.x || slot.x,
+        y: p.y || slot.y,
+        side: slot.side,
+        projects: p.projects || 0,
+        custom: true,
+      };
+    });
     const nodes = [...baseNodes, ...customNodes];
 
     const map = document.getElementById('pathwayMap');
