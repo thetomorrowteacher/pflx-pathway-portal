@@ -281,41 +281,44 @@
       top: 80px;
       left: 50%; transform: translateX(-50%);
       text-align: center;
-      z-index: 60;
+      /* Below the node layer (30) — the glowing words are scenery, so node
+         arms and labels always render cleanly ON TOP of them, and the title
+         can never intercept clicks. Was z-index 60, which put the words
+         over the map and caused the background-text overlay glitches. */
+      z-index: 20;
+      pointer-events: none;
       white-space: nowrap;
     }
     .main-title h2 {
-      font-family: 'Orbitron'; font-weight: 700; font-size: 28px;
-      letter-spacing: 8px; text-transform: uppercase;
+      font-family: 'Orbitron'; font-weight: 700;
+      /* responsive — stops the nowrap title running under the info panel /
+         world map on smaller windows */
+      font-size: clamp(15px, 2.1vw, 28px);
+      letter-spacing: clamp(3px, 0.55vw, 8px);
+      text-transform: uppercase;
       color: #00e5ff;
+      /* trimmed glow (was up to 150px) so the halo doesn't wash over the
+         top row of pathway nodes */
       text-shadow:
         0 0 10px rgba(0,229,255,0.9),
-        0 0 20px rgba(0,229,255,0.7),
-        0 0 40px rgba(0,212,255,0.5),
-        0 0 80px rgba(0,212,255,0.3),
-        0 0 120px rgba(0,180,255,0.2);
+        0 0 22px rgba(0,229,255,0.6),
+        0 0 44px rgba(0,212,255,0.35);
       animation: titleGlow 3s ease-in-out infinite alternate;
+      will-change: opacity;
     }
+    /* opacity pulse instead of animating multi-layer text-shadows —
+       text-shadow animation forces a repaint of the glow every frame and
+       was a key source of the page-wide stutter */
     @keyframes titleGlow {
-      0% {
-        text-shadow:
-          0 0 10px rgba(0,229,255,0.9),
-          0 0 20px rgba(0,229,255,0.7),
-          0 0 40px rgba(0,212,255,0.5),
-          0 0 80px rgba(0,212,255,0.3);
-      }
-      100% {
-        text-shadow:
-          0 0 15px rgba(0,229,255,1),
-          0 0 30px rgba(0,229,255,0.8),
-          0 0 60px rgba(0,212,255,0.6),
-          0 0 100px rgba(0,212,255,0.4),
-          0 0 150px rgba(0,180,255,0.25);
-      }
+      0% { opacity: 0.82; }
+      100% { opacity: 1; }
     }
     .main-title h3 {
-      font-family: 'Orbitron'; font-weight: 500; font-size: 16px;
-      color: rgba(0,212,255,0.7); letter-spacing: 6px; text-transform: uppercase;
+      font-family: 'Orbitron'; font-weight: 500;
+      font-size: clamp(10px, 1.3vw, 16px);
+      color: rgba(0,212,255,0.7);
+      letter-spacing: clamp(2px, 0.45vw, 6px);
+      text-transform: uppercase;
       margin-top: 4px;
     }
 
@@ -1246,6 +1249,11 @@
       for (const c of PARTICLE_COLORS) { cum += c.weight; if (r < cum) return c; }
       return PARTICLE_COLORS[0];
     }
+    // PERF: color, glow, and background are set ONCE at creation. The
+    // per-frame loop only touches opacity + transform — both compositor
+    // properties — so 55 particles no longer force style/paint work every
+    // frame (the old loop rewrote box-shadow + background strings per
+    // particle per frame and was a major source of the page stutter).
     for (let i = 0; i < 55; i++) {
       const p = document.createElement('div');
       p.className = 'particle';
@@ -1253,7 +1261,10 @@
       const c = pickColor();
       const x = Math.random() * 100;
       const y = Math.random() * 100;
-      p.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:0;`;
+      p.style.cssText = `left:${x}%;top:${y}%;width:${size}px;height:${size}px;opacity:0;`
+        + `background:rgba(${c.rgb},0.9);`
+        + `box-shadow:0 0 ${(size * 5).toFixed(0)}px rgba(${c.rgb},0.55), 0 0 ${(size * 12).toFixed(0)}px rgba(${c.rgb},0.16);`
+        + `will-change:transform,opacity;`;
       particleLayer.appendChild(p);
       particles.push({ el: p, color: c.rgb, maxOp: c.maxOp, size, baseX: x, baseY: y,
         phase: Math.random() * Math.PI * 2, speed: 0.4 + Math.random() * 0.6 });
@@ -1269,8 +1280,6 @@
         const ty = Math.cos(t * 0.3 + p.phase) * 60;
         p.el.style.opacity = op.toFixed(3);
         p.el.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px)`;
-        p.el.style.boxShadow = `0 0 ${p.size * 5}px rgba(${p.color},${(op * 0.7).toFixed(3)}), 0 0 ${p.size * 12}px rgba(${p.color},${(op * 0.2).toFixed(3)})`;
-        p.el.style.background = `rgba(${p.color},${op.toFixed(3)})`;
       });
       requestAnimationFrame(animateParticles);
     }
@@ -1282,11 +1291,16 @@
     const pulseRingLayer = document.getElementById('pulseRingLayer');
     const pulseRings = [];
     const ringColors = ['0,212,255','139,92,246','255,0,255','0,212,255','139,92,246'];
+    // PERF: border + glow set once; per-frame is transform + opacity only
+    // (opacity fades the border and the glow together for free).
     for (let i = 0; i < 5; i++) {
       const ring = document.createElement('div');
       ring.className = 'pulse-ring';
       const maxSize = 300 + i * 200;
-      ring.style.cssText = `width:${maxSize}px;height:${maxSize}px;border-color:rgba(${ringColors[i]},0.25);`;
+      ring.style.cssText = `width:${maxSize}px;height:${maxSize}px;`
+        + `border-color:rgba(${ringColors[i]},0.6);`
+        + `box-shadow:0 0 30px rgba(${ringColors[i]},0.3), inset 0 0 30px rgba(${ringColors[i]},0.1);`
+        + `will-change:transform,opacity;`;
       pulseRingLayer.appendChild(ring);
       pulseRings.push({ el: ring, duration: 5000 + i * 2500, offset: i * 2000, start: Date.now(), color: ringColors[i] });
     }
@@ -1301,8 +1315,6 @@
                  : Math.max(0, 0.15 - (progress - 0.4) / 0.6 * 0.15);
         r.el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
         r.el.style.opacity = op.toFixed(3);
-        r.el.style.borderColor = `rgba(${r.color},${(op * 0.6).toFixed(3)})`;
-        r.el.style.boxShadow = `0 0 30px rgba(${r.color},${(op * 0.3).toFixed(3)}), inset 0 0 30px rgba(${r.color},${(op * 0.1).toFixed(3)})`;
       });
       requestAnimationFrame(animatePulseRings);
     }
@@ -1319,6 +1331,8 @@
       line.className = 'scan-line';
       line.style.background = `linear-gradient(90deg, transparent 0%, rgba(${scanColors[i]},0.0) 10%, rgba(${scanColors[i]},0.4) 50%, rgba(${scanColors[i]},0.0) 90%, transparent 100%)`;
       line.style.boxShadow = `0 0 20px 4px rgba(${scanColors[i]},0.15), 0 0 60px 8px rgba(${scanColors[i]},0.06)`;
+      line.style.top = '0';
+      line.style.willChange = 'transform,opacity';
       scanLineLayer.appendChild(line);
       scanLines.push({ el: line, duration: 8000 + i * 3000, offset: i * 3500, start: Date.now() });
     }
@@ -1327,11 +1341,12 @@
       scanLines.forEach(s => {
         const elapsed = (now - s.start + s.offset) % s.duration;
         const progress = elapsed / s.duration;
-        const yPos = progress * 120 - 10;
         const op = progress < 0.05 ? progress / 0.05
                  : progress < 0.9 ? 1
                  : (1 - progress) / 0.1;
-        s.el.style.top = yPos + '%';
+        // PERF: translateY (compositor) instead of animating `top`, which
+        // forced a layout pass for every line on every frame
+        s.el.style.transform = `translateY(${(progress * 120 - 10).toFixed(2)}vh)`;
         s.el.style.opacity = (op * 0.5).toFixed(3);
       });
       requestAnimationFrame(animateScanLines);
@@ -1342,6 +1357,10 @@
     // AURORA GRADIENT (slow drifting color wash)
     // ═══════════════════════════════════════════════════════════════════
     const auroraLayer = document.getElementById('auroraLayer');
+    // PERF: the aurora drifts over ~40 seconds, but the old loop rebuilt a
+    // fullscreen 3-stop gradient string on EVERY animation frame — a full
+    // repaint of the largest layer on screen, 60×/s. The wash moves so
+    // slowly that 8 updates per second is visually identical.
     function animateAurora() {
       const t = Date.now() / 1000;
       const x1 = 30 + Math.sin(t * 0.1) * 20;
@@ -1354,9 +1373,9 @@
         radial-gradient(ellipse at ${x2}% ${y2}%, rgba(139,92,246,0.07) 0%, transparent 50%),
         radial-gradient(ellipse at 50% 50%, rgba(255,0,255,0.04) 0%, transparent 60%)`;
       auroraLayer.style.opacity = op.toFixed(3);
-      requestAnimationFrame(animateAurora);
     }
     animateAurora();
+    setInterval(animateAurora, 125);
 
     // ═══════════════════════════════════════════════════════════════════
     // SOUND FX ENGINE (Web Audio API — synthesized cyberpunk tones)

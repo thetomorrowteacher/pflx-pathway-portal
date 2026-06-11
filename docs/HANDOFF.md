@@ -968,6 +968,23 @@ deploy). Linked from the node editor's Course Package row ("⬡ BUILDER").
    picker was silently falling back to Novice in embedded runs.
 3. `modules/storybuilding-storyboarding.pflx` re-zipped in sync.
 
+### Selection screen (preview.html) smoothness pass — June 11
+Ennis reported glitchiness + "words in the background" overlaying things.
+Root causes fixed:
+1. The glowing CHOOSE YOUR PATHWAY title was z-index 60 (ABOVE the node
+   layer at 30), nowrap at fixed 28px — its words + 150px glow overlapped
+   node arms and ran under the info panel on smaller windows. Now z-20
+   + pointer-events:none (scenery under the nodes), clamp()-responsive
+   font/letter-spacing, glow trimmed to 44px.
+2. titleGlow animated 5-layer text-shadows (repaint/frame) → now an
+   opacity pulse.
+3. animateParticles rewrote box-shadow + background on 55 particles per
+   frame → colors/glows set once, per-frame opacity+transform only.
+4. animatePulseRings per-frame borderColor/boxShadow → set once.
+5. animateScanLines animated `top` (layout/frame) → translateY.
+6. animateAurora rebuilt a fullscreen 3-gradient per frame at 60fps →
+   throttled to 8fps (slow wash, visually identical).
+
 ### Builder follow-ups
 - Ingest existing material (Google Slides exports, legacy course.json)
   into draft phases — the original Open Question #2 ambition.
