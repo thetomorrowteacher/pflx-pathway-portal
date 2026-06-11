@@ -1873,6 +1873,13 @@
       }
 
       function decorateNodes() {
+        // DISABLED (Ennis, June 2026): the "N OPEN TASKS" chips crowded the
+        // selection screen under every pathway node. Task detail lives in
+        // Mission Control / Home Base — the selection screen stays clean.
+        // The function body is kept below for easy re-enable; this strip
+        // removes any chips a previous render left behind, then exits.
+        document.querySelectorAll('.pflx-node-chip').forEach(function (c) { c.remove(); });
+        return;
         var nodes = document.querySelectorAll('.pathway-node');
         if (!nodes || nodes.length === 0) return;
 
@@ -1919,7 +1926,12 @@
       }
 
       function renderActiveCheckpointBanner() {
+        // DISABLED (Ennis, June 2026): the ACTIVE CHECKPOINT pill rendered
+        // on top of the CHOOSE YOUR PATHWAY title. Checkpoint status lives
+        // in Mission Control / the season ticker — not on this screen.
         var banner = document.getElementById('pflxActiveCpBanner');
+        if (banner) banner.style.display = 'none';
+        return;
         var nameEl = document.getElementById('pflxActiveCpName');
         var progEl = document.getElementById('pflxActiveCpProgress');
         if (!banner || !nameEl) return;
