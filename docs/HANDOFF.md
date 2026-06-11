@@ -1159,8 +1159,26 @@ brake/reverse. Bird's-eye keeps classic zoom-at-cursor.
   chase/cockpit; the flat DOM SVG silhouettes hide there via
   `body.gl-active.cam-chase .station-structure` CSS (bird's-eye keeps
   the SVG look). Beacons breathe + rings spin in tick().
-- NEXT GRAPHICS PHASES: P3 postprocessing bloom (needs esbuild
-  bundle), P4 GPU particles — see roadmap below.
+- **Graphics P3 SHIPPED (same session):** post-processing chain —
+  EffectComposer + RenderPass + half-res UnrealBloomPass (strength
+  0.65 / radius 0.45 / threshold 0.82) + subtle FilmPass grain. The
+  r128 examples load as UMD scripts from jsdelivr (pinned 0.128.0; all
+  four URLs verified 200). Wrapped in try/catch — if any script fails,
+  pflxSpace falls back to plain renderer.render. Resize handled.
+- **Graphics P4 SHIPPED (same session):** particle system —
+  `pflxSpace.burst(lx, ly, rgb, count, opts)` (Points + additive
+  material, velocity decay, auto-dispose). Wired: blaster hits spawn
+  rock-debris bursts, cluster destruction fires a hot-core + ember
+  cloud double burst, and the ship trails engine exhaust sparks while
+  thrusting (every 3rd frame, boost-scaled).
+- **THREE.JS VISUAL MIGRATION: P1–P4 COMPLETE.** The original
+  docs/THREEJS_MIGRATION_PLAN.md (esbuild bundle, src/pflx3d) is now
+  superseded for visuals — everything it targeted (3D ship, 3D world
+  objects, postprocessing, particles) ships in-page on the r128 global
+  build. OPTIONAL P5 (only if ever needed): move connectors/warp-lanes
+  and the remaining DOM map plane fully into GL; keep DOM for UI only.
+  src/pflx3d remains as a future TypeScript home if the file outgrows
+  inline maintenance.
 
 ### GRAPHICS → "PS5 LEVEL" ROADMAP (June 11)
 Shipped now: ACES filmic tone mapping + sRGB output + exposure 1.15 on

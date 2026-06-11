@@ -8,6 +8,18 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- Open Space UI: WebGL deep-space layer (pinned; legacy DOM starfield is the fallback if this fails to load) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Graphics P3: post-processing chain (r128 examples UMD builds; each
+       attaches to the global THREE). If any fail to load, pflxSpace falls
+       back to plain renderer.render — bloom is an enhancement, not a
+       dependency. -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FilmShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/FilmPass.js"></script>
   <script>
     // Global error handler — catches uncaught JS errors
     window.onerror = function(msg, url, line, col, err) {
@@ -4633,13 +4645,87 @@ window.pflxSpace = (function () {
       s.mat.opacity = p < 0.15 ? p / 0.15 * 0.7 : 0.7 * (1 - (p - 0.15) / 0.85);
     });
 
-    renderer.render(scene, camera);
+    // particle bursts (Graphics P4): debris, explosions, engine exhaust
+    for (let bi = bursts.length - 1; bi >= 0; bi--) {
+      const b = bursts[bi];
+      b.life -= dt;
+      const pos = b.geo.attributes.position.array;
+      for (let pi = 0; pi < b.vel.length; pi++) {
+        pos[pi * 3] += b.vel[pi].x * dt;
+        pos[pi * 3 + 1] += b.vel[pi].y * dt;
+        pos[pi * 3 + 2] += b.vel[pi].z * dt;
+        b.vel[pi].x *= 0.985; b.vel[pi].y *= 0.985;
+      }
+      b.geo.attributes.position.needsUpdate = true;
+      b.mat.opacity = Math.max(0, b.life / b.dur) * b.maxOp;
+      if (b.life <= 0) {
+        scene.remove(b.points);
+        b.geo.dispose(); b.mat.dispose();
+        bursts.splice(bi, 1);
+      }
+    }
+
+    if (composer) composer.render(dt);
+    else renderer.render(scene, camera);
+  }
+
+  // ── Graphics P3: bloom + film grain post chain (graceful fallback) ──
+  let composer = null;
+  try {
+    if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) {
+      composer = new THREE.EffectComposer(renderer);
+      composer.addPass(new THREE.RenderPass(scene, camera));
+      // half-res bloom keeps the cost sane at retina DPR
+      const bloom = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
+        0.65,   // strength — glows pop without washing the scene
+        0.45,   // radius
+        0.82    // threshold — only truly bright things bloom
+      );
+      composer.addPass(bloom);
+      if (THREE.FilmPass) {
+        const film = new THREE.FilmPass(0.07, 0, 0, false);  // subtle grain, no scanlines
+        composer.addPass(film);
+      }
+      composer.setSize(window.innerWidth, window.innerHeight);
+    }
+  } catch (e) { composer = null; console.warn('[pflxSpace] post chain unavailable, plain render', e); }
+
+  // ── Graphics P4: particle burst system ──
+  const bursts = [];
+  function burst(lx, ly, rgb, count, opts) {
+    try {
+      opts = opts || {};
+      const n = Math.min(80, count || 16);
+      const geo = new THREE.BufferGeometry();
+      const arr = new Float32Array(n * 3);
+      const vel = [];
+      const p = toGL(lx, ly);
+      const baseAng = (typeof opts.dir === 'number') ? opts.dir : null;
+      for (let i = 0; i < n; i++) {
+        arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = opts.z || -140;
+        const a = baseAng !== null ? baseAng + (Math.random() - 0.5) * 0.8 : Math.random() * 6.283;
+        const sp = (opts.speed || 90) * (0.35 + Math.random() * 0.9);
+        vel.push({ x: Math.cos(a) * sp, y: Math.sin(a) * sp, z: (Math.random() - 0.5) * 30 });
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      const mat = new THREE.PointsMaterial({
+        color: new THREE.Color('rgb(' + (rgb || '150,220,255') + ')'),
+        size: opts.size || 7, transparent: true, opacity: 1,
+        blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+      });
+      const points = new THREE.Points(geo, mat);
+      scene.add(points);
+      bursts.push({ points: points, geo: geo, mat: mat, vel: vel,
+        life: opts.dur || 0.8, dur: opts.dur || 0.8, maxOp: opts.maxOp || 1 });
+    } catch (e) {}
   }
 
   window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
   });
 
   // initialize for life — sync to whatever pan/zoom is when first called
@@ -4648,7 +4734,7 @@ window.pflxSpace = (function () {
 
   window.PFLX_GL_ACTIVE = true;
   document.body.classList.add('gl-active');
-  return { sync: sync, setMode: setMode, syncStations: syncStations };
+  return { sync: sync, setMode: setMode, syncStations: syncStations, burst: burst };
 })();
 
 // ==================== STARFIELD ====================
@@ -10499,10 +10585,17 @@ const pflxBlaster = {
       if (Math.random() < 0.10) pflxCargo.add('crystal-shard', 1, 'blasted rock');
     }
     this.flash(x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 60, false);
+    // P4: rock debris burst in the GL scene
+    if (window.pflxSpace && pflxSpace.burst) pflxSpace.burst(x, y, '170,225,255', 14, { speed: 110, size: 6, dur: 0.7 });
     if (o.hp <= 0) {
       o.depleted = true;
       if (o.gl) o.gl.visible = false;
       this.flash(o.x, o.y, true);
+      // P4: full destruction explosion — hot core + slow ember cloud
+      if (window.pflxSpace && pflxSpace.burst) {
+        pflxSpace.burst(o.x, o.y, '255,200,110', 42, { speed: 170, size: 9, dur: 1.1 });
+        pflxSpace.burst(o.x, o.y, '255,120,60', 24, { speed: 60, size: 12, dur: 1.5, maxOp: 0.8 });
+      }
       pflxCargo.add('iron-ore', 2, 'cluster destroyed');
       if (Math.random() < 0.25) pflxCargo.add('plasma-core', 1, 'cluster destroyed');
       pflxCargo.addXC(10, 'cluster destroyed');
@@ -11611,6 +11704,20 @@ function pflxKeyLoop() {
   window._pflxThrustN = (pflxCamera.mode === 'birdseye') ? 0 : Math.max(0, Math.min(1, thrust));
   if (streaks) {
     streaks.style.opacity = (pflxCamera.mode === 'birdseye') ? '0' : boostN.toFixed(2);
+  }
+
+  // P4: engine exhaust — short-lived spark trail behind the ship while
+  // thrusting (every 3rd frame keeps the particle count cheap)
+  if (window.pflxSpace && pflxSpace.burst && window._pflxThrustN > 0.25 && pflxCamera.mode !== 'birdseye') {
+    pflxKeyLoop._exFrame = (pflxKeyLoop._exFrame || 0) + 1;
+    if (pflxKeyLoop._exFrame % 3 === 0) {
+      var __back = window.pflxShipHeading + Math.PI;
+      pflxSpace.burst(
+        pflxShip.x + Math.cos(__back) * 26, pflxShip.y + Math.sin(__back) * 26,
+        '120,210,255', 3,
+        { speed: 55 + (window._pflxBoostN || 0) * 70, size: 5, dur: 0.5, dir: __back, maxOp: 0.8 }
+      );
+    }
   }
 
   // Spawn trail particles while moving
