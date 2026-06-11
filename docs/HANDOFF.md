@@ -986,7 +986,17 @@ Root causes fixed:
    throttled to 8fps (slow wash, visually identical).
 
 ### Builder follow-ups
-- Ingest existing material (Google Slides exports, legacy course.json)
-  into draft phases — the original Open Question #2 ambition.
+- ~~Ingest existing material into draft phases~~ — **SHIPPED June 11**:
+  "⬆ Ingest Content" in the Builder top bar accepts PPTX, DOCX, PDF,
+  Markdown/TXT, CSV, XLSX. All parsing is client-side: pptx/docx via
+  JSZip+DOMParser (pptx slide images embedded as dataURLs, 400KB/img +
+  3MB total caps), pdf via pdf.js (lazy cdnjs), xlsx via SheetJS, csv
+  via PapaParse. Sections are mapped onto FLX strands by keyword
+  scoring (STRAND_KEYWORDS) with positional fallback; CSV/XLSX with a
+  `phase` header column map rows directly (columns: phase, segment,
+  kind, title, content, url). Auto-adds import-review callout, warm-up
+  activity, reflection stub, and default objectives so gates and
+  validation work immediately. Google Slides path = export as .pptx.
+  Parsers verified against synthetic OOXML in Node (jszip+xmldom).
 - The AI difficulty layer that `aiAdaptation` scaffolds.
 - A tools registry for branded tool cards (open question 14.8 #4).

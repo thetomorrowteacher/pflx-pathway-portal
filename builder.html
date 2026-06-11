@@ -131,6 +131,8 @@
   <span class="flp">FLX · FUTURE LEARNING PROTOCOL</span>
   <span class="spacer"></span>
   <span class="statusline" id="autosaveStatus">draft autosaves locally</span>
+  <button class="tbtn ghost" id="btnIngest" title="Upload a PPTX, DOCX, PDF, Markdown, CSV, or XLSX file — the Builder reads it and drafts the module">⬆ Ingest Content</button>
+  <input type="file" id="ingestInput" accept=".pptx,.docx,.pdf,.md,.markdown,.txt,.csv,.xlsx" style="display:none">
   <button class="tbtn ghost" id="btnImport">⬆ Import</button>
   <input type="file" id="importInput" accept=".json,.pflx,.zip" style="display:none">
   <button class="tbtn ghost" id="btnNew">✦ New</button>
@@ -915,6 +917,342 @@ document.getElementById('importInput').onchange = function(){
     r.onload = function(){ try { adopt(JSON.parse(r.result)); } catch(e){ toast('Not valid manifest JSON'); } };
     r.readAsText(file);
   }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTENT INGESTION — upload PPTX / DOCX / PDF / Markdown / CSV / XLSX
+   and the Builder reads, analyzes, and drafts the module from it.
+   Everything is parsed in the browser:
+     pptx/docx → JSZip + DOMParser (pptx slide images are embedded too)
+     pdf       → pdf.js (lazy-loaded from cdnjs)
+     xlsx      → SheetJS (lazy-loaded)   csv → PapaParse (lazy-loaded)
+     md/txt    → native
+   Sections are mapped onto the FLX strands by keyword scoring with a
+   positional fallback (start→Engagement, middle→Development split into
+   Ideation/Creation, then Enhancement, end→Fulfillment), and each phase
+   gets an interactive stub so gates work out of the box.
+   ═══════════════════════════════════════════════════════════════════ */
+function loadScript(src){
+  loadScript._p = loadScript._p || {};
+  if (loadScript._p[src]) return loadScript._p[src];
+  loadScript._p[src] = new Promise(function(res, rej){
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = function(){ res(); };
+    s.onerror = function(){ rej(new Error('failed to load ' + src)); };
+    document.head.appendChild(s);
+  });
+  return loadScript._p[src];
+}
+var ING_MIME = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml' };
+
+/* ---- parsers: every parser returns [{ title, paras:[], bullets:[], images:[{url,alt}] }] ---- */
+
+function ingestPptx(file){
+  return JSZip.loadAsync(file).then(function(zip){
+    var slideNames = Object.keys(zip.files)
+      .filter(function(n){ return /^ppt\/slides\/slide\d+\.xml$/.test(n); })
+      .sort(function(a,b){ return parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]); });
+    if (!slideNames.length) throw new Error('no slides found — is this a .pptx?');
+    var totalImgBytes = 0;
+    function slideImages(name){
+      var relName = name.replace('slides/', 'slides/_rels/') + '.rels';
+      var rel = zip.file(relName);
+      if (!rel) return Promise.resolve([]);
+      return rel.async('string').then(function(xml){
+        var doc = new DOMParser().parseFromString(xml, 'text/xml');
+        var rels = doc.getElementsByTagName('Relationship');
+        var jobs = [];
+        for (var i = 0; i < rels.length; i++) {
+          var r = rels[i];
+          if (!/\/image$/.test(r.getAttribute('Type') || '')) continue;
+          var target = (r.getAttribute('Target') || '').replace('../', 'ppt/');
+          var mf = zip.file(target);
+          if (!mf) continue;
+          var ext = (target.split('.').pop() || '').toLowerCase();
+          if (!ING_MIME[ext]) continue;
+          (function(mf, ext){
+            jobs.push(mf.async('base64').then(function(b64){
+              var bytes = b64.length * 0.75;
+              // keep the eventual .pflx sane — skip big files, cap the total
+              if (bytes > 400 * 1024 || totalImgBytes + bytes > 3 * 1024 * 1024) return null;
+              totalImgBytes += bytes;
+              return { url: 'data:' + ING_MIME[ext] + ';base64,' + b64, alt: 'slide image' };
+            }));
+          })(mf, ext);
+        }
+        return Promise.all(jobs).then(function(list){ return list.filter(Boolean); });
+      }).catch(function(){ return []; });
+    }
+    return Promise.all(slideNames.map(function(name){
+      return zip.file(name).async('string').then(function(xml){
+        var doc = new DOMParser().parseFromString(xml, 'text/xml');
+        var title = '', paras = [];
+        var shapes = doc.getElementsByTagName('p:sp');
+        for (var si = 0; si < shapes.length; si++) {
+          var sp = shapes[si];
+          var phType = '';
+          var phs = sp.getElementsByTagName('p:ph');
+          if (phs.length) phType = phs[0].getAttribute('type') || 'body';
+          var pEls = sp.getElementsByTagName('a:p');
+          for (var pi = 0; pi < pEls.length; pi++) {
+            var runs = pEls[pi].getElementsByTagName('a:t');
+            var txt = '';
+            for (var ri = 0; ri < runs.length; ri++) txt += runs[ri].textContent;
+            txt = txt.trim();
+            if (!txt) continue;
+            if ((phType === 'title' || phType === 'ctrTitle') && !title) title = txt;
+            else paras.push(txt);
+          }
+        }
+        if (!title && paras.length) title = paras.shift();
+        return slideImages(name).then(function(imgs){
+          return { title: title || 'Slide', paras: paras, bullets: [], images: imgs };
+        });
+      });
+    }));
+  });
+}
+
+function ingestDocx(file){
+  return JSZip.loadAsync(file).then(function(zip){
+    var docFile = zip.file('word/document.xml');
+    if (!docFile) throw new Error('not a valid .docx');
+    return docFile.async('string');
+  }).then(function(xml){
+    var doc = new DOMParser().parseFromString(xml, 'text/xml');
+    var pEls = doc.getElementsByTagName('w:p');
+    var sections = [], cur = null;
+    function ensure(){ if (!cur) { cur = { title: 'Document', paras: [], bullets: [], images: [] }; sections.push(cur); } return cur; }
+    for (var i = 0; i < pEls.length; i++) {
+      var p = pEls[i];
+      var txt = '';
+      var ts = p.getElementsByTagName('w:t');
+      for (var t = 0; t < ts.length; t++) txt += ts[t].textContent;
+      txt = txt.trim();
+      if (!txt) continue;
+      var styleEls = p.getElementsByTagName('w:pStyle');
+      var style = styleEls.length ? (styleEls[0].getAttribute('w:val') || '') : '';
+      var isHeading = /^Heading[123]$|^Title$/i.test(style);
+      var isBullet = p.getElementsByTagName('w:numPr').length > 0;
+      if (isHeading) { cur = { title: txt, paras: [], bullets: [], images: [] }; sections.push(cur); }
+      else if (isBullet) ensure().bullets.push(txt);
+      else ensure().paras.push(txt);
+    }
+    if (!sections.length) throw new Error('no readable text found');
+    return sections;
+  });
+}
+
+function ingestPdf(file){
+  return loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js').then(function(){
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return file.arrayBuffer();
+  }).then(function(buf){
+    return window.pdfjsLib.getDocument({ data: buf }).promise;
+  }).then(function(pdf){
+    var jobs = [];
+    for (var n = 1; n <= pdf.numPages; n++) {
+      (function(n){
+        jobs.push(pdf.getPage(n).then(function(page){ return page.getTextContent(); }).then(function(tc){
+          var lines = [], line = '', lastY = null;
+          tc.items.forEach(function(it){
+            if (lastY !== null && Math.abs(it.transform[5] - lastY) > 4) { if (line.trim()) lines.push(line.trim()); line = ''; }
+            line += it.str + ' ';
+            lastY = it.transform[5];
+          });
+          if (line.trim()) lines.push(line.trim());
+          var title = (lines[0] && lines[0].length < 90) ? lines.shift() : 'Page ' + n;
+          return { title: title, paras: lines, bullets: [], images: [] };
+        }));
+      })(n);
+    }
+    return Promise.all(jobs);
+  });
+}
+
+function ingestMarkdown(file){
+  return file.text().then(function(txt){
+    var sections = [], cur = null;
+    function ensure(){ if (!cur) { cur = { title: 'Introduction', paras: [], bullets: [], images: [] }; sections.push(cur); } return cur; }
+    txt.split('\n').forEach(function(ln){
+      var h = ln.match(/^#{1,3}\s+(.*)/);
+      if (h) { cur = { title: h[1].trim(), paras: [], bullets: [], images: [] }; sections.push(cur); return; }
+      var b = ln.match(/^\s*[-*]\s+(.*)/);
+      if (b) { ensure().bullets.push(b[1].trim()); return; }
+      if (ln.trim()) ensure().paras.push(ln.trim());
+    });
+    return sections;
+  });
+}
+
+function rowsToSections(rows, sheetName){
+  // structured mode: a header row containing "phase" maps rows straight
+  // into strands (columns: phase, segment, kind, title, content/url)
+  if (!rows.length) return [];
+  var header = rows[0].map(function(h){ return String(h || '').toLowerCase().trim(); });
+  var phaseCol = header.indexOf('phase') !== -1 ? header.indexOf('phase') : header.indexOf('strand');
+  if (phaseCol !== -1) {
+    var col = function(name){ return header.indexOf(name); };
+    var out = [];
+    rows.slice(1).forEach(function(r){
+      var ph = String(r[phaseCol] || '').toLowerCase().trim();
+      if (['engagement','development','enhancement','fulfillment'].indexOf(ph) === -1) return;
+      out.push({ __direct: true, phase: ph,
+        segment: col('segment') !== -1 ? String(r[col('segment')] || '').toLowerCase().trim() : '',
+        kind: col('kind') !== -1 ? String(r[col('kind')] || '').toLowerCase().trim() : '',
+        title: col('title') !== -1 ? String(r[col('title')] || '') : '',
+        content: col('content') !== -1 ? String(r[col('content')] || '') : (col('text') !== -1 ? String(r[col('text')] || '') : ''),
+        url: col('url') !== -1 ? String(r[col('url')] || '') : '' });
+    });
+    if (out.length) return out;
+  }
+  // generic mode: the table becomes a bulleted reference section
+  var bullets = rows.slice(0, 200).map(function(r){
+    return r.filter(function(c){ return String(c || '').trim(); }).map(function(c){ return String(c).trim(); }).join(' — ');
+  }).filter(Boolean);
+  return bullets.length ? [{ title: sheetName || 'Data', paras: ['Reference data imported from the uploaded table:'], bullets: bullets, images: [] }] : [];
+}
+
+function ingestCsv(file){
+  return loadScript('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js').then(function(){
+    return new Promise(function(res, rej){
+      window.Papa.parse(file, { skipEmptyLines: true,
+        complete: function(r){ res(rowsToSections(r.data, file.name.replace(/\.[^.]+$/, ''))); },
+        error: function(e){ rej(e); } });
+    });
+  });
+}
+
+function ingestXlsx(file){
+  return loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js').then(function(){
+    return file.arrayBuffer();
+  }).then(function(buf){
+    var wb = window.XLSX.read(buf, { type: 'array' });
+    var sections = [];
+    wb.SheetNames.forEach(function(sn){
+      var rows = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
+      sections = sections.concat(rowsToSections(rows, sn));
+    });
+    return sections;
+  });
+}
+
+/* ---- analysis: map sections onto the FLX strands ---- */
+var STRAND_KEYWORDS = {
+  engagement:  ['intro','introduction','welcome','overview','hook','why ','warm','discover','empath','research','question','explore','what is','objective','goal','agenda'],
+  ideation:    ['brainstorm','ideate','idea','plan','planning','elements','concept','define','outline','sketch','strategy','think'],
+  creation:    ['build','create','make','design','draft','develop','how to','steps','tutorial','practice','prototype','produce','workshop'],
+  enhancement: ['feedback','test','testing','refine','improve','revise','review','iterate','critique','polish','edit','peer'],
+  fulfillment: ['final','finalize','submit','submission','present','presentation','publish','showcase','share','deliver','portfolio','wrap','conclusion','next steps']
+};
+function scoreSection(sec){
+  var hay = (sec.title + ' ' + (sec.paras[0] || '')).toLowerCase();
+  var best = null, bestN = 0;
+  Object.keys(STRAND_KEYWORDS).forEach(function(k){
+    var n = 0;
+    STRAND_KEYWORDS[k].forEach(function(w){ if (hay.indexOf(w) !== -1) n += (sec.title.toLowerCase().indexOf(w) !== -1 ? 2 : 1); });
+    if (n > bestN) { bestN = n; best = k; }
+  });
+  return best;   // null = no keyword signal → positional fallback
+}
+function sectionBlocks(sec){
+  var blocks = [];
+  var md = '## ' + sec.title + '\n\n';
+  if (sec.paras.length) md += sec.paras.join('\n\n') + '\n\n';
+  if (sec.bullets.length) md += sec.bullets.map(function(b){ return '- ' + b; }).join('\n') + '\n';
+  blocks.push({ kind: 'markdown', content: md.trim() });
+  (sec.images || []).forEach(function(im){ blocks.push({ kind: 'image', url: im.url, alt: im.alt || sec.title }); });
+  return blocks;
+}
+
+function ingestApply(sections, filename){
+  if (!sections.length) { toast('Nothing readable found in that file'); return; }
+  var base = filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+  if (!S.meta.name) S.meta.name = base.replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+
+  // fresh novice phase set (module info, criteria, tier toggles are kept)
+  var ph = { engagement: newPhase('engagement'), development: newPhase('development'),
+             enhancement: newPhase('enhancement'), fulfillment: newPhase('fulfillment') };
+  var counts = { engagement: 0, ideation: 0, creation: 0, enhancement: 0, fulfillment: 0 };
+  function put(slot, blocks){
+    counts[slot] += 1;
+    if (slot === 'ideation')  ph.development.segments[0].blocks.push.apply(ph.development.segments[0].blocks, blocks);
+    else if (slot === 'creation') ph.development.segments[1].blocks.push.apply(ph.development.segments[1].blocks, blocks);
+    else if (slot === 'fulfillment') {
+      // submission block stays last
+      var tb = ph.fulfillment.blocks;
+      Array.prototype.splice.apply(tb, [Math.max(0, tb.length - 1), 0].concat(blocks));
+    }
+    else ph[slot].blocks.push.apply(ph[slot].blocks, blocks);
+  }
+
+  // direct rows (structured CSV/XLSX with a phase column)
+  sections.filter(function(s){ return s.__direct; }).forEach(function(r){
+    var blk;
+    if (r.kind === 'video' && r.url) blk = { kind:'video', url: r.url, caption: r.title };
+    else if (r.kind === 'image' && r.url) blk = { kind:'image', url: r.url, alt: r.title };
+    else if (r.kind === 'callout') blk = { kind:'callout', tone:'info', content: r.content || r.title };
+    else blk = { kind:'markdown', content: (r.title ? '## ' + r.title + '\n\n' : '') + (r.content || '') };
+    var slot = r.phase === 'development' ? (r.segment === 'creation' ? 'creation' : 'ideation') : r.phase;
+    put(slot, [blk]);
+  });
+
+  // loose sections: keyword score first, positional fallback second
+  var loose = sections.filter(function(s){ return !s.__direct; });
+  var n = loose.length;
+  loose.forEach(function(sec, i){
+    var slot = scoreSection(sec);
+    if (!slot) {
+      var pos = n <= 1 ? 0.5 : i / (n - 1);
+      slot = pos < 0.15 ? 'engagement' : pos < 0.45 ? 'ideation' : pos < 0.72 ? 'creation' : pos < 0.87 ? 'enhancement' : 'fulfillment';
+    }
+    put(slot, sectionBlocks(sec));
+  });
+
+  // review notice + interactive stubs so every phase gate has a gate
+  ph.engagement.blocks.unshift({ kind:'callout', tone:'warn',
+    content: '**Imported from ' + filename + '** — auto-mapped onto the FLX strands. Review every phase, then delete this callout.' });
+  ph.engagement.blocks.push({ kind:'activity', id: uid('act'), title:'Warm-up',
+    instructions:'Before you dive in: what do you already know about this topic, and what do you want to get out of it?',
+    fields:[{ id:'f-know', label:'What I already know', type:'textarea' }] });
+  ph.enhancement.blocks.push({ kind:'reflection', id: uid('act'), title:'Reflect',
+    prompts:[{ id:'r-0', prompt:'What did you improve after feedback, and what would you refine next?' }] });
+  if (!ph.development.segments[0].blocks.length) ph.development.segments[0].blocks.push({ kind:'markdown', content:'## Ideation\n\nPlan your approach before you build.' });
+  if (!ph.development.segments[1].blocks.length) ph.development.segments[1].blocks.push({ kind:'markdown', content:'## Creation\n\nBuild it.' });
+
+  // default objectives so validation passes — refine them per phase
+  ph.engagement.flxObjectives = ['FLX.CN.1','FLX.CN.2'];
+  ph.development.flxObjectives = ['FLX.ID.1','FLX.CR.1'];
+  ph.enhancement.flxObjectives = ['FLX.RE.1','FLX.RE.2'];
+  ph.fulfillment.flxObjectives = ['FLX.PR.1','FLX.PR.2'];
+
+  S.tiers.novice.phases = [ph.engagement, ph.development, ph.enhancement, ph.fulfillment];
+  S.curTier = 'novice'; S.curPhase = 0;
+  renderAll(); autosave();
+  toast('Drafted from ' + filename + ' — E:' + counts.engagement + ' · ID:' + counts.ideation + ' · CR:' + counts.creation + ' · RE:' + counts.enhancement + ' · PR:' + counts.fulfillment);
+}
+
+document.getElementById('btnIngest').onclick = function(){ document.getElementById('ingestInput').click(); };
+document.getElementById('ingestInput').onchange = function(){
+  var file = this.files[0]; if (!file) return;
+  this.value = '';
+  var hasContent = S.tiers.novice.phases.some(function(p){
+    var all = p.segments ? p.segments.reduce(function(a,s){return a.concat(s.blocks);},[]) : (p.blocks||[]);
+    return all.some(function(b){ return b.kind !== 'submission'; });
+  });
+  if (hasContent && !confirm('Ingesting "' + file.name + '" will replace the Novice tier\'s current content (module info and criteria are kept). Continue?')) return;
+  toast('Reading ' + file.name + '…');
+  var ext = (file.name.split('.').pop() || '').toLowerCase();
+  var job = ext === 'pptx' ? ingestPptx(file)
+          : ext === 'docx' ? ingestDocx(file)
+          : ext === 'pdf'  ? ingestPdf(file)
+          : ext === 'csv'  ? ingestCsv(file)
+          : ext === 'xlsx' ? ingestXlsx(file)
+          : (ext === 'md' || ext === 'markdown' || ext === 'txt') ? ingestMarkdown(file)
+          : Promise.reject(new Error('Unsupported file type: .' + ext));
+  job.then(function(sections){ ingestApply(sections, file.name); })
+     .catch(function(e){ console.error(e); toast('Ingest failed: ' + e.message); });
 };
 
 renderAll();
