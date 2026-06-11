@@ -122,6 +122,8 @@
     body.gl-active .radial-ring,
     body.gl-active .space-depth-layer,
     body.gl-active .rotating-ring { display: none; }
+    /* Graphics P1: the GL 3D hero ship replaces the flat CSS chase ship */
+    body.gl-hero #chaseShip { display: none !important; }
 
     /* ========== OPEN SPACE — station-city node structures (Phase 2) ========== */
     .station-structure {
@@ -3955,9 +3957,72 @@ window.pflxSpace = (function () {
 
   // camera pitch per view mode — chase/cockpit look toward the horizon
   let pitchTarget = 0;
+  // ═══════════════════════════════════════════════════════════════════
+  // 3D HERO SHIP (Graphics P1) — a real model in the GL scene, attached
+  // to the camera so it rides screen-fixed in chase view. Banks with
+  // turn input, engines flare with thrust/boost, idles with a gentle
+  // bob, shakes subtly at full burn. Replaces the flat CSS #chaseShip.
+  // ═══════════════════════════════════════════════════════════════════
+  const heroShip = new THREE.Group();
+  (function buildHeroShip() {
+    const hull = new THREE.MeshStandardMaterial({ color: 0x9fb6c8, metalness: 0.75, roughness: 0.35 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x39424e, metalness: 0.6, roughness: 0.5 });
+    const glowCyan = new THREE.MeshBasicMaterial({ color: 0x00d4ff });
+
+    // fuselage — elongated hex body, nose toward -z (away from camera)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 8, 44, 6), hull);
+    body.rotation.x = -Math.PI / 2;
+    heroShip.add(body);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(3.4, 14, 6), hull);
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.z = -29;
+    heroShip.add(nose);
+    // canopy
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(3.6, 16, 12), new THREE.MeshStandardMaterial({ color: 0x06283c, metalness: 0.2, roughness: 0.1, emissive: 0x00394f }));
+    canopy.scale.set(1, 0.62, 1.7);
+    canopy.position.set(0, 3.4, -8);
+    heroShip.add(canopy);
+    // swept wings
+    [-1, 1].forEach(function (s) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(26, 1.6, 14), hull);
+      wing.position.set(s * 15, -1, 8);
+      wing.rotation.z = s * -0.12;
+      wing.rotation.y = s * 0.5;
+      heroShip.add(wing);
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.4, 8), dark);
+      tip.position.set(s * 27, -1, 12.5);
+      tip.rotation.y = s * 0.5;
+      heroShip.add(tip);
+      // cyan running-light strip on each wing
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(20, 0.5, 1.2), glowCyan);
+      strip.position.set(s * 14, 0.1, 9);
+      strip.rotation.y = s * 0.5;
+      heroShip.add(strip);
+    });
+    // twin engines + glow
+    heroShip.userData.engines = [];
+    [-1, 1].forEach(function (s) {
+      const eng = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.2, 9, 12), dark);
+      eng.rotation.x = -Math.PI / 2;
+      eng.position.set(s * 6.4, -1.2, 22);
+      heroShip.add(eng);
+      const flame = haloSprite('120,220,255', 0.0, 0.95);
+      flame.scale.set(11, 11, 1);
+      flame.position.set(s * 6.4, -1.2, 28);
+      heroShip.add(flame);
+      heroShip.userData.engines.push(flame);
+    });
+    heroShip.position.set(0, -34, -150);
+    heroShip.visible = false;
+    scene.add(camera);          // camera children render only if camera is in the scene
+    camera.add(heroShip);
+  })();
+
   function setMode(mode) {
     pitchTarget = mode === 'cockpit' ? 0.34 : mode === 'chase' ? 0.2 : 0;
     orbital.visible = (mode === 'cockpit' || mode === 'chase');
+    heroShip.visible = (mode === 'chase');
+    try { document.body.classList.toggle('gl-hero', mode === 'chase'); } catch (e) {}
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -4325,6 +4390,27 @@ window.pflxSpace = (function () {
     camera.rotation.x += (pitchTarget - camera.rotation.x) * Math.min(1, dt * 2.2);
     // roll with the flight rotation so the stars turn as you bank
     camera.rotation.z += (rollTarget - camera.rotation.z) * Math.min(1, dt * 3.2);
+
+    // hero ship: bank with turn input, engines flare with thrust/boost,
+    // idle bob, subtle full-burn shake
+    if (heroShip.visible) {
+      const turnIn = window._pflxLastTurn || 0;
+      const thrustN = window._pflxThrustN || 0;
+      const boostHN = window._pflxBoostN || 0;
+      const bankTarget = -turnIn * 0.42;
+      heroShip.rotation.z += (bankTarget - heroShip.rotation.z) * Math.min(1, dt * 5);
+      heroShip.rotation.x += ((thrustN * -0.10) - heroShip.rotation.x) * Math.min(1, dt * 4);
+      const bob = Math.sin(t * 1.6) * 1.4;
+      const shake = boostHN > 0.5 ? (Math.random() - 0.5) * boostHN * 2.2 : 0;
+      heroShip.position.y = -34 + bob + shake;
+      heroShip.position.x = (Math.random() - 0.5) * (boostHN > 0.5 ? boostHN * 1.6 : 0);
+      (heroShip.userData.engines || []).forEach(function (f) {
+        const k = 0.45 + thrustN * 0.55 + boostHN * 0.5 + Math.sin(t * 22) * 0.06;
+        f.material.opacity = Math.min(1, k);
+        const sc = 9 + thrustN * 9 + boostHN * 10;
+        f.scale.set(sc, sc, 1);
+      });
+    }
 
     // orbital command map: trail the camera, planets ride their rings
     if (orbital.visible) {
@@ -11325,6 +11411,14 @@ function pflxKeyLoop() {
     }
   }
 
+  // ── DEEP-SPACE DIVE ── thrusting (↑ key OR two-finger swipe) eases
+  // the camera IN — the zoom-in sensation IS the forward navigation
+  // feel. Braking eases back out. The GL backdrop dollies with it
+  // (target.z = 2300/zoom), so stars and planets sweep past faster.
+  var __diveBase = (pflxCamera.mode === 'cockpit') ? pflxCamera.cockpitZoom : pflxCamera.chaseZoom;
+  var __diveTarget = __diveBase * (1 + Math.max(0, thrust) * 0.16 + (pflxKeys.shift && thrust > 0 ? 0.10 : 0) + Math.min(0.10, pflxShipSpeed / 80));
+  zoom += (__diveTarget - zoom) * 0.05;
+
   // Camera follow for chase/cockpit
   panX = (window.innerWidth / 2) - pflxShip.x * zoom;
   panY = (window.innerHeight * (pflxCamera.mode === 'chase' ? 0.62 : 0.5)) - pflxShip.y * zoom;
@@ -11340,8 +11434,10 @@ function pflxKeyLoop() {
 
   // Boost vignette + speed streak intensity (game feel)
   var streaks = document.getElementById('speedStreaks');
+  var boostN = Math.max(0, Math.min(1, (pflxShipSpeed - SHIP_MAX_SPEED * 0.8) / (SHIP_BOOST_MAX * 0.9)));
+  window._pflxBoostN = (pflxCamera.mode === 'birdseye') ? 0 : boostN;
+  window._pflxThrustN = (pflxCamera.mode === 'birdseye') ? 0 : Math.max(0, Math.min(1, thrust));
   if (streaks) {
-    var boostN = Math.max(0, Math.min(1, (pflxShipSpeed - SHIP_MAX_SPEED * 0.8) / (SHIP_BOOST_MAX * 0.9)));
     streaks.style.opacity = (pflxCamera.mode === 'birdseye') ? '0' : boostN.toFixed(2);
   }
 

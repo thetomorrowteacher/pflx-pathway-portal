@@ -1135,6 +1135,20 @@ heading (decaying burst, continuous swipe = continuous thrust,
 `window._pflxWheelThrust` consumed in pflxKeyLoop), reverse swipe =
 brake/reverse. Bird's-eye keeps classic zoom-at-cursor.
 
+### DEEP-SPACE DIVE + GRAPHICS P1 SHIPPED (June 11, late)
+- ↑ and the trackpad swipe now produce the SAME forward feel: both feed
+  one thrust value, and thrusting eases the camera zoom IN (the
+  "deep-space dive" — GL backdrop dollies with it). Braking eases out.
+- **Graphics P1 — 3D hero ship** (`heroShip` in the pflxSpace IIFE):
+  procedural metal-hull model (hex fuselage, swept wings, cyan running
+  lights, canopy, twin engines with halo flames) attached to the GL
+  camera, visible in chase. Banks with turn input, pitches with
+  thrust, engine flames scale/flicker with thrust+boost, idle bob,
+  subtle full-burn shake. `body.gl-hero` hides the CSS #chaseShip
+  (CSS ship remains as the no-WebGL fallback).
+- NEXT GRAPHICS PHASES: P2 stations in-scene, P3 postprocessing bloom
+  (needs esbuild bundle), P4 GPU particles — see roadmap below.
+
 ### GRAPHICS → "PS5 LEVEL" ROADMAP (June 11)
 Shipped now: ACES filmic tone mapping + sRGB output + exposure 1.15 on
 the GL renderer (filmic highlight rolloff — planets/nebulae stop
