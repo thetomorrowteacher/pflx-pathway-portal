@@ -6121,10 +6121,48 @@ function showDetail(n) {
       if (!n.submissions) n.submissions = [];
       n.submissions.push(submissionData);
       savePathwayEdits();
-      // Send to X-Coin approvals via syncBus
-      if (typeof pflxSyncBus !== 'undefined') {
-        pflxSyncBus.emit('node-submission', submissionData);
-      }
+      // ── Send to the shared approvals queue ──
+      // The old pflxSyncBus.emit was a dead pipe (pflxSyncBus was never
+      // defined anywhere) — node submissions silently went nowhere. Now we
+      // append a CoinSubmission-shaped record to the cloud `submissions`
+      // row (the same queue X-Coin Approvals and the Console host home
+      // Approvals card read) and ping the Console shell for an instant
+      // toast + card refresh. Big screenshot/html data-URLs stay on the
+      // node record only — the queue carries the link + description.
+      try {
+        var pu = {};
+        try { pu = JSON.parse(localStorage.getItem('pflxUser') || '{}') || {}; } catch (e) {}
+        var subRec = {
+          id: 'sub-node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          playerId: pu.id || '',
+          brand: pu.brand || pu.brandName || '',
+          coinType: n.badgeName || ('Node: ' + (n.title || n.id)),
+          amount: 1,
+          reason: 'Core Pathways node submission: ' + (n.title || n.id) +
+                  (submissionData.description ? ' — ' + submissionData.description : ''),
+          evidenceUrl: submissionData.link || '',
+          status: 'pending',
+          submittedAt: submissionData.timestamp,
+          source: 'player',
+          nodeId: n.id,
+          pathwayId: submissionData.pathwayId
+        };
+        if (window._supabase) {
+          window._supabase.from('app_data').select('data').eq('key', 'submissions').maybeSingle()
+            .then(function (res) {
+              var list = (res && res.data && Array.isArray(res.data.data)) ? res.data.data : [];
+              list.push(subRec);
+              return window._supabase.from('app_data').upsert(
+                { key: 'submissions', data: list, updated_at: new Date().toISOString() },
+                { onConflict: 'key' });
+            })
+            .then(function () { console.log('[Pathways] ✓ submission → shared approvals queue'); },
+                  function (e) { console.warn('[Pathways] submission cloud push failed', e); });
+        }
+        if (window.parent !== window) {
+          window.parent.postMessage(JSON.stringify({ type: 'pflx_node_submission', submission: subRec }), '*');
+        }
+      } catch (e) { console.warn('[Pathways] submission dispatch failed', e); }
       // Update UI
       document.getElementById('subSubmitBtn').style.display = 'none';
       document.getElementById('subPendingMsg').style.display = 'block';

@@ -1308,3 +1308,30 @@ collection (_mcCloudBaseline). recover-mc.html added for
 localStorage-based recovery on any device. FLP indicators are CODE
 (temporal phases from dates + flpTracking field) — they need no data
 restore beyond the task itself.
+
+### Unified host approvals on home screen (June 12)
+The host home "🛡 Approvals" card now aggregates EVERY pending stream:
+1. X-Tracker reward requests — now CLOUD-SYNCED (key
+   pflx_mc_reward_requests; was localStorage-only so cross-device hosts
+   saw nothing). Merge rule on pull: resolved status beats pending.
+2. MC task submissions (unchanged, mcTasks status='submitted').
+3. X-Coin badge submissions — cloud 'submissions' row, pending only.
+   Inline approve mirrors X-Coin's pipeline: badge + XC (value from the
+   mcBadges catalog, fallback 100 XC / primary) via PflxDataBus.award,
+   row saved back so X-Coin admin shows it approved. NOTE: the Console
+   path does NOT apply studio tax (X-Coin's earnXCWithTax does) — known
+   divergence, approve in X-Coin if tax matters.
+4. Core Pathways node submissions — pathway.html's old
+   pflxSyncBus.emit('node-submission') was a DEAD PIPE (pflxSyncBus
+   never existed; submissions went nowhere). Now: CoinSubmission-shaped
+   record appended to the shared cloud 'submissions' row (tagged
+   nodeId/pathwayId, shown as "🛰 Pathways: …") + pflx_node_submission
+   postMessage to the Console for an instant toast/card entry.
+   Screenshot/html data-URLs stay on the node record (not the queue).
+5. X-Coin peer trades (cloud 'trades', pending) — display + "REVIEW IN
+   X-COIN" deep-link (settlement/escrow logic stays in X-Coin).
+Live updates: _pflxPullApprovalFeeds (15s throttle on home refresh) +
+Supabase Realtime rows 'submissions'/'trades'/'pflx_mc_reward_requests'
+re-render the card. Known race: X-Coin admin saving its whole
+submissions array can clobber a node submission appended after X-Coin's
+boot — mitigated by Realtime; full fix would be per-item rows.
