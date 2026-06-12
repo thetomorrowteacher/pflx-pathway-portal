@@ -1345,3 +1345,25 @@ on all five repos. On-demand: Host Mission Control → Settings →
 "🛟 Create Save Point" button (pflxCreateSavePoint) downloads a full
 app_data snapshot JSON (covers EVERY app — shared Supabase) and writes
 a pflx_last_savepoint marker row.
+
+### Multiplayer presence fixed (June 12, "players couldn't see each other")
+Live-tested with two Node clients + two real tabs: Supabase presence
+ITSELF worked (both tabs were in the channel) — three UX/identity
+defects made players invisible to each other:
+1. IDENTITY DEAD CODE — pflxCrew.init called pflxModulePlayer(), but
+   that fn is nested inside showLaunchOverlay's scope → typeof was
+   always undefined → EVERY player joined as anonymous "Explorer" with
+   a random id (confirmed in live presence payloads). Waves/invites are
+   addressed by player id, so they could never reach anyone. Fixed:
+   identity resolved inline (PFLX_SESSION → ?pid/&brand → localStorage
+   pflxUser → Explorer fallback).
+2. SPAWN OVERLAP — every ship spawns at the same world point (2500,
+   4250 on prof-entrepreneur); a crewmate at spawn rendered exactly
+   under your own ship. Markers now nudge +64/-28 while a peer is
+   within 50u.
+3. NO WAY TO FIND EACH OTHER in endless space. The CREW chip is now
+   clickable → roster panel (brand, distance in units, FLY TO via
+   pflxShipFlyTo, WAVE). Join toasts announce arrivals after first
+   sync.
+Node test harness: two supabase-js clients on channel
+'pflx-space-<slug>' (presence keys must differ). Verified A↔B sync.
