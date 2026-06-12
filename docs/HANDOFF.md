@@ -1335,3 +1335,13 @@ Supabase Realtime rows 'submissions'/'trades'/'pflx_mc_reward_requests'
 re-render the card. Known race: X-Coin admin saving its whole
 submissions array can clobber a node submission appended after X-Coin's
 boot — mitigated by Realtime; full fix would be per-item rows.
+
+### Save point system (June 12)
+NEW RESTORE REFERENCE: `PFLX Apps/pflx-supabase-backup-2026-06-12.json`
+(187 app_data rows, 9.6MB, verified 97 players + recovered task/
+checkpoint). The March 31 file is obsolete — use this one for any
+future recovery. Code reference: git tag `savepoint-2026-06-12` pushed
+on all five repos. On-demand: Host Mission Control → Settings →
+"🛟 Create Save Point" button (pflxCreateSavePoint) downloads a full
+app_data snapshot JSON (covers EVERY app — shared Supabase) and writes
+a pflx_last_savepoint marker row.
