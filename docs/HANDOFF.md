@@ -1252,3 +1252,36 @@ session:
 Pending/known: LiveTicker iframe-suppressed; xbot fines from
 "-read" violations still flow through the existing approval → fine
 pipeline (no auto-fine).
+
+### LinkedIn connection — phases 1+3 live, phase 2 scaffolded (June 12)
+Repo: pflx-xcoin (folder pflx-xcoin-check).
+**Phase 1+3 (zero-API, works now):**
+- `/badge/<playerId>` — PUBLIC server-rendered badge page (brand name
+  ONLY, never real name). generateMetadata emits OG tags so LinkedIn's
+  crawler previews "BRAND earned the X badge". `?b=<badge name>`
+  focuses one badge. Data: cloud `users` + approved `submissions`
+  (the same source rank logic uses) + host-customized `coinCategories`
+  catalog with static COIN_CATEGORIES fallback. NOTE: cloud app_data
+  column is `data` NOT `value` (REST: `select=data`).
+- Per-badge buttons: SHARE ON LINKEDIN (share-offsite deep link),
+  ADD TO PROFILE (profile/add?startTask=CERTIFICATION_NAME prefill,
+  org = "PFLX — The Tomorrow Teacher"), COPY LINK.
+- Wallet entry point: "in SHARE TO LINKEDIN" button in the Digital
+  Badge Collection header → opens the public page.
+- Anonymous visitors are NOT blocked: pflx-app-bootstrap gate only
+  denies when launch params carry an allowedApps list.
+**Phase 2 (OAuth post-to-feed, needs setup):**
+- api/linkedin/{auth,callback,post}/route.ts + lib.ts. Scopes
+  `openid profile w_member_social`, UGC Posts API. Tokens AES-256-GCM
+  encrypted (key derived from client secret) before persisting to
+  `linkedin_tokens` app_data key (table is anon-readable by design).
+- Wallet: LinkedInConnect widget (hidden until configured) — CONNECT
+  LINKEDIN → OAuth → "⚡ POST LATEST BADGE".
+- ENNIS SETUP REQUIRED: developer.linkedin.com → create app attached
+  to a verified LinkedIn Company Page → request "Sign In with LinkedIn
+  using OpenID Connect" + "Share on LinkedIn" products → add redirect
+  URL `https://<xcoin-domain>/api/linkedin/callback` → set
+  LINKEDIN_CLIENT_ID + LINKEDIN_CLIENT_SECRET in Vercel env (xcoin
+  project) → redeploy. Limits: ~100 calls/day/member, 60-day tokens.
+- No badges exist in cloud yet (submissions empty, badgeCounts all 0)
+  — page shows a clean empty state until hosts approve submissions.
