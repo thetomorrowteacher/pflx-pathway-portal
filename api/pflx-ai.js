@@ -36,11 +36,13 @@ const MODELS = {
   anthropic: process.env.PFLX_AI_MODEL || 'claude-sonnet-4-6',
   openai: process.env.PFLX_AI_MODEL_OPENAI || 'gpt-4o-mini',
   gemini: process.env.PFLX_AI_MODEL_GEMINI || 'gemini-2.0-flash',
+  deepseek: process.env.PFLX_AI_MODEL_DEEPSEEK || 'deepseek-chat',
 };
 const KEYS = {
   anthropic: process.env.ANTHROPIC_API_KEY || '',
   openai: process.env.OPENAI_API_KEY || '',
   gemini: process.env.GEMINI_API_KEY || '',
+  deepseek: process.env.DEEPSEEK_API_KEY || '',
 };
 
 export default async function handler(req, res) {
@@ -53,7 +55,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       hasKey: !!KEYS.anthropic,   // back-compat for the Module Builder probe
-      providers: { anthropic: !!KEYS.anthropic, openai: !!KEYS.openai, gemini: !!KEYS.gemini },
+      providers: { anthropic: !!KEYS.anthropic, openai: !!KEYS.openai, gemini: !!KEYS.gemini, deepseek: !!KEYS.deepseek },
       model: MODELS.anthropic,
     });
   }
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const provider = ['anthropic', 'openai', 'gemini'].includes(body.provider) ? body.provider : 'anthropic';
+    const provider = ['anthropic', 'openai', 'gemini', 'deepseek'].includes(body.provider) ? body.provider : 'anthropic';
     if (!KEYS[provider]) return res.status(503).json({ error: 'no-key' });
 
     const system = String(body.system || '').slice(0, 6000);
@@ -81,15 +83,17 @@ export default async function handler(req, res) {
       const data = await r.json();
       if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'anthropic upstream' });
       text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
-    } else if (provider === 'openai') {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    } else if (provider === 'openai' || provider === 'deepseek') {
+      // both speak the OpenAI chat-completions protocol
+      const base = provider === 'deepseek' ? 'https://api.deepseek.com/v1' : 'https://api.openai.com/v1';
+      const r = await fetch(base + '/chat/completions', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${KEYS.openai}` },
-        body: JSON.stringify({ model: MODELS.openai, max_tokens: maxTokens,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${KEYS[provider]}` },
+        body: JSON.stringify({ model: MODELS[provider], max_tokens: maxTokens,
           messages: [{ role: 'system', content: system }, ...messages] }),
       });
       const data = await r.json();
-      if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'openai upstream' });
+      if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || provider + ' upstream' });
       text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     } else {
       const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
