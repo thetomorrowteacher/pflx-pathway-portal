@@ -1221,3 +1221,34 @@ or above the rank passes the cohort deny; the ACCESS DENIED modal shows
 block. Verified in Node: 9/9 gate scenarios incl. drift, multi-cohort
 deny-wins, registry drift, bypass, bypass-removal, host exemption.
 - A tools registry for branded tool cards (open question 14.8 #4).
+
+### DarkCampus pillars — built (June 12 session)
+Repo: pflx-darkcampus (folder pflx-darkcampus-check). What already
+existed and was kept: Slack/Discord #missioncontrol bridges (send +
+read via notificationSettings tokens / slackResolver), DMs at /api/dm,
+threads, xbot-scan.ts regex engine, Host Control Panel. New this
+session:
+1. **Cross-post registry + host deletion** — api/send/route.ts now
+   captures the platform message IDs (`r.ts` Slack / `r.id` Discord)
+   for every DC → #missioncontrol cross-post into cloud key
+   `dc_crossposts` (cap 200, tokens stored server-side only).
+   api/host-actions/route.ts: GET `?action=crossposts` (last 50,
+   tokens stripped) and POST `delete_crosspost` → Slack chat.delete /
+   Discord DELETE message per target (404 counts as deleted), marks
+   rec.deleted + audit entry in dc_host_actions. Host UI: X-BOT tab of
+   HostControlPanel → "CROSS-POSTS → #MISSIONCONTROL" list with ✕
+   DELETE per entry, 15s poll.
+2. **X-Bot reads Slack/Discord** — api/messages/route.ts
+   scanInboundMessages(): every GET of a bridged channel feeds fresh
+   human messages (not bots, not bridge echoes `[BRAND] ` prefix)
+   through xbotScan → pending entries in dc_violations
+   (platform "slack-read"/"discord-read") and dc_peer_rewards for the
+   host approval queues. Dedupe via `dc_scanned_ids` (capped 2000).
+3. **Rank-gated channel creation** — ChannelSidebar perm `rank:N`
+   (playerRank from dc_auth user.rank/level, wired in terminal/page).
+   HostSettingsModal local-channel perm select now offers Host Only /
+   All / rank:3 / rank:5 / rank:7 + free-text custom (e.g. rank:4).
+4. Demo messages removed from terminal; boot screen claims honest.
+Pending/known: LiveTicker iframe-suppressed; xbot fines from
+"-read" violations still flow through the existing approval → fine
+pipeline (no auto-fine).
