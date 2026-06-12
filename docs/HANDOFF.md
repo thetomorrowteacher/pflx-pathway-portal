@@ -1285,3 +1285,26 @@ Repo: pflx-xcoin (folder pflx-xcoin-check).
   project) → redeploy. Limits: ~100 calls/day/member, 60-day tokens.
 - No badges exist in cloud yet (submissions empty, badgeCounts all 0)
   — page shows a clean empty state until hosts approve submissions.
+
+### MC stomp incident + recovery (June 12, ~17:03 UTC)
+A Console session pushed mock/empty in-memory state over the shared
+pflx_mc_* rows (Save All / boot-race; pre-guard build). Damage after
+audit: ONLY tasks — cloud held 3 March-mock tasks; the real task was
+gone. checkpoints/modifiers/pflxranks/studios/badges/players verified
+byte-identical to pre-stomp copies.
+RECOVERY: real data carved out of Chrome Profile-1 LevelDB history
+(~/Library/.../Local Storage/leveldb — old versions survive compaction)
+with a custom SSTable/WAL parser. Restored: task "Complete
+Projects/Courses" (task-1779903770394, roundId round-1, flpTracking
+"monitoring", 1700 XC, due 2026-06-04, 6 reward badges, deadline fine
+100/grace 2) → pflx_mc_tasks + legacy 'tasks'. Snapshots saved:
+pflx_backup_pflx_mc_tasks_2026-06-12_pre-task-restore (+tasks). Real
+checkpoint "Checkpoint Gamma" (round-1, 2026-03-02→06-02, Schoology
+link, banner) was still intact in cloud.
+PREVENTION (preview.html, commit d0cb660): mcCloudPush/mcCloudSync now
+(1) refuse to run before the boot pull completes (_mcCloudPulledOnce),
+(2) refuse to overwrite a cloud row that had items with an EMPTY local
+collection (_mcCloudBaseline). recover-mc.html added for
+localStorage-based recovery on any device. FLP indicators are CODE
+(temporal phases from dates + flpTracking field) — they need no data
+restore beyond the task itself.
