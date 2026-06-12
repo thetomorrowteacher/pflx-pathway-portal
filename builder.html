@@ -132,7 +132,7 @@
   <span class="spacer"></span>
   <span class="statusline" id="autosaveStatus">draft autosaves locally</span>
   <button class="tbtn ghost" id="btnIngest" title="Upload a PPTX, DOCX, PDF, Markdown, CSV, or XLSX file — the Builder reads it and drafts the module">⬆ Ingest Content</button>
-  <input type="file" id="ingestInput" accept=".pptx,.docx,.pdf,.md,.markdown,.txt,.csv,.xlsx" style="display:none">
+  <input type="file" id="ingestInput" accept=".pptx,.docx,.pdf,.md,.markdown,.txt,.csv,.xlsx" multiple style="display:none">
   <button class="tbtn ghost" id="btnImport">⬆ Import</button>
   <input type="file" id="importInput" accept=".json,.pflx,.zip" style="display:none">
   <button class="tbtn ghost" id="btnNew">✦ New</button>
@@ -1206,6 +1206,9 @@ function ingestPdf(file){
 
 function ingestMarkdown(file){
   return file.text().then(function(txt){
+    // NotebookLM-export cleanup: strip inline citation markers like [1],
+    // [2, 5] — they're noise to a learner reading the module
+    txt = txt.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, '');
     var sections = [], cur = null;
     function ensure(){ if (!cur) { cur = { title: 'Introduction', paras: [], bullets: [], images: [] }; sections.push(cur); } return cur; }
     txt.split('\n').forEach(function(ln){
@@ -1215,7 +1218,10 @@ function ingestMarkdown(file){
       if (b) { ensure().bullets.push(b[1].trim()); return; }
       if (ln.trim()) ensure().paras.push(ln.trim());
     });
-    return sections;
+    // drop bibliography-style sections (NotebookLM appends these)
+    return sections.filter(function(s){
+      return !/^(sources?|citations?|references?|bibliography|works cited)\b/i.test(s.title || '');
+    });
   });
 }
 
@@ -1367,25 +1373,40 @@ function ingestApply(sections, filename){
 }
 
 document.getElementById('btnIngest').onclick = function(){ document.getElementById('ingestInput').click(); };
+function ingestOne(file){
+  var ext = (file.name.split('.').pop() || '').toLowerCase();
+  return ext === 'pptx' ? ingestPptx(file)
+       : ext === 'docx' ? ingestDocx(file)
+       : ext === 'pdf'  ? ingestPdf(file)
+       : ext === 'csv'  ? ingestCsv(file)
+       : ext === 'xlsx' ? ingestXlsx(file)
+       : (ext === 'md' || ext === 'markdown' || ext === 'txt') ? ingestMarkdown(file)
+       : Promise.reject(new Error('Unsupported file type: .' + ext));
+}
 document.getElementById('ingestInput').onchange = function(){
-  var file = this.files[0]; if (!file) return;
+  // MULTI-FILE: select several NotebookLM exports (or any mix of
+  // supported files) — they ingest in selection order into one module,
+  // so "one notebook per phase" works naturally.
+  var files = Array.prototype.slice.call(this.files || []);
   this.value = '';
+  if (!files.length) return;
+  var label = files.length === 1 ? files[0].name : files.length + ' files (' + files.map(function(f){ return f.name; }).join(', ').slice(0, 120) + ')';
   var hasContent = S.tiers.novice.phases.some(function(p){
     var all = p.segments ? p.segments.reduce(function(a,s){return a.concat(s.blocks);},[]) : (p.blocks||[]);
     return all.some(function(b){ return b.kind !== 'submission'; });
   });
-  if (hasContent && !confirm('Ingesting "' + file.name + '" will replace the Novice tier\'s current content (module info and criteria are kept). Continue?')) return;
-  toast('Reading ' + file.name + '…');
-  var ext = (file.name.split('.').pop() || '').toLowerCase();
-  var job = ext === 'pptx' ? ingestPptx(file)
-          : ext === 'docx' ? ingestDocx(file)
-          : ext === 'pdf'  ? ingestPdf(file)
-          : ext === 'csv'  ? ingestCsv(file)
-          : ext === 'xlsx' ? ingestXlsx(file)
-          : (ext === 'md' || ext === 'markdown' || ext === 'txt') ? ingestMarkdown(file)
-          : Promise.reject(new Error('Unsupported file type: .' + ext));
-  job.then(function(sections){ ingestApply(sections, file.name); })
-     .catch(function(e){ console.error(e); toast('Ingest failed: ' + e.message); });
+  if (hasContent && !confirm('Ingesting ' + label + ' will replace the Novice tier\'s current content (module info and criteria are kept). Continue?')) return;
+  toast('Reading ' + label + '…');
+  // sequential so section order matches file order
+  var all = [];
+  var chain = Promise.resolve();
+  files.forEach(function(file){
+    chain = chain.then(function(){ return ingestOne(file); }).then(function(sections){
+      all = all.concat(sections || []);
+    });
+  });
+  chain.then(function(){ ingestApply(all, files.length === 1 ? files[0].name : files.length + ' notebooks'); })
+       .catch(function(e){ console.error(e); toast('Ingest failed: ' + e.message); });
 };
 
 /* ═══════════════════════════════════════════════════════════════════
