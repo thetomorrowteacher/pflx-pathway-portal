@@ -10937,7 +10937,16 @@ const pflxCrew = {
           'text-shadow:0 0 6px rgba(0,0,0,0.9);white-space:nowrap;">' + (d.brand || 'Explorer') + '</div>';
       const self = this;
       el.addEventListener('click', function (e) { e.stopPropagation(); self.peerMenu(k, d, e); });
-      canvas.appendChild(el);
+      // CRITICAL: append into #nodeLayer, NOT #nodeCanvas. The world
+      // pan/zoom/rotate transform is applied to nodeLayer, and the
+      // player's own ship (#pflxShip) and every node live inside it.
+      // The old code appended to the outer nodeCanvas, so peer markers
+      // stayed in raw screen space while the world scrolled underneath —
+      // they were positioned correctly in DATA but rendered in the wrong
+      // coordinate system, almost always off-screen. THIS is why two
+      // players in the same sector never saw each other's ships.
+      var _layer = document.getElementById('nodeLayer') || canvas;
+      _layer.appendChild(el);
       p = this.peers[k] = { el: el, data: d };
     }
     p.data = d;

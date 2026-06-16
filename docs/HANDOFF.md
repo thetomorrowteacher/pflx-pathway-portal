@@ -1367,3 +1367,15 @@ defects made players invisible to each other:
    sync.
 Node test harness: two supabase-js clients on channel
 'pflx-space-<slug>' (presence keys must differ). Verified A↔B sync.
+
+### Crew presence — ROOT CAUSE found (June 12, round 2)
+Presence sync was never the problem (Node test + live channel confirmed
+both players present with correct brands). The real bug: peer ship
+markers were appended to #nodeCanvas (the OUTER, untransformed
+container). The world pan/zoom/rotate transform is applied to
+#nodeLayer, and the player's own ship (#pflxShip) + all nodes live
+INSIDE #nodeLayer. So peer markers sat in raw screen space while the
+world scrolled underneath — correct data, wrong coordinate system,
+effectively always off-screen. Fix: pflxCrew.upsertPeer now appends to
+#nodeLayer (fallback to canvas). One-line root-cause fix; the earlier
+identity/spawn-nudge/roster work stands on top of it.
