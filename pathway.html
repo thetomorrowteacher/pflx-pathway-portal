@@ -11751,11 +11751,20 @@ function pflxKeyLoop() {
   if (pflxShip.flying) { pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop); return; }
 
   // ── HEADING + THRUST flight model ──
-  // turn input: arrow keys + mouse/trackpad steering combined
-  let turn = 0;
-  if (pflxKeys.left) turn -= 1;
-  if (pflxKeys.right) turn += 1;
-  turn += (window._pflxMouseSteer || 0);
+  // Aim model (June 2026 rewrite): the MOUSE / TRACKPAD is the sole aim
+  // input. Arrow Left/Right used to spin the ship continuously, which
+  // felt like fighting the controls — the player would press right to
+  // "look right" and the whole world would tumble. Now Left/Right
+  // STRAFE laterally (perpendicular to the cursor-aimed heading) and
+  // the cursor position is the only thing that turns the ship.
+  //
+  // Up arrow: thrust forward along the heading the cursor is pointing.
+  //           Visually this reads as flying INTO space (camera "zooms"
+  //           closer to whatever's ahead).
+  // Down arrow: thrust backward. Reads as pulling out of space.
+  // Left arrow:  strafe LEFT (slide sideways without rotating).
+  // Right arrow: strafe RIGHT (slide sideways without rotating).
+  let turn = (window._pflxMouseSteer || 0);
   turn = Math.max(-1.4, Math.min(1.4, turn));
   window.pflxShipHeading += turn * 0.042;
   window._pflxLastTurn = turn;
@@ -11773,10 +11782,27 @@ function pflxKeyLoop() {
   }
   thrust = Math.max(-1, Math.min(1.6, thrust));
 
+  // Strafe input: Left/Right arrows slide the ship sideways without
+  // rotating it. Heading-perpendicular = heading + 90° (right) or - 90°
+  // (left). Strafe accel is slightly weaker than forward thrust so it
+  // feels like a maneuvering thruster, not a primary drive.
+  let strafe = 0;
+  if (pflxKeys.left) strafe -= 1;
+  if (pflxKeys.right) strafe += 1;
+
   const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
   const tierMult = pflxShip.upgrades._speedMult || 1;
   let ax = Math.cos(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
   let ay = Math.sin(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
+
+  // Lateral strafe — perpendicular to heading. cos(h + π/2) = -sin(h),
+  // sin(h + π/2) = cos(h). Strafe at 0.65× the forward accel so it reads
+  // as maneuvering, not the primary drive.
+  if (strafe !== 0) {
+    const STRAFE_ACCEL = SHIP_ACCEL * 0.65 * tierMult;
+    ax += -Math.sin(window.pflxShipHeading) * STRAFE_ACCEL * strafe;
+    ay +=  Math.cos(window.pflxShipHeading) * STRAFE_ACCEL * strafe;
+  }
 
   pflxShipVx += ax;
   pflxShipVy += ay;
@@ -11788,9 +11814,15 @@ function pflxKeyLoop() {
     pflxShipVy = (pflxShipVy / spd) * maxSpd * tierMult;
   }
 
-  // Friction when not thrusting (drag applies to the whole velocity
-  // vector — turning no longer bleeds speed on one axis only)
-  if (!pflxKeys.up && !pflxKeys.down) { pflxShipVx *= SHIP_FRICTION; pflxShipVy *= SHIP_FRICTION; }
+  // Friction when not thrusting OR strafing (drag applies to the whole
+  // velocity vector — turning no longer bleeds speed on one axis only).
+  // Including strafe in the "actively flying" check means the lateral
+  // velocity from Left/Right doesn't get bled out by friction every
+  // frame; it builds up like forward thrust does.
+  if (!pflxKeys.up && !pflxKeys.down && !pflxKeys.left && !pflxKeys.right) {
+    pflxShipVx *= SHIP_FRICTION;
+    pflxShipVy *= SHIP_FRICTION;
+  }
 
   // Stop if very slow
   pflxShipSpeed = Math.sqrt(pflxShipVx * pflxShipVx + pflxShipVy * pflxShipVy);
