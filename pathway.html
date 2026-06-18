@@ -4979,7 +4979,11 @@ function applyTransform() {
   }
   updateMinimap();
 
-  // Billboard: counter-rotate nodes so they face the camera
+  // Billboard: counter-rotate nodes so they face the camera. The SAME
+  // pass billboards the crew-peer markers (other players' ships in
+  // co-op), otherwise they lie flat against the tilted ground plane in
+  // chase/cockpit mode and become near-invisible. This is the reason
+  // players reported "I can't see other ships in chase/cockpit view."
   if (tiltX > 0) {
     // counter-rotate nodes for BOTH the tilt and the world rotation so
     // station labels stay upright while the world spins behind the ship
@@ -4993,6 +4997,18 @@ function applyTransform() {
         n.style.transform = 'rotate(' + (-viewRot).toFixed(1) + 'deg) rotateX(' + counterTilt + 'deg) scale(' + nodeScale + ')';
         n.style.transformStyle = 'preserve-3d';
       });
+      // Co-op crew peers — same billboarding treatment as nodes. Scaled
+      // up a touch in cockpit so they read from farther out. The CSS
+      // transition on .crew-peer's left/top makes them animate smoothly
+      // as peers move; we only override the transform property here.
+      const peerScale = camMode === 'cockpit' ? 1.5 : 1.2;
+      document.querySelectorAll('.crew-peer').forEach(function (pe) {
+        pe.style.transform = 'rotate(' + (-viewRot).toFixed(1) + 'deg) rotateX(' + counterTilt + 'deg) scale(' + peerScale + ')';
+        pe.style.transformStyle = 'preserve-3d';
+        // Lift peers above the tilted ground plane so they're not buried
+        // behind layered nodes or the chase vignette.
+        pe.style.zIndex = '60';
+      });
     }
   } else if (applyTransform._lastTiltKey) {
     applyTransform._lastTiltKey = null;
@@ -5001,6 +5017,15 @@ function applyTransform() {
     allNodes.forEach(function(n) {
       n.style.transform = '';
       n.style.transformStyle = '';
+    });
+    // Reset crew peer transforms too — in birdseye they should sit flat
+    // on the plane like nodes do. Without clearing this, a peer that
+    // joined while you were in chase would keep its counter-rotation
+    // applied when you flip back to birdseye and look tilted.
+    document.querySelectorAll('.crew-peer').forEach(function (pe) {
+      pe.style.transform = '';
+      pe.style.transformStyle = '';
+      pe.style.zIndex = '5';
     });
   }
 
@@ -10963,6 +10988,21 @@ const pflxCrew = {
     } catch (e) {}
     p.el.style.left = px + 'px';
     p.el.style.top = py + 'px';
+    // If we're currently in chase or cockpit, immediately billboard the
+    // new peer so they show upright instead of flat against the ground.
+    // applyTransform's billboard pass is cache-keyed and won't re-run
+    // just because a new peer joined; this handles the gap.
+    try {
+      const _mode = (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye';
+      if (_mode === 'chase' || _mode === 'cockpit') {
+        const _tilt = _mode === 'cockpit' ? 55 : 38;
+        const _scale = _mode === 'cockpit' ? 1.5 : 1.2;
+        const _rot = (typeof window.pflxViewRotDeg === 'number') ? window.pflxViewRotDeg : 0;
+        p.el.style.transform = 'rotate(' + (-_rot).toFixed(1) + 'deg) rotateX(' + (-_tilt) + 'deg) scale(' + _scale + ')';
+        p.el.style.transformStyle = 'preserve-3d';
+        p.el.style.zIndex = '60';
+      }
+    } catch (e) {}
   },
 
   // ── Crew roster panel — click the CREW chip to list everyone in the
