@@ -1379,3 +1379,97 @@ world scrolled underneath — correct data, wrong coordinate system,
 effectively always off-screen. Fix: pflxCrew.upsertPeer now appends to
 #nodeLayer (fallback to canvas). One-line root-cause fix; the earlier
 identity/spawn-nudge/roster work stands on top of it.
+
+---
+---
+
+# Session Update — July 1 2026 (Sonnet) — MC redesign + hierarchy overhaul
+
+**New persistent rule (Ennis, 2026-07-01):** After **every** PFLX change/upgrade, update this HANDOFF doc with a dated entry so a fresh Claude session or Fable chat can pick up. This entry is the first application of that rule.
+
+## What shipped this session
+
+Focus: Mission Control redesign — cards, hierarchy, progress, redesign toward Notion/Monday/Linear feel.
+
+### `pflx-platform` commits (`pflx-platform-check/`)
+
+| SHA | Subject |
+|-----|---------|
+| `47fc06f` | MC Projects: cohort UI + task cascade + completion reward |
+| `b53d029` | P0 MC project disappearing — Stomp Guard 3 timestamp check |
+| `27252b8` | P0 Stop X-Coin bridge from clobbering MC cloud with mock seeds (Stomp Guard 4) |
+| `91d6010` | P0 MC project save — Stomp Guard 5 (single mcLoadData/session) + quota-safe setItem + banner downscale |
+| `fc4739c` | MC Projects: banner-on-top 16:9 card layout |
+| `9e686e3` | MC Checkpoints: hero-tier card treatment (16:9 banner, 28px Orbitron title, wider grid) |
+| `40678f6` | MC Hierarchy: visible lineage across Task/Project/Checkpoint cards + helpers |
+| `0da7eb7` | MC Redesign v3: Notion-style task rows + progress bars + urgency chips + rewards emphasis |
+| `bae4b42` | P0 Fix Uncaught SyntaxError on Projects/Tasks (`_mcJumpAttr` HTML-safe helper) |
+| `69f7920` | Bundle B pass 1: Priority levels + ⌘K command palette |
+
+### Data model additions
+
+- **Task.priority** — `urgent` / `high` / `normal` / `low`. Sorted highest first within each FLP bucket.
+- **Cohort seed** — 10 cohort groups seeded via SQL into `pflx_mc_cohortgroups` (DD Core 1/2/3/5, DD Studio 2/3/7, Falcon Studios, Falcon Studios (MS Division), Global Digital Intern). `pflx_mc_cohortgroups_seeded` flag added to `mcLoadData` to prevent re-seeding from the legacy `COHORTS` constant on subsequent boots.
+- **Task.roundId** still the legacy link Task → Checkpoint. Task ↔ Project link is via `Project.taskIds`.
+
+### New behaviours a downstream agent must know
+
+1. **Stomp Guards 1–5** protect `pflx_mc_*` cloud rows from being wiped by stale writes:
+   - #1 no cloud push before boot pull completes
+   - #2 empty local collection never overwrites populated cloud row
+   - #3 timestamped `_mcLocalLastWrite` blocks stale cloud echoes within the 4s echo window
+   - #4 rejects `pflx_cloud_data` messages from X-Coin for MC-owned keys (X-Coin mockProjects et al. would otherwise clobber real data)
+   - #5 `mcRenderProjects` (and now all card renders) trust in-memory `mcProjects` after the boot load; do NOT reload from localStorage on every render — quota failures would otherwise wipe fresh writes
+2. **`_mcSetItemSafe(key, coll)`** wraps every MC `localStorage.setItem`. On QuotaExceededError it strips large `bannerImage` / `image` data-URLs from the local cache and retries; cloud row still gets the full payload.
+3. **`mcUploadProjectBanner`** now downscales uploaded images to 1600×900 max, JPEG @ 82%. A 3MB PNG becomes ~150–300KB. Fallback to raw file if canvas resize errors.
+4. **Hierarchy helpers** — `mcFindTaskParentProject`, `mcChildTasksForProject`, `mcChildProjectsForCheckpoint`, `mcChildTasksForCheckpoint`, and `mcJumpToItem(kind, id)` router that scrolls to a `data-mc-<kind>-id="…"` anchor and pulses a gold highlight ring.
+5. **`_mcJumpAttr(kind, id)`** — HTML-safe onclick builder. NEVER splice `JSON.stringify(id)` inside `onclick="…"` — id values containing quotes truncate the attribute and produce `Uncaught SyntaxError: Unexpected end of input (line 1)`. Always use `_mcJumpAttr`.
+6. **`MC_PRIORITY_META`** + `_mcPriorityFlag(level)` + `_mcPriorityLabelPill(level)` + `_mcPriorityWeight(level)` for the Urgent/High/Normal/Low system.
+7. **Command palette** — activated by ⌘K/Ctrl+K anywhere. Fuzzy-search across Navigate, Create, and item jumps (Checkpoints/Projects/Tasks/Players). Exposed globally as `window.mcOpenCommandPalette`.
+8. **`_mcUrgencyForDueDate(dateStr)`** returns `{color, rgb, label, days}` on the green/yellow/orange/red scale. Reused across Task, Project, Checkpoint cards.
+9. **`_mcProjectProgress(project)` + `_mcCheckpointProgress(cp)`** compute % approved. Checkpoint aggregates across child Projects + direct Tasks (de-duped).
+10. **`_mcProgressBarHtml(pct, opts)`** shared bar renderer.
+11. **`window._mcInitialLoadDone`** — the boot flag guarding `mcLoadData()` from repeat calls per session.
+
+### UI transformation summary
+
+- **Task cards → rows**: Notion-style horizontal list. Left = checkbox (green ✓ if approved, orange ◐ if submitted+clickable to approve, empty if open) + priority dot + category emoji. Middle = title (strike-through when approved) + one-line description + lineage chips. Right = urgency chip + XC pill (gold glow) + badge count + Edit/Delete. FLP phase pill, checklist, submission panel still render below when relevant.
+- **Project cards**: banner-on-top 16:9, edge-to-edge under rounded corners. Lineage chip → parent Checkpoint. "📊 PROGRESS" hero panel with bar + tasks approved + XC earned. "📋 TASKS IN THIS PROJECT" scannable list.
+- **Checkpoint cards**: hero tier. 16:9 banner with `◆ CHECKPOINT` corner chip + status pill + 28px Orbitron title overlay. "◆ CHECKPOINT PROGRESS" aggregate bar. "◆ MISSION CONTENTS" tree (Projects with nested Tasks + Standalone Tasks). Wider grid (`minmax(560px, 1fr)`) vs Projects (`minmax(380px, 1fr)`).
+
+## Roadmap — deferred to next commits
+
+Ennis authorized building the full Notion/Monday/Linear-inspired vision (msg 2026-07-01). Bundle B pass 1 shipped Priority + Command palette. Remaining in Bundle B:
+
+- **Season context bar** at top of MC — active Season name, cohort scope, active-checkpoint count
+- **My Work widget** on Home Base — for hosts: awaiting approval + overdue; for players: assigned to me sorted by urgency
+- **Player Task submission form** — modal with title + description + link + file upload → sends to host approval queue
+- **Structural enforcement** — block save of empty Project (needs ≥1 Task) / empty Checkpoint (needs ≥1 Task or Project)
+
+Bundle C:
+- **Player Portal parity** — port the row + progress + urgency treatment to `/player/checkpoints`, `/player/projects`, `/player/tasks`
+- **Jobs = inverse of Tasks** — Job posted → applied → hired → auto-becomes a Task on the assignee, linked to source Project if any
+- **Reward flow audit** — verify XC + badge dispatch at every approval tier (Task, Project, Checkpoint)
+
+Bundle D and beyond:
+- **Multiple views toggle** (List/Board/Calendar/Timeline/Table) on Tasks + Projects + Checkpoints
+- **Template gallery** — save Checkpoint/Project as reusable template
+- **Automations engine** — rule builder ("when task approved AND belongs to Checkpoint X, award badge Y")
+- **Dependencies / blocking** between Tasks
+- **Recurring Tasks + Sprint framework**
+- **X-Bot AI priority suggestion** — analyze description + deadline, propose priority
+- **Streak system** — bonus XC for N approvals in a row
+- **Player-proposed Tasks** — self-directed learning path with host approval
+- **AI Task breakdown** — X-Bot decomposes a goal into sub-tasks
+- **Portfolio view per player** — approved Task/Project/Checkpoint rollup as showcase
+
+## How to resume
+
+1. Latest commit is `69f7920` on `pflx-platform` (live at `prototypeflx.com` after Vercel READY).
+2. Priority + ⌘K are live but not yet backfilled onto legacy Tasks — existing tasks default to `normal`.
+3. Cohort groups row `pflx_mc_cohortgroups` in Supabase (project `hyxiagexyptzvetqjmnj`) has the 10 seeded groups — do NOT wipe.
+4. `pflx_mc_projects` cloud row was cleared to `{items:[]}` at 2026-07-01 04:59 UTC to remove legacy stubs.
+5. Deploys use `osascript` via the Control-your-Mac MCP to run `git push origin main` from the sandbox — Ennis approved this pattern so I no longer need to hand off push commands.
+6. **Push rule:** if a `.git/HEAD.lock` sticks around from a prior interrupted push, delete it before the next attempt.
+
+Related memory: [[pflx-repo-location]] [[pflx-subapp-gits-and-clones]] [[pflx-data-sync-architecture]] [[pflx-open-space-ui]].
