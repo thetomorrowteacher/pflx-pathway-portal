@@ -1669,7 +1669,69 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle D pass 2: ✅ Templates gallery + host reject flow + streak reset (`2de404d`)
 - Bundle D pass 3: ✅ Calendar view + Table view + streak badge on Player Home (`c1b4e11`)
 - **Bundle D complete.**
-- Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+- Bundle E pass 1: ✅ X-Bot AI priority suggestion + task breakdown (`897153c`)
+- Bundle E pass 2: ✅ Dependencies + Recurring Tasks (`211d958`)
+- Bundle E pass 3+: ⏳ Automations engine, Sprints framework, Portfolio view
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle E pass 1 + 2
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `897153c` | Bundle E pass 1: X-Bot AI priority suggestion + task breakdown |
+| `211d958` | Bundle E pass 2: Dependencies + Recurring Tasks |
+
+## Pass 1 — X-Bot AI assist (heuristic, no network)
+
+### Priority suggestion
+- **`_mcSuggestPriority({ description, dueDate, xcReward })`** scores against three signals:
+  1. Description keywords (urgent/asap/blocking/deadline +3; important/key/launch +2; optional/stretch/bonus -2)
+  2. Due-date proximity (overdue +4, ≤2d +3, ≤7d +1, >30d -1)
+  3. XC pool (≥500 +2, ≥200 +1)
+- Score ≥5 → `urgent`, ≥3 → `high`, ≤-2 → `low`, else `normal`.
+- Returns `{ priority, reasons, score, summary }` for the toast.
+- Task form: **🤖 SUGGEST** pill button next to the Priority label. Fills the dropdown + toasts the reasoning (up to 3 top reasons).
+
+### Task breakdown
+- **`_mcSuggestBreakdown(description)`** tries four strategies in order:
+  1. Numbered list (`1. do this 2. do that`) — cleanest signal
+  2. Bullet lines (`- * •`)
+  3. Connector-based (`then / and then / next / after that / finally`) when 3+ steps
+  4. Sentence boundaries (2–8 sentences)
+- Falls through to single-step fallback.
+- Task form: dedicated purple **🤖 BREAK DOWN** panel below Priority. Populates `mcTaskChecklist` so the existing checklist pipeline is untouched.
+
+## Pass 2 — Structural task features
+
+### Dependencies (`task.dependsOn`)
+- Array of task IDs. This task can't be submitted / approved until all listed tasks are approved.
+- **`_mcTaskDependenciesMet(task)`** and **`_mcTaskUnmetDependencies(task)`** helpers.
+- Task form: 🔒 **Depends On** multi-select panel listing every other task. Approved deps show a green ✓ marker.
+
+### Recurring (`task.recurring = { frequency }`)
+- Frequencies: `daily`, `weekly`, `monthly`.
+- On `mcApproveTask` (after streak-bonus), **`_mcSpawnRecurringNext(task)`** clones the just-approved task, resets per-instance state (`submission`, `submissions`, `approvedAt`, `startedAt`, `status:'open'`, `completed:false`), and pushes the deadline forward by the frequency.
+- Preserves the recurring config so the chain continues forever until the host clears the dropdown.
+- Stamps `spawnedFrom` for analytics.
+- Task form: 🔁 **Recurring** dropdown (One-time / Daily / Weekly / Monthly).
+
+## API surface added
+
+- `window._mcSuggestPriority(opts)`
+- `window._mcSuggestBreakdown(description)`
+- `window.mcSuggestPriorityFromForm()` and `window.mcBreakdownTaskFromForm()`
+- `window._mcTaskDependenciesMet(task)` and `window._mcTaskUnmetDependencies(task)`
+- `window._mcSpawnRecurringNext(task)` — invoked automatically from `mcApproveTask`
+
+## Deferred (Bundle E pass 3+)
+
+- **Automations engine** — rule builder ("when X AND Y → do Z"). Big scope; deserves its own commit.
+- **Sprints framework** — new `mcSprints` collection + view + form.
+- **Portfolio view per player** — approved Task/Project/Checkpoint rollup as a showcase page.
+- Task-row rendering: show ⛔ locked chip when unmet dependencies exist; block `pflxSubmitTaskPhaseUI` / `mcApproveTask` when deps unmet.
 
 ---
 
