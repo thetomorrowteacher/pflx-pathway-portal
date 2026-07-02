@@ -1661,6 +1661,42 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle B: ✅ complete
 - Bundle C pass 1: ✅ Jobs=inverse core (`fd2900d`)
 - Bundle C pass 2: ✅ Reward flow audit (`5c32074`)
-- Bundle C pass 3: ⏳ Player Portal parity + per-applicant Hire UI
+- Bundle C pass 3a: ✅ per-applicant Hire button now creates Task (`d7e6c7e`)
+- Bundle C pass 3b: ✅ Player Portal MyTasks parity (`845eeb1`)
+- Bundle C pass 3c: ⏳ Remaining Player Portal parity (Checkpoints, Project detail, Job apply, Home strip)
 - Bundle D: ⏳ Multiple views + Templates + Streaks
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle C pass 3a + 3b
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `d7e6c7e` | Bundle C pass 3a: per-applicant Hire button now creates Task + cascades |
+| `845eeb1` | Bundle C pass 3b: Player Portal MyTasks parity |
+
+## Pass 3a: `mcHireApplicant` now triggers the auto-Task flow
+
+Before: `mcHireApplicant` only pushed the applicant into `job.hired[]` and saved. The auto-Task creation lived inside `mcSaveJobForm`, so clicking the inline HIRE button on an applicant produced no Task.
+
+After: Refactored the task-creation logic into a shared helper `_mcSyncJobHiresToTasks(job)` called from both `mcSaveJobForm` and `mcHireApplicant`. Identical output either way. Click Hire → applicant added → Task created for the assignee → Task nested into `job.projectId`'s Project taskIds → toast **"Hired &lt;name&gt; — Task created"**.
+
+## Pass 3b: Player MyTasks list renders Notion-style rows
+
+Ported the MC row treatment to `ppRenderMyTasks`:
+- Empty-outline status square + priority dot (same visual language as MC checkbox).
+- Sort by priority DESC then urgency ASC — matches My Work widget.
+- Urgency chip using `_mcUrgencyForDueDate` (green > 7d, yellow 3–7d, orange 1–2d, red overdue/today).
+- Gold-glow XC pill.
+- ◐ SUBMITTED chip when the task is awaiting host review.
+- Checkpoint indicator upgraded to ◆ to match the hierarchy tag language.
+
+## Deferred (Bundle C pass 3c)
+
+- `ppRenderCheckpoints` and `ppRenderCheckpointDetail` — port hero banner + aggregate progress bar + MISSION CONTENTS treatment.
+- `ppRenderProjectDetail` — banner-on-top + child tasks list + progress panel.
+- `ppRenderJobBoard` — player-side Apply UI.
+- `ppRenderHome` — mission-strip refresh with priority ordering.
