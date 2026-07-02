@@ -1664,9 +1664,70 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle C pass 3a: ✅ per-applicant Hire button now creates Task (`d7e6c7e`)
 - Bundle C pass 3b: ✅ Player Portal MyTasks parity (`845eeb1`)
 - Bundle C pass 3c: ✅ Player Checkpoint Detail hero + progress (`e692504`)
-- Bundle C pass 3d: ⏳ Remaining Player Portal parity (ProjectDetail row + JobBoard apply + Home strip)
-- Bundle D: ⏳ Multiple views + Templates + Streaks
+- Bundle C pass 3d: ✅ Player ProjectDetail + JobBoard apply (`b6e73de`)
+- Bundle D pass 1: ✅ Board view toggle for Tasks + streak system (`a415062`)
+- Bundle D pass 2+: ⏳ Templates gallery, Calendar/Table views, Home strip
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle C pass 3d + Bundle D pass 1
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `b6e73de` | Bundle C pass 3d: Player ProjectDetail + JobBoard apply parity |
+| `a415062` | Bundle D pass 1: Board view toggle for Tasks + streak system |
+
+## Bundle C pass 3d — Player-side polish
+
+### Player Project Detail
+- Lineage chip up top → parent Checkpoint (clickable).
+- PROGRESS hero panel: fat bar, "✓ X of Y tasks approved", XC earned/total pool.
+- Task rows are Notion-style: filled green ✓ (approved with strike-through), orange ◐ (submitted), empty (open). Priority dot, urgency chip, gold XC pill. Sort by priority DESC then urgency ASC.
+
+### Player Job Board
+- **`ppApplyForJob` now actually applies.** Pushes `{playerId, playerName, appliedAt}` into `job.applicants[]` and persists. Idempotent — repeat clicks toast "Already applied".
+- **Array-aware hired detection.** Was `job.hired || false` (boolean fallback). Now checks `job.hired.indexOf(activeSession.id)`.
+- **Three states surface distinctly**:
+  - **Hired** — `✓ HIRED — ASSIGNED AS TASK` chip + `→ Open My Task` button that jumps to the auto-created Task Detail.
+  - **Applied** — `◐ APPLIED — AWAITING HOST REVIEW` chip + soft italic "Your application is with the host".
+  - **Slots filled (not picked)** — italic "All slots have been filled".
+  - **Open** — enlarged `📝 Apply for This Job` button.
+- Slot fill count + applicant count pills for context.
+- Gold XC pill + urgency chip stacked in the right rail.
+
+## Bundle D pass 1 — Views + Streaks
+
+### View mode toggle (Tasks)
+- `☰ LIST` (default) vs `▤ BOARD` (Kanban) buttons above the Task search bar.
+- Selection persists in `localStorage['pflx_mc_tasks_view']`.
+- `mcRenderTasks` branches to `_mcRenderTasksBoard` in board mode. Three columns: Open / Submitted / Approved.
+- Board cards are compact — priority dot + title + urgency chip + XC pill. Click to jump via `mcJumpToItem`.
+- Same sort rule as List and My Work (priority DESC → urgency ASC).
+
+### Streak system
+- `player.streak` counter + `player.longestStreak` tracker.
+- `_mcApplyStreakBonus(submitterId, task)` runs after every `mcApproveTask` reward chain. Every **5 consecutive approvals** grants a **20% bonus XC** (min 10) via `PflxDataBus.award` reason `streak:N`.
+- Toast: **"🔥 N-approval streak! +M bonus XC"**.
+- `_mcResetStreak(submitterId)` clears streak (call from rejection path — wire-up follows in next commit).
+
+## API surface added
+
+- `window.mcSetTasksView(mode)` — `'list'` or `'board'`.
+- `window._mcApplyStreakBonus(playerId, task)` — invoke from any approval path.
+- `window._mcResetStreak(playerId)` — invoke on rejection.
+- `MC_STREAK_TIER = 5` and `MC_STREAK_BONUS_PCT = 0.20` — tunable constants.
+- New data-model fields on `mcPlayer`: `streak`, `longestStreak`.
+
+## Deferred
+
+- Templates gallery (save Checkpoint / Project as template).
+- Calendar + Table view modes (button + renderer).
+- Home strip refresh with priority ordering.
+- Streak badges surface in player profile / portfolio.
+- Rejection flow wiring for `_mcResetStreak`.
 
 ---
 
