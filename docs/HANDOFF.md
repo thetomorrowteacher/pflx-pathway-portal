@@ -1671,7 +1671,45 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - **Bundle D complete.**
 - Bundle E pass 1: ✅ X-Bot AI priority suggestion + task breakdown (`897153c`)
 - Bundle E pass 2: ✅ Dependencies + Recurring Tasks (`211d958`)
-- Bundle E pass 3+: ⏳ Automations engine, Sprints framework, Portfolio view
+- Bundle E pass 3: ✅ Dep guard-rails + row chips + Portfolio view (`0fb7a63`)
+- Bundle E pass 4+: ⏳ Automations engine, Sprints framework
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle E pass 3
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `0fb7a63` | Bundle E pass 3: Dep guard-rails + row chips + Portfolio view |
+
+## Dependency guard-rails
+
+- `mcApproveTask` now calls `_mcTaskUnmetDependencies(task)` before proceeding. Unmet blockers → error sfx + alert listing the blocking task titles.
+- Task List row gets a **⛔ N blocker(s)** chip inline (right after the priority dot). Tooltip enumerates the blockers by title.
+- **🔁 Recurring** chip renders alongside when `task.recurring.frequency` is set, so the host sees at a glance the task will respawn.
+
+## Portfolio view (Player)
+
+- New `ppRenderPortfolio(el)` render + `playerPortalView === 'portfolio'` route.
+- **Hero header** — 80px avatar + PORTFOLIO kicker + big Orbitron name + rank + XC earned.
+- **Big stats row** — Approved Tasks / Completed Projects / Badges Earned / XC From Approvals / Best Streak.
+- **COMPLETED PROJECTS** section — purple cards, clickable → ProjectDetail. ✓ COMPLETED chip.
+- **APPROVED TASKS** section — green-accented rows sorted by `approvedAt` DESC. "Approved [date]" line + gold XC pill. Caps at 40 with overflow message.
+- Empty-state copy for new players: *"No approved work yet — as tasks get approved they will build up here as your résumé."*
+- ⌘K palette gains **"My Portfolio"** NAVIGATE action.
+
+## API surface added
+
+- `window.ppRenderPortfolio(el)` — player-side render.
+- `_ppPortfolioStat(label, value, color, icon)` — small stat card renderer.
+- `hexToRgb(hex)` — utility (kept local to portfolio scope).
+
+## Deferred (Bundle E pass 4+)
+
+- **Automations engine** — rule builder ("when task approved AND belongs to Checkpoint X → award badge Y"). Requires a small DSL model + rule editor UI + evaluator that fires on `pflx_task_approved` / `pflx_task_rejected` events. Biggest single remaining feature; deserves its own commit.
+- **Sprints framework** — new `mcSprints` collection + list view + form. Simple lifecycle (upcoming → active → completed) with a start/end date range and a taskIds bundle.
 
 ---
 
