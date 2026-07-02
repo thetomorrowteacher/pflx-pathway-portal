@@ -1616,3 +1616,51 @@ When a host puts a player in a Job's `hired[]`, a Task is auto-created for that 
 - **Per-applicant Hire UI** — Apply button on player Job Board card, per-applicant Hire button on host Job card.
 - **Player Portal parity** — port Notion-row / progress-bar / urgency / lineage treatment to `/player/checkpoints`, `/player/projects`, `/player/tasks`.
 - **Reward flow audit** — verify Task, Project, and Checkpoint approval each fire `PflxDataBus.award` (`XC` + `badges`) correctly at every tier.
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle C pass 2: Reward flow audit
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `5c32074` | Bundle C pass 2: Reward flow audit — submitter resolution + Checkpoint completion chain |
+
+## What's fixed
+
+### Task approval — submitter resolution
+`mcApproveTask` previously only read `task.submission.submittedBy` (legacy singular). But the new player submission modal writes to `task.submissions[]` (plural array with `playerId`). Result: **fresh player submissions were producing zero reward on approval.**
+
+New three-shape fallback chain in `mcApproveTask`:
+1. Legacy: `task.submission.submittedBy`
+2. New player modal: `task.submissions[last].playerId || .submittedBy`
+3. Job-hired auto-task: `task.assignedTo[0] || task.playerId`
+
+First non-empty wins.
+
+### Checkpoint completion reward chain (new)
+Symmetric to the Project-completion chain added on `47fc06f`. When `mcSaveCPForm` transitions `cp.status` to `'completed'`, every player who submitted a task inside the Checkpoint's scope (direct `cp.taskIds` + every `taskId` nested in `cp.projectIds`) gets:
+- `cp.xcReward` XC via `PflxDataBus.award(pid, { xc, source:'mc', reason:'checkpoint:<id>' })`
+- Each `cp.rewardBadges` entry as a badge grant
+
+Idempotency: `obj._cpRewardedAt` set once so a re-save never double-pays.
+
+Toast: **"Checkpoint completed — rewards dispatched to N players"**.
+
+## Reward tier summary — all three tiers now fire
+
+| Tier | Trigger | Recipients | Route |
+|---|---|---|---|
+| Task | `mcApproveTask` | Submitter (resolved via 3-shape chain) | `PflxDataBus.award(id, {xc,badge})` reason `task:<id>` |
+| Project | `mcSaveProjectForm` when `status → completed` | Team + every child-task submitter | reason `project:<id>` |
+| Checkpoint | `mcSaveCPForm` when `status → completed` | Every child-task submitter (direct + via projects) | reason `checkpoint:<id>` |
+
+## Roadmap status
+
+- Bundle B: ✅ complete
+- Bundle C pass 1: ✅ Jobs=inverse core (`fd2900d`)
+- Bundle C pass 2: ✅ Reward flow audit (`5c32074`)
+- Bundle C pass 3: ⏳ Player Portal parity + per-applicant Hire UI
+- Bundle D: ⏳ Multiple views + Templates + Streaks
+- Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
