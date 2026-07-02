@@ -1786,6 +1786,20 @@ Read this HANDOFF top-to-bottom. Every commit SHA is captured, every API surface
 
 ---
 
+## New persistent rule (Ennis, 2026-07-01 late): iCloud backup mirror
+
+**`~/Desktop/PFLX Apps` is a passive iCloud backup mirror of the working copy `~/My Apps/PFLX Apps`.** After any PFLX change bundle:
+
+1. Commit + push to GitHub (as always).
+2. Run `~/My Apps/PFLX Apps/REFRESH_ICLOUD_BACKUP.command` (double-click in Finder, or `bash ~/My\ Apps/PFLX\ Apps/REFRESH_ICLOUD_BACKUP.command` from a shell). It rsyncs the working copy → Desktop, `--delete` to keep them exact, excluding `node_modules`, `.next`, `.vercel`, `.turbo`, `out`, `build`, `dist`, `.DS_Store`.
+3. **Never run git commands from the iCloud copy** — iCloud fileproviderd breaks git internals (see memory `pflx-repo-location`). The backup exists purely as a snapshot.
+
+**For Claude / Fable sessions:** After making any change to PFLX (platform, sub-apps, Core Pathways, HANDOFF, etc.), invoke `REFRESH_ICLOUD_BACKUP.command` via osascript so the iCloud mirror stays current. Full details in `~/My Apps/PFLX Apps/BACKUP_RULE.md`.
+
+Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/My Apps/PFLX Apps/` and get rsynced into the backup so they're discoverable from either location.
+
+---
+
 # Session Update — July 1 2026 (Sonnet, evening) — Bundle E pass 3
 
 ## New commits (`pflx-platform`)
