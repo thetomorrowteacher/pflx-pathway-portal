@@ -1663,9 +1663,41 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle C pass 2: ✅ Reward flow audit (`5c32074`)
 - Bundle C pass 3a: ✅ per-applicant Hire button now creates Task (`d7e6c7e`)
 - Bundle C pass 3b: ✅ Player Portal MyTasks parity (`845eeb1`)
-- Bundle C pass 3c: ⏳ Remaining Player Portal parity (Checkpoints, Project detail, Job apply, Home strip)
+- Bundle C pass 3c: ✅ Player Checkpoint Detail hero + progress (`e692504`)
+- Bundle C pass 3d: ⏳ Remaining Player Portal parity (ProjectDetail row + JobBoard apply + Home strip)
 - Bundle D: ⏳ Multiple views + Templates + Streaks
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle C pass 3c
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `e692504` | Bundle C pass 3c: Player Portal Checkpoint Detail — hero banner + progress panel |
+
+## What's new in production
+
+The Player-side Checkpoint Detail view (the screen that used to show the tall banner and a mostly-empty page under it) now gets the same hero treatment as MC.
+
+- **16:9 banner** edge-to-edge under rounded corners. Was a fixed 200px block.
+- **◆ CHECKPOINT hierarchy tag** in top-left with backdrop-blur.
+- **● Active Now pill** in top-right when live.
+- **28px Orbitron title** overlaying the banner bottom third.
+- No-banner fallback is also 16:9 with a gradient block + ◆ CHECKPOINT tag.
+- **◆ CHECKPOINT PROGRESS hero panel** — computed by `_mcCheckpointProgress` across every player task in scope (direct + via child projects, de-duped). Big 18px percent readout, "approved / total tasks" text, urgency chip against `endDate`.
+- **Meta row** (start / deadline / reward) preserved below the hero. Deadline text turns red when overdue.
+
+Defensive fallback: if `_mcCheckpointProgress` or `_mcProgressBarHtml` haven't loaded yet (Player Portal fires ahead of MC boot), falls back to legacy `cp.progress` and `ppProgressBar`. No hard crash.
+
+## Deferred (Bundle C pass 3d)
+
+- `ppRenderProjectDetail` — banner-on-top + child tasks list + progress panel (parity with MC Project card).
+- `ppRenderJobBoard` — Apply button surface + application state.
+- `ppRenderHome` — mission-strip refresh with priority ordering.
+- Task rows inside Checkpoint Detail — currently 🔴 required / ⬜ optional icons; port to Notion-row treatment.
 
 ---
 
