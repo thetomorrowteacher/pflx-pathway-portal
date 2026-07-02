@@ -1667,7 +1667,57 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle C pass 3d: ✅ Player ProjectDetail + JobBoard apply (`b6e73de`)
 - Bundle D pass 1: ✅ Board view toggle for Tasks + streak system (`a415062`)
 - Bundle D pass 2: ✅ Templates gallery + host reject flow + streak reset (`2de404d`)
-- Bundle D pass 3: ⏳ Calendar view, Table view, streak badge display
+- Bundle D pass 3: ✅ Calendar view + Table view + streak badge on Player Home (`c1b4e11`)
+- **Bundle D complete.**
+- Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle D pass 3 — **Bundle D complete**
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `c1b4e11` | Bundle D pass 3: Calendar view + Table view + streak badge in player Home |
+
+## Calendar view (Tasks)
+
+- Third view mode alongside List / Board. Month grid with **← PREV / NEXT →** nav.
+- Tasks land on their `dueDate` cell as compact chips colored by priority (uses `MC_PRIORITY_META` rgb). Approved chips get strike-through.
+- **Today cell** highlighted with a 2px cyan border + cyan-tinted background.
+- Max 3 chips per day, plus a "+ N more" overflow.
+- Header: month name + year + scheduled task count.
+- `_mcCalMoveMonth(delta)` handles cross-year navigation.
+
+## Table view (Tasks)
+
+- Fourth view mode. Dense sortable columns: **Priority · Task · Status · Due · XC · Edit**.
+- Click any column header to sort. Sticky ↑/↓ arrow on the active column. `_mcTableSortBy(field)` toggles asc/desc.
+- Due column color-codes by urgency (green > 7d, yellow 3–7d, orange 1–2d, red overdue).
+- Approved rows: strike-through + dimmed.
+- Cyan hover tint on rows so the click target is obvious.
+
+## Streak badge on Player Home
+
+- Reads from canonical `mcPlayers[me].streak` + `longestStreak`.
+- 🔥 badge next to the player greeting with current streak in Orbitron gold.
+- Subtitle: "STREAK" or "STREAK · BEST N" (when longest > current).
+- Only appears once there's at least one approval on record.
+- Tooltip explains "every 5 grants bonus XC" so the mechanic is discoverable.
+
+## API surface added
+
+- `window._mcCalMoveMonth(delta)` — Calendar month step.
+- `window._mcTableSortBy(field)` — Table sort toggle.
+- Fields sortable in Table: `priority` · `title` · `status` · `due` · `xc`.
+
+## Roadmap status
+
+- Bundle A: ✅ complete
+- Bundle B: ✅ complete
+- Bundle C: ✅ complete
+- **Bundle D: ✅ complete**
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
 
 ---
