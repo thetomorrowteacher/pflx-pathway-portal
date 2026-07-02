@@ -1533,3 +1533,48 @@ Hierarchy contract is now enforced at save time.
 ## How to resume
 
 Latest commit `23d0794` on `pflx-platform` live on `prototypeflx.com`. Season bar and My Work render on every navigation to any MC view. `mcSeasons` in Supabase governs the Season name shown — hosts create/toggle-active a Season from the existing Seasons section (surfaced via `mcRenderSeasons`).
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle B pass 3
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `63acc5a` | Bundle B pass 3: Player Task submission — title + description + link + file |
+
+## What's new in production
+
+### Player Task submission modal — enhanced
+The existing `mc-player-submit-modal` was upgraded to match the "title / description / link / file upload" spec Ennis called out on July 1 morning.
+
+- **Submission Title** (new required input) — surfaces in the host approval queue so a submission has a meaningful label, not just the task title.
+- **Description** (renamed from Notes) — fuller placeholder "Describe what you did, what you learned, what to look for". Persists to both `submission.notes` (backwards-compatible) and `submission.description` (new canonical).
+- **Link** — unchanged; still gated by `task.allowLinkSubmit`.
+- **File Upload** — routed through `mcPlayerSubmitFilePick(input)`. Images downscaled to 1600×900 max JPEG @ 82% via the existing `_mcDownscaleImageDataUrl` helper. Non-image files size-capped at 4MB. The file-name chip shows the resized KB so the player sees the optimization.
+- **`submission.fileType`** persisted alongside `fileData` so host preview can render images inline.
+- Field order reshuffled: Title → Description → Checklist → Link → File. Matches Notion / ClickUp conventions where the write-up leads.
+
+### API surface added
+- `window.mcPlayerSubmitFilePick(input)` — file input change handler with image downscale.
+- Globals: `mcSubmitFileName`, `mcSubmitFileType` alongside pre-existing `mcSubmitFileData`.
+
+### Data model additions on `submission`
+- `submission.title` (new, required at save time)
+- `submission.description` (new, mirrors notes)
+- `submission.fileType`
+
+## Deferred
+
+- **Host approval-queue render updates** — currently displays the task title; a one-line change to show `submission.title` when present. Filed for Bundle C alongside Player Portal parity so both host + player views ship together.
+
+## Roadmap status
+
+- Bundle B pass 1: ✅ Priority + ⌘K palette (`69f7920`)
+- Bundle B pass 2: ✅ Season bar + My Work + enforcement (`23d0794`)
+- Bundle B pass 3: ✅ Player Task submission (`63acc5a`)
+- **Bundle B complete.**
+- Bundle C: ⏳ Player Portal parity + Jobs=inverse + reward audit
+- Bundle D: ⏳ Multiple views + Templates + Streaks
+- Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
