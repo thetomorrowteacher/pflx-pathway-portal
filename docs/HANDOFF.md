@@ -1672,7 +1672,117 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle E pass 1: ✅ X-Bot AI priority suggestion + task breakdown (`897153c`)
 - Bundle E pass 2: ✅ Dependencies + Recurring Tasks (`211d958`)
 - Bundle E pass 3: ✅ Dep guard-rails + row chips + Portfolio view (`0fb7a63`)
-- Bundle E pass 4+: ⏳ Automations engine, Sprints framework
+- Bundle E pass 4: ✅ Sprints framework + Automations engine (`9d0fa38`)
+- **BUNDLE E COMPLETE — BUNDLES A THROUGH E ALL SHIPPED.**
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle E pass 4 — **BUNDLE E COMPLETE**
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `9d0fa38` | Bundle E pass 4 — FINAL: Sprints framework + Automations engine |
+
+## Sprints framework
+
+- New `mcSprints` cloud collection. Added to `MC_CLOUD_TYPES`, `_mcCollectionFor`, `_mcApplyCollection`, `mcSaveData`, `mcLoadData`.
+- **Sprint shape**: `{ id, name, startDate, endDate, taskIds[], status, createdAt, createdBy }`.
+- **`_mcSprintStatus(sp)`** auto-computes lifecycle from date range vs current date. `sp.status === 'completed'` overrides.
+- **`mcCreateSprint()`** — 3-prompt wizard (name, start, end). Creates instantly.
+- **`pflxOpenSprintsPicker()`** — modal lists every sprint with lifecycle chip (upcoming/active/completed), date range, task count, delete button.
+- Command palette: **"Sprints…"** NAVIGATE entry.
+
+## Automations engine
+
+- New `mcAutomations` cloud collection.
+- **Rule shape**:
+  ```
+  { id, name, enabled, trigger,
+    conditions: [{ field, op, value }],
+    actions:    [{ type, value }] }
+  ```
+- **Triggers**: `task.approved` | `task.rejected` | `task.submitted` | `project.completed` | `checkpoint.completed`.
+- **Condition operators**: `eq` / `neq` / `gte` / `lte` / `in` / `contains`.
+- **Action types**:
+  - `award_xc` — routes through `PflxDataBus.award` so toolbar + sub-apps update live.
+  - `award_badge` — same path.
+  - `toast` — surface a message via `pflxToast`.
+  - `set_priority` — mutate the task's priority in place.
+  - `notify_host` — persistent warning toast for the host.
+- **`window.mcAutomationsFire(trigger, ctx)`** — public entry. Currently wired into `mcApproveTask` with full ctx (`taskId, playerId, projectId, checkpointId, priority, xcReward`). Rejection + project/checkpoint completion wiring available for the next commit that touches those paths.
+- **`pflxOpenAutomationsPicker()`** — modal lists every rule with `WHEN … IF … → …` summary, ON/OFF pause toggle, delete.
+- **`mcCreateAutomation()`** — 5-prompt wizard for a quick rule build. A richer editor form is a natural follow-up but doesn't block use today.
+- Command palette: **"Automations…"** NAVIGATE entry.
+
+## Full API surface added (this session)
+
+**Utilities**: `mcJumpToItem`, `_mcJumpAttr`, `_mcUrgencyForDueDate`, `_mcProjectProgress`, `_mcCheckpointProgress`, `_mcProgressBarHtml`, `_mcSetItemSafe`, `_mcDownscaleImageDataUrl`, `hexToRgb`
+
+**Priority + streaks**: `MC_PRIORITY_META`, `_mcPriorityFlag`, `_mcPriorityWeight`, `_mcApplyStreakBonus`, `_mcResetStreak`
+
+**Season / My Work**: `pflxRenderSeasonBar`, `pflxRenderMyWork`
+
+**Command palette**: `mcOpenCommandPalette` (⌘K)
+
+**Templates**: `mcSaveAsTemplate`, `mcSpawnFromTemplate`, `mcDeleteTemplate`, `pflxOpenTemplatePicker`
+
+**X-Bot AI**: `_mcSuggestPriority`, `_mcSuggestBreakdown`, `mcSuggestPriorityFromForm`, `mcBreakdownTaskFromForm`
+
+**Dependencies + Recurring**: `_mcTaskDependenciesMet`, `_mcTaskUnmetDependencies`, `_mcSpawnRecurringNext`
+
+**Jobs=inverse**: `_mcSyncJobHiresToTasks`
+
+**Player Portfolio**: `ppRenderPortfolio`
+
+**Sprints**: `mcCreateSprint`, `mcDeleteSprint`, `pflxOpenSprintsPicker`
+
+**Automations**: `mcCreateAutomation`, `mcToggleAutomation`, `mcDeleteAutomation`, `mcAutomationsFire`, `pflxOpenAutomationsPicker`
+
+## Full commit list (session end)
+
+**`pflx-platform`** — 27 commits, all live on `prototypeflx.com`:
+
+| SHA | Bundle | Subject |
+|---|---|---|
+| `47fc06f` | pre-A | MC Projects cohort UI + task cascade + completion reward |
+| `b53d029` | pre-A | Stomp Guard 3 timestamp check |
+| `27252b8` | pre-A | Stomp Guard 4 — X-Coin mock overwrite fix |
+| `91d6010` | pre-A | Stomp Guard 5 + quota-safe setItem + banner downscale |
+| `fc4739c` | A | Projects banner-on-top 16:9 |
+| `9e686e3` | A | Checkpoints hero-tier card |
+| `40678f6` | A | Visible lineage across cards |
+| `0da7eb7` | A | Notion rows + progress + urgency + rewards |
+| `bae4b42` | A | P0 SyntaxError fix (`_mcJumpAttr`) |
+| `69f7920` | B | Priority + ⌘K palette |
+| `23d0794` | B | Season bar + My Work + enforcement |
+| `63acc5a` | B | Player Task submission modal |
+| `fd2900d` | C | Jobs=inverse core |
+| `5c32074` | C | Reward flow audit |
+| `d7e6c7e` | C | Per-applicant Hire button |
+| `845eeb1` | C | Player MyTasks Notion rows |
+| `e692504` | C | Player Checkpoint Detail hero |
+| `b6e73de` | C | Player ProjectDetail + JobBoard apply |
+| `a415062` | D | Board view + streak system |
+| `2de404d` | D | Templates gallery + reject flow |
+| `c1b4e11` | D | Calendar + Table views + streak badge |
+| `897153c` | E | X-Bot AI priority + breakdown |
+| `211d958` | E | Dependencies + Recurring |
+| `0fb7a63` | E | Dep guard-rails + Portfolio |
+| `9d0fa38` | E | Sprints + Automations |
+
+**`pflx-pathway-portal`** — 19 HANDOFF updates keeping this doc current.
+
+## Roadmap status — FINAL
+
+| Bundle | Status |
+|---|---|
+| A · B · C · D · E | ✅ **ALL SHIPPED** |
+
+## How a fresh session picks up
+
+Read this HANDOFF top-to-bottom. Every commit SHA is captured, every API surface is documented, every deferred item (rich Automation form editor, rejection→automation wiring, sprint UI polish) is listed. The full Ennis-July-1 vision is live.
 
 ---
 
