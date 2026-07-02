@@ -1800,6 +1800,70 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 2 2026 (Opus, morning) — Bundle F pass 2
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| _pending push_ | Bundle F pass 2: @mentions + push_slack/discord + WebRTC calls + host presence + cohort chat controls |
+
+## What shipped
+
+### Automations engine — outbound push actions
+`_mcAutomationRunActions` gained two new action types:
+- **`push_slack`** — POSTs the interpolated `value` to the webhook stored at `localStorage['pflx_chat_slack_webhook']` (same key used by the Chat bridge bar).
+- **`push_discord`** — same, keyed on `pflx_chat_discord_webhook`, payload shape `{content: ...}` per Discord.
+
+Template variables `{{taskId}}`, `{{playerId}}`, `{{xcReward}}`, etc. are interpolated from the automation `ctx`. Missing webhook → silent `console.warn` (no user-visible error).
+
+### PFLX Chat — @mentions
+- `pflxChatSend` scans the outgoing text for `@name` tokens, resolves them against thread participants (case-insensitive brand match), and stores the resolved IDs in `msg.mentions[]`.
+- `_pcCheckMentionsForMe` runs on every cloud pull and every realtime push. When an unseen message mentions the current player, it fires a `pflxToast('💬 X mentioned you: …', 'info', 6000)` and plays the nav SFX. `_pcPrimeSeen` baselines the seen-set on boot so old messages don't retro-toast.
+- Bubble render highlights every `@name` as an amber chip; the bubble itself gets an amber border when it mentions the current player.
+
+### PFLX Chat — Video calls + screen sharing (WebRTC)
+- New CALL and SHARE buttons in the chat header (shown only when a DM thread is open and cohort caps allow).
+- New in-panel overlay (`#pflx-chat-call-overlay`) with remote video, floating local PIP, and Mute / Camera / Share / End controls plus a call timer.
+- Signaling piggybacks on Supabase Realtime broadcast per-thread channel: `pflx-call-<threadId>` with events `offer`, `answer`, `ice`, `hangup`.
+- STUN: Google's public servers. **No TURN yet** — calls behind symmetric NAT will fail (add a TURN service if this becomes an issue).
+- `pflxChatCallToggleScreen` swaps the outgoing video track between camera and `getDisplayMedia()` via `RTCRtpSender.replaceTrack` — no renegotiation needed.
+- Incoming call is announced via a `confirm()` banner tied to a passive per-thread inbound channel. Group-thread calls are deferred (calls are 1:1 for now).
+- A short **system** message (`system: true`) drops into the thread when a call starts — rendered as a centered subdued line ("📹 Started a call · 3:42pm").
+
+### Host cohort Chat Controls
+- New **💬 Chat Controls** button on each cohort card in the Cohort Groups admin view.
+- Modal toggles six caps on `cg.chat`: `enabled`, `dm`, `group`, `video`, `screen`, `bridges`. Defaults are all-on.
+- `_pcMyCaps()` reads the active player's cohort and returns the resolved caps. Admins/hosts always bypass caps.
+- Every user-facing entry point is gated:
+  - `pflxChatToggle()` refuses to open when `enabled=false`.
+  - `pflxChatShowCompose()` refuses to make DMs / groups per caps.
+  - CALL / SHARE header buttons hidden per `video` / `screen`.
+  - `pflxChatPushBridge()` refuses without `bridges`.
+- Cohort card summary chip surfaces which caps are off ("no video · no bridges") or an "all chat on" pill when everything is default.
+
+### Host Live Roster + presence
+- New **🟢 LIVE** toolbar button — visible only for admin / host / teacher / instructor roles. Badge count colored by highest active state (cyan = someone in a call, orange = someone chatting, green = idle-online).
+- Supabase Realtime **Presence** channel `pflx-presence` tracked per player. Payload includes playerId, name, role, cohort, image, activity (`online` / `chatting` / `in-call` / `sharing`), threadId, threadName, timestamp.
+- `window.pflxChatState()` is exposed by the chat IIFE and read by the presence IIFE every 8s (plus on `visibilitychange`) — activity mirrors the chat panel + call state without tight coupling.
+- Live Roster panel (top-right) lists everyone currently online sorted by activity: in-call → chatting → online. Each row shows avatar, name (+ HOST badge for staff), cohort chip, and a colored activity line.
+- Hosts get a `pflxToast('📞 X started a video call with …', 'info')` the moment a player's activity transitions into `in-call` / `sharing`.
+
+## Files touched
+
+- `PFLX Overlay/pflx-platform-check/preview.html` — all chat/presence/cohort work is in this single file.
+
+## Deferred (Bundle F pass 3+)
+
+- **TURN server** so calls work behind symmetric NAT.
+- **Group calls** (>2 participants; mesh or SFU).
+- **Supabase edge function** for live `webcal://` calendar subscription.
+- **DarkCampus ↔ PFLX Chat bridge** — bidirectional mirror between DC channels and PFLX Chat groups.
+- **Slack/Discord inbound** — receive replies posted to the bridged channel back into the PFLX thread (needs an edge function per platform).
+- **Call recording** — server-side capture of the media stream.
+
+---
+
 # Session Update — July 1 2026 (Sonnet, late) — Bundle F pass 1
 
 ## New commits (`pflx-platform`)
