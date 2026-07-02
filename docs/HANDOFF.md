@@ -1575,6 +1575,44 @@ The existing `mc-player-submit-modal` was upgraded to match the "title / descrip
 - Bundle B pass 2: ✅ Season bar + My Work + enforcement (`23d0794`)
 - Bundle B pass 3: ✅ Player Task submission (`63acc5a`)
 - **Bundle B complete.**
-- Bundle C: ⏳ Player Portal parity + Jobs=inverse + reward audit
+- Bundle C pass 1: ✅ Jobs=inverse core (`fd2900d`)
+- Bundle C pass 2: ⏳ Player Portal parity + Applicant/Hire UI + reward audit
 - Bundle D: ⏳ Multiple views + Templates + Streaks
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle C pass 1: Jobs = inverse of Tasks
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `fd2900d` | Bundle C pass 1: Jobs = inverse of Tasks. Hire triggers Task + Project cascade. |
+
+## What's new in production
+
+When a host puts a player in a Job's `hired[]`, a Task is auto-created for that player. If the Job has a linked Project, the new Task also nests inside that Project so it rolls up into the Project's TASKS IN THIS PROJECT panel and its progress bar counts it.
+
+**Job model additions**:
+- `job.projectId` (new, optional) — link to a source Project.
+
+**Job form UI**:
+- New "🎬 Source Project" dropdown next to Checkpoint. "None (standalone Job)" fallback. Restored on edit.
+
+**Auto-Task creation (in `mcSaveJobForm`)**:
+- Fires whenever `hired.length > 0` (not just on `Claimed` status).
+- New task fields: `id`, `title: '[JOB] ' + job.title`, `description`, `category: 'collaboration'`, `playerId` (legacy) + `assignedTo` array (canonical), `jobId`, `projectId`, `checkpointId` inherited from job, `status: 'open'` (lowercase matches Notion-row checkbox states), `priority: 'normal'`, `xcReward`, `dueDate = job.endDate`, `backFromJobId + originTaskId` lineage, `allowFileUpload + allowLinkSubmit` default `true`.
+- Idempotent — an existing job→player pair is never duplicated.
+
+**Project cascade**:
+- If `job.projectId` is set, new task ids are appended to `mcProjects[X].taskIds`. `mcSaveData('projects')` fires alongside `mcSaveData('tasks')`.
+
+**Toast**:
+- "Created N Task(s) from Job hires" fires so the host sees the effect immediately.
+
+## Deferred (Bundle C pass 2)
+
+- **Per-applicant Hire UI** — Apply button on player Job Board card, per-applicant Hire button on host Job card.
+- **Player Portal parity** — port Notion-row / progress-bar / urgency / lineage treatment to `/player/checkpoints`, `/player/projects`, `/player/tasks`.
+- **Reward flow audit** — verify Task, Project, and Checkpoint approval each fire `PflxDataBus.award` (`XC` + `badges`) correctly at every tier.
