@@ -1800,6 +1800,70 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 1 2026 (Sonnet, late) — Bundle F pass 1
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `8d82559` | Bundle F pass 1: Standalone PFLX Chat + Calendar .ics export |
+
+## Standalone PFLX Chat
+
+Toolbar CHAT button no longer opens DarkCampus Quick Chat. It opens a new standalone PFLX Chat panel with DMs, group chats, and outbound bridges.
+
+**Data model** — Supabase row `pflx_chat_threads`:
+```
+{ threads: [{
+    id, type: 'dm'|'group', name, participants: [playerId],
+    messages: [{ id, senderId, senderName, text, at, readBy: [] }],
+    createdAt, updatedAt, createdBy
+}] }
+```
+- localStorage mirror `pflx_chat_threads` for offline / boot speed.
+- Debounced 700ms cloud push. `_pcSelfWriting` flag guards against realtime echo.
+- Realtime channel `pflx-chat-live` with `postgres_changes` filter.
+
+**UI** — bottom-right 420×560 slide panel.
+- Header: back arrow, thread title, `+ NEW` button, close.
+- **Thread list**: last-message preview, pink unread pill, GROUP chip when applicable.
+- **Message view**: bubble style, own messages cyan-gradient right-aligned, others grey left-aligned. Sender label surfaces in group chats.
+- **Composer**: Enter sends, Shift+Enter newline.
+- **Bridge bar** — 📧 EMAIL (mailto: link), 💼 SLACK (webhook POST), 🎮 DISCORD (webhook POST). Webhook URLs stored in localStorage per user.
+- **+ NEW** flow: number-list picker of the roster. Pick one for DM, several for group (prompts for group name). DM creation is idempotent — picking an existing DM partner jumps to that thread.
+
+**API surface**:
+- `window.pflxChatToggle()` — open/close panel
+- `window.pflxChatShowCompose()` — new-message picker
+- `window.pflxChatOpenThread(id)` — jump to a thread
+- `window.pflxChatSend()` — send from composer
+- `window.pflxChatBackToList()` — back to thread list
+- `window.pflxChatPushBridge('email'|'slack'|'discord')` — outbound push
+- `window.pflxChatRender()` — repaint
+
+## Calendar export (`.ics`)
+
+- **`mcExportCalendarIcs()`** builds a full VCALENDAR with:
+  - VEVENT per Task with `dueDate` (all-day, `PRIORITY` mapped from urgent/high/normal/low → 1/3/5/7, `CONFIRMED` if approved else `TENTATIVE`)
+  - VEVENT per Checkpoint spanning `startDate → endDate`
+- Downloads `pflx-mc-YYYY-MM-DD.ics`. Google Calendar Import + Apple Calendar double-click both consume it.
+- **`mcCalendarSubscribeInfo()`** alert explains the webcal:// live-sync path needs a Supabase edge function (queued for pass 2).
+
+## Command palette additions
+
+- **Open Chat** (💬)
+- **Export MC to Calendar (.ics)** (📅)
+- **Subscribe MC Calendar (webcal)** (📅)
+
+## Deferred (Bundle F pass 2+)
+
+- **Supabase edge function** serving live `webcal://` so Google/Apple Calendar auto-refresh MC events without re-importing.
+- **X-Bot outbound bridges** — automations engine action `push_slack` / `push_discord` firing on `task.approved` / `checkpoint.completed` via the same webhook pattern.
+- **@mention** with push toast to the mentioned player.
+- **DarkCampus ↔ PFLX Chat bridge** — messages posted in a DarkCampus channel show up in a matching PFLX Chat group (bi-directional).
+
+---
+
 # Session Update — July 1 2026 (Sonnet, evening) — Bundle E pass 3
 
 ## New commits (`pflx-platform`)
