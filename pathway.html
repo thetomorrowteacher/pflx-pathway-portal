@@ -5754,6 +5754,53 @@ window.addEventListener('message', function (ev) {
   } catch (e) {}
 });
 
+// ── Deep-link handler ──
+// The parent shell (or a task-detail launch button) posts this event to
+// jump straight to a specific node. Matches by explicit id first, then by
+// name (case-insensitive) to be tolerant of catalog/pathway drift.
+// If the requested pathwayId doesn't match the currently-loaded pathway,
+// swap the URL so the correct pathway loads with `nodeId` carried over.
+function pflxHandleDeeplink(payload) {
+  if (!payload) return;
+  var wantPathway = String(payload.pathwayId || '').trim();
+  if (wantPathway && wantPathway !== pathwaySlug) {
+    var qp = new URLSearchParams(window.location.search);
+    qp.set('p', wantPathway);
+    if (payload.nodeId) qp.set('nodeId', payload.nodeId);
+    if (payload.nodeName) qp.set('nodeName', payload.nodeName);
+    window.location.search = qp.toString();
+    return;
+  }
+  var wantId = String(payload.nodeId || '').trim();
+  var wantName = String(payload.nodeName || '').trim().toLowerCase();
+  var node = null;
+  if (wantId && Array.isArray(pathway.nodes)) node = pathway.nodes.find(function (n) { return n && n.id === wantId; });
+  if (!node && wantName && Array.isArray(pathway.nodes)) {
+    node = pathway.nodes.find(function (n) { return n && String(n.title || n.name || '').toLowerCase() === wantName; });
+    if (!node) node = pathway.nodes.find(function (n) { return n && String(n.title || n.name || '').toLowerCase().indexOf(wantName) !== -1; });
+  }
+  if (node) {
+    try { showDetail(node); } catch (e) { console.warn('[deeplink] showDetail failed', e); }
+  } else {
+    console.warn('[deeplink] node not found for', payload);
+  }
+}
+window.addEventListener('message', function (ev) {
+  try {
+    var d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+    if (d && d.type === 'pflx_pathways_deeplink') pflxHandleDeeplink(d.payload || d);
+  } catch (e) {}
+});
+// URL-param entry: if the page was opened with ?nodeId= (or ?nodeName=),
+// apply the deeplink after the map + nodes have booted.
+setTimeout(function () {
+  try {
+    var p = new URLSearchParams(window.location.search);
+    var payload = { pathwayId: pathwaySlug, nodeId: p.get('nodeId') || '', nodeName: p.get('nodeName') || '' };
+    if (payload.nodeId || payload.nodeName) pflxHandleDeeplink(payload);
+  } catch (e) {}
+}, 1500);
+
 function showDetail(n) {
   selectedNode = n;
 
