@@ -1666,8 +1666,51 @@ Toast: **"Checkpoint completed — rewards dispatched to N players"**.
 - Bundle C pass 3c: ✅ Player Checkpoint Detail hero + progress (`e692504`)
 - Bundle C pass 3d: ✅ Player ProjectDetail + JobBoard apply (`b6e73de`)
 - Bundle D pass 1: ✅ Board view toggle for Tasks + streak system (`a415062`)
-- Bundle D pass 2+: ⏳ Templates gallery, Calendar/Table views, Home strip
+- Bundle D pass 2: ✅ Templates gallery + host reject flow + streak reset (`2de404d`)
+- Bundle D pass 3: ⏳ Calendar view, Table view, streak badge display
 - Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle D pass 2
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `2de404d` | Bundle D pass 2: Templates gallery + host reject flow + streak reset |
+
+## Templates gallery
+
+- New `mcTemplates` cloud collection (`pflx_mc_templates`, in `MC_CLOUD_TYPES`). Stomp-guarded like every other MC row.
+- **Save as Template** buttons on every Project and Checkpoint card:
+  - Project card: 📄 icon button in the action row.
+  - Checkpoint card: 📄 Template pill in the action row.
+- `mcSaveAsTemplate(kind, index)` prompts for a template name, strips run-scoped fields via `_mcStripForTemplate` (child `taskIds`, `hired[]`, `phaseSubmissions`, timestamps, `_rewardedAt` / `_cpRewardedAt`), and pushes to `mcTemplates`.
+- **`pflxOpenTemplatePicker()`** modal lists every template with **✨ USE** (spawn + navigate) and **🗑** (delete) buttons.
+- Command palette gains **"New from Template…"** as a CREATE action — ⌘K → type "template" → open picker.
+
+## Host reject flow
+
+- New `mcRejectTask(index, note?)` marks task rejected (`status: 'rejected'`), records `rejectedAt` + `rejectionReason`, and resets submitter's streak via `_mcResetStreak`.
+- Submitter resolution uses the same 3-shape chain approve uses (legacy singular, new plural array, job-hired assignedTo/playerId).
+- Toast: **"Task rejected — streak reset"** + `pflx_task_rejected` broadcast.
+
+## API surface added
+
+- `window.mcSaveAsTemplate(kind, index)` — kind: `'project'` or `'checkpoint'`
+- `window.mcSpawnFromTemplate(templateId)`
+- `window.mcDeleteTemplate(templateId)`
+- `window.pflxOpenTemplatePicker(filterKind?)` — filterKind optional
+- `window.mcRejectTask(index, note?)`
+- New data type: `pflx_mc_templates` row (Supabase + localStorage). Template shape: `{ id, type, name, data, createdAt, createdBy }`.
+
+## Deferred (Bundle D pass 3)
+
+- **Calendar view** for Tasks (third view mode alongside List/Board).
+- **Table view** — dense sortable columns.
+- **Streak badge display** in player profile / portfolio.
+- Home strip refresh with priority ordering.
 
 ---
 
