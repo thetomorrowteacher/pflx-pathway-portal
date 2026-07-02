@@ -1473,3 +1473,63 @@ Bundle D and beyond:
 6. **Push rule:** if a `.git/HEAD.lock` sticks around from a prior interrupted push, delete it before the next attempt.
 
 Related memory: [[pflx-repo-location]] [[pflx-subapp-gits-and-clones]] [[pflx-data-sync-architecture]] [[pflx-open-space-ui]].
+
+---
+
+# Session Update — July 1 2026 (Sonnet, evening) — Bundle B pass 2
+
+## New commits (`pflx-platform`)
+
+| SHA | Subject |
+|-----|---------|
+| `23d0794` | Bundle B pass 2: Season context bar + My Work widget + structural enforcement |
+
+## What's new in production
+
+### Season context bar (all MC views)
+A pinned strip at the top of `mc-content` shows the active Season name, cohort scope, and roll-up stats. Rendered by `pflxRenderSeasonBar()` on every `mcNav` call.
+
+- **Active Season name** — reads `mcSeasons.find(s => s.active) || mcSeasons[0]`. Falls back to "No Season Set" placeholder.
+- **Stats pills** — 👥 players count · 🏁 active checkpoints · 📋 open tasks · 📤 awaiting approval (shown only when > 0, colored amber).
+- **Scope pill** — reads `activeSeason.cohortScope` (string or array). Falls back to "All Cohorts".
+
+### My Work widget (MC Dashboard)
+Personalized landing card at the top of `mc-panel-dashboard`. Rendered by `pflxRenderMyWork()` on every `mcNav`.
+
+- **Host view** (`pflxRole !== 'player'`):
+  - 📤 **AWAITING YOUR APPROVAL** — every `mcTasks` with `status === 'submitted'`. Each row has an inline ✓ APPROVE button that calls `mcApproveTask(index)`.
+  - ⚠ **OVERDUE TASKS** — non-approved tasks with negative days-until-due.
+  - ⚠ **OVERDUE PROJECTS** — non-completed projects with expired `dueDate/endDate/deadline`.
+  - Nice empty state: "Nothing waiting on you. Nice work. 🎉"
+- **Player view**:
+  - Their assigned open tasks sorted by priority DESC then urgency ASC.
+  - Priority dot next to title; urgency chip on the right.
+  - Empty state points to Job Board.
+
+### Structural enforcement
+Hierarchy contract is now enforced at save time.
+- **`mcSaveProjectForm`** — blocks save with alert if no Task checkboxes are ticked ("A Project needs at least one Task…").
+- **`mcSaveCPForm`** — blocks save if the Checkpoint has 0 tasks + 0 projects + 0 jobs ("A Checkpoint needs at least one Task, Project, or Job attached…").
+
+## API surface added
+
+- `window.pflxRenderSeasonBar()` — repaint the top strip. Cheap (reads current in-memory MC arrays).
+- `window.pflxRenderMyWork()` — repaint the My Work widget. Role-aware (host vs player).
+- Both are called automatically at the tail of `mcNav()`. Callers can force a refresh after a data mutation.
+
+## Deferred in this pass (queued for next commit)
+
+- **Player Task submission modal** — title + description + link + file upload, routed to host approval. Existing task submission surface needs a fresh UI to match the vision from the July 1 morning brief.
+
+## Roadmap status
+
+- Bundle B pass 1: ✅ Priority + ⌘K palette (`69f7920`)
+- Bundle B pass 2: ✅ Season bar + My Work + enforcement (`23d0794`)
+- Bundle B pass 3: ⏳ Player Task submission modal
+- Bundle C: ⏳ Player Portal parity + Jobs=inverse + reward audit
+- Bundle D: ⏳ Multiple views + Templates + Streaks
+- Bundle E: ⏳ X-Bot AI priority + Automations + Dependencies + Sprints + Portfolio
+
+## How to resume
+
+Latest commit `23d0794` on `pflx-platform` live on `prototypeflx.com`. Season bar and My Work render on every navigation to any MC view. `mcSeasons` in Supabase governs the Season name shown — hosts create/toggle-active a Season from the existing Seasons section (surfaced via `mcRenderSeasons`).
