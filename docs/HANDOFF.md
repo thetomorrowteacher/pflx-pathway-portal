@@ -2019,6 +2019,19 @@ config + easy-vs-hard wave scaling + sanitize; studio whitelist-at-read
 + edit preserves creator/plays). NEEDS live: theme preview strip,
 emblem picker feel, SFX volume taste, edit round-trip.
 
+## Seventh pass (same session) — 10 more background themes (16 total)
+
+Added to `STUDIO_BACKGROUNDS`/`STUDIO_BG_CSS` in preview.html AND the
+`BG_CSS` maps baked into BOTH game cartridges (kept in sync — note the
+games use 4-space indent inside their IIFEs, preview uses 2-space; a
+sync check compares all three maps): Aurora Borealis (layered
+teal/violet), Abyssal Ocean, Magma Core, Cyber Dusk, Royal Nebula,
+Gilded Vault, Frozen Expanse, Blood Moon, Dark Forest, Ion Storm — on
+top of Deep Space, Neon City, Crimson Nebula, Emerald Grid, Pure Void,
+Solar Sunset. Whitelist sanitizers in both games untouched (unknown
+ids still fall back to 'space'). Verified: syntax gates ×3 clean,
+maps aligned 16↔16↔16, labels match css ids.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
