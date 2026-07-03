@@ -1950,6 +1950,32 @@ everyone → plays counted → XC proposed on results.
    ready template). NEEDS live: publish a game and play it from Side
    Quests in the browser.
 
+## Fifth pass (same session) — LANE DEFENSE: second Studio template
+
+1. **`public/games/lane-defense.html`** — PvZ-style cartridge
+   (game id `lane-defense`, contract v0.1, config {title, accent}).
+   5 lanes × 7 cols canvas-2D (deliberately dependency-free instead of
+   Phaser: zero CDN risk, and the WHOLE game is a pure simulation core
+   `window.LD._core` that runs headless in Node). Raiders march left;
+   the quiz panel is the economy — correct answer = +40⚡ (+10/streak,
+   cap +70), wrong = 4s energy lockout. Defenders: 🔫 BLASTER 100⚡
+   (10dmg/1.1s), 🧱 WALL 50⚡ (220hp), 🔋 GENERATOR 75⚡ (3⚡/s).
+   3 waves (5/9/13 raiders, hp+speed ramp), 3 lives, last column
+   reserved as spawn edge. Score = kills×5 + correct×10 + lives×20 +
+   bestStreak×5 + 30 win bonus. Victory "SECTOR HELD" / defeat
+   "OVERRUN" screens, REBUILD/EXIT, standalone demo deck fallback.
+2. **Studio** — template tiles are now CLICKABLE (`studioPickTemplate`,
+   `studioSelTemplate` replaces the hidden input); Lane Defense is
+   ready:true; config header shows the selected template; Side Quests
+   shelf + published list show the correct template icon/name;
+   launcher header genericized to "🎮 <title>".
+3. Verification: syntax gates clean (3 files); Node sim tests **13/13**
+   — wave structure, placement rules (occupied/edge/bounds), reward
+   cap, **full undefended game → LOSS**, **full fortified+answering
+   game → WIN** (kills counted), score formula, question building.
+   NEEDS live: play both templates in the browser, check canvas
+   scaling on mobile.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
