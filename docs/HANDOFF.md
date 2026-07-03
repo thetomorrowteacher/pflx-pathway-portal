@@ -1800,6 +1800,76 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 2 2026 (Fable) — EVE-STYLE COMBAT COMMAND LAYER (Open Space Phase A+B)
+
+Ennis directive: Core Pathways UI + game mechanics should mimic Eve Online
+and Nova: Space Armada — controls, graphics, interactions, weapon controls.
+Researched Nova (fleet builder: Shield→Armor→Hull layers, Accuracy/Evasion,
+kinetic/missile/laser weapon triangle, component rarity + daily loops).
+Eve supplies the command layer. Phase A+B shipped this session.
+
+## What shipped (`pflx-pathway-portal`, pathway.html — `pflxCombat` IIFE)
+
+Search anchor: `EVE-STYLE COMBAT COMMAND LAYER`. Window API: `window.pflxCombat`.
+
+1. **Target locking** (`pflxCombat._tgt`) — clicking a contact in chase/
+   cockpit now LOCKS it (was: auto-fly). Animated lock cycle 1.4s (0.7s
+   with deep-scanner), max 3 simultaneous locks, Tab cycles the active
+   target. Target cards top-right: icon, name, live distance, HP bar
+   (asteroids), ▸ APPROACH and ✕ unlock buttons; destroyed targets linger
+   1.4s with 💥 DESTROYED then drop. In-world spinning lock reticle on the
+   active target (in #nodeLayer, hidden in bird's-eye). Approach REFUSES
+   black holes ("NAV REFUSAL").
+2. **Capacitor** (`pflxCombat._cap`) — pool 90 + speedMult×30, regen 7/s;
+   modules drain it; empty cap deactivates modules + "CAPACITOR LOW"
+   toast. Eve-style circular gauge (gold arc, segmented base ring).
+3. **Module rack** (`pflxCombat._rack`) — bottom-center HUD hub, F1–F4 or
+   1–4, click too. Slots: F1 BLASTER (always owned; auto-cycles on active
+   asteroid target 520u; accuracy 0.85 / 0.95 mk2 — misses fire an offset
+   bolt + MISS floater — Nova accuracy/evasion), F2 MINING (mining-laser
+   system; 3s ranged cycle, ×2 payout, mirrors hazard-mining rewards),
+   F3 TRACTOR (tractor-beam; collects derelicts/comets at 620u), F4
+   SHIELD (shield-booster or shieldAura; toggle, 6 cap/s, cuts black-hole
+   pull to 0.12 — patched into pflxSpaceHazards force calc). Cooldown
+   conic-gradient sweep, active glow, unowned slots show 🔒 → Ship Bay
+   toast. Legacy SPACE blaster untouched.
+4. **HUD hub** also shows SHD/ARM/HULL tri-bars (Nova layered defense —
+   cosmetic scaffolding until Phase D wires damage; SHD shows OFFLINE
+   without shield hardware; refreshed on pflx_ship_state_update) and a
+   speed readout in the capacitor ring.
+5. **Overview panel** (`pflxCombat.toggleOverview`, O key, ☰ OVERVIEW rail
+   button at bottom:280px) — Eve overview: sortable table (name/dist/
+   status) of stations (all), space objects <5200u, crew ships. Click =
+   lock, double-click = approach, black holes marked ⚠ AVOID. Refreshes
+   0.9s while open. Works in every camera mode.
+6. **Integration** — pflxCombat.tick(1/60) driven from pflxKeyLoop after
+   pflxBlaster.tick. Combat HUD/target bar CSS-gated to cam-chase/
+   cam-cockpit.
+
+## Verification
+- Syntax gate: 4 inline blocks, node --check, 0 failures.
+- Node behavioral harness (stubbed DOM): **20/20 pass** — lock lifecycle,
+  max locks, Tab cycle, cap spend/regen/refusal, ownership gating,
+  blaster cycle damage, destroyed-target linger/drop, shield drain,
+  black-hole nav refusal.
+- NEEDS Ennis live play-test: visuals/layout of the hub + target bar,
+  key conflicts, feel of lock-then-shoot loop vs old click-to-fly.
+
+## Roadmap agreed with Ennis (phases)
+- **Phase C** — Approach/Orbit-at-range/Keep-at-range autopilot + radial
+  context menu on contacts.
+- **Phase D** — NPC pirates/drones (orbit+fire AI), real damage to the
+  SHD/ARM/HULL bars, weapon-type triangle (kinetic/missile/laser — Nova),
+  loot drops, hit feedback (camera shake, damage numbers).
+- **Phase E** — graphics: GLTF hulls, warp-lane beams, volumetric
+  nebulae, instanced asteroids; move engine to src/pflx3d if the inline
+  file gets too heavy.
+- **Nova-inspired later**: component rarity tiers for ship systems in the
+  Ship Bay; daily mission points tied to the MC streak system.
+- IP note: mimic the FEEL, never Eve/Nova assets, names, or art.
+
+---
+
 # Session Update — July 2 2026 (Fable) — Video calling FIXED + Project cohort chat
 
 ## The bug (Ennis: "I tried to call a player and it did not go through")

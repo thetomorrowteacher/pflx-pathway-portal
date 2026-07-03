@@ -10390,6 +10390,7 @@ window.addEventListener('message', function(e) {
     if (msg.type === 'pflx_ship_state_update' && msg.state) {
       localStorage.setItem('pflx_ship_state', JSON.stringify(msg.state));
       pflxLoadShipState();
+      if (window.pflxCombat && pflxCombat.refreshBars) pflxCombat.refreshBars();
     }
     // Console credited space XC into the player's X-Coin account
     if (msg.type === 'pflx_space_xc_ack' && typeof msg.amount === 'number') {
@@ -10538,7 +10539,7 @@ const pflxSpaceHazards = {
       if (o.type === 'blackhole') {
         if (d < o.r) {
           // gravitational pull — stronger near the core; shields resist
-          const f = Math.pow(1 - d / o.r, 2) * 11 * (this.shielded() ? 0.35 : 1);
+          const f = Math.pow(1 - d / o.r, 2) * 11 * ((window.pflxCombat && pflxCombat.shieldBoostActive()) ? 0.12 : (this.shielded() ? 0.35 : 1));
           pflxShipVx += (o.x - sx) / (d || 1) * f;
           pflxShipVy += (o.y - sy) / (d || 1) * f;
           if (d < 80 && this._bhCooldown <= 0) {
@@ -10791,8 +10792,604 @@ canvas.addEventListener('click', function (e) {
   });
   if (!best) return;
   if (birdseye) { pflxSpacePrompt(best); return; }
+  // Flight modes: clicking a contact LOCKS it (Eve-style). Approach via
+  // the target card's APPROACH button or the Overview double-click.
+  if (window.pflxCombat && pflxCombat.lockObject) { pflxCombat.lockObject(best); return; }
   if (best.type !== 'blackhole') pflxSpaceHazards.flyToObject(best);
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// EVE-STYLE COMBAT COMMAND LAYER (July 2026, Fable)
+//   pflxCombat.targeting — click-to-lock w/ lock cycle, target cards,
+//     in-world lock reticle, Tab-cycle active target
+//   pflxCombat.cap — capacitor: modules drain it, it recharges (Eve)
+//   pflxCombat.rack — F1-F4 / 1-4 activatable ship systems with cycle
+//     sweeps: Blaster, Mining Laser, Tractor Beam, Shield Boost
+//   pflxCombat.overview — sortable sector table (Eve overview), O key
+// Defense model borrows Nova: Space Armada — layered SHD/ARM/HULL
+// readout + Accuracy/Evasion hit rolls on weapon cycles. Weapon-type
+// identities (kinetic/missile/laser) land with NPCs in Phase D.
+// ═══════════════════════════════════════════════════════════════════
+const pflxCombat = (function () {
+  'use strict';
+  var TYPE_META = {
+    asteroids: { icon: '\ud83e\udea8', label: 'Asteroid Cluster' },
+    blackhole: { icon: '\ud83d\udd73\ufe0f', label: 'Black Hole' },
+    derelict:  { icon: '\ud83d\udef8', label: 'Derelict Pod' },
+    comet:     { icon: '\u2604\ufe0f', label: 'Comet' },
+    station:   { icon: '\ud83d\udef0', label: 'Station' },
+    crew:      { icon: '\ud83e\uddd1\u200d\ud83d\ude80', label: 'Crew Ship' }
+  };
+  var _tidSeq = 1;
+
+  function inFlight() { return typeof pflxCamera !== 'undefined' && pflxCamera.mode !== 'birdseye'; }
+  function fmtDist(d) { return d >= 1000 ? (d / 1000).toFixed(1) + 'k u' : Math.round(d) + ' u'; }
+
+  // ── target position/validity resolvers per kind ──
+  function entryPos(en) {
+    if (en.kind === 'obj') return { x: en.ref.x, y: en.ref.y };
+    if (en.kind === 'station') {
+      var ne = (typeof nodeElements !== 'undefined') && nodeElements[en.id];
+      if (!ne) return null;
+      return { x: parseFloat(ne.el.style.left) || 0, y: parseFloat(ne.el.style.top) || 0 };
+    }
+    if (en.kind === 'crew') {
+      var pr = window.pflxCrew && pflxCrew.peers && pflxCrew.peers[en.id];
+      if (!pr || !pr.data) return null;
+      return { x: pr.data.x, y: pr.data.y };
+    }
+    return null;
+  }
+  function entryAlive(en) {
+    if (en.kind === 'obj') {
+      if (en.ref.collected) return false;
+      if ((window.pflxSpaceObjects || []).indexOf(en.ref) === -1) return false;
+      return true; // depleted asteroids linger briefly as DESTROYED
+    }
+    return !!entryPos(en);
+  }
+  function entryDist(en) {
+    var p = entryPos(en);
+    return p ? Math.hypot(p.x - pflxShip.x, p.y - pflxShip.y) : Infinity;
+  }
+
+  // ═════════ TARGETING ═════════
+  var tgt = {
+    locked: [], activeId: null, MAX: 3,
+    lockTime: function () { return pflxHasModule('deep-scanner') ? 0.7 : 1.4; },
+    byId: function (id) { return this.locked.find(function (e) { return e.tid === id; }); },
+    active: function () { return this.byId(this.activeId); },
+    lock: function (kind, id, ref, name, icon) {
+      var existing = this.locked.find(function (e) { return e.kind === kind && e.id === id; });
+      if (existing) { this.activeId = existing.tid; renderTargets(); return existing; }
+      if (this.locked.length >= this.MAX) {
+        pflxSpaceToast('\ud83c\udfaf', 'MAX TARGETS', 'Your targeting computer tracks ' + this.MAX + ' locks. Unlock one first (\u2715 on a target card).', '');
+        return null;
+      }
+      var en = { tid: 't' + (_tidSeq++), kind: kind, id: id, ref: ref, name: name, icon: icon,
+                 locking: true, lockT: 0, hpMax: (ref && typeof ref.hp === 'number') ? Math.max(ref.hp, 1) : null,
+                 deadT: 0 };
+      this.locked.push(en);
+      this.activeId = en.tid;
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+      renderTargets();
+      return en;
+    },
+    unlock: function (tid) {
+      this.locked = this.locked.filter(function (e) { return e.tid !== tid; });
+      if (this.activeId === tid) this.activeId = this.locked.length ? this.locked[this.locked.length - 1].tid : null;
+      renderTargets();
+    },
+    cycle: function () {
+      if (!this.locked.length) return;
+      var i = this.locked.findIndex(function (e) { return e.tid === tgt.activeId; });
+      this.activeId = this.locked[(i + 1) % this.locked.length].tid;
+      renderTargets();
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+    }
+  };
+
+  function lockObject(o) {
+    if (!o._tlockId) o._tlockId = 'obj-' + (_tidSeq++);
+    var meta = TYPE_META[o.type] || { icon: '\u2728', label: 'Contact' };
+    tgt.lock('obj', o._tlockId, o, meta.label, meta.icon);
+  }
+  function lockStation(nodeId, title) { tgt.lock('station', nodeId, null, title || 'Station', TYPE_META.station.icon); }
+  function lockCrew(key, brand) { tgt.lock('crew', key, null, brand || 'Crew Ship', TYPE_META.crew.icon); }
+
+  function approach(en) {
+    if (en.kind === 'obj' && en.ref.type === 'blackhole') {
+      pflxSpaceToast('\ud83d\udd73\ufe0f', 'NAV REFUSAL', 'Autopilot will not fly into a gravitational anomaly. Manual approach only \u2014 shields recommended.', 'AVOID');
+      return;
+    }
+    var p = entryPos(en);
+    if (!p || typeof pflxShipFlyTo !== 'function' || pflxShip.flying) return;
+    pflxShipFlyTo(p.x, p.y, function () { if (window.pflxSpaceHazards) pflxSpaceHazards.tick(); });
+  }
+
+  // ═════════ CAPACITOR ═════════
+  var cap = {
+    val: 100, warnT: 0,
+    max: function () { return Math.round(90 + ((pflxShip.upgrades && pflxShip.upgrades._speedMult) || 1) * 30); },
+    regen: function () { return 7; },
+    spend: function (n) {
+      if (this.val < n) {
+        if (this.warnT <= 0) {
+          this.warnT = 2.5;
+          pflxSpaceToast('\u26a1', 'CAPACITOR LOW', 'Not enough energy. Modules recharge the capacitor over time \u2014 ease off and let it fill.', '');
+          if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
+        }
+        return false;
+      }
+      this.val -= n;
+      return true;
+    },
+    tick: function (dt) {
+      if (this.warnT > 0) this.warnT -= dt;
+      this.val = Math.min(this.max(), this.val + this.regen() * dt);
+    }
+  };
+
+  // ═════════ MODULE RACK ═════════
+  // Accuracy/Evasion (Nova) — each weapon cycle rolls to hit.
+  var rack = {
+    slots: [
+      { key: 'F1', id: 'blaster', icon: '\ud83d\udd2b', name: 'BLASTER',
+        owned: function () { return true; },
+        cycle: function () { return pflxHasModule('blaster-mk2') ? 0.9 : 1.4; },
+        capCost: 6, range: 520,
+        accuracy: function () { return pflxHasModule('blaster-mk2') ? 0.95 : 0.85; },
+        wants: ['asteroids'] },
+      { key: 'F2', id: 'mining', icon: '\u26cf\ufe0f', name: 'MINING',
+        owned: function () { return pflxHasModule('mining-laser'); }, buyId: 'mining-laser',
+        cycle: function () { return 3.0; }, capCost: 8, range: 340, accuracy: function () { return 1; },
+        wants: ['asteroids'] },
+      { key: 'F3', id: 'tractor', icon: '\ud83e\uddf2', name: 'TRACTOR',
+        owned: function () { return pflxHasModule('tractor-beam'); }, buyId: 'tractor-beam',
+        cycle: function () { return 2.2; }, capCost: 12, range: 620, accuracy: function () { return 1; },
+        wants: ['derelict', 'comet'] },
+      { key: 'F4', id: 'shield', icon: '\ud83d\udee1', name: 'SHIELD',
+        owned: function () { return pflxHasModule('shield-booster') || !!(pflxShip.upgrades && pflxShip.upgrades.shieldAura); },
+        buyId: 'shield-booster', toggle: true, capPerSec: 6 }
+    ],
+    state: {}, // id -> { active, prog }
+    st: function (id) { if (!this.state[id]) this.state[id] = { active: false, prog: 0 }; return this.state[id]; },
+    toggle: function (id) {
+      var slot = this.slots.find(function (sl) { return sl.id === id; });
+      if (!slot) return;
+      if (!slot.owned()) {
+        pflxSpaceToast('\ud83d\udd12', 'SYSTEM NOT INSTALLED', 'Buy the ' + slot.name + ' ship system in the X-Coin Ship Bay, then it slots in here.', 'SHIP BAY');
+        return;
+      }
+      var st = this.st(id);
+      st.active = !st.active;
+      if (!st.active) st.prog = 0;
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play(st.active ? 'unlock' : 'click'); } catch (e) {} }
+      renderRack();
+    },
+    tick: function (dt) {
+      var self = this;
+      this.slots.forEach(function (slot) {
+        var st = self.st(slot.id);
+        if (!st.active) { st.prog = 0; return; }
+        if (slot.toggle) { // shield boost — continuous cap drain
+          if (!cap.spend(slot.capPerSec * dt)) { st.active = false; renderRack(); }
+          return;
+        }
+        var en = tgt.active();
+        var valid = en && !en.locking && en.kind === 'obj' && slot.wants.indexOf(en.ref.type) !== -1 &&
+                    !en.ref.depleted && !en.ref.collected && entryDist(en) <= slot.range;
+        if (!valid) {
+          if (st.prog > 0) st.prog = 0;
+          // stay armed but idle — Eve modules glow waiting for a valid target
+          return;
+        }
+        st.prog += dt / slot.cycle();
+        if (st.prog >= 1) {
+          st.prog = 0;
+          if (!cap.spend(slot.capCost)) { st.active = false; renderRack(); return; }
+          fireCycle(slot, en);
+        }
+      });
+    }
+  };
+  function shieldBoostActive() { var st = rack.state.shield; return !!(st && st.active); }
+
+  function missFloater(x, y) {
+    var f = document.createElement('div');
+    f.textContent = 'MISS';
+    f.style.cssText = 'position:absolute;z-index:7;font-family:Orbitron,sans-serif;font-size:11px;font-weight:800;' +
+      'pointer-events:none;letter-spacing:0.12em;color:#ffbd66;text-shadow:0 0 8px rgba(255,160,60,0.8);' +
+      'transition:transform 0.9s ease-out,opacity 0.9s ease-out;';
+    f.style.left = x + 'px'; f.style.top = y + 'px';
+    canvas.appendChild(f);
+    requestAnimationFrame(function () { f.style.transform = 'translateY(-46px)'; f.style.opacity = '0'; });
+    setTimeout(function () { f.remove(); }, 950);
+  }
+
+  function fireCycle(slot, en) {
+    var o = en.ref, p = entryPos(en);
+    if (!p) return;
+    if (slot.id === 'blaster') {
+      // Accuracy roll (Nova) — a miss still fires the bolt, offset past the rock
+      if (Math.random() > slot.accuracy()) {
+        var ox = p.x + (Math.random() - 0.5) * 160, oy = p.y + (Math.random() - 0.5) * 160;
+        pflxBlaster.boltFX(pflxShip.x, pflxShip.y, ox, oy, null);
+        missFloater(p.x, p.y - 40);
+        return;
+      }
+      pflxBlaster.boltFX(pflxShip.x, pflxShip.y, p.x, p.y, o);
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+    } else if (slot.id === 'mining') {
+      // one ranged laser cycle strips the whole cluster — same payout as
+      // the proximity-mining path in pflxSpaceHazards (kept in sync)
+      o.depleted = true;
+      if (o.gl) o.gl.scale.set(0.35, 0.35, 0.35);
+      pflxCargo.add('iron-ore', (1 + ((Math.random() * 2) | 0)) * 2, 'mining laser');
+      if (Math.random() < 0.55) pflxCargo.add('crystal-shard', 2, 'mining laser');
+      if (Math.random() < 0.15) pflxCargo.add('plasma-core', 1, 'mining laser');
+      pflxSpaceToast('\u26cf\ufe0f', 'CLUSTER MINED', 'Ranged mining cycle complete \u2014 ore beamed to the hold.', 'MINING LASER \u00d72');
+      if (window.pflxSpace && pflxSpace.burst) pflxSpace.burst(p.x, p.y, '140,240,200', 20, { speed: 80, size: 7, dur: 0.9 });
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+    } else if (slot.id === 'tractor') {
+      if (o.type === 'derelict' && !o.collected) {
+        o.collected = true;
+        if (o.gl) o.gl.visible = false;
+        pflxCargo.add('salvage-scrap', 2, 'tractor beam');
+        if (Math.random() < 0.5) pflxCargo.add('artifact', 1, 'tractor beam');
+        pflxCargo.addXC(50, 'derelict salvage (tractor)');
+        pflxSpaceToast('\ud83e\uddf2', 'POD TRACTORED IN', 'Cargo pod reeled in from range and cracked open.', '+SALVAGE \u00b7 +50 XC');
+      } else if (o.type === 'comet' && !o.collected) {
+        o.collected = true;
+        pflxCargo.add('stardust', 2, 'tractor beam');
+        pflxCargo.addXC(25, 'comet intercept (tractor)');
+        pflxSpaceToast('\u2604\ufe0f', 'TAIL SWEPT', 'Stardust pulled straight off the comet tail.', '+2 STARDUST \u00b7 +25 XC');
+      }
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+    }
+  }
+
+  // ═════════ UI — target bar, reticle, HUD hub, rack, overview ═════════
+  var ui = { targetBar: null, reticle: null, hub: null, rackEl: null, ovPanel: null, ovOpen: false, ovTimer: null, ovSort: { f: 'dist', dir: 1 } };
+
+  function injectCss() {
+    var st = document.createElement('style');
+    st.textContent =
+      '#pflxTargetBar{position:fixed;top:96px;right:18px;z-index:150;display:none;flex-direction:column;gap:8px;width:212px;}' +
+      'body.cam-chase #pflxTargetBar,body.cam-cockpit #pflxTargetBar{display:flex;}' +
+      '.ptb-card{background:rgba(4,12,22,0.92);border:1px solid rgba(0,212,255,0.3);border-radius:10px;padding:8px 10px;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;font-family:Rajdhani,sans-serif;}' +
+      '.ptb-card.active{border-color:rgba(125,249,255,0.9);box-shadow:0 0 16px rgba(0,212,255,0.35);}' +
+      '.ptb-card.locking{border-style:dashed;animation:ptbPulse 0.7s ease-in-out infinite;}' +
+      '@keyframes ptbPulse{50%{border-color:rgba(255,220,120,0.9);}}' +
+      '.ptb-hp{height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-top:5px;}' +
+      '#pflxLockReticle{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;pointer-events:none;z-index:5;display:none;}' +
+      'body.cam-birdseye #pflxLockReticle{display:none !important;}' +
+      '#pflxLockReticle svg{width:100%;height:100%;animation:pflxRetSpin 6s linear infinite;}' +
+      '@keyframes pflxRetSpin{to{transform:rotate(360deg);}}' +
+      '#pflxCombatHub{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:150;display:none;align-items:center;gap:14px;' +
+        'background:rgba(4,10,20,0.88);border:1px solid rgba(0,212,255,0.35);border-radius:16px;padding:10px 16px;backdrop-filter:blur(5px);' +
+        'box-shadow:0 0 24px rgba(0,212,255,0.15);font-family:Orbitron,sans-serif;}' +
+      'body.cam-chase #pflxCombatHub,body.cam-cockpit #pflxCombatHub{display:flex;}' +
+      '.pch-slot{width:56px;height:56px;border-radius:12px;border:1px solid rgba(0,212,255,0.3);background:rgba(6,14,26,0.9);position:relative;' +
+        'cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;overflow:hidden;transition:border-color 0.2s;}' +
+      '.pch-slot:hover{border-color:rgba(125,249,255,0.7);}' +
+      '.pch-slot.on{border-color:#7df9ff;box-shadow:0 0 14px rgba(0,212,255,0.45),inset 0 0 10px rgba(0,212,255,0.12);}' +
+      '.pch-slot.dead{opacity:0.45;}' +
+      '.pch-cyc{position:absolute;inset:0;pointer-events:none;}' +
+      '.pch-key{position:absolute;top:2px;left:5px;font-size:7px;color:rgba(125,249,255,0.75);letter-spacing:0.08em;}' +
+      '.pch-ico{font-size:17px;line-height:1;z-index:1;}' +
+      '.pch-nm{font-size:6.5px;letter-spacing:0.1em;color:rgba(207,238,254,0.75);z-index:1;}' +
+      '.pch-bars{display:flex;flex-direction:column;gap:4px;width:88px;font-family:Rajdhani,sans-serif;}' +
+      '.pch-bar{height:6px;border-radius:3px;background:rgba(255,255,255,0.07);overflow:hidden;}' +
+      '.pch-bl{font-size:8px;letter-spacing:0.14em;color:rgba(207,238,254,0.6);display:flex;justify-content:space-between;font-family:Orbitron,sans-serif;}' +
+      '#pflxOverview{position:fixed;top:110px;left:16px;z-index:150;width:342px;max-height:52vh;display:none;flex-direction:column;' +
+        'background:rgba(4,10,20,0.94);border:1px solid rgba(0,212,255,0.4);border-radius:4px;font-family:Rajdhani,sans-serif;' +
+        'clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px));}' +
+      '#pflxOverview.open{display:flex;}' +
+      '.pov-row{display:grid;grid-template-columns:26px 1fr 62px 70px;gap:6px;align-items:center;padding:5px 10px;cursor:pointer;font-size:12px;color:#cfeefe;}' +
+      '.pov-row:hover{background:rgba(0,212,255,0.08);}' +
+      '.pov-row.locked{background:rgba(0,212,255,0.10);}' +
+      '.pov-head{display:grid;grid-template-columns:26px 1fr 62px 70px;gap:6px;padding:7px 10px;font-family:Orbitron,sans-serif;font-size:8px;' +
+        'letter-spacing:0.12em;color:rgba(125,249,255,0.8);border-bottom:1px solid rgba(0,212,255,0.25);cursor:pointer;user-select:none;}' +
+      '#overviewBtn{position:absolute;bottom:280px;right:20px;z-index:100;background:rgba(6,10,18,0.9);border:1px solid rgba(0,212,255,0.3);' +
+        'color:rgba(0,212,255,0.85);font-family:Orbitron,sans-serif;font-size:9px;font-weight:600;letter-spacing:1px;padding:8px 12px;cursor:pointer;transition:all 0.2s;}' +
+      '#overviewBtn:hover{background:rgba(0,212,255,0.15);color:#fff;}';
+    document.head.appendChild(st);
+  }
+
+  function buildUi() {
+    injectCss();
+    ui.targetBar = document.createElement('div');
+    ui.targetBar.id = 'pflxTargetBar';
+    document.body.appendChild(ui.targetBar);
+
+    ui.reticle = document.createElement('div');
+    ui.reticle.id = 'pflxLockReticle';
+    ui.reticle.innerHTML = '<svg viewBox="0 0 120 120" fill="none">' +
+      '<circle cx="60" cy="60" r="52" stroke="rgba(125,249,255,0.85)" stroke-width="2" stroke-dasharray="24 14"/>' +
+      '<circle cx="60" cy="60" r="40" stroke="rgba(0,212,255,0.4)" stroke-width="1" stroke-dasharray="4 8"/>' +
+      '</svg>';
+    var layer = document.getElementById('nodeLayer') || canvas;
+    layer.appendChild(ui.reticle);
+
+    ui.hub = document.createElement('div');
+    ui.hub.id = 'pflxCombatHub';
+    ui.hub.innerHTML =
+      '<div class="pch-bars" id="pchBars"></div>' +
+      '<div style="position:relative;width:84px;height:84px;flex-shrink:0;">' +
+        '<svg viewBox="0 0 84 84" style="position:absolute;inset:0;transform:rotate(-90deg);">' +
+          '<circle cx="42" cy="42" r="36" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6" stroke-dasharray="4 2.2"/>' +
+          '<circle id="pchCapArc" cx="42" cy="42" r="36" fill="none" stroke="#f5c842" stroke-width="6" stroke-linecap="round" stroke-dasharray="226.2" stroke-dashoffset="0" style="filter:drop-shadow(0 0 4px rgba(245,200,66,0.7));"/>' +
+        '</svg>' +
+        '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
+          '<div id="pchSpd" style="font-size:13px;font-weight:900;color:#7df9ff;">0</div>' +
+          '<div style="font-size:6px;letter-spacing:0.14em;color:rgba(207,238,254,0.55);">SPEED</div>' +
+          '<div id="pchCapTxt" style="font-size:8px;color:#f5c842;margin-top:1px;">100</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pchSlots" style="display:flex;gap:8px;"></div>';
+    document.body.appendChild(ui.hub);
+
+    ui.rackEl = document.getElementById('pchSlots');
+    renderRack();
+    renderBars();
+
+    // Overview panel + rail button
+    ui.ovPanel = document.createElement('div');
+    ui.ovPanel.id = 'pflxOverview';
+    ui.ovPanel.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid rgba(0,212,255,0.3);">' +
+        '<span style="font-family:Orbitron,sans-serif;font-size:10px;font-weight:800;letter-spacing:0.16em;color:#7df9ff;">\u2637 OVERVIEW</span>' +
+        '<button onclick="pflxCombat.toggleOverview()" style="background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;font-size:13px;">\u2715</button>' +
+      '</div>' +
+      '<div class="pov-head">' +
+        '<span></span>' +
+        '<span onclick="pflxCombat.sortOverview(&quot;name&quot;)">NAME \u21c5</span>' +
+        '<span onclick="pflxCombat.sortOverview(&quot;dist&quot;)">DIST \u21c5</span>' +
+        '<span onclick="pflxCombat.sortOverview(&quot;status&quot;)">STATUS \u21c5</span>' +
+      '</div>' +
+      '<div id="povRows" style="overflow-y:auto;flex:1;"></div>' +
+      '<div style="padding:6px 12px;font-size:10px;color:rgba(207,238,254,0.45);border-top:1px solid rgba(0,212,255,0.15);">click = lock \u00b7 double-click = approach \u00b7 O toggles</div>';
+    document.body.appendChild(ui.ovPanel);
+
+    var ob = document.createElement('button');
+    ob.id = 'overviewBtn';
+    ob.textContent = '\u2637 OVERVIEW';
+    ob.title = 'Sector overview — everything on scan (O)';
+    ob.addEventListener('click', function () { pflxCombat.toggleOverview(); });
+    var cargoBtn = document.getElementById('cargoBtn');
+    (cargoBtn && cargoBtn.parentNode ? cargoBtn.parentNode : document.body).appendChild(ob);
+  }
+
+  // ── SHD / ARM / HULL readout (Nova layered defense; Phase D wires damage) ──
+  function renderBars() {
+    var el = document.getElementById('pchBars');
+    if (!el) return;
+    var hasShield = !!(pflxShip.upgrades && pflxShip.upgrades.shieldAura) || pflxHasModule('shield-booster');
+    var mult = (pflxShip.upgrades && pflxShip.upgrades._speedMult) || 1;
+    var arm = Math.min(100, 40 + mult * 18);
+    var rows = [
+      { l: 'SHD', v: hasShield ? 100 : 0, c: '#7df9ff', off: !hasShield },
+      { l: 'ARM', v: arm, c: '#f5c842' },
+      { l: 'HULL', v: 100, c: '#4ade80' }
+    ];
+    el.innerHTML = rows.map(function (r) {
+      return '<div><div class="pch-bl"><span>' + r.l + '</span><span>' + (r.off ? 'OFFLINE' : Math.round(r.v) + '%') + '</span></div>' +
+        '<div class="pch-bar"><div style="width:' + r.v + '%;height:100%;background:' + r.c + ';box-shadow:0 0 6px ' + r.c + ';opacity:' + (r.off ? 0.25 : 1) + ';"></div></div></div>';
+    }).join('');
+  }
+
+  function renderRack() {
+    if (!ui.rackEl) return;
+    ui.rackEl.innerHTML = rack.slots.map(function (slot) {
+      var st = rack.st(slot.id);
+      var owned = slot.owned();
+      return '<div class="pch-slot' + (st.active ? ' on' : '') + (owned ? '' : ' dead') + '" data-slot="' + slot.id + '" ' +
+        'onclick="pflxCombat.toggleSlot(&quot;' + slot.id + '&quot;)" title="' + slot.name + ' (' + slot.key + ')">' +
+        '<div class="pch-cyc" data-cyc="' + slot.id + '"></div>' +
+        '<span class="pch-key">' + slot.key + '</span>' +
+        '<span class="pch-ico">' + (owned ? slot.icon : '\ud83d\udd12') + '</span>' +
+        '<span class="pch-nm">' + slot.name + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderTargets() {
+    if (!ui.targetBar) return;
+    ui.targetBar.innerHTML = tgt.locked.map(function (en) {
+      var active = en.tid === tgt.activeId;
+      var hp = '';
+      if (en.hpMax && en.kind === 'obj') {
+        var frac = Math.max(0, (en.ref.hp || 0) / en.hpMax);
+        hp = '<div class="ptb-hp"><div style="width:' + Math.round(frac * 100) + '%;height:100%;background:' + (frac > 0.5 ? '#4ade80' : frac > 0.2 ? '#f5c842' : '#ef4444') + ';"></div></div>';
+      }
+      var dead = en.kind === 'obj' && (en.ref.depleted || en.ref.collected);
+      return '<div class="ptb-card' + (active ? ' active' : '') + (en.locking ? ' locking' : '') + '" onclick="pflxCombat.setActive(&quot;' + en.tid + '&quot;)">' +
+        '<div style="display:flex;align-items:center;gap:7px;">' +
+          '<span style="font-size:16px;">' + en.icon + '</span>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:12px;font-weight:700;color:#e6f8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + en.name + '</div>' +
+            '<div style="font-size:10px;color:rgba(125,249,255,0.7);font-family:monospace;" data-dist="' + en.tid + '">' + (en.locking ? 'LOCKING\u2026' : fmtDist(entryDist(en))) + '</div>' +
+          '</div>' +
+          '<button onclick="event.stopPropagation();pflxCombat.approachTid(&quot;' + en.tid + '&quot;)" title="Approach" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.35);color:#7df9ff;border-radius:6px;font-size:10px;padding:3px 6px;cursor:pointer;">\u25b8</button>' +
+          '<button onclick="event.stopPropagation();pflxCombat.unlockTid(&quot;' + en.tid + '&quot;)" title="Unlock" style="background:none;border:none;color:rgba(255,255,255,0.45);cursor:pointer;font-size:12px;">\u2715</button>' +
+        '</div>' + hp +
+        (dead ? '<div style="font-size:9px;color:#f5c842;letter-spacing:0.12em;font-family:Orbitron,sans-serif;margin-top:3px;">\ud83d\udca5 DESTROYED</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  // ═════════ OVERVIEW data ═════════
+  function overviewRows() {
+    var rows = [];
+    try {
+      Object.keys((typeof nodeElements !== 'undefined') ? nodeElements : {}).forEach(function (nid) {
+        var ne = nodeElements[nid];
+        if (!ne || !ne.el || !ne.node) return;
+        rows.push({ kind: 'station', id: nid, name: ne.node.title || 'Station', icon: TYPE_META.station.icon,
+          x: parseFloat(ne.el.style.left) || 0, y: parseFloat(ne.el.style.top) || 0,
+          status: (ne.node.status || 'open').replace('_', ' ') });
+      });
+    } catch (e) {}
+    (window.pflxSpaceObjects || []).forEach(function (o) {
+      if (o.depleted || o.collected) return;
+      var meta = TYPE_META[o.type] || { icon: '\u2728', label: 'Contact' };
+      rows.push({ kind: 'obj', ref: o, name: meta.label, icon: meta.icon, x: o.x, y: o.y,
+        status: o.type === 'blackhole' ? '\u26a0 AVOID' : (typeof o.hp === 'number' ? o.hp + ' hp' : 'scan') });
+    });
+    try {
+      Object.keys((window.pflxCrew && pflxCrew.peers) || {}).forEach(function (k) {
+        var d = pflxCrew.peers[k].data || {};
+        rows.push({ kind: 'crew', id: k, name: d.brand || 'Crew', icon: TYPE_META.crew.icon, x: d.x || 0, y: d.y || 0, status: 'crew' });
+      });
+    } catch (e) {}
+    rows.forEach(function (r) { r.dist = Math.hypot(r.x - pflxShip.x, r.y - pflxShip.y); });
+    rows = rows.filter(function (r) { return r.kind === 'station' || r.dist < 5200; });
+    var f = ui.ovSort.f, dir = ui.ovSort.dir;
+    rows.sort(function (a, b) {
+      var va = a[f], vb = b[f];
+      if (typeof va === 'string') return va.localeCompare(vb) * dir;
+      return (va - vb) * dir;
+    });
+    return rows.slice(0, 40);
+  }
+
+  function renderOverview() {
+    var el = document.getElementById('povRows');
+    if (!el) return;
+    var lockedKeys = {};
+    tgt.locked.forEach(function (en) { lockedKeys[en.kind + ':' + (en.kind === 'obj' ? en.ref._tlockId : en.id)] = true; });
+    el.innerHTML = overviewRows().map(function (r, i) {
+      var lk = r.kind + ':' + (r.kind === 'obj' ? (r.ref._tlockId || '') : r.id);
+      return '<div class="pov-row' + (lockedKeys[lk] ? ' locked' : '') + '" data-ov="' + i + '">' +
+        '<span>' + r.icon + '</span>' +
+        '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;">' + String(r.name).replace(/</g, '&lt;') + '</span>' +
+        '<span style="font-family:monospace;font-size:11px;color:rgba(125,249,255,0.8);">' + fmtDist(r.dist) + '</span>' +
+        '<span style="font-size:10px;color:rgba(207,238,254,0.6);text-transform:uppercase;letter-spacing:0.06em;">' + r.status + '</span>' +
+      '</div>';
+    }).join('');
+    ui._ovData = overviewRows();
+    Array.prototype.forEach.call(el.querySelectorAll('.pov-row'), function (rowEl) {
+      var r = ui._ovData[parseInt(rowEl.getAttribute('data-ov'), 10)];
+      if (!r) return;
+      rowEl.addEventListener('click', function () { lockRow(r); });
+      rowEl.addEventListener('dblclick', function () { approachRow(r); });
+    });
+  }
+  function lockRow(r) {
+    if (r.kind === 'obj') lockObject(r.ref);
+    else if (r.kind === 'station') lockStation(r.id, r.name);
+    else if (r.kind === 'crew') lockCrew(r.id, r.name);
+  }
+  function approachRow(r) {
+    if (r.kind === 'obj' && r.ref.type === 'blackhole') { approach({ kind: 'obj', ref: r.ref }); return; }
+    if (typeof pflxShipFlyTo === 'function' && !pflxShip.flying) pflxShipFlyTo(r.x, r.y, function () { if (window.pflxSpaceHazards) pflxSpaceHazards.tick(); });
+  }
+
+  // ═════════ per-frame tick (driven by pflxKeyLoop) ═════════
+  var _uiFrame = 0;
+  function tick(dt) {
+    cap.tick(dt);
+    rack.tick(dt);
+    // lock cycles + target validity
+    var changed = false;
+    for (var i = tgt.locked.length - 1; i >= 0; i--) {
+      var en = tgt.locked[i];
+      if (en.locking) {
+        en.lockT += dt;
+        if (en.lockT >= tgt.lockTime()) {
+          en.locking = false; changed = true;
+          if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+        }
+      }
+      if (!entryAlive(en)) { tgt.locked.splice(i, 1); if (tgt.activeId === en.tid) tgt.activeId = null; changed = true; continue; }
+      if (en.kind === 'obj' && (en.ref.depleted || en.ref.collected)) {
+        en.deadT += dt;
+        if (en.deadT === dt) changed = true; // first dead frame → re-render card w/ DESTROYED
+        if (en.deadT > 1.4) { tgt.locked.splice(i, 1); if (tgt.activeId === en.tid) tgt.activeId = null; changed = true; }
+      }
+    }
+    if (changed) renderTargets();
+
+    // throttled UI refresh (~10Hz): distances, cap arc, speed, cycle sweeps, reticle
+    _uiFrame++;
+    if (_uiFrame % 6 === 0) {
+      tgt.locked.forEach(function (en) {
+        var dEl = ui.targetBar && ui.targetBar.querySelector('[data-dist="' + en.tid + '"]');
+        if (dEl) dEl.textContent = en.locking ? 'LOCKING\u2026' : fmtDist(entryDist(en));
+      });
+      var arc = document.getElementById('pchCapArc');
+      if (arc) arc.setAttribute('stroke-dashoffset', String((1 - cap.val / cap.max()) * 226.2));
+      var capTxt = document.getElementById('pchCapTxt');
+      if (capTxt) capTxt.textContent = Math.round(cap.val);
+      var spd = document.getElementById('pchSpd');
+      if (spd) spd.textContent = Math.round((typeof pflxShipSpeed !== 'undefined' ? pflxShipSpeed : 0) * 10);
+      rack.slots.forEach(function (slot) {
+        var cyc = ui.rackEl && ui.rackEl.querySelector('[data-cyc="' + slot.id + '"]');
+        if (!cyc) return;
+        var st = rack.st(slot.id);
+        cyc.style.background = st.active
+          ? 'conic-gradient(rgba(0,212,255,0.30) ' + Math.round((slot.toggle ? 1 : st.prog) * 360) + 'deg, transparent 0deg)'
+          : 'none';
+      });
+    }
+    // reticle follows the ACTIVE target every frame
+    var act = tgt.active();
+    if (act && ui.reticle) {
+      var p = entryPos(act);
+      if (p) {
+        ui.reticle.style.display = inFlight() ? 'block' : 'none';
+        ui.reticle.style.left = p.x + 'px';
+        ui.reticle.style.top = p.y + 'px';
+        ui.reticle.style.opacity = act.locking ? '0.45' : '1';
+      }
+    } else if (ui.reticle) {
+      ui.reticle.style.display = 'none';
+    }
+  }
+
+  // ═════════ keys ═════════
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    var k = e.key;
+    if (k === 'o' || k === 'O') { e.preventDefault(); api.toggleOverview(); return; }
+    if (!inFlight()) return;
+    var map = { F1: 'blaster', '1': 'blaster', F2: 'mining', '2': 'mining', F3: 'tractor', '3': 'tractor', F4: 'shield', '4': 'shield' };
+    if (map[k]) { e.preventDefault(); rack.toggle(map[k]); return; }
+    if (k === 'Tab') { e.preventDefault(); tgt.cycle(); }
+  });
+
+  // ═════════ boot ═════════
+  function boot() { buildUi(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  var api = {
+    tick: tick,
+    lockObject: lockObject,
+    lockStation: lockStation,
+    lockCrew: lockCrew,
+    setActive: function (tid) { tgt.activeId = tid; renderTargets(); },
+    unlockTid: function (tid) { tgt.unlock(tid); },
+    approachTid: function (tid) { var en = tgt.byId(tid); if (en) approach(en); },
+    toggleSlot: function (id) { rack.toggle(id); },
+    shieldBoostActive: shieldBoostActive,
+    refreshBars: renderBars,
+    toggleOverview: function () {
+      ui.ovOpen = !ui.ovOpen;
+      ui.ovPanel.classList.toggle('open', ui.ovOpen);
+      if (ui.ovOpen) { renderOverview(); ui.ovTimer = setInterval(renderOverview, 900); }
+      else if (ui.ovTimer) { clearInterval(ui.ovTimer); ui.ovTimer = null; }
+    },
+    sortOverview: function (f) {
+      if (ui.ovSort.f === f) ui.ovSort.dir *= -1; else { ui.ovSort.f = f; ui.ovSort.dir = 1; }
+      renderOverview();
+    },
+    _tgt: tgt, _cap: cap, _rack: rack
+  };
+  return api;
+})();
+window.pflxCombat = pflxCombat;
 
 // ═══════════════════════════════════════════════════════════════════
 // CARGO PANEL UI
@@ -12024,6 +12621,9 @@ function pflxKeyLoop() {
 
   // Blaster: SPACE fires at the nearest asteroid cluster
   if (window.pflxBlaster) pflxBlaster.tick(1 / 60);
+
+  // Eve-style command layer: capacitor, module cycles, target locks
+  if (window.pflxCombat) pflxCombat.tick(1 / 60);
 
   // Cluster bearing indicator (cockpit/chase navigation aid)
   if (window.pflxClusters) pflxClusters.updateIndicator();
