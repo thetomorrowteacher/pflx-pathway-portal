@@ -2149,6 +2149,57 @@ clears the final wave's HP budget in <60s of fire). Phaser scene logic
 the ONE part that truly needs Ennis's browser play-test — first Phaser
 usage in the ecosystem.
 
+## Eleventh pass (same session) — ALL 9 GAMES DONE + HOST LIVE SESSIONS (Ennis)
+
+Ennis locked the distribution model: **hosts bind decks and LAUNCH games
+to Side Quests for a time window (Gimkit/Blooket class-session style);
+players play while it's live.** Free-play by players is NOT the model —
+the host controls what's live and when.
+
+### Three final game templates shipped (all 9 tiles now READY):
+1. **`games/pulse-runner.html`** (`pulse-runner` ⚡, Geometry Dash) —
+   canvas auto-runner, speed ramps 230→520, TAP/SPACE/↑ jump firewalls,
+   crash = KNOWLEDGE CHECKPOINT (correct = free resume + 28% slowdown +
+   grace zone; wrong = burn 1 of 3 shield cores), reach 1500/2000/2600m.
+   Bug found by test + fixed: instant double-jump before first physics
+   step (now requires vy<=0 grounded).
+2. **`games/mecha-tamer.html`** (`mecha-tamer` 🤖, Haypi/Dislyte) —
+   turn-based battler: correct = strike (atk + streak×2 ≤+12), wrong =
+   counter (reduced by stage armor). 4 wild machines (RUST CRAWLER →
+   ION WASP → PLASMA GOLEM → VOID LEVIATHAN), mech EVOLVES 🐕 SPARK PUP
+   → 🐺 VOLT HOUND → 🦾 STORM TITAN after battles 1 & 3 (full heal),
+   25% field repair otherwise, one 🔧 repair-kit revive at 50%.
+3. **`games/star-saga.html`** (`star-saga` 🎲, sci-fi D&D) — 8 authored
+   chapters aboard the derelict megaship VANTA, 2 approaches each
+   (DC / fail dmg / xp tradeoffs), question sets the dice: correct =
+   ADVANTAGE (2d20 keep highest +4), wrong = 1d20−2; animated die roll;
+   boss (THE HELMSMAN) needs 2 successful strikes; difficulty adjusts
+   DC ±2, fail dmg, and starting HP 34/30/26.
+
+### LIVE SESSIONS system (`baSessions`, Supabase row `pflx_ba_sessions`)
+- Session = { id, title, template, deckId, config, launchedBy(+Name),
+  startsAt, endsAt }. Read-modify-write like decks/games; long-expired
+  (>2d) pruned on write; boots 1300ms.
+- **Host launch controls in the Studio config form** (isHostUser only):
+  duration select (15m/30m/1h/2h/6h/24h/1week) + 🔴 LAUNCH LIVE — uses
+  the SAME form (template, deck, all asset config), so a launch carries
+  full theming. ACTIVE SESSIONS list below with ⏳ countdown + ✕ END
+  (sets endsAt to now).
+- **Side Quests "🔴 LIVE NOW — HOST SESSIONS" shelf** (above player-made
+  games): red-glow cards w/ emblem, host brand, countdown, LIVE badge;
+  click = play with the session's deck+config; expired sessions vanish
+  (45s auto re-render on side_quests/studio keeps countdowns fresh).
+- `arenaSessionPlay` guards: ended → alert+refresh; deleted deck /
+  missing template → alert.
+
+### Verification
+Syntax gates: preview.html + ALL NINE game files clean. Node: **26/26**
+(runner physics/crash/cores/win + double-jump regression; tamer
+evolve/repair/loss/full-win-to-TITAN; saga advantage math, chapter
+advance, boss 2-hit, death; sessions active-window filter incl. future
+sessions, countdown labels, early end, pruning, 1-week duration).
+NEEDS live browser pass on the 3 new games + a real host launch.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
