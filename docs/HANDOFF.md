@@ -2032,6 +2032,59 @@ Solar Sunset. Whitelist sanitizers in both games untouched (unknown
 ids still fall back to 'space'). Verified: syntax gates ×3 clean,
 maps aligned 16↔16↔16, labels match css ids.
 
+## Eighth pass (same session) — GIMKIT/BLOOKET DIRECTION (Ennis)
+
+Ennis: Battle Arena Studio should have games like Gimkit/Blooket and
+functions/elements from Gimkit Creative. Researched: Gimkit Creative =
+2D sandbox w/ terrain/props + DEVICES wired via CHANNELS (event bus),
+item granters, up to 60 players. The full device/channel map editor is
+the long-term Studio v3 vision (roadmap below); this pass shipped its
+portable core elements:
+
+1. **`games/knowledge-tycoon.html`** (template id `knowledge-tycoon`,
+   💰 ready in Studio) — THE Gimkit economy loop: answer → cash →
+   UPGRADE SHOP → snowball. Upgrades: CASH/ANSWER ×5 lvls
+   (+10/25/60/150/400), STREAK BONUS ×4 (+$n × streak, cap ×10),
+   AUTO-MINER ×4 ($/sec passive), TIME WARP ×3 (+15s). Win = cash ON
+   HAND reaches target before the clock (spend-vs-bank tension). Diff:
+   easy $1800/150s · normal $2500/120s · hard $3600/105s. Pure core
+   `window.KT._core`; full skilled-player sim WINS easy (verified).
+2. **`games/gold-rush.html`** (template id `gold-rush`, 🪙 ready) —
+   Blooket Gold Quest luck loop: correct answer → pick 1 of 3 mystery
+   chests (weighted: gold 40-100/110-200, jackpot 240-400, DOUBLE
+   capped +1200, STEAL 30% of richest rival, SWAP fortunes, CAVE-IN
+   −30%, empty) vs 3 AI rivals (NOVA-7/VEX/ORION) who dig every round
+   — hard mode rivals raid the player. 12 rounds, most gold wins,
+   wrong answer = no chest but rivals still dig. Live leaderboard
+   chips. Pure core `window.GR._core`.
+3. **POWER-UPS in the duel** (Gimkit items element) — Studio config
+   toggle `powerups` (default on): streak milestones grant one-use
+   items: 3 → 🔍 50/50 (dims two wrong answers), 5 → 💊 HEAL +22,
+   7 → ⚡ 2× NEXT HIT (armed state). #puBar renders under the status
+   strip; all gated by config; reset per match.
+4. Studio: 4 ready templates now (duel, lane defense, tycoon, gold
+   rush) + 2 coming-soon; POWER-UPS select in the form, carried in
+   `studioConfigOf`, restored on edit.
+
+Verification: syntax gates ×5 files clean; Node tests **29/29**
+(tycoon economy math, buy/afford rules, time warp, auto-miner income,
+win/lose conditions, FULL winning sim; gold-rush weighted distribution,
+all 8 outcomes, steal/swap/lose/double-cap math, rival bands + hard
+raids, 12-round termination + winner calc; duel power-up hooks).
+NEEDS live play of both new games + power-up feel.
+
+## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
+- Device/channel event system ("when X → transmit on channel → Y
+  listens"): portable as a visual RULES BUILDER on top of templates
+  (trigger: streak/score/time/hp → action: grant item, spawn wave,
+  bonus, message). The Automations engine in MC (`mcAutomationsFire`)
+  is the in-house pattern to mirror.
+- Multiplayer live sessions (Gimkit is class-live): host starts a
+  lobby, players join via Supabase Realtime — reuse the cipher lobby
+  plumbing.
+- Map/terrain editor (top-down or platformer) = the full Creative
+  vision; only after the rules layer proves out.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
