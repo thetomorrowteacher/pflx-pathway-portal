@@ -2200,6 +2200,43 @@ advance, boss 2-hit, death; sessions active-window filter incl. future
 sessions, countdown labels, early end, pruning, 1-week duration).
 NEEDS live browser pass on the 3 new games + a real host launch.
 
+## Twelfth pass (same session) — HOST LAUNCHPAD + SEASON MODE (Ennis model lock)
+
+**Ennis confirmed the full distribution model** (now all live):
+- Studio = PLAYERS create games from assets/templates → publish →
+  🛠 PLAYER-MADE GAMES panel in Side Quests (was already live).
+- Hosts see ALL game modes in a dedicated dashboard and must LAUNCH a
+  mode (deck attached + time frame) before players can play it —
+  Gimkit/Blooket style.
+- A launch can span a FULL SEASON and be replayable at higher levels.
+
+**Shipped:**
+1. **🎛 HOST LAUNCHPAD** (`renderHostModes`, screen `host_modes`,
+   host-only button in the Side Quests header) — grid of all 9 READY
+   game modes, each card with: session title, deck attach (≥4 cards),
+   duration (15m→1week + **Full Season 90 days**), base difficulty,
+   and **Season mode toggle**; 🔴 LAUNCH per mode. ACTIVE SESSIONS
+   management strip on top (countdowns + ✕ END).
+2. **SEASON MODE — level-up replays**: `sessionLevelFor/LevelUp/
+   DifficultyFor` — a season session starts every player at LVL 1
+   (easy); each WIN advances their level (normal → hard, capped);
+   level stored per (session, browser) `pflx_sess_lvl_<id>`; the
+   result handler bumps it on `won && seasonMode`. LIVE cards show
+   "🎚 YOUR LVL n/3".
+3. **6 new sci-fi coming-soon tiles** registering Ennis's requested
+   game types: 🧗 Sky Climb (Don't Look Down), 🥷 Stick Circuit
+   (stickman fighter), 🏟 Nexus Legends (Mobile Legends MOBA),
+   🐢 Shell Strike (TMNT beat-em-up), 🏙 Neo City (SimCity builder),
+   🤼 Circuit Brawl (Brawlhalla platform fighter). NOTE for next
+   sessions: Sky Climb + Neo City are canvas-feasible next; the three
+   real-time fighters (Stick Circuit / Shell Strike / Circuit Brawl)
+   and the MOBA need Phaser + iterative browser testing — build one
+   per session with Ennis play-testing.
+Verification: syntax gate clean; Node 16/16 (level ladder easy→normal→
+hard w/ cap, non-season respects configured difficulty, Full Season
+registered, route + win-hook + 9 ready/6 soon tiles). Studio's own
+launch controls remain as a shortcut for hosts.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
