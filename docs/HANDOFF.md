@@ -1800,6 +1800,65 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 2 2026 (Fable) — Video calling FIXED + Project cohort chat
+
+## The bug (Ennis: "I tried to call a player and it did not go through")
+
+**Root cause found and confirmed against the live Supabase project with a
+two-client Node test:** every chat participant holds a passive invite-listener
+channel on topic `pflx-call-<threadId>`. Starting/joining a call created a
+SECOND channel on the SAME topic on the SAME client — Phoenix allows one join
+per topic per socket, so the second `subscribe()` callback NEVER fires
+(verified: 8s hang, no status). The old code did a bare
+`await new Promise(... if SUBSCRIBED resolve ...)` → hung forever → the
+invite was never broadcast → callee never rang. No error surfaced.
+
+Second defect: the realtime `postgres_changes` thread-sync handler never
+called `_pcCallAttachInbound()`, so a callee whose client learned about a
+brand-new DM via realtime had NO invite listener for it — calls on fresh
+threads were unreceivable.
+
+## Fixes shipped (`pflx-platform`, preview.html)
+
+1. `_pcCallDetachInbound(threadId)` — removes the passive listener BEFORE
+   creating the active call channel (both caller + joiner paths). Re-attached
+   on hangup (600ms defer).
+2. `_pcCallSubscribe(ch)` — subscribe wrapped in a promise that actually
+   settles: SUBSCRIBED resolves; CHANNEL_ERROR / TIMED_OUT / CLOSED or 12s
+   rejects → surfaced as a toast instead of a silent hang.
+3. Realtime thread-sync handler now calls `_pcCallAttachInbound()` so new
+   threads ring immediately.
+4. Ring feedback — 45s `ringTimer` on the caller: "No answer — they may be
+   offline" + toast. Cleared when any peer materialises and on hangup.
+5. `offer` payload now carries `fromName` so call tiles show names, not ids.
+
+## Project cohort chat + group calls
+
+- New engine API `window.pflxChatEnsureGroupThread(name, participantIds,
+  {projectId, open})` — dedupes by name, syncs membership (new cohort
+  members get added on re-open), creates inside `_pcThreads` (the engine's
+  source of truth), saves via `_pcSave`, attaches the call invite listener,
+  opens the thread. Caps-gated (`enabled` + `group`).
+- `pflxStartProjectChat` now DELEGATES to it. The old path wrote
+  localStorage + cloud behind the engine's back — the engine's next
+  `_pcSave` clobbered the new group with its stale in-memory copy, and
+  `pflxChatOpenThread` couldn't find the thread. Legacy path kept only as
+  fallback when the engine isn't booted.
+- Group calls from a project thread already work (mesh, CALL/SHARE buttons
+  show for groups; invite prompt says "in <group name>").
+
+## Verification
+
+- Live Supabase test (Node, 2 clients): duplicate-topic subscribe = HANG
+  (old bug reproduced); detach-then-create = SUBSCRIBED; cross-client
+  invite delivery = OK.
+- Syntax gate: 12 inline blocks, node --check, 0 failures.
+- STILL NEEDS a human 2-browser play-test (camera/mic permissions + real
+  WebRTC media can't be exercised from the sandbox). No TURN yet — calls
+  across symmetric NAT still need a TURN server (known Bundle F item).
+
+---
+
 # Session Update — July 2 2026 (Fable) — MC Project card: Progress hero panel
 
 ## What shipped (`pflx-platform`, preview.html, `mcRenderProjects`)
