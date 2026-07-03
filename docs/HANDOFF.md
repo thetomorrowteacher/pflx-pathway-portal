@@ -2120,6 +2120,35 @@ progression, lockout+O₂ concurrent drain, hint depletion, full
 heist mechanics unchanged post-retheme; studio 5+4 registration).
 NEEDS live play of Escape Protocol + retheme eyeballs.
 
+## Tenth pass (same session) — VOID RANGER: first Phaser 3 template (Archero-style)
+
+**`games/void-ranger.html`** (template id `void-ranger`, 🎯 READY in
+Studio — 6 playable templates now). The first cartridge on a real game
+engine: **Phaser 3.55.2 pinned from cdnjs** (URL verified HTTP 200),
+arcade physics, procedural textures via generateTexture (hero circle /
+drone triangle / bolt rect — zero asset files), transparent canvas over
+the shared BG themes, Scale.FIT for mobile. Graceful fallback message
+if Phaser fails to load.
+
+Gameplay (Archero 2 signature): drones spawn from the arena edges and
+chase; the ranger **auto-fires at the nearest drone ONLY while
+standing still** — move (WASD/arrows/hold-pointer) to dodge, stop to
+shoot. Contact damage per second. Between the 5 waves: a deck question
+gates the ABILITY DRAFT — correct → pick 1 of 3 from: 🔱 MULTISHOT
+(+1 bolt, spread volley), ⏩ RAPID FIRE (25% faster), 💥 POWER CELL
+(+40% dmg), 🚀 THRUSTERS (+20% speed), 🧬 NANOREPAIR (+40 HP, +10 max),
+🗡 PIERCE (+1 passthrough); wrong → "DECODE FAILED — NO UPGRADE".
+Difficulty scales wave count/hp (0.8/1/1.3). Score = kills×4 + wave×15
++ correct×10 + streak×5 + 50 win.
+
+Pure core `window.VR._core` (abilities, waves, draft, score) tested
+headlessly: **13/13** incl. ability stacking, wave/difficulty ramps,
+deterministic draft, and a balance proof (multishot+power+rapid hero
+clears the final wave's HP budget in <60s of fire). Phaser scene logic
+(overlap, spawn queue, chase, cull) is conventional arcade code but is
+the ONE part that truly needs Ennis's browser play-test — first Phaser
+usage in the ecosystem.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
