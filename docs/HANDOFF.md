@@ -2073,6 +2073,53 @@ all 8 outcomes, steal/swap/lose/double-cap math, rival bands + hard
 raids, 12-round termination + winner calc; duel power-up hooks).
 NEEDS live play of both new games + power-up feel.
 
+## Ninth pass (same session) — SCI-FI MANDATE + Escape Protocol (Ennis)
+
+**LOCKED DIRECTION: every Battle Arena game is future/sci-fi/tech
+themed.** Ennis referenced Archero 2, Project Entropy, Kingshot, Wittle
+Defender, Planet Defense TD, Blooket CryptoHack, Gimkit Don't Look Down
+/ No Way Out, escape rooms, Geometry Dash, D&D, Haypi Monsters — and
+asked about engines (Godot? Gimkit Creative's stack? CoSpaces?).
+
+**Engine decision (researched):** Gimkit does NOT publish its stack —
+custom in-house web tech w/ own physics (staff-built), on Google Cloud.
+CoSpaces Edu = browser WebGL 3D + Blockly-style CoBlocks. Conclusion
+UNCHANGED: stay web-native. Our cartridge contract already IS the
+platform; Phaser 3 gets adopted per-template when a game needs real
+physics (Void Ranger/Pulse Runner); three.js (already in pathway.html)
+is the CoSpaces-like 3D path later; Godot stays optional for advanced
+creators via future cartridge upload — never a platform dependency.
+
+**Shipped:**
+1. **Gold Rush → CRYPTO HEIST** (sci-fi retheme, = Blooket CryptoHack):
+   encrypted caches 🗄, ₵RYPTO, COLD WALLET, MOTHERLODE, OVERCLOCK,
+   HACK RIVAL, WALLET SWAP, FIREWALL TRACE, CORRUPTED cache; blocks not
+   rounds; "MASTER NETRUNNER"/"OUT-MINED". Mechanics, weights, and
+   game id `gold-rush` UNCHANGED (verified: steal math + weight sum
+   100 intact) so published games keep working.
+2. **Knowledge Tycoon sci-fi copy**: CREDITS BANKED, 💳 CREDITS/ANSWER,
+   🛰 ORBITAL MINER, 🧪 UPGRADE LAB, BOOT THE STARTUP, UNICORN STATUS /
+   SERVERS SEIZED.
+3. **`games/escape-protocol.html`** (template id `escape-protocol`,
+   🔓 ready) — No Way Out/escape room: 5 bulkheads (CARGO BAY → REACTOR
+   → LAB DECK → BRIDGE → ESCAPE POD), each needs N correct codes
+   (easy 2/2/2/3/3 · normal 2/2/3/3/4 · hard 2/3/3/4/4), O₂ timer
+   (320/260/210s, red pulse <25%), wrong code = security lockout
+   (6/8/10s, O₂ keeps draining), 3 hint chips (50/50). Terminal
+   aesthetic w/ scanlines. Score = doors×20 + correct×8 + O₂/2 +
+   streak×5 + 50 win. Pure core `window.EP._core`.
+4. **Studio: 5 ready templates** (Duel, Lane Defense, Tycoon, Crypto
+   Heist, Escape Protocol) **+ 4 sci-fi coming-soon tiles** telegraphing
+   the agreed roadmap: 🤖 Mecha Tamer (Haypi/Dislyte), 🎯 Void Ranger
+   (Archero — Phaser), ⚡ Pulse Runner (Geometry Dash — Phaser),
+   🎲 Star Saga (sci-fi D&D campaign).
+
+Verification: syntax gates ×6 files clean; Node **16/16** (escape door
+progression, lockout+O₂ concurrent drain, hint depletion, full
+14-answer escape WIN, O₂-death LOSS, post-death input ignored, score;
+heist mechanics unchanged post-retheme; studio 5+4 registration).
+NEEDS live play of Escape Protocol + retheme eyeballs.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
