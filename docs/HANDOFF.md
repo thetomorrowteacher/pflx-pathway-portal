@@ -1883,6 +1883,39 @@ but the LIVE feature had to ship inside `public/preview.html`:
    deck). NEEDS live check: import a real Quizlet export in the
    browser and run a Cipher session with it.
 
+## Third pass (same session) — QUIZ CARD DUEL: first Arena Game Cartridge
+
+The first playable deck-bound game shipped, establishing the **Arena Game
+Cartridge contract v0.1** (postMessage, documented in the game file head):
+- game → host: `pflx_game_ready` · host → game: `pflx_arena_deck`
+  { deck {id,name,subject,cards[{term,definition}]}, player {id, brand} —
+  brand only, never real names } · game → host:
+  `pflx_arena_game_result` { game, deckId, score, correct, total,
+  bestStreak, won } and `pflx_arena_game_exit`.
+
+1. **`public/games/quiz-card-duel.html`** — self-contained DOM/CSS game
+   (deliberately not Phaser: card games read better in DOM; Phaser is
+   reserved for the action templates). HP duel vs RIVAL AI: question
+   card + 4 answer cards per round, 15s timer bar, speed + streak
+   damage (base 12 + speed ≤8 + streak ≤8, cap 30), rival damage ramps
+   14→26, deck loops until someone drops. Victory/defeat screen with
+   score (correct×10 + bestStreak×5 + 30 win bonus), REMATCH/EXIT.
+   Standalone demo deck after 1600ms if no host answers (also playable
+   directly at /games/quiz-card-duel.html).
+2. **Launcher/connector in preview.html** (anchor `ARENA GAME CARTRIDGE
+   LAUNCHER`) — `arenaGameLaunch(deckId)` fullscreen iframe overlay,
+   answers `pflx_game_ready` with the bound deck + player (brand only),
+   on result proposes XC via the existing `arenaPostAward`
+   (`pflx_award_proposed` → Console economy authority):
+   xc = clamp(score×0.25, 5, 40), reason `arena.duel.<deckId>.win|loss`;
+   standalone mode credits local state.player.xc. Header shows the
+   "+N XC PROPOSED" note. **⚔ DUEL** button on every deck card.
+3. Verification: syntax gates clean (preview 3 blocks, game 1 block);
+   Node tests **12/12** on the game core (round building invariants
+   incl. shuffled correctIdx, <4-card refusal, damage/streak/caps, cpu
+   ramp, score formula) + **3/3** on the XC clamp mapping. NEEDS live
+   browser play-test.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
