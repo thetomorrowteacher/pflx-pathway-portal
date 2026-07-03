@@ -1849,6 +1849,40 @@ Architecture decided with Ennis:
   out in the sandbox, so full `next build` typecheck happens on
   Vercel — **check the deploy status after push**.
 
+## CRITICAL DEPLOY FACT discovered + second pass (same session)
+
+**The deployed Battle Arena is NOT the Next.js app.** `vercel.json` has
+`buildCommand: ""`, `outputDirectory: "."`, framework null, and rewrites
+`/` → `/public/preview.html` — production is the 537KB single-file
+`public/preview.html` (same pattern as the Console). The Next app
+(`app/…`) never builds on Vercel. The earlier `app/lib/decks.ts` +
+`app/decks/page.tsx` remain in the repo as the future-migration version,
+but the LIVE feature had to ship inside `public/preview.html`:
+
+1. **`baDecks` engine** (search anchor `KNOWLEDGE DECKS (July 2026)`) —
+   same parsers (Quizlet tab/comma/dash + rows newline/semicolon,
+   first-sep-only; RFC-4180 CSV w/ tags col3), Supabase row
+   `pflx_ba_decks` via the file's existing supabaseLoad/Save,
+   read-modify-write upsert/delete, localStorage mirror, boots 900ms
+   after load.
+2. **DECKS screen** — nav link + `state.screen === 'decks'` route.
+   Deck grid (source badge, subject chip, bound-to-Cipher highlight),
+   search (targeted DOM update, no focus loss), import modal (paste +
+   file upload + separator selects + LIVE preview via
+   `deckUpdatePreview()` — targeted, keystrokes never full-render),
+   deck detail modal. Delete = creator or host.
+3. **CIPHER IS NOW DECK-POWERED** — `cipherActiveQuestions()` returns
+   the bound deck mapped to Cipher's question shape (correct def + 3
+   random other defs as distractors, ≥4 cards required) else the
+   built-in CIPHER_QUESTIONS. Both `questionPool` build sites swapped.
+   Cipher config's mock "Coming Soon" block replaced with a real deck
+   selector + "📚 Import / Manage Decks" button. `CIPHER_CONFIG.deckId`
+   holds the binding; deck cards also show USE IN CIPHER.
+4. Verification: syntax gate 3 blocks 0 failures; Node harness 8/8
+   (parsers, cipher mapping, ≥4-card rule, fallback, bound/missing
+   deck). NEEDS live check: import a real Quizlet export in the
+   browser and run a Cipher session with it.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
