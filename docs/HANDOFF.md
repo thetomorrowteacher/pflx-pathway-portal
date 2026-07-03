@@ -1916,6 +1916,40 @@ Cartridge contract v0.1** (postMessage, documented in the game file head):
    ramp, score formula) + **3/3** on the XC clamp mapping. NEEDS live
    browser play-test.
 
+## Fourth pass (same session) — BATTLE ARENA STUDIO v1 SHIPS (the Roblox loop closes)
+
+Players can now BUILD and PUBLISH games. Full loop live: import deck →
+open Studio → configure → test → publish → appears in Side Quests for
+everyone → plays counted → XC proposed on results.
+
+1. **Studio screen** (`renderStudio`, `state.screen === 'studio'`) —
+   template gallery (Quiz Card Duel ready; Lane Defense / Monster Tamer
+   / Rogue Runner shown as COMING SOON tiles), config form (game title*,
+   deck* ≥4 cards, rival name, round timer 10/15/20s, accent theme ×5),
+   🎮 TEST RUN (launches unpublished with config) and 🚀 PUBLISH.
+   Published-games grid with ▶ PLAY and ✕ unpublish (creator or host).
+2. **`baGames`** — Supabase row `pflx_ba_games` {games:[{id,title,
+   template,deckId,config,createdBy,createdByName,createdAt,plays}]},
+   read-modify-write (verified it preserves a second client's concurrent
+   publish), localStorage mirror, `bumpPlays` on launch, cap 100. Boots
+   1100ms after load.
+3. **Side Quests shelf** — `arenaStudioCardsHtml()` renders under the
+   mode cards: 🛠 PLAYER-MADE GAMES section (title, "by <brand> · N
+   plays", deck name, player-made badge, click = play) + a dashed
+   "Create a Game" card → Studio. Studio entry point is Side Quests
+   (no extra nav link).
+4. **Cartridge contract v0.1 extended** — `pflx_arena_deck` now carries
+   optional `config { title, accent, rivalName, roundTime }`. The duel
+   sanitizes it (`applyConfig`): accent must be #rrggbb (else dropped —
+   blocks style injection), roundTime clamped 8–30, rivalName ≤24 chars,
+   title ≤60; accent recolors question card, kicker, hover, player HP
+   bar; title hits document.title + intro.
+5. Verification: syntax gates clean; Node tests **5/5 applyConfig**
+   (valid, malicious accent, out-of-range, null) + **5/5 baGames**
+   (publish, concurrent-client preservation, remove, bumpPlays, single
+   ready template). NEEDS live: publish a game and play it from Side
+   Quests in the browser.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
