@@ -1820,9 +1820,21 @@ Project" and be more visually distinct.
 3. Verified with the standard syntax gate (12 inline script blocks,
    `node --check`, 0 failures).
 
-Player Portal ProjectDetail (~line 23487) already renders progress above
-tasks; its panel is still the flat purple style — port the hero treatment
-there if Ennis wants parity.
+4. **Player Portal parity (same session)** — ProjectDetail's flat purple
+   progress panel replaced with the identical hero treatment (ring +
+   dynamic accent). Uses `done` / `totalUnits` ("assignments completed").
+5. **Clickable links (Ennis, same session)** — new global helper
+   `window.pflxLinkify(text)` (defined next to `_mcProgressBarHtml`):
+   escapes HTML first, then wraps `https://` / `http://` / `www.` URLs in
+   cyan `target="_blank" rel="noopener noreferrer"` anchors with
+   `event.stopPropagation()` so links inside clickable rows/cards don't
+   trigger row navigation. Trailing punctuation is excluded from the URL.
+   Applied to 8 description render sites: MC Project card, MC task row
+   (CSS-clamped), task board card, Player ProjectDetail, Player Task
+   Detail, secondary project card (~32985), and the two template-literal
+   player-portal sites (~44996/45024). Substring-truncated previews keep
+   plain `escapeHtml` (a cut URL would produce a broken link). Use
+   `pflxLinkify` for any future user-entered description render.
 
 ---
 
