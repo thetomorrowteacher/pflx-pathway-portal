@@ -1800,6 +1800,66 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 2 2026 (Fable) — BATTLE ARENA: Knowledge Decks (Quizlet import)
+
+Ennis vision (locked direction): Battle Arena Side Quest becomes a
+Roblox-like platform — an external **Battle Arena Studio** where players
+build games that bind imported flashcard decks as their dataset.
+Architecture decided with Ennis:
+1. **Knowledge Database** — decks in Supabase, imported from Quizlet
+   export paste / CSV (Quizlet's official API is DISCONTINUED; the
+   supported path is the built-in Export on each set — do NOT scrape).
+2. **Arena Game Cartridge standard** — game = HTML5 zip speaking a
+   postMessage connector (init w/ deck + player ctx, score → XC through
+   the locked economy). The existing arena /cartridges page (HTML upload
+   shelf) is the seed. ANY engine that speaks the contract is valid —
+   Godot NOT required; core templates ship on Phaser 3 (web-native).
+3. **Studio v1** = template-driven builder (like builder.html): card
+   duel, lane defense (PvZ-like), monster-tamer quiz battles, roguelite
+   runner. v2 visual scripting; v3 open cartridge contract to external
+   engines. Real-time MOBA PvP deferred; start turn-based/async on
+   Supabase Realtime.
+
+## Shipped this session (`pflx-battle-arena`, folder pflx-arena-check)
+
+1. **`app/lib/decks.ts`** — KnowledgeDeck/KnowledgeCard types;
+   `parseDelimited` (Quizlet export: term/def sep Tab|Comma|custom,
+   rows Newline|Semicolon|custom, first-separator-only split so
+   definitions keep the sep), `parseCsv` (RFC-4180-ish: quotes, escaped
+   quotes, header auto-skip, col3 = tags), `autoParse` detection.
+   Persistence: Supabase KV row **`pflx_ba_decks`** {decks:[...]} +
+   localStorage mirror; upsert/delete are read-modify-write on the
+   freshest cloud copy (stomp-guard). Caps: 500 cards/deck, 120 decks.
+   Game SDK contract: `deckToGameData()` → games receive
+   `{ type: 'pflx_arena_deck', deck }` via postMessage (play-side
+   wiring lands with the Studio).
+2. **`app/decks/page.tsx`** — 📚 KNOWLEDGE DECKS page: deck grid
+   (source badge QUIZLET/CSV/MANUAL, subject chip, card count, search),
+   import modal (paste + .csv/.txt upload, separator pickers matching
+   Quizlet's export dialog, LIVE PREVIEW with parsed/skipped counts),
+   deck detail modal (numbered card table w/ tags). Delete = creator or
+   admin. Quizlet how-to hint in the header.
+3. **Navbar** — DECKS link between Leaderboard and Cartridges.
+
+## Verification
+- Parser unit tests (esbuild→cjs, Node): **15/15 pass** (tab export,
+  first-sep-only, comma+semicolon combo, quoted/escaped CSV, tags,
+  header skip, autoParse detection, 500-card cap, newDeck/gameData).
+- page.tsx + Navbar.tsx transpile clean (esbuild). npm install times
+  out in the sandbox, so full `next build` typecheck happens on
+  Vercel — **check the deploy status after push**.
+
+## Next steps (Battle Arena Studio roadmap)
+1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
+   the `pflx_arena_deck` play-side wiring in /cartridges.
+2. Deck picker on cartridge config (bind deck ↔ game).
+3. Studio shell (template picker → configure → export cartridge).
+4. Score → XC connector through the approvals/instant-credit economy.
+- Nova-inspired later: component rarity for ship/game items, daily
+  mission points tied to MC streaks.
+
+---
+
 # Session Update — July 2 2026 (Fable) — EVE-STYLE COMBAT COMMAND LAYER (Open Space Phase A+B)
 
 Ennis directive: Core Pathways UI + game mechanics should mimic Eve Online
