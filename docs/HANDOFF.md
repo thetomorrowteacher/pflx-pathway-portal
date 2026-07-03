@@ -1800,6 +1800,32 @@ Both `BACKUP_RULE.md` and `REFRESH_ICLOUD_BACKUP.command` live at the top of `~/
 
 ---
 
+# Session Update — July 2 2026 (Fable) — MC Project card: Progress hero panel
+
+## What shipped (`pflx-platform`, preview.html, `mcRenderProjects`)
+
+Ennis request: on the MC Project card, Progress must sit ABOVE "Tasks in this
+Project" and be more visually distinct.
+
+1. **Reorder** — `progressPanel` now renders first in the card body (before
+   `projTasksPanel`, FLP pill, checklist, submissions).
+2. **Hero treatment** — new panel design:
+   - **SVG progress ring** (58px, r=23) with the percent inside (✓ at 100%).
+   - **Dynamic accent** by completion: cyan 0% → orange >0 → gold ≥33 →
+     light-green ≥66 → green 100%. Drives gradient background, border,
+     left accent bar, glow shadow, ring, and the kicker color.
+   - Kicker renamed **📊 MISSION PROGRESS**; bar bumped to 14px height;
+     XC readout upgraded to a framed gold pill; COMPLETE chip at 100%.
+   - Panel uses `margin-bottom:14px` (it leads the stack now).
+3. Verified with the standard syntax gate (12 inline script blocks,
+   `node --check`, 0 failures).
+
+Player Portal ProjectDetail (~line 23487) already renders progress above
+tasks; its panel is still the flat purple style — port the hero treatment
+there if Ennis wants parity.
+
+---
+
 # Session Update — July 2 2026 (Opus, morning) — Bundle F pass 2
 
 ## New commits (`pflx-platform`)
