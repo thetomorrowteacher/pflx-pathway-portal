@@ -1976,6 +1976,49 @@ everyone → plays counted → XC proposed on results.
    NEEDS live: play both templates in the browser, check canvas
    scaling on mobile.
 
+## Sixth pass (same session) — STUDIO EXPANSION: assets + functions (Ennis: "add more assets and functions")
+
+**New Studio assets** (catalogs at the top of the studio block in
+preview.html): `STUDIO_BACKGROUNDS`/`STUDIO_BG_CSS` (6 themes: Deep
+Space, Neon City, Crimson Nebula, Emerald Grid, Pure Void, Solar
+Sunset), `STUDIO_EMBLEMS` (12 emoji emblems), `STUDIO_DIFFICULTY`
+(easy/normal/hard). Config form gained: BACKGROUND, DIFFICULTY,
+QUESTION ORDER (shuffled / deck-order "lesson mode"), SOUND FX on/off,
+DESCRIPTION (140 chars, shown on the shelf card), GAME EMBLEM picker
+grid, and a **LIVE THEME PREVIEW strip** (background + accent + emblem
++ title, updates on input without re-render — `studioPreview()`).
+
+**New Studio functions:**
+- **✎ EDIT published games** (`studioEditGame`) — loads a game back
+  into the form (gold border + "✎ EDITING" header + CANCEL EDIT), SAVE
+  CHANGES updates IN PLACE preserving id, creator, createdAt, and play
+  count. Edit button on published cards (creator or host).
+- `studioConfigOf(c)` — single config shape used by TEST RUN and
+  PUBLISH: { accent, background, emblem, difficulty, ordered, sound,
+  rivalName, roundTime }. Shelf cards show the game's emblem +
+  creator description.
+
+**Both game templates honor the config** (applyConfig extended in each,
+all values sanitized in the GAME not just the Studio — whitelisted
+backgrounds, emblem ≤4 chars no '<', difficulty whitelist, ordered
+bool, sound bool):
+- Backgrounds swap document.body background (same 6-theme map baked
+  into each cartridge — cartridges stay self-contained).
+- Difficulty: duel = rival damage ×0.75/1/1.3; lane defense =
+  makeWaves multiplier (more + tougher raiders, verified headless).
+- Ordered: rounds/questions re-sorted to deck order (teacher lesson
+  flow) while answer choices stay shuffled.
+- Sound: tiny dependency-free WebAudio synth (`sfx` in each game) —
+  correct = up-chirp, wrong = low buzz, kill/hit = tick; disabled by
+  config or if AudioContext unavailable.
+- Emblem shows on the intro screen + document.title.
+
+Verification: syntax gates clean ×3 files; Node tests **13/13** (duel
+config apply + sanitize + dmgMult + sfx gate + body bg; lane-defense
+config + easy-vs-hard wave scaling + sanitize; studio whitelist-at-read
++ edit preserves creator/plays). NEEDS live: theme preview strip,
+emblem picker feel, SFX volume taste, edit round-trip.
+
 ## Next steps (Battle Arena Studio roadmap)
 1. First game template: **Quiz Card Duel** (Phaser 3) bound to a deck +
    the `pflx_arena_deck` play-side wiring in /cartridges.
