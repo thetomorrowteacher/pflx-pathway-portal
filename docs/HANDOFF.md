@@ -2986,3 +2986,36 @@ Ported the MC row treatment to `ppRenderMyTasks`:
 - `ppRenderProjectDetail` — banner-on-top + child tasks list + progress panel.
 - `ppRenderJobBoard` — player-side Apply UI.
 - `ppRenderHome` — mission-strip refresh with priority ordering.
+
+---
+
+## 2026-07-04 — Sixteenth pass: 3D asset packs downloaded + installed (repo-hosted, CC0)
+
+User: "Ok download the repos and install for use."
+
+### What was downloaded (all CC0 / MIT, committed into `pflx-arena-check`)
+- `public/vendor/three.min.js` — three.js **r128** (same pinned build as CDN) + `public/vendor/GLTFLoader.js` (r128 examples loader). The platform no longer depends on cdnjs for the Creator; CDN kept as document.write fallback.
+- `public/assets/models/` — **215 CC0 GLB models (~4.4 MB total)**:
+  - `space/` 153 models — Kenney **Space Kit** (craft_speeder/racer/miner/cargo ships, corridors, hangar, astronauts, alien, terrain, rocket parts, machines, desks/computers)
+  - `blasters/` 40 models — Kenney **Blaster Kit 2.1** (blaster-a…p, scopes, clips, grenades, targets)
+  - `units/` 7 models — Kenney Starter Kits (character, enemy-flying, blaster, blaster-repeater, coin, flag, block-coin)
+  - `city/` 15 models — Kenney **City Builder Kit** (buildings a–d, roads, pavement, grass-trees) → reserved for Neo City
+  - `models.json` — generated manifest {version, base, license, categories{cat:[files]}} — single source for palettes
+  - `LICENSES.md` — attribution table (CC0, Kenney.nl; three.js MIT)
+- Quaternius: no usable GitHub source (site downloads are JS-gated) — skipped this pass; Kenney coverage is sufficient.
+
+### Install-for-use wiring
+- `vercel.json`: NEW rewrites `/vendor/:path*` → `/public/vendor/:path*` and `/assets/:path*` → `/public/assets/:path*` (static-deploy rule: every URL-referenced public/ path needs a rewrite).
+- `creator.html` (Battle Arena Creator) upgrades:
+  - Loads local `vendor/three.min.js` (+ CDN fallback) and `vendor/GLTFLoader.js`.
+  - NEW **3D MODEL LIBRARY (CC0)** palette section: search box + collapsible categories (🛸 SPACE / 🔫 BLASTERS / 🤖 UNITS / 🏙️ CITY), all 215 models placeable.
+  - `buildGlb(path)`: placeholder shimmer cube → async GLTF load → cached master (`glbCache`) → per-instance clone with cloned materials (so select-glow doesn't leak across instances) → `fitAndGround` normalizes to ≤4.5 units and sits on y=0.
+  - Object `type` for models is `glb:<cat>/<file>` — round-trips through save/load/export/import unchanged (`assetDef()` resolves icon/name for both procedural and glb types).
+- Syntax gate passed (2 inline script blocks, node --check OK).
+
+### Engine question (answered again for the record)
+Unity/Godot as the platform: **no** — cartridges are instant-load browser iframes; desktop-engine exports are heavy and break the deck/postMessage contract. If Ennis installs Godot anyway, games CAN be authored there and exported to HTML5, but they'd need the cartridge contract shim; three.js + these committed GLB packs is the recommended path (now fully local, no CDN).
+
+### Next
+- Use `units/character.glb` + space-kit craft in per-game 3D upgrades (Mecha Tamer arena first).
+- Creator v2: play-test mode walking `character.glb` around the map.
