@@ -2226,7 +2226,11 @@ NEEDS live browser pass on the 3 new games + a real host launch.
 3. **6 new sci-fi coming-soon tiles** registering Ennis's requested
    game types: 🧗 Sky Climb (Don't Look Down), 🥷 Stick Circuit
    (stickman fighter), 🏟 Nexus Legends (Mobile Legends MOBA),
-   🐢 Shell Strike (TMNT beat-em-up), 🏙 Neo City (SimCity builder),
+   🛡 Cyber Agents (co-op beat-em-up — ENNIS REJECTED the TMNT angle;
+   the 4 playable characters are CyberSecurity Agents of the STARTUP
+   STUDIOS: MINDFORGE, INNOV8, GENTECH, eMAGINATION — pull studio
+   names/branding from the platform's Startup Studios data when
+   building), 🏙 Neo City (SimCity builder),
    🤼 Circuit Brawl (Brawlhalla platform fighter). NOTE for next
    sessions: Sky Climb + Neo City are canvas-feasible next; the three
    real-time fighters (Stick Circuit / Shell Strike / Circuit Brawl)
