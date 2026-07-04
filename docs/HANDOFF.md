@@ -3047,3 +3047,23 @@ User: "ok use the new installs to redesign all game modes."
 
 ### Next
 - Deeper passes: lane-defense full 3D lane, pulse-runner 3D track, per-stage distinct mech models (attach blaster GLBs), Creator play-test mode.
+
+---
+
+## 2026-07-04 — Eighteenth pass: two NEW game modes — Scouter Break + Planet Defense: Space TD
+
+User: "scouter break: combat" → clarified: "make a game mode like this" (Dragon-Ball-style scouter/power-level combat). Also: "also build the planet defense like game."
+
+### 🥽 Scouter Break (`games/scouter-break.html`, id `scouter-break`, window.SB)
+Power-level combat with a push-your-luck core: correct answers CHARGE ⚡ power (600 + streak×250, streak cap 8); the UNLEASH button fires a beam anytime — dmg = 34 × (power/foe rating), cap 120; at ≥150% of the foe's rating the foe's SCOUTER SHATTERS (×1.5 crit + banner "READING OFF THE SCALE"). Unleashing keeps 40% of charge. Wrong answers = foe blast + up to 400 power drained. Five rated fighters (1200/2400/4200/6400/**9001** — the wink); 130 HP, +35 corner recovery between bouts, one 🔧 nano-repair. 3D fight ring: character.glb vs [enemy-flying, astronautB, turret_double, rover, alien]; the beam is a real translucent cylinder between fighters (fxBeam), crits burst gold + shake. BGM drive 132bpm. Balance (500-run sims): expert(90%) 100% · skilled(80%) 89% · average ~4% normal / 22% easy · poor 0%. Score: battle×30 + correct×8 + bestStreak×5 + breaks×12 + won×60.
+
+### 🪐 Planet Defense: Space TD (`games/planet-defense.html`, id `planet-defense`, window.PD)
+Real tower defense on canvas 2D (right layer per graphics directive; 3D hero turret on intro). Deterministic sim core (Node-tested): planet center (100 HP), 6 turret slots on a ring (L1/2/3: dps 7/13/22, range 110/130/150, cost 50/80/120⚡), raiders spawn on random bearings and dive radially; 10 waves (count 3+wave×2, hp 10+wave×7, speed 27+wave×2.5); wave 10 = 👑 DREADNOUGHT (420hp, 34 planet dmg). Correct answers = +⚡ (18 + streak×4, cap 6); wrong = 3s RAIDER SURGE (×1.45 speed). Wave clear pays 14+wave×3⚡; kills pay 3⚡. Renderer: gradient planet w/ HP-tinted ring, turret triangles by level, beam lines to targets, boss hp bars, surge tint, inter-wave countdown. Balance (150-run sims, fortified build order): expert 99% · skilled(75%) 84% · average(50%) 13% · poor 0%; undefended dies wave 2. Score: wave×20 + kills×2 + correct×6 + won×80.
+
+### Wiring
+- Both registered in STUDIO_TEMPLATES as ready w/ PIL covers (`games/covers/scouter-break.png`, `planet-defense.png`); the planet-defense 🚧 tile from earlier today became the real entry. Build stamp → `2026-07-04.3`.
+- Both speak cartridge contract v0.1 (ready/deck/result/exit), full config sanitizer incl. music, briefing typewriter, starfield, BGM, hero models. Cores exported under `window.SB._core` / `window.PD._core`.
+- Mapping note for Ennis: Void Ranger = Archero-2-style; Lane Defense = Wittle-Defender-style; Planet Defense = the Space TD; Scouter Break = the DBZ-style combat. 15 modes → 11 ready / 5 in development.
+
+### Next
+- Play-test both; possible rename pass (Void Ranger/Lane Defense) if Ennis wants names closer to inspirations.
