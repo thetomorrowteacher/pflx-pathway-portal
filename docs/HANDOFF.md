@@ -2310,6 +2310,44 @@ Also this pass: Launchpad shows all 15 modes (dev tiles dimmed
 🚧 IN DEVELOPMENT) + visible build stamp (v2026-07-04.1) in the Side
 Quests header for cache diagnosis.
 
+## Fifteenth pass (July 4 2026) — STORYLINES + GRAPHICS LAYER + GAME MUSIC (Ennis)
+
+All NINE game cartridges upgraded in one universal injection pass:
+1. **MISSION BRIEFING intros** — every game now leads with an
+   in-universe STORYLINE (typewriter effect, accent-colored lore
+   panel; unique fiction per game — Cognition Circuit, Outpost K-77,
+   Neo City startup, abandoned blockchain, station VANTA-9, void
+   sector, collapsing data-highway, scrapworld tamers, megaship VANTA)
+   + a "▸ HOW TO PLAY" panel with 4 concrete gameplay instructions.
+   Injected before #introSub; intro screens now overflow-y:auto.
+2. **Animated graphics layer** — #bgfx fixed canvas behind gameplay:
+   110-star parallax field w/ twinkle + 3 drifting accent-tinted
+   nebula glows. Ennis then said: use the layer only AS IT SUITS each
+   game and push real 3D per game — logged as the graphics directive
+   (see priorities below).
+3. **PROCEDURAL GAME MUSIC** (Ennis: "standard game mode music") —
+   WebAudio synth soundtrack engine baked into every cartridge, NO
+   audio files: bass + arpeggio (mood scale) + pad chords + hats on an
+   8th-note scheduler. Per-game identity: duel tense 112bpm · lane
+   march 100 · tycoon upbeat 122 · heist dark 96 · escape eerie 84 ·
+   ranger drive 128 · runner drive 140 · mecha march 108 · saga eerie
+   76. 🎵 toggle button top-right (persists localStorage
+   pflx_bgm_muted), starts on first gesture (autoplay policy), and a
+   **GAME MUSIC on/off option in Studio config + Launchpad launches**
+   (config.music → engine disables). All gates clean ×10 files.
+
+## GRAPHICS DIRECTIVE (Ennis, July 4): per-game 3D upgrades
+- Starfield layer only where it fits; each game gets REAL 3D (three.js)
+  as suits it: Mecha Tamer = 3D mechs in arena; Crypto Heist = vault
+  room; Duel = 3D card table; Lane Defense/Void Ranger = 3D fields.
+  One game per session with Ennis play-testing. Engine guidance:
+  stay three.js/Phaser web-native (cartridge iframes); Godot/Unity
+  desktop downloads DON'T fit the iframe platform; useful GitHub
+  resources: three.js examples repo, Kenney.nl CC0 asset packs
+  (kenney.nl — downloadable, commit into public/), Quaternius CC0
+  low-poly GLTF packs, pmndrs/drei patterns. GLTF models + Kenney/
+  Quaternius assets committed to the repo = the fastest real-3D lift.
+
 ## NEXT SESSION PRIORITIES (Ennis: "continue to develop the new games")
 1. Live play-test pass with Ennis — launches actually work now.
 2. Graphics mandate: three.js scenes into the 2D cartridges one at a
