@@ -2294,6 +2294,32 @@ Ennis corrections this pass:
 6. **Quizlet datasets**: importer is live (DECKS screen paste flow) —
    Ennis will supply real exported sets; no code needed.
 
+## Fourteenth pass (July 4 2026) — P0: ALL GAME LAUNCHES 404'D IN PROD — FIXED
+
+Ennis screenshot: Vercel 404 NOT_FOUND when playing a live session.
+ROOT CAUSE: arena vercel.json serves the repo ROOT (outputDirectory
+'.') with only `/` rewritten to /public/preview.html — the launcher
+iframes `games/<id>.html` → /games/... = 404. EVERY game launch,
+cover image, and creator.html was affected (games were never
+browser-launched in prod until now). FIX: rewrites added →
+/games/:path* → /public/games/:path* and /creator.html →
+/public/creator.html. **VERIFIED LIVE: all three URL classes return
+200.** RULE for future arena work: any new file in public/ that the
+app references by URL needs a rewrite entry.
+Also this pass: Launchpad shows all 15 modes (dev tiles dimmed
+🚧 IN DEVELOPMENT) + visible build stamp (v2026-07-04.1) in the Side
+Quests header for cache diagnosis.
+
+## NEXT SESSION PRIORITIES (Ennis: "continue to develop the new games")
+1. Live play-test pass with Ennis — launches actually work now.
+2. Graphics mandate: three.js scenes into the 2D cartridges one at a
+   time (start w/ Mecha Tamer arena or Crypto Heist vault room).
+3. Build Sky Climb + Neo City (canvas-feasible), then Phaser fighters
+   (Stick Circuit, Circuit Brawl, Nexus Legends, Cyber Agents w/
+   Startup Studios characters MINDFORGE/INNOV8/GENTECH/eMAGINATION).
+4. Creator v2: logic devices, play-test mode, publish-to-Side-Quests.
+5. Adobe Firefly covers once Ennis authorizes the connector.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
