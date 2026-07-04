@@ -2241,6 +2241,59 @@ hard w/ cap, non-season respects configured difficulty, Full Season
 registered, route + win-hook + 9 ready/6 soon tiles). Studio's own
 launch controls remain as a shortcut for hosts.
 
+## Thirteenth pass (July 3-4 2026) — BATTLE ARENA CREATOR + covers + model corrections (Ennis)
+
+Ennis corrections this pass:
+1. **Rift & Cipher reported missing from Side Quests.** Code audit: they
+   were never removed (getAllModes/MODES intact); a runtime throw in the
+   injected LIVE/player-made sections would blank the whole screen.
+   FIX: both injected sections + the host Launchpad button are now
+   wrapped in try/catch — a failure logs a console warning and returns
+   '' so the built-in mode cards can NEVER be taken down. If Ennis still
+   sees them missing after deploy, check browser console for
+   '[sq] ... render failed' and the CUSTOM_MODES/mode-admin data.
+2. **Player model confirmed**: Side Quests = host-launched active
+   sessions + player-published games only. Players NEVER configure.
+   (Already true; template studio remains for creation, not play.)
+3. **BATTLE ARENA CREATOR** (renamed from Studio; Ennis) —
+   **`public/creator.html`** NEW: standalone three.js r128 game-creation
+   engine (Gimkit Creative / Delightex / Roblox Studio direction):
+   - 12-asset palette (floor tile, wall, pillar, cargo block, spawn
+     pad, question terminal, energy core, gate, turret, hazard zone,
+     ramp, glow beacon) — all procedural sci-fi meshes w/ emissive
+     materials, no asset files.
+   - Click-asset → click-map placement w/ grid snap; click select;
+     drag move; R rotate; raise/lower; duplicate; Del delete; Esc.
+   - Custom orbit camera (drag orbit, wheel zoom, shift-drag pan),
+     fog, 3-light rig, spinning energy cores, point-light beacons.
+   - Maps saved to Supabase row **`pflx_ba_maps`** (read-modify-write,
+     cap 60) + localStorage; LOAD picker w/ delete; EXPORT/IMPORT JSON.
+   - Opens in a NEW TAB from the Side Quests "Battle Arena Creator"
+     card and from the Template Studio header button. **Ennis then
+     said it could also live in the Console** — it's a standalone
+     page (arena vercel.json already sets frame-ancestors *), so the
+     Console can iframe it as an app tile whenever wanted; note both
+     entry points remain valid.
+   - v2 roadmap: device/channel logic wiring, play-test mode with a
+     walking character, PUBLISH map as a playable cartridge.
+4. **Game-mode COVER IMAGES** — `img` field on STUDIO_TEMPLATES + the
+   Launchpad cards render 16:7 covers (onerror-hidden if missing).
+   **9 covers generated programmatically (PIL) and committed** to
+   `public/games/covers/<id>.png` (per-game palette + motif art).
+   IMAGE PIPELINE ANSWER (Ennis asked for an MCP that creates images
+   "from GitHub"): no such MCP exists — the flow is generate → commit
+   to GitHub → Vercel serves. Options: (a) these committed PIL covers
+   (live now), (b) **Adobe for creativity connector (Firefly)** once
+   Ennis authorizes it — premium AI covers, then commit, (c) Canva
+   connector (also needs auth).
+5. **QUALITY-GRAPHICS MANDATE (Ennis)**: every game should use quality
+   three.js graphics or better. Roadmap: Creator + Void Ranger lead;
+   progressively upgrade each 2D cartridge with WebGL scenes (three.js
+   background layers first, then full scenes), one per session with
+   Ennis play-testing. Logged as the standing graphics direction.
+6. **Quizlet datasets**: importer is live (DECKS screen paste flow) —
+   Ennis will supply real exported sets; no code needed.
+
 ## Roadmap — Gimkit Creative-style Studio v3 (discussed, not built)
 - Device/channel event system ("when X → transmit on channel → Y
   listens"): portable as a visual RULES BUILDER on top of templates
