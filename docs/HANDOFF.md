@@ -3019,3 +3019,31 @@ Unity/Godot as the platform: **no** — cartridges are instant-load browser ifra
 ### Next
 - Use `units/character.glb` + space-kit craft in per-game 3D upgrades (Mecha Tamer arena first).
 - Creator v2: play-test mode walking `character.glb` around the map.
+
+---
+
+## 2026-07-04 — Seventeenth pass: 3D redesign of the game modes (using the installed CC0 packs)
+
+User: "ok use the new installs to redesign all game modes."
+
+### New shared engine
+- `public/vendor/pflx-stage3d.js` — reusable three.js scene helper for every cartridge. API: `PFLXStage.create(el, {ground, accent, cam})` → stage with `load()` (cached GLB, per-instance material clones, auto fit+ground), `spin/bob/lunge/hitFlash/shake/burst/tween/onFrame/dispose`; plus `PFLXStage.hero(screenEl, path, opts)` which drops a spinning showcase model onto any intro screen. Degrades silently when THREE is missing (games never break).
+- Games load `../vendor/three.min.js` + `GLTFLoader.js` + `pflx-stage3d.js` (all local; /vendor rewrite). Models stream from `/assets/models/`.
+- All 3D UI is gated behind `body.has3d` — if WebGL/three fails, layouts fall back to the previous 2D design untouched.
+
+### Per-game redesigns (directive honored: 3D only where it suits)
+1. **Mecha Tamer — full 3D battle arena** (`#arena3d`, 220px): emoji sprites hidden; player mech vs wild machine on a glowing ring. Stage models: rover → character → character-large (evolve = model swap + cyan flash). Foes: machine_barrel / enemy-flying (hovers) / turret_double / alien. Correct = lunge+burst on foe; wrong = counter-lunge, red flash, camera shake; defeat/evolve/revive all have particle bursts. Hooks: `arenaInit/arenaSync/fxStrike/fxCounter/fxDefeated/fxEvolve/fxRevive` inside `answer()` + `MT.start`.
+2. **Quiz Card Duel — 3D duel deck** (`#duel3d`): craft_speederA (you) vs craft_speederD (rival) bobbing over the ring; every hit lunges the attacker, flashes + bursts the target, shakes the camera on incoming. Hooks `d3Init/d3Fire` in resolve + `QCD.start`.
+3. **Crypto Heist (gold-rush) — 3D vault room** (`#vault3d`): machine_generatorLarge core (slow spin) flanked by barrel machines; every cache outcome bursts in the outcome's color and flashes the core; bad outcomes shake. Hooks `v3Init/v3Outcome` in `pick()`.
+4. **Knowledge Tycoon — living 3D mining base** (`#base3d`): every upgrade purchased erects the next structure (12-model build order: generator→hangars→dishes→rocket parts→monorail cargo) on a fixed spot layout with a gold burst. Rematch clears holders. Hooks `b3Init/b3Build` in the buy handler.
+5. **Escape Protocol — 3D corridor scene** (`#room3d`): corridor_detailed slow-pan + astronautA bobbing; bulkhead UNSEALED banner triggers green breach burst + shake. Hooks `r3Init/r3Breach` via banner().
+6. **Star Saga — per-chapter 3D diorama** (`#saga3d`): 8 encounter models (gate → corridor_cross → machine_wirelessCable → hangar_roundGlass → monorail_trainFront → rock_crystalsLargeA → satelliteDish_detailed → alien boss), swapped in `showEncounter()`; d20 success/fail bursts green/red via `s3Roll`.
+7-9. **Pulse Runner / Void Ranger / Lane Defense** — kept on their purpose-built canvas/Phaser gameplay engines (fast-twitch 2D is the right layer there) but each intro now shows a spinning 3D hero model (craft_racer / enemy-flying / turret_double). ALL nine games got intro hero models with matching accents.
+- Build stamp bumped → `2026-07-04.2`.
+
+### Verification
+- Syntax gate: 38 inline script blocks across 10 files + pflx-stage3d.js — all `node --check` clean.
+- 3D containers hidden by default (`display:none` until `body.has3d`) so nothing shifts if 3D unavailable.
+
+### Next
+- Deeper passes: lane-defense full 3D lane, pulse-runner 3D track, per-stage distinct mech models (attach blaster GLBs), Creator play-test mode.
