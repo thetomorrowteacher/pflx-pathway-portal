@@ -3140,3 +3140,22 @@ Per the locked directive (free play by default, questions at natural beats):
 3. **Last Colony TD**: passive reactor drip +1.6⚡/s in tick (floor-displayed) — the grid funds itself slowly; answers = big surges.
 4. **Nexus Legends**: barracks auto-trains an ally GRUNT every 9s — the lane war never stalls; answers deploy extra/elite minions.
 All gates node --check clean. Remaining conversions queued: Neo City ₡ drip, Crypto Heist free digs on cooldown, fighters (Overlimit/Stick/Brawl/Agents) real-time exchanges like Mecha Tamer.
+
+---
+
+## 2026-07-04 — Twenty-second pass: gameplay-first wave 2 + in-game ❓ HOW TO PLAY everywhere
+
+### Gameplay-first conversions (wave 2)
+- **Overlimit 9001**: live bout — `autoExchange` every 3.5s (power trickles +60, light trades: you 2, foe atk×0.35); answers charge power MUCH faster; unleash unchanged. Idle can't out-trickle the chip damage.
+- **Circuit Brawl**: live scrap — both chip % every 4.2s (rival favored ×mult), auto-launch rolls at 0.35× the normal launch odds w/ full 3D launch fx; answers land the big combos.
+- **Stick Circuit + Cyber Agents**: mecha-style autoExchange every 4s (you 3, foe atk×0.5 − mitigation) with pose/3D fx, auto kills flow through round pipeline.
+- **Crypto Heist**: ⛏ FREE DIG — rig auto-charges every 18s → opens a bonus cache with NO question and NO block advance (button w/ live countdown, starts charged after 10s).
+- **Neo City**: passive economy — ₡2/s drip + ₡1/s per 🌳 PARK (parks now matter!) via 1s interval; answer payout rebased 34→26.
+- All autoTimers cleared in reportResult; briefings updated to describe the live loops. Gate: every script block in all 17 games node --check clean.
+
+### In-game details & instructions (user: "more in game details and instructions for gameplay")
+- EVERY game (17/17) now has a floating ❓ button (below the 🎵 toggle) that opens a mid-game HOW TO PLAY overlay: the mission storyline + the full ▸ HOW TO PLAY list, captured from the intro before it unmounts; click-outside or ✕ to return. Zero per-game code — one shared injected block (`howtoOverlay`).
+- Combined with the live log narration (auto-battle trades, gate distances, drip notices) every game now teaches itself during play.
+
+### Next
+- Remaining directive items: Escape/Saga exploration beats; team/vs splits in Live Play rooms.
