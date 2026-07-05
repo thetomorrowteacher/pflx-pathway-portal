@@ -3094,3 +3094,27 @@ User: "now build the others and re name the last 2" (clarified: rename the 2 new
 ### Next
 - Ennis full play-test of all 15; per-mode difficulty knobs already flow from Launchpad.
 - Possible upgrades: Cyber Agents true co-op (shared session), Neo City districts/adjacency, Creator play-test mode.
+
+---
+
+## 2026-07-04 — Twentieth pass: Fortnite-style mode select + LIVE PLAY v1 + co-op rooms
+
+User: side-by-side Fortnite/Roblox-style selection cards, Live Play last; Live Play = host launches a ONE-SHOT live collaborative event pushed to player dashboards; join code HIDDEN by default (private), host can unhide → open join; same game modes as Side Quests; co-op Side Quests where a player opens a room others can join; team/vs adjustments in-game.
+
+### Choose Your Battle (renderHome)
+- `.cat-grid` → 3 side-by-side tall cards (min-height 400px, repeat(3,1fr), stacks <860px) with cover-art backgrounds (`cat-art` + fade overlay + hover zoom/lift). Order: Creator Showdown → Side Quests → **Live Play last**. Live Play is ENABLED (was Coming Soon); its badge becomes "● N LIVE NOW" when events run.
+
+### Live Play v1 (KV row `pflx_ba_live`, manager `baLive` — baSessions pattern incl. read-modify-write upsert)
+- Event: {id, kind:'live'|'room', gameId, deckId, title, hostId/Name, code (6-char A-Z/2-9), **open:false by default (private)**, startsAt, endsAt, players[{id,brand,score,won,at}]}
+- HOST (renderLivePlay launch panel): pick any of the 17 ready modes + deck + 30/60/120min + title → 🔴 GO LIVE. Event card shows the big dashed CODE, toggle 🔒 PRIVATE ↔ 🔓 OPEN JOIN (`baLiveToggleOpen`), ✕ END EVENT, and the live leaderboard (players sorted by score, 👑 leader, 🏆 winners).
+- PLAYER: Live Play screen lists LIVE NOW events: open events → "▶ JOIN EVENT"; private → INVITE CODE input + 🔒 JOIN (client-side code check; host bypasses). Join = roster add (RMW) + `arenaGameLaunch(..., {liveId})`. REJOIN — BEAT YOUR SCORE for returning players (score = max).
+- Scores: game-result handler now calls `baLiveReportScore(liveId, score, won)` → RMW into event players → live leaderboard. XC pipeline unchanged on top.
+- Push to dashboards: Side Quests LIVE NOW shelf appends `arenaLiveEventsShelfHtml()` (events + rooms, JOIN → live_play screen); home Live Play card shows live count; `baLive.load()` at boot + 20s refresh interval while on home/side_quests/live_play.
+
+### Co-op rooms (kind:'room', open:true by default)
+- "👥 START CO-OP ROOM" button on every LIVE NOW session card + "👥 CO-OP" on player-published shelf games → `baRoomCreate` creates the room and drops the creator straight in; the room then appears on everyone's shelf/Live Play with open join and its own shared leaderboard (compete mode v1).
+
+### Not done yet (next passes)
+- In-game TEAM/VS mechanics (needs per-cartridge work — e.g. team-tagged scores, duel pairing); currently rooms/events compete on a shared score board.
+- Realtime push (currently 20s poll); host kick/lock; spectate.
+- Build stamp → `2026-07-04.5`. Gate: all preview.html script blocks node --check clean.
