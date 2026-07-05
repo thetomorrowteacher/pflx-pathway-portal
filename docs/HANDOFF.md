@@ -3184,3 +3184,13 @@ User: "Are you effectively using the three.js graphics and features in each game
 - Cinematic idle camera drift (sin 0.22/0.15, ±0.5/±0.2 units, suppressed during shake), opts.drift/fog opt-outs.
 - Graphics status ledger: full 3D fields (Mecha Tamer, Overlimit, Circuit Brawl, Cyber Agents, Duel, Heist, Neo City, Tycoon, Saga dioramas, Escape corridor) · engine-appropriate 2D (Pulse Runner, Void Ranger/Phaser, Lane Defense, Sky Climb, Nexus, Stick Circuit canvas) with 3D heroes.
 - Next graphics frontier (noted for Ennis): Sky Climb 3D spire, Last Colony 3D battlefield, post-processing bloom (needs EffectComposer vendor), GLTF-rigged characters (Quaternius animated packs when a clean source is found).
+
+---
+
+## 2026-07-04 — Twenty-fifth pass: RIGGED ANIMATED CHARACTERS (the big visual leap)
+
+- **New asset**: `assets/models/units/robot-expressive.glb` (464KB) — RobotExpressive by Tomás Laulhé, CC0, sourced from the three.js r128 examples tree. 14 skeletal animation clips: Idle, Punch, Jump, Death, Dance, ThumbsUp, Wave, No, Walking, Running, etc. Registered in models.json + LICENSES.md (also placeable in the Creator's model library).
+- **Engine** (`pflx-stage3d.js`): new `st.loadAnimated(path, {scale,x,rotY,tint,idle}, cb(holder, api))` — fresh (non-cloned) load per instance to keep SkinnedMesh bindings intact; THREE.AnimationMixer per instance updated in the render tick; `api.play(name)` crossfades (0.15/0.2s), one-shot clips clamp + auto-return to Idle via the mixer 'finished' event; optional emissive `tint`.
+- **Mecha Tamer**: player is now the living robot — breathing Idle, PUNCH on specials, "No" flinch when hit, JUMP + tint swap on evolve (cyan→green→gold, growing 2.3→3.0→3.8), ThumbsUp on nano-repair, DANCE on victory, DEATH collapse on defeat.
+- **Cyber Agents**: your agent is the robot tinted with the agent's accent (MINDFORGE orange / INNOV8 gold / GENTECH green / eMAGINATION purple), WAVES on deploy, punches/flinches/dances/dies; re-picks rebuild the model with the new tint.
+- Gates clean. Remaining graphics queue: same treatment for Stick Circuit foe? (canvas by design), Sky Climb 3D spire, Last Colony 3D field, EffectComposer bloom.
