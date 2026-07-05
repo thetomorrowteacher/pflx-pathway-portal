@@ -3194,3 +3194,13 @@ User: "Are you effectively using the three.js graphics and features in each game
 - **Mecha Tamer**: player is now the living robot — breathing Idle, PUNCH on specials, "No" flinch when hit, JUMP + tint swap on evolve (cyan→green→gold, growing 2.3→3.0→3.8), ThumbsUp on nano-repair, DANCE on victory, DEATH collapse on defeat.
 - **Cyber Agents**: your agent is the robot tinted with the agent's accent (MINDFORGE orange / INNOV8 gold / GENTECH green / eMAGINATION purple), WAVES on deploy, punches/flinches/dances/dies; re-picks rebuild the model with the new tint.
 - Gates clean. Remaining graphics queue: same treatment for Stick Circuit foe? (canvas by design), Sky Climb 3D spire, Last Colony 3D field, EffectComposer bloom.
+
+---
+
+## 2026-07-05 — Twenty-sixth pass: TITLE ART + SUNO MUSIC PIPELINE (drop-in, zero-code)
+
+User: 16:9 title graphics (Nano Banana) + gameplay music (Suno) per game mode; prompts + the feature.
+- **Title art**: every game auto-probes `games/art/<game-id>.png` (Image.onload); if present, renders it as a 16:9 banner (600px, rounded, glow) at the top of the intro screen. Missing file = silent no-op.
+- **Music**: BGM block in all 17 games now tries `games/music/<game-id>.mp3` first (Audio, loop, vol 0.35, canplaythrough/readyState gate); if present it REPLACES the procedural score; 🎵 toggle + host GAME MUSIC config still govern both paths; fallback to procedural when absent.
+- Dirs `public/games/art/` + `public/games/music/` created with README naming guides (served via existing /games rewrite).
+- **`ART_AND_MUSIC_PROMPTS.md`** (repo root): 17 Nano Banana image prompts (shared cinematic style block, 16:9, no text) + 17 Suno style prompts (instrumental, loopable, per-game BPM/mood matching the procedural scores) + menu-theme bonus. Ennis workflow: generate → drop files with the game-id names → push. No code ever needed.
