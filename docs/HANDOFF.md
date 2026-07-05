@@ -3129,3 +3129,14 @@ Per-game sketch for next session:
 - Neo City: passive ₡ drip per second, questions for permits on SPIRE-class builds + blackout recovery.
 - Crypto Heist / Gold Rush: free cache-picking on a cooldown, questions to unlock bonus digs/power-ups.
 - Escape Protocol / Star Saga / Quiz Card Duel: question-driven by nature — keep, but add free exploration/dialogue choices between locks.
+
+---
+
+## 2026-07-04 — Twenty-first pass: GAMEPLAY-FIRST rework, wave 1 (4 games)
+
+Per the locked directive (free play by default, questions at natural beats):
+1. **Sky Climb — full conversion**: TAP / SPACE / click = free vaulting (14m/tap, 160ms rhythm cap); quiz panel HIDDEN during free climb; every 200m a ⛩ CHECKPOINT GATE seals the spire → quiz appears; correct = unseal +20m; wrong = gate holds + void +30m (void continues rising while you think — real pressure). Void retuned 5 + alt/65. Core: tap()/answerGate()/GATE_EVERY exported. Sims (tap-rate + answer-latency model): expert 99% · skilled 71% · average 19% · poor 1%.
+2. **Mecha Tamer — real-time auto-battle**: `autoExchange(s)` every 3.5s — mechs trade light blows (you 3+stage, foe max(3, atk/2 − stage×2)) with lunge fx; auto kills/evolutions/revives flow through the same pipeline; questions remain the SPECIAL strikes. Balance verified: idle-never-answers 0% win (autos can't carry), poor 10%, average 84%, skilled 100%.
+3. **Last Colony TD**: passive reactor drip +1.6⚡/s in tick (floor-displayed) — the grid funds itself slowly; answers = big surges.
+4. **Nexus Legends**: barracks auto-trains an ally GRUNT every 9s — the lane war never stalls; answers deploy extra/elite minions.
+All gates node --check clean. Remaining conversions queued: Neo City ₡ drip, Crypto Heist free digs on cooldown, fighters (Overlimit/Stick/Brawl/Agents) real-time exchanges like Mecha Tamer.
