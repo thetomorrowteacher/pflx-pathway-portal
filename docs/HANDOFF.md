@@ -3172,3 +3172,15 @@ All gates node --check clean. Remaining conversions queued: Neo City ₡ drip, C
 ### 🔦 Escape Protocol exploration beats (per gameplay-first directive)
 - New 'search' phase: every UNSEALED bulkhead (except the final escape) → "SECTION CLEAR — SEARCH THE ROOM": pick 1 of 3 random spots (locker/console/vent/crate/bunk/med) — NO questions; O₂ keeps draining. Loot: 40% +12s O₂ · 25% +1 hint · 20% +5s · 15% dust. `startSearch/doSearch`, EP.search exported; resumes questions after.
 - Gates: escape-protocol + preview.html script blocks all node --check clean.
+
+---
+
+## 2026-07-04 — Twenty-fourth pass: cinematic 3D engine upgrade (pflx-stage3d)
+
+User: "Are you effectively using the three.js graphics and features in each game? I want the best graphics and gameplay possible." Honest audit: scenes were wired to gameplay but rendered on defaults. Central upgrade (one file → all 10 3D-scene games + all 17 heroes improve):
+- Renderer: ACESFilmicToneMapping (exposure 1.15), sRGBEncoding, PCFSoft shadow maps.
+- Key light casts 1024px soft shadows (bias −0.002, 24×24 ortho bounds); ground discs receiveShadow; ALL GLB instances now castShadow (was explicitly off).
+- Scene fog (0x04070d, 16–55) + 240-point star dome inside every scene for depth.
+- Cinematic idle camera drift (sin 0.22/0.15, ±0.5/±0.2 units, suppressed during shake), opts.drift/fog opt-outs.
+- Graphics status ledger: full 3D fields (Mecha Tamer, Overlimit, Circuit Brawl, Cyber Agents, Duel, Heist, Neo City, Tycoon, Saga dioramas, Escape corridor) · engine-appropriate 2D (Pulse Runner, Void Ranger/Phaser, Lane Defense, Sky Climb, Nexus, Stick Circuit canvas) with 3D heroes.
+- Next graphics frontier (noted for Ennis): Sky Climb 3D spire, Last Colony 3D battlefield, post-processing bloom (needs EffectComposer vendor), GLTF-rigged characters (Quaternius animated packs when a clean source is found).
