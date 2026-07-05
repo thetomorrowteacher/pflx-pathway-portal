@@ -3204,3 +3204,10 @@ User: 16:9 title graphics (Nano Banana) + gameplay music (Suno) per game mode; p
 - **Music**: BGM block in all 17 games now tries `games/music/<game-id>.mp3` first (Audio, loop, vol 0.35, canplaythrough/readyState gate); if present it REPLACES the procedural score; 🎵 toggle + host GAME MUSIC config still govern both paths; fallback to procedural when absent.
 - Dirs `public/games/art/` + `public/games/music/` created with README naming guides (served via existing /games rewrite).
 - **`ART_AND_MUSIC_PROMPTS.md`** (repo root): 17 Nano Banana image prompts (shared cinematic style block, 16:9, no text) + 17 Suno style prompts (instrumental, loopable, per-game BPM/mood matching the procedural scores) + menu-theme bonus. Ennis workflow: generate → drop files with the game-id names → push. No code ever needed.
+
+---
+
+## 2026-07-05 — Twenty-seventh pass: Side Quests grid + live event durations 3–30 min
+
+- **Side Quests Fortnite-style grid**: new `.sq-grid` (auto-fill minmax(340px,1fr), max-width 1160px, 1-col <760px) applied to the mode cards (Cipher/Rift), 🔴 LIVE NOW sessions, 🔴 LIVE EVENTS & CO-OP ROOMS, and 🛠 PLAYER-MADE GAMES shelves — all headers widened to match. Live Play screen event lists use the same grid.
+- **Live event durations (Ennis: "3 min to 30 mins")**: launch select now 3/5/10/15/20/30 min (default 10); `baLiveLaunch` clamps 3–30; co-op rooms 60→30 min; `baLiveTimeLeft` shows seconds under 10 min. Build → 2026-07-05.1.
