@@ -3159,3 +3159,16 @@ All gates node --check clean. Remaining conversions queued: Neo City ₡ drip, C
 
 ### Next
 - Remaining directive items: Escape/Saga exploration beats; team/vs splits in Live Play rooms.
+
+---
+
+## 2026-07-04 — Twenty-third pass: LIVE PLAY TEAM BATTLES + Escape Protocol exploration
+
+### 🔵🔴 Team battles in Live Play (preview.html, build 2026-07-04.6)
+- Launch panel checkbox "TEAM BATTLE" → ev.teams. Joiners auto-balanced into 🔵 NOVA / 🔴 ION (player.team, assigned at join by squad counts).
+- Event card: teams mode renders a two-column squad leaderboard (per-squad totals + members) with a live "🔵 NOVA LEADS / 🔴 ION LEADS / ⚖ TIED" headline; card meta shows "YOUR SQUAD".
+- Works for host events AND co-op rooms (same event object). Scores still flow via baLiveReportScore.
+
+### 🔦 Escape Protocol exploration beats (per gameplay-first directive)
+- New 'search' phase: every UNSEALED bulkhead (except the final escape) → "SECTION CLEAR — SEARCH THE ROOM": pick 1 of 3 random spots (locker/console/vent/crate/bunk/med) — NO questions; O₂ keeps draining. Loot: 40% +12s O₂ · 25% +1 hint · 20% +5s · 15% dust. `startSearch/doSearch`, EP.search exported; resumes questions after.
+- Gates: escape-protocol + preview.html script blocks all node --check clean.
