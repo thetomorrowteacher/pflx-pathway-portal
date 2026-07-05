@@ -3211,3 +3211,21 @@ User: 16:9 title graphics (Nano Banana) + gameplay music (Suno) per game mode; p
 
 - **Side Quests Fortnite-style grid**: new `.sq-grid` (auto-fill minmax(340px,1fr), max-width 1160px, 1-col <760px) applied to the mode cards (Cipher/Rift), 🔴 LIVE NOW sessions, 🔴 LIVE EVENTS & CO-OP ROOMS, and 🛠 PLAYER-MADE GAMES shelves — all headers widened to match. Live Play screen event lists use the same grid.
 - **Live event durations (Ennis: "3 min to 30 mins")**: launch select now 3/5/10/15/20/30 min (default 10); `baLiveLaunch` clamps 3–30; co-op rooms 60→30 min; `baLiveTimeLeft` shows seconds under 10 min. Build → 2026-07-05.1.
+
+---
+
+## 2026-07-05 — Twenty-eighth pass: MC IS THE SINGLE SOURCE FOR SEASONAL DATA
+
+Ennis: launched Side Quests not visible; "a season is not 90 days — most run 10 weeks; Battle Arena must read seasonal data from MC"; "There should be no Seasons active — if there are it's reading old data. All Seasons, Checkpoints, Projects, Tasks originate through Mission Control."
+
+### Root causes found (live Supabase audit)
+1. The "missing" Side Quest launches: 3 short sessions expired on schedule (60-min windows from Jul 3); the 2 "Full Season" test launches were phantom 90-day sessions from the old hardcoded duration. DATA WAS INTACT — nothing was lost.
+2. **Stale active data**: KV row `checkpoints` had "Checkpoint Gamma" status:'active' with endDate 2026-06-02 (ended a month ago, never flipped) — this is what every ticker displayed. KV `seasons` row is EMPTY (correct — no seasons exist yet).
+
+### Fixes
+- **Arena reads MC seasons** (`mcSeasons` manager, KV key 'seasons', loaded at boot): a season counts ACTIVE only if MC flags it active AND today is inside startDate..endDate (stale flags can't leak). No more hardcoded "Full Season (90 days)" — SESSION_DURATIONS caps at 1 week; the Launchpad season select lists each active MC season ("🏆 <name> — ends <date> (level-up replays)") or a disabled "no active Season in Mission Control" notice. Season launches store seasonId/seasonName and endsAt = the season's endDate 23:59:59 (10-week seasons Just Work — length comes from MC, never the arena).
+- **baSessions.active()**: seasonMode sessions are only visible while their MC season is active (legacy season sessions without a valid seasonId are hidden). Season cards show 🏆 season name.
+- **Purged**: the 2 phantom 90-day test sessions removed from `pflx_ba_sessions` (row: 5→3).
+- **MC auto-expiry (platform preview.html)**: on data load, checkpoints past endDate flip status→'completed' and seasons past endDate flip active→false, then save — expired things can never read as active anywhere again. Applied retroactively: **Checkpoint Gamma marked completed in Supabase**.
+- Build → 2026-07-05.2. All gates clean (arena + platform script blocks).
+### Rule going forward: Battle Arena never invents seasonal/checkpoint/project/task data — it reads MC's KV rows ('seasons', 'checkpoints', …) with date-validated activity checks.
