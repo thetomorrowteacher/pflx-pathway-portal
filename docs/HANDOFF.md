@@ -3067,3 +3067,30 @@ Real tower defense on canvas 2D (right layer per graphics directive; 3D hero tur
 
 ### Next
 - Play-test both; possible rename pass (Void Ranger/Lane Defense) if Ennis wants names closer to inspirations.
+
+---
+
+## 2026-07-04 — Nineteenth pass: ALL 15 GAME MODES PLAYABLE + rename pass
+
+User: "now build the others and re name the last 2" (clarified: rename the 2 newest).
+
+### Renames (display names only — ids/files/XC pipeline unchanged)
+- `scouter-break` → **Overlimit 9001** 🥽 (title, intro, template name, cover regenerated)
+- `planet-defense` → **Last Colony TD** 🪐 (same)
+
+### Six NEW cartridges (all chassis-transformed, all node --check clean, all sim-balanced)
+1. **🧗 Sky Climb** (`sky-climb.html`, window.SK) — Don't-Look-Down: canvas spire, climber pinned at 62% viewport, DATASTORM void rises continuously (3.5 + alt/90 m/s, accelerating); correct = vault 58+streak×12m; wrong = slip 28m + void +22m; SUMMIT 1000m. Sims: expert@6s 95% · skilled@7s 34% · average 3%.
+2. **🌆 Neo City** (`neo-city.html`, window.NC) — SimCity on the LIVE 3D SKYLINE (city/ GLB pack on a 12-spot grid + road strip): ₡ from answers (34+streak×6+SHOP income), buildings HAB 45₡/+90👥 · SHOP 65₡/+40👥+12₡/✓ · PARK 35₡/+60👥 · SPIRE 150₡/+260👥; blackout −40👥; target 1,000👥 in 24 sessions. KEY DESIGN: 12-plot cap makes hab-spam a TRAP — shop→spire strategy wins (smart 55% acc → 86% win; greedy 90% acc → 0%).
+3. **🥊 Circuit Brawl** (`circuit-brawl.html`, window.CB) — Brawlhalla: DAMAGE % instead of HP, launchChance = clamp((pct−50)/160, 0, 0.9), 3 stocks; KO = 3D model launched off the platform (tween arc + respawn drop-in). Rival combo 22×mult. Sims: 90%→100 · 75%→98 · 55%→57 · 35%→2.
+4. **🛡 Cyber Agents** (`cyber-agents.html`, window.CA) — pick MINDFORGE 🔨 (dmg ×1.35) / INNOV8 ⚡ (streak bonus ×2) / GENTECH 🧬 (+5hp per strike) / eMAGINATION 🌈 (halves first 3 hits); purge 👻 Firewall Phantom → 🪱 Worm Nest → 👑 Breach King; agent-accented 3D floor. Agent balance @70% acc: 84–96% win.
+5. **⚔ Nexus Legends** (`nexus-legends.html`, window.NL) — MOBA lane-push sim: two cores (100hp), minions march/brawl autonomously (tick sim, blocked-melee model), tiers GRUNT/SOLDIER(streak 3)/CHAMPION(streak 5); wrong = enemy soldier; enemy spawner accelerates (5.5s → 3.2s). Sims: 90%@5s 98% · 75% 43% · 55% 3%.
+6. **🥋 Stick Circuit** (`stick-circuit.html`, window.ST) — canvas STICK-FIGURE fighter: pose-lerp animation system (POSES: idle/jab/kick/hit/down/win as joint-angle sets, 5-param lerp, lunge on attack), 3-round ladder (Novice Proxy/Volt Duelist/Grid Master, color-coded fighters). Sims: 85%→100 · 65%→76 · 45%→7.
+
+### Wiring
+- All 6 registered ready in STUDIO_TEMPLATES with PIL covers (`covers/{sky-climb,neo-city,stick-circuit,nexus-legends,circuit-brawl,cyber-agents}.png`).
+- **ALL 15 GAME MODES NOW PLAYABLE** — the 🚧 roadmap is empty. Build stamp → `2026-07-04.4`.
+- Lesson recorded: chassis-transform pattern (copy nearest sibling → python region replacements → stale-ref grep → node gate → core sim) ships a full cartridge in ~5 tool calls; watch for `onclick="XX.` handles hiding in showQuestion (caught MT.answer leak in cyber-agents/stick-circuit).
+
+### Next
+- Ennis full play-test of all 15; per-mode difficulty knobs already flow from Launchpad.
+- Possible upgrades: Cyber Agents true co-op (shared session), Neo City districts/adjacency, Creator play-test mode.
