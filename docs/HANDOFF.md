@@ -3118,3 +3118,14 @@ User: side-by-side Fortnite/Roblox-style selection cards, Live Play last; Live P
 - In-game TEAM/VS mechanics (needs per-cartridge work — e.g. team-tagged scores, duel pairing); currently rooms/events compete on a shared score board.
 - Realtime push (currently 20s poll); host kick/lock; spectate.
 - Build stamp → `2026-07-04.5`. Gate: all preview.html script blocks node --check clean.
+
+## LOCKED DIRECTIVE (2026-07-04, Ennis): GAMEPLAY-FIRST, QUIZ AT NATURAL BEATS
+"The games seem too heavily driven by the knowledge decks. There should be more opportunities to play the games without needing to answer questions to make the gameplay more natural and engaging. Then whenever the time is right game-wise then you should need to answer more questions."
+→ Redesign target for EVERY cartridge: continuous/free gameplay as the default loop; deck questions appear at game-appropriate moments (checkpoints, boss gates, power unlocks, revives, big purchases) — the Pulse Runner model (run freely, question only on crash) and Void Ranger model (real-time action, questions as reload/power gates) are the reference implementations.
+Per-game sketch for next session:
+- Mecha Tamer / Overlimit / Stick Circuit / Cyber Agents / Circuit Brawl: real-time auto-battle exchanges (timed attacks both ways); questions gate SPECIAL moves, evolutions, revives, finishers.
+- Last Colony TD / Nexus Legends: sim already runs continuously — let basic income/spawns accrue on a timer, questions only for BIG buys (L3 turrets, champions, boss-wave shields).
+- Sky Climb: free tap-to-jump platform hops (Pulse-Runner-style), questions at 200m checkpoint gates + after slips.
+- Neo City: passive ₡ drip per second, questions for permits on SPIRE-class builds + blackout recovery.
+- Crypto Heist / Gold Rush: free cache-picking on a cooldown, questions to unlock bonus digs/power-ups.
+- Escape Protocol / Star Saga / Quiz Card Duel: question-driven by nature — keep, but add free exploration/dialogue choices between locks.
