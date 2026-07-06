@@ -3233,3 +3233,6 @@ Ennis: launched Side Quests not visible; "a season is not 90 days — most run 1
 ## 2026-07-05 — addendum: game titles INSIDE the title art
 - ART_AND_MUSIC_PROMPTS.md: shared style block now instructs a bold chrome-neon AAA-style logo of the title across the upper third ("spelled EXACTLY"); every game prompt (all 17 + menu bonus) begins with `Title text (must appear in the image, spelled exactly): "<TITLE>"`.
 - All 17 games: when art/<id>.png loads, the intro's `.big` text title is hidden — the artwork carries the title, no doubling.
+
+## 2026-07-05 — addendum: profile dropdown reorder (platform preview)
+- VIEW PORTFOLIO moved to the TOP of the profile-card dropdown (above MY WALLET / MY TASKS / LEADERBOARD / SOUND / SETTINGS / SIGN OUT), per Ennis.
