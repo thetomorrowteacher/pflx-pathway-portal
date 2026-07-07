@@ -3454,3 +3454,67 @@ host, `mc-player-edit-modal`), per Ennis's decision.
 - Note: the quick "Make Host / Make Player" action in the player row still flips
   `role` admin↔player directly (→ Master/Player). The modal Tier dropdown is now
   the precise control; consider retiring or relabeling that quick toggle.
+
+---
+
+# Session Update — July 6 2026 (Opus) — TIERED HOST ACCESS, Phase 3 (enforcement)
+
+Phase 3 makes the tiers actually *do* something (`pflx-platform`,
+`preview.html`). Focus = the **Approvals suite**, which the user's spec defines
+per tier. **Design guard: only scoped tiers (cohost/instructor/guest) are ever
+filtered — Master/Admin see and act on everything**, so existing hosts have
+zero regression.
+
+## inScope refined (in the Phase 1 engine)
+`inScope` now reads the RAW session fields to distinguish:
+- **`managedNodes/managedCohorts/managedProjectId` undefined** (never assigned —
+  e.g. a legacy `instructor`-role account) → **permissive** (legacy grace, keeps
+  them working until an admin scopes them).
+- **assigned as an array, even `[]`** (any tier created via the Phase 2 Player
+  Manager) → **STRICT membership** — an explicitly-empty scope manages nothing.
+Master/admin still bypass scope entirely (global).
+
+## Approvals enforcement (both surfaces)
+Shared helpers next to the approvals card: `_pflxApprovalEnforce()` (true only
+for cohost/instructor/guest with the engine loaded), `_scopedApprovalCan(cap,
+ctx)`, and `_pflxPlayerCohortById(id)`.
+- **Home Approvals card** (`renderApprovalsCard`) — items now carry scope hints
+  (`cohort` on task/trade, `nodeId`+`cohort` on coinsub). After sort, scoped
+  hosts get `items.filter(_homeApprovalAllowed)`:
+  reward→`approve.reward`, task→`approve.task{cohort}`,
+  coinsub→ node? `approve.node{nodeId}` : `approve.reward`,
+  trade→`approve.trade{cohort}`.
+- **MC Approvals tab** (`mcRenderApprovals`) — `items.filter(_mcApprovalAllowed)`:
+  task→`approve.task{cohort}`, pitch→`approve.node`,
+  arena_external→`approve.reward` (admin+ only), module_completion→
+  `approve.node{nodeId}`.
+- **Action backstops** (a hidden item can't be approved via a stale/forged
+  button): guards added to `pflxApproveSubmission`, `pflxDenySubmission`,
+  `mcApproveItem`, `mcRejectItem` — each re-derives cap+scope by id and refuses
+  with a toast if the tier can't act.
+
+Net effect per the spec: a **Co-Host** sees node / task / trade approvals for
+its cohorts (no reward requests, no barter); an **Instructor** the same for its
+one cohort (barter allowed); a **Guest** only its project's task/node items;
+**Admin/Master** everything.
+
+## Verification
+- Node harness (`/tmp/tier3_harness.js`, real engine extracted from preview):
+  **15/15 pass** — undefined-scope permissive vs assigned-`[]` strict vs
+  membership, for cohort / node / project; master/admin ignore scope; capability
+  still enforced regardless of scope (cohost never `approve.reward`, guest never
+  `approve.trade`). Earlier Phase-1/2 harnesses (34/34, 24/24) still hold.
+- `node --check` on both affected `<script>` blocks (2.3M approvals block +
+  94k engine block): clean.
+- NOT browser-tested. Ennis: assign a test account Co-Host scoped to one cohort,
+  sign in as them, confirm the Approvals card + MC Approvals tab show only that
+  cohort's task/node/trade items and NO reward requests; confirm an Admin still
+  sees everything.
+
+## Remaining
+- **Phase 4 (plus gating):** Save Point / lockdown / freeze / restore behind
+  `pflxCan('plus.*')` — Master only.
+- **Optional Phase 3b:** scope the *player list* and *cohort views* themselves so
+  a Co-Host/Instructor only sees their cohorts' players (currently still global —
+  only approvals are scoped this pass). Wire the same `pflxCan('manage.cohorts',
+  {cohort})` / `manage.players` into `mcRenderPlayers` + cohort renderers.
