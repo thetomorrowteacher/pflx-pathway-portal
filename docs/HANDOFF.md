@@ -3734,3 +3734,48 @@ a per-player activation + BYO layer on top.
   (the existing X-Bot monitor/mimic tools are the hook).
 - Per-cohort feature unlocks (tutor / study-buddy / quest-hints) gated on
   activation.
+
+---
+
+# Session Update — July 6 2026 (Opus) — X-Bot BYO-LLM, slice 2 (validated connect + dormant abilities)
+
+Builds on slice 1 (`pflx-platform`, `preview.html`).
+
+## What shipped
+1. **Validated connect (no silent broken keys).** `pflxPlayerAI.testConnection(conn)`
+   runs a real minimal call before activating: host mode probes the server proxy;
+   BYO does a tiny `XBOT_AI.callModel` with the candidate key. On failure it
+   **restores the engine's keys** and returns the error. The connect modal's
+   Activate is now async — shows "Validating…", activates only on success, and
+   toasts the actual error otherwise.
+2. **Activation-aware "dormant abilities"** (the original vision — features that
+   light up once a player connects their AI). New `xbotRefreshAbilities()` owns
+   the X-Bot quick-actions row:
+   - Unactivated player → a single **⚡ Activate X-Bot** chip → opens the connect
+     modal.
+   - Activated player → the learning abilities appear: **📚 Study Buddy**,
+     **🧭 Explain This**, **💡 Quest Hint**, **✍️ Writing Coach** (plus the
+     basics). Each sends a safety-wrapped preset through the normal `respond()`
+     path (so the locked educational prompt still applies).
+   - Hosts keep the classic basics (progress/missions/rank/help) with the
+     no-AI static fallback preserved.
+   Rebuilt on login (`initXBot`) and again on connect/disconnect (via the
+   module's `_refreshUi` → `window.xbotRefreshAbilities`).
+
+## Verification
+- Harness (`/tmp/s2_harness.js`, real module): **10/10** — host-proxy ok/down,
+  valid key stays applied, **bad key restores engine keys + surfaces the error**,
+  empty-response invalid + restore, local-provider valid. Slice-1 harness
+  (17/17) still holds.
+- `node --check` on the containing block: clean.
+- NOT browser-tested. Ennis: as a `player`-mode player, tap ⚡ → paste a WRONG
+  key → should refuse with an error (X-Bot stays dormant); paste a good key →
+  activates and the Study Buddy / Explain / Quest Hint / Writing Coach chips
+  appear.
+
+## Still open (BYO-LLM)
+- Encrypted per-cohort host key for `host` mode (spend control) — X-Coin AES-GCM
+  pattern.
+- Moderation is already present (`XBOT_MOD`) on typed input; extend to ability
+  presets if desired + host visibility of player AI usage.
+- Per-cohort selection of WHICH abilities unlock; usage/roster surfacing.
