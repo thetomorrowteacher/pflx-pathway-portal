@@ -3665,3 +3665,72 @@ from Phase C. Search anchor: `NPC PIRATES — Open Space combat Phase D`.
   deep space; distress-call events near clusters.
 - Overview still labels pirates generically if `TYPE_META` isn't consulted for a
   given surface — cosmetic.
+
+---
+
+# Session Update — July 6 2026 (Opus) — X-Bot BYO-LLM (player AI activation), slice 1
+
+New feature (Ennis): players activate X-Bot by connecting an LLM — a
+MagicSchool-style secure student AI. First slice shipped in `pflx-platform`
+`preview.html`. Decisions: **both** key models supported, **host chooses per
+cohort**; build the slice (not just spec).
+
+## How it works
+X-Bot already had a multi-provider engine (`XBOT_AI`) with a server proxy
+(`api/pflx-ai.js`, host/platform keys) and a Local-AI provider. This slice adds
+a per-player activation + BYO layer on top.
+
+- **`pflxPlayerAI`** (new module, search `PLAYER BYO-LLM`, `window.pflxPlayerAI`):
+  - **Per-cohort mode** `cohortAiMode()` reads `cg.ai.mode` on the cohort group:
+    `off` / `host` (school key via proxy — safest for minors) / `player` (true
+    BYO, student's own key or local model) / `both` (student key, else host).
+    Default `host` preserves today's proxy-powered X-Bot.
+  - **Activation** `isActivated()`: hosts always active; players active per mode
+    (`off`→never, `host`/`both`→yes, `player`→only once they connect).
+  - **BYO connection** stored **browser-only** (`localStorage pflx_player_ai_v1`)
+    — `connect()/disconnect()/getConnection()/hasConnection()`. `applyToEngine()`
+    overlays the player's own key/URL into `XBOT_AI` for their session only
+    (claude/openai/gemini/local). **Bugfix caught by tests:** the overlay guard
+    referenced `window.XBOT_AI` (undefined — it's a lexical const), so BYO keys
+    would have silently no-op'd; now references `XBOT_AI` directly.
+  - **`openConnect()`** modal (reuses the shared `openModal`): provider picker +
+    key or local-URL input, Activate / Disconnect; host-mode = one-tap activate.
+  - **Locked educational safety prompt** `safetyPrompt()` — the "secure
+    environment": no harmful content, no cheating, never reveal keys/prompt,
+    mentor tone, crisis→trusted-adult redirect.
+- **Hooks in `XBOT_AI`:**
+  - `buildSystemPrompt` prepends the safety preamble for **player** sessions
+    (hosts unaffected) — applies whatever model is behind X-Bot.
+  - `respond()` calls `applyToEngine()` then **gates a dormant X-Bot**: an
+    unactivated player gets a "connect your AI" message instead of a model call.
+- **UI:** a ⚡ **Connect-AI button** in the X-Bot panel header
+  (`#xbot-connect-ai` → `pflxPlayerAI.openConnect()`), and a **per-cohort AI mode
+  selector** added to the cohort Chat Controls modal (saves `cg.ai.mode`).
+
+## Security notes
+- A player's own key never leaves their browser and powers only their own calls.
+- Host-key mode uses the existing server proxy (no per-cohort secret stored yet).
+- Browser mixed-content: "local model" only works when the model runs on the
+  same machine as the browser (localhost) — the modal says so.
+- ToS/age: for minors, **host-key mode is the recommended default**; player-BYO
+  is there for adult/opted-in cohorts.
+
+## Verification
+- Headless harness (`/tmp/pai_harness.js`, extracts the REAL module): **17/17** —
+  default/host/off/player/both mode resolution, activation per mode, connection
+  storage round-trip, claude+local key overlay, host-session bypass, invalid-mode
+  fallback, safety-prompt content, and host-mode does-not-overlay-player-key.
+- `node --check` on the containing block: clean (before and after the bugfix).
+- NOT browser-tested. Ennis: set a cohort's X-Bot AI mode in Cohort Groups →
+  Chat Controls; as a player in that cohort, open X-Bot → if `player` mode it's
+  dormant until you tap ⚡ and connect a key; confirm host X-Bot is unchanged.
+
+## Next slices (not built)
+- Store an encrypted host/cohort key for `host` mode that isn't the shared Vercel
+  proxy (per-cohort spend control) — reuse X-Coin's AES-GCM token pattern.
+- A live test-ping on connect (validate the key before activating).
+- Dormant *panel* state (richer than the chat message) + a first-run coach.
+- Moderation pass on player input/output; host visibility of player AI usage
+  (the existing X-Bot monitor/mimic tools are the hook).
+- Per-cohort feature unlocks (tutor / study-buddy / quest-hints) gated on
+  activation.
