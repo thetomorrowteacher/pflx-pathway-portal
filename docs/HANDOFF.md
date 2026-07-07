@@ -3561,8 +3561,47 @@ the model intends ("Admin Host: no plus features").
 - Phase 2 (Player-Manager assignment UI) ✅
 - Phase 3 (approvals enforcement + strict scope) ✅
 - Phase 4 (Master-only plus features) ✅
-- Optional follow-ups: **3b** (scope the player list / cohort views themselves —
-  currently only approvals + plus features are enforced), and richer scope
+- Optional follow-ups: **3b** ✅ SHIPPED (next entry), and richer scope
   pickers (a real node/module multiselect instead of the comma-separated ID
   field). The `pflxCan(cap, {cohort|nodeId|projectId})` gate is the one place to
   extend for any further surface.
+
+---
+
+# Session Update — July 6 2026 (Opus) — TIERED HOST ACCESS, Phase 3b (list/cohort scoping)
+
+Scopes the player lists and cohort cards themselves so a Co-Host/Instructor only
+sees what they manage (`pflx-platform`, `preview.html`).
+
+## What shipped
+Two shared helpers next to the approvals enforcement block:
+- `_pflxPlayerVisible(p)` → `pflxCan('manage.players', {cohort:p.cohort})`.
+- `_pflxCohortVisible(name)` → `pflxCan('manage.cohorts', {cohort:name})`.
+Both fail open when the engine is absent. Wired into:
+1. **`mcRenderPlayers`** (Settings → Manage Players) — filter predicate drops
+   players outside the host's cohort scope.
+2. **`hmcRenderPlayers`** (Host Mission Control player table) — same filter, and
+   the cohort filter dropdown is limited to visible cohorts.
+3. **`mcRenderCohortGroups`** — non-visible cohort cards are skipped in-place
+   (return '' inside the map, preserving index `i` so edit/delete still target
+   the right group); empty state reads "No cohort groups in your scope."
+
+Behavior by tier: Master/Admin see everyone (global); Co-Host/Instructor see
+only players/cards in their `managedCohorts` (a legacy tier with no assigned
+scope stays permissive); **Guest sees no players or cohort cards** (guests hold
+neither `manage.players` nor `manage.cohorts` — they work at the Project level).
+
+## Verification
+- Logic harness (`/tmp/pv_logic.js`, real engine): **10/10** — master/admin see
+  all, cohost in/out-of-scope, legacy-cohost permissive, instructor single
+  cohort, guest sees none, cohort-card visibility, engine-absent fail-open.
+- `node --check` on the containing block (2.3M): clean.
+- NOT browser-tested. Ennis: as a scoped Co-Host, Manage Players + the Host
+  panel table + Cohort Groups should show only your cohorts; as Admin, all.
+
+## Note (not changed)
+- Cohort Groups stat tiles (TOTAL GROUPS / TOTAL PLAYERS) still show global
+  counts — cosmetic; the card list itself is scoped. Scope those counts too if
+  it matters.
+- Player row "Make Host/Make Player" quick toggle is unchanged (still a coarse
+  admin↔player flip); the modal Tier dropdown remains the precise control.
