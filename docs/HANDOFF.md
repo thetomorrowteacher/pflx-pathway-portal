@@ -3812,3 +3812,38 @@ Hosts now choose WHICH dormant abilities a cohort's students get
 - Still open: encrypted per-cohort host key (spend control), host visibility of
   who's activated (needs a cloud `aiConnected` flag — no keys), moderation on
   ability presets.
+
+---
+
+# Session Update — July 6 2026 (Opus) — X-Bot BYO-LLM, slice 4 (host visibility of activation)
+
+The MagicSchool-style oversight piece (`pflx-platform`, `preview.html`).
+
+## What shipped
+- On connect/disconnect, `pflxPlayerAI.reportStatus()` upserts a **non-secret**
+  entry into cloud row `pflx_player_ai_status` = `{ [playerId]: { connected,
+  provider, brand, cohort, at } }` — **never a key**, read-modify-write so a
+  player only writes their own entry.
+- `loadStatusMap()` + pure `summarize(map, cohortFilter)` (counts total /
+  activated / by-provider, optional cohort restriction, case-insensitive).
+- `paintActivation()` renders a host readout at the top of **Cohort Groups**
+  (`#mc-ai-activation`): "⚡ N of M students have connected an AI to X-Bot
+  (2× claude · 1× openai)", **scoped to the host's visible cohorts** via the
+  Phase 3b `_pflxCohortVisible` gate (so a Co-Host only sees their cohorts'
+  numbers). Hooked at the tail of `mcRenderCohortGroups` (async, best-effort).
+
+## Verification
+- Harness (`/tmp/s4_harness.js`, real module): **11/11** — total vs activated,
+  by-provider tally, cohort scoping (case-insensitive), empty/null-safe. Slices
+  1–3 harnesses still hold.
+- `node --check` clean. NOT browser-tested — Ennis: after a couple of players
+  activate, open Cohort Groups and confirm the ⚡ readout shows counts for your
+  cohorts only. Privacy: only connection flags + provider name are stored, never
+  keys.
+
+## BYO-LLM — remaining
+- Encrypted per-cohort **host key** for spend control (X-Coin AES-GCM pattern) —
+  the one sizeable piece left; `host` mode currently uses the shared platform
+  proxy.
+- Moderation already covers typed input (`XBOT_MOD`); could extend to ability
+  presets. Per-player usage detail (beyond counts) if wanted.
