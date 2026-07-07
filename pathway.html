@@ -10635,9 +10635,12 @@ const pflxBlaster = {
     // target: nearest live asteroid cluster in range
     let best = null, bestD = Infinity;
     (window.pflxSpaceObjects || []).forEach(function (o) {
-      if (o.type !== 'asteroids' || o.depleted) return;
+      if (o.depleted || o.collected) return;
+      if (o.type !== 'asteroids' && o.type !== 'pirate') return;
       const d = Math.hypot(o.x - pflxShip.x, o.y - pflxShip.y);
-      if (d < pflxBlaster.range && d < bestD) { best = o; bestD = d; }
+      // hostiles win ties within range so the blaster prioritizes threats
+      const pri = o.type === 'pirate' ? d - 0.001 : d;
+      if (d < pflxBlaster.range && pri < bestD) { best = o; bestD = pri; }
     });
     if (best) {
       this.boltFX(pflxShip.x, pflxShip.y, best.x, best.y, best);
@@ -10685,6 +10688,13 @@ const pflxBlaster = {
   },
 
   hit(o, x, y) {
+    // Hostile ships take real damage through the pirate module; asteroids
+    // keep the per-rock mining bounty path below.
+    if (o.type === 'pirate') {
+      if (window.pflxPirates) pflxPirates.damagePirate(o, this.damage() * 2, x, y);
+      else this.flash(x, y, false);
+      return;
+    }
     const dmg = this.damage();
     for (let k = 0; k < dmg && o.hp > 0; k++) {
       o.hp--;
@@ -10716,6 +10726,269 @@ const pflxBlaster = {
   },
 };
 window.pflxBlaster = pflxBlaster;
+
+// ═══════════════════════════════════════════════════════════════════
+// NPC PIRATES — Open Space combat Phase D (July 2026, Opus)
+//   Hostile ships that roam deep space, orbit the player and fire the
+//   Nova: Space Armada weapon triangle at the ship's layered defense:
+//     • kinetic (Raider)  → high armor-penetration, low shield-pen
+//     • laser   (Gunship) → high shield-penetration, low armor-pen
+//     • missile (Frigate) → balanced penetration, heavy hit
+//   AI: approach → orbit-at-range (fire) → flee at low hull. They register
+//   in pflxSpaceObjects so the target computer, overview, autopilot and
+//   blaster all treat them as normal contacts. Damage TO the player runs
+//   through pflxCombat.applyDamage (the Phase C substrate); damage to
+//   pirates comes from the blaster (pflxBlaster.hit branch). Kills drop
+//   salvage + instant-credit XC. Feedback: hull-hit vignette, damage
+//   floaters, and a real camera shake on #nodeCanvas (untransformed, so
+//   it never fights applyTransform which only touches #nodeLayer).
+//   The pure simulation core is window.pflxPirates._core for headless tests.
+// ═══════════════════════════════════════════════════════════════════
+const pflxPirates = (function () {
+  'use strict';
+  var TYPES = {
+    raider:  { name: 'Raider',          icon: '🛩', hp: 8,  speed: 5.4, orbitR: 300, bounty: 18, hull: '#ff6b4a',
+               weapon: { kind: 'kinetic', dmg: 6,  shieldPen: 0.10, armorPen: 0.85, range: 360, cycle: 1.4 } },
+    gunship: { name: 'Gunship',         icon: '🛸', hp: 14, speed: 3.7, orbitR: 460, bounty: 32, hull: '#c084fc',
+               weapon: { kind: 'laser',   dmg: 9,  shieldPen: 0.85, armorPen: 0.10, range: 520, cycle: 2.0 } },
+    frigate: { name: 'Missile Frigate', icon: '🚀', hp: 22, speed: 2.5, orbitR: 560, bounty: 55, hull: '#f5c842',
+               weapon: { kind: 'missile', dmg: 14, shieldPen: 0.45, armorPen: 0.45, range: 640, cycle: 3.0 } }
+  };
+  var MAX = 3, SAFE_R = 1500, SPAWN_MIN = 850, SPAWN_MAX = 1250, DESPAWN = 2900, FLEE_FRAC = 0.28;
+  var HOME_X = 1000, HOME_Y = 1000;
+
+  // ───────── pure core (headless-testable, no DOM / globals) ─────────
+  function makePirate(ptype, x, y) {
+    var T = TYPES[ptype] || TYPES.raider;
+    return {
+      type: 'pirate', ptype: ptype, name: T.name, icon: T.icon,
+      x: x, y: y, vx: 0, vy: 0, hp: T.hp, hpMax: T.hp, r: 34,
+      weapon: T.weapon, orbitR: T.orbitR, orbitDir: Math.random() < 0.5 ? 1 : -1,
+      speed: T.speed, bounty: T.bounty, hull: T.hull,
+      cd: 0.6 + Math.random() * T.weapon.cycle, state: 'approach',
+      el: null, dead: false, collected: false, hitFlash: 0
+    };
+  }
+  // one AI + motion step. Returns { state, fire, dist }. Per-FRAME units
+  // (matches the ship model); dt only drives the fire cooldown.
+  function step(p, ship, dt) {
+    var dx = ship.x - p.x, dy = ship.y - p.y, dist = Math.hypot(dx, dy) || 0.0001, toS = Math.atan2(dy, dx);
+    var frac = p.hp / p.hpMax, desired, thrust = 1;
+    if (frac < FLEE_FRAC) { p.state = 'flee'; desired = toS + Math.PI; }
+    else if (dist > p.weapon.range) { p.state = 'approach'; desired = toS; }
+    else {
+      p.state = 'orbit';
+      var err = dist - p.orbitR, bias = Math.max(-1, Math.min(1, err / 160));
+      var tang = toS + p.orbitDir * (Math.PI / 2);
+      var hx = Math.cos(tang) + Math.cos(toS) * bias, hy = Math.sin(tang) + Math.sin(toS) * bias;
+      desired = Math.atan2(hy, hx); thrust = 0.85;
+    }
+    var acc = p.speed * 0.35;
+    p.vx += Math.cos(desired) * acc * thrust;
+    p.vy += Math.sin(desired) * acc * thrust;
+    p.vx *= 0.94; p.vy *= 0.94;
+    var sp = Math.hypot(p.vx, p.vy);
+    if (sp > p.speed) { p.vx = p.vx / sp * p.speed; p.vy = p.vy / sp * p.speed; }
+    p.x += p.vx; p.y += p.vy;
+    p.cd -= dt;
+    var fire = false;
+    if (p.state !== 'flee' && dist <= p.weapon.range && p.cd <= 0) { p.cd = p.weapon.cycle; fire = true; }
+    return { state: p.state, fire: fire, dist: dist };
+  }
+  // weapon payload for pflxCombat.applyDamage (the Nova triangle)
+  function weaponPayload(p) {
+    var w = p.weapon;
+    return { dmg: w.dmg, shieldPen: w.shieldPen, armorPen: w.armorPen, type: w.kind };
+  }
+  // apply player damage to a pirate; returns { killed, reward }
+  function hurt(p, dmg) {
+    if (p.dead) return { killed: false };
+    p.hp -= dmg; p.hitFlash = 1;
+    if (p.hp <= 0) { p.hp = 0; p.dead = true; return { killed: true, reward: killReward(p) }; }
+    return { killed: false };
+  }
+  function killReward(p) {
+    var items = [{ id: 'salvage-scrap', n: 1 + ((Math.random() * 2) | 0) }];
+    if (Math.random() < 0.5) items.push({ id: 'weapon-part', n: 1 });
+    if (Math.random() < 0.15) items.push({ id: 'plasma-core', n: 1 });
+    return { xc: p.bounty, items: items };
+  }
+  function pickType() {
+    var r = Math.random();
+    return r < 0.55 ? 'raider' : r < 0.85 ? 'gunship' : 'frigate';
+  }
+
+  // ───────── live state + integration ─────────
+  var list = [];
+  var spawnCd = 5;
+  var _shakeT = 0, _shakeMag = 0;
+  var _hurtEl = null;
+
+  function inFlight() { return typeof pflxCamera !== 'undefined' && pflxCamera.mode !== 'birdseye'; }
+  function layer() { return document.getElementById('nodeLayer') || canvas; }
+
+  function boot() {
+    var st = document.createElement('style');
+    st.textContent =
+      '.pflx-pirate{position:absolute;width:52px;margin:-26px 0 0 -26px;z-index:5;pointer-events:auto;cursor:crosshair;text-align:center;transition:left 0.08s linear,top 0.08s linear;}' +
+      '.pflx-pirate .pp-body{width:38px;height:38px;margin:0 auto;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;' +
+        'background:radial-gradient(circle at 35% 30%,rgba(255,90,60,0.5),rgba(20,4,4,0.5));border:1.5px solid rgba(255,90,60,0.85);box-shadow:0 0 14px rgba(255,70,50,0.6);}' +
+      '.pflx-pirate.flee .pp-body{filter:grayscale(0.4);opacity:0.75;}' +
+      '.pflx-pirate .pp-hp{height:4px;width:38px;margin:3px auto 0;border-radius:3px;background:rgba(255,255,255,0.12);overflow:hidden;}' +
+      '.pflx-pirate .pp-hp>div{height:100%;background:#ff5a3c;box-shadow:0 0 6px #ff5a3c;transition:width 0.15s;}' +
+      '#pflxHurtVig{position:fixed;inset:0;z-index:140;pointer-events:none;opacity:0;transition:opacity 0.25s ease-out;' +
+        'box-shadow:inset 0 0 160px 40px rgba(220,30,30,0.55);background:radial-gradient(circle,transparent 55%,rgba(180,10,10,0.18));}' +
+      'body.cam-birdseye .pflx-pirate{opacity:0.85;}';
+    document.head.appendChild(st);
+    _hurtEl = document.createElement('div');
+    _hurtEl.id = 'pflxHurtVig';
+    document.body.appendChild(_hurtEl);
+  }
+
+  function trySpawn() {
+    if (typeof pflxShip === 'undefined') return;
+    // safe zone: no hostiles near the home/start area
+    if (Math.hypot(pflxShip.x - HOME_X, pflxShip.y - HOME_Y) < SAFE_R) return;
+    var ang = Math.random() * Math.PI * 2, d = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
+    var x = pflxShip.x + Math.cos(ang) * d, y = pflxShip.y + Math.sin(ang) * d;
+    var p = makePirate(pickType(), x, y);
+    list.push(p);
+    if (window.pflxSpaceObjects) window.pflxSpaceObjects.push(p);
+    renderMarker(p, true);
+    pflxSpaceToast('☠️', 'HOSTILE DETECTED', p.name + ' inbound — weapons free. Lock it (click) and hold fire, or run for a station.', 'THREAT');
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
+  }
+
+  function renderMarker(p, create) {
+    if (create) {
+      var el = document.createElement('div');
+      el.className = 'pflx-pirate';
+      el.innerHTML = '<div class="pp-body" style="border-color:' + p.hull + ';box-shadow:0 0 14px ' + p.hull + '99;">' + p.icon + '</div>' +
+                     '<div class="pp-hp"><div style="width:100%;"></div></div>';
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (window.pflxCombat && pflxCombat.lockObject) pflxCombat.lockObject(p);
+      });
+      layer().appendChild(el);
+      p.el = el;
+    }
+    if (!p.el) return;
+    p.el.style.left = p.x + 'px';
+    p.el.style.top = p.y + 'px';
+    p.el.classList.toggle('flee', p.state === 'flee');
+    var bar = p.el.querySelector('.pp-hp>div');
+    if (bar) bar.style.width = Math.max(0, (p.hp / p.hpMax) * 100) + '%';
+    if (p.hitFlash > 0) { p.el.style.filter = 'brightness(1.8)'; p.hitFlash -= 0.2; if (p.hitFlash <= 0) p.el.style.filter = ''; }
+  }
+
+  function removePirate(p) {
+    p.dead = true; p.collected = true;
+    if (p.el && p.el.parentNode) p.el.parentNode.removeChild(p.el);
+    p.el = null;
+    var i = list.indexOf(p); if (i >= 0) list.splice(i, 1);
+    if (window.pflxSpaceObjects) {
+      var j = window.pflxSpaceObjects.indexOf(p);
+      if (j >= 0) window.pflxSpaceObjects.splice(j, 1);
+    }
+  }
+
+  function floater(x, y, text, color) {
+    var f = document.createElement('div');
+    f.textContent = text;
+    f.style.cssText = 'position:absolute;z-index:8;font-family:Orbitron,sans-serif;font-size:13px;font-weight:800;pointer-events:none;' +
+      'color:' + color + ';text-shadow:0 0 8px ' + color + ';transition:transform 0.8s ease-out,opacity 0.8s ease-out;';
+    f.style.left = x + 'px'; f.style.top = y + 'px';
+    layer().appendChild(f);
+    requestAnimationFrame(function () { f.style.transform = 'translateY(-42px)'; f.style.opacity = '0'; });
+    setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 820);
+  }
+
+  function boltFX(sx, sy, tx, ty, color) {
+    var bolt = document.createElement('div');
+    var ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
+    bolt.style.cssText = 'position:absolute;width:22px;height:3px;border-radius:2px;pointer-events:none;z-index:6;transform-origin:0 50%;' +
+      'transform:rotate(' + ang.toFixed(1) + 'deg);background:linear-gradient(90deg,rgba(255,60,40,0),' + color + ',#fff);box-shadow:0 0 8px ' + color + ';';
+    bolt.style.left = sx + 'px'; bolt.style.top = sy + 'px';
+    layer().appendChild(bolt);
+    var t0 = performance.now(), dur = 150;
+    (function stepB(now) {
+      var k = Math.min(1, (now - t0) / dur);
+      bolt.style.left = (sx + (tx - sx) * k) + 'px';
+      bolt.style.top = (sy + (ty - sy) * k) + 'px';
+      if (k < 1) requestAnimationFrame(stepB); else if (bolt.parentNode) bolt.parentNode.removeChild(bolt);
+    })(performance.now());
+  }
+
+  function shake(mag) { _shakeMag = Math.max(_shakeMag, mag); _shakeT = 0.28; }
+
+  function fireAtShip(p) {
+    var pay = weaponPayload(p);
+    var dealt = 0;
+    try { if (window.pflxCombat && pflxCombat.applyDamage) dealt = pflxCombat.applyDamage(pay.dmg, pay); } catch (e) {}
+    var col = pay.type === 'laser' ? '#c084fc' : pay.type === 'missile' ? '#f5c842' : '#ff6b4a';
+    boltFX(p.x, p.y, pflxShip.x, pflxShip.y, col);
+    floater(pflxShip.x + (Math.random() - 0.5) * 30, pflxShip.y - 30, '-' + Math.round(dealt || pay.dmg), '#ff5a5a');
+    shake(6 + pay.dmg * 0.4);
+    if (_hurtEl) { _hurtEl.style.opacity = Math.min(0.9, 0.35 + pay.dmg * 0.03).toFixed(2); setTimeout(function () { if (_hurtEl) _hurtEl.style.opacity = '0'; }, 130); }
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  }
+
+  // player weapon → pirate (called from pflxBlaster.hit)
+  function damagePirate(p, dmg, x, y) {
+    var res = hurt(p, dmg);
+    floater(p.x + (Math.random() - 0.5) * 30, p.y - 24, '-' + Math.round(dmg), '#7df9ff');
+    if (window.pflxSpace && pflxSpace.burst) pflxSpace.burst(p.x, p.y, '255,160,120', 10, { speed: 90, size: 5, dur: 0.6 });
+    renderMarker(p, false);
+    if (res.killed) {
+      if (window.pflxSpace && pflxSpace.burst) {
+        pflxSpace.burst(p.x, p.y, '255,200,110', 40, { speed: 170, size: 9, dur: 1.1 });
+        pflxSpace.burst(p.x, p.y, '255,120,60', 22, { speed: 60, size: 12, dur: 1.5, maxOp: 0.8 });
+      }
+      var rw = res.reward;
+      try {
+        (rw.items || []).forEach(function (it) { if (window.pflxCargo && pflxCargo.add) pflxCargo.add(it.id, it.n, p.name + ' wreckage'); });
+        if (window.pflxCargo && pflxCargo.addXC) pflxCargo.addXC(rw.xc, 'destroyed ' + p.name);
+      } catch (e) {}
+      pflxSpaceToast('💥', p.name.toUpperCase() + ' DESTROYED', 'Hostile down. Salvage and a bounty were swept into the hold.', '+SALVAGE · +' + rw.xc + ' XC');
+      shake(10);
+      removePirate(p);
+    }
+  }
+
+  function tick(dt) {
+    // camera shake decays on the untransformed outer container
+    if (_shakeT > 0) {
+      _shakeT -= dt;
+      var m = _shakeMag * Math.max(0, _shakeT / 0.28);
+      if (_shakeT <= 0) { canvas.style.transform = ''; _shakeMag = 0; }
+      else canvas.style.transform = 'translate(' + ((Math.random() - 0.5) * 2 * m).toFixed(1) + 'px,' + ((Math.random() - 0.5) * 2 * m).toFixed(1) + 'px)';
+    }
+    if (typeof pflxShip === 'undefined') return;
+    var flight = inFlight();
+    spawnCd -= dt;
+    if (flight && list.length < MAX && spawnCd <= 0) { spawnCd = 4 + Math.random() * 5; trySpawn(); }
+    for (var i = list.length - 1; i >= 0; i--) {
+      var p = list[i];
+      if (p.dead) { removePirate(p); continue; }
+      var r = step(p, pflxShip, dt);
+      if (r.dist > DESPAWN) { removePirate(p); continue; }
+      if (r.fire && flight) fireAtShip(p);
+      renderMarker(p, false);
+    }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  return {
+    tick: tick,
+    damagePirate: damagePirate,
+    count: function () { return list.length; },
+    clear: function () { list.slice().forEach(removePirate); },
+    _core: { TYPES: TYPES, makePirate: makePirate, step: step, weaponPayload: weaponPayload, hurt: hurt, killReward: killReward, pickType: pickType, MAX: MAX, SAFE_R: SAFE_R, FLEE_FRAC: FLEE_FRAC }
+  };
+})();
+window.pflxPirates = pflxPirates;
 
 // ═══════════════════════════════════════════════════════════════════
 // RPG INTERACTION PROMPTS — bird's-eye is OVERVIEW/MAPPING ONLY.
@@ -10818,7 +11091,8 @@ const pflxCombat = (function () {
     derelict:  { icon: '\ud83d\udef8', label: 'Derelict Pod' },
     comet:     { icon: '\u2604\ufe0f', label: 'Comet' },
     station:   { icon: '\ud83d\udef0', label: 'Station' },
-    crew:      { icon: '\ud83e\uddd1\u200d\ud83d\ude80', label: 'Crew Ship' }
+    crew:      { icon: '\ud83e\uddd1\u200d\ud83d\ude80', label: 'Crew Ship' },
+    pirate:    { icon: '\u2620\ufe0f', label: 'Hostile Ship' }
   };
   var _tidSeq = 1;
 
@@ -11129,7 +11403,7 @@ const pflxCombat = (function () {
         cycle: function () { return pflxHasModule('blaster-mk2') ? 0.9 : 1.4; },
         capCost: 6, range: 520,
         accuracy: function () { return pflxHasModule('blaster-mk2') ? 0.95 : 0.85; },
-        wants: ['asteroids'] },
+        wants: ['asteroids', 'pirate'] },
       { key: 'F2', id: 'mining', icon: '\u26cf\ufe0f', name: 'MINING',
         owned: function () { return pflxHasModule('mining-laser'); }, buyId: 'mining-laser',
         cycle: function () { return 3.0; }, capCost: 8, range: 340, accuracy: function () { return 1; },
@@ -13017,6 +13291,9 @@ function pflxKeyLoop() {
 
   // Eve-style command layer: capacitor, module cycles, target locks
   if (window.pflxCombat) pflxCombat.tick(1 / 60);
+
+  // NPC pirates: spawn, AI, weapon fire, camera shake (Phase D)
+  if (window.pflxPirates) pflxPirates.tick(1 / 60);
 
   // Cluster bearing indicator (cockpit/chase navigation aid)
   if (window.pflxClusters) pflxClusters.updateIndicator();

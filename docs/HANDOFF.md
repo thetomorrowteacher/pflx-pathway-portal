@@ -3605,3 +3605,63 @@ neither `manage.players` nor `manage.cohorts` — they work at the Project level
   it matters.
 - Player row "Make Host/Make Player" quick toggle is unchanged (still a coarse
   admin↔player flip); the modal Tier dropdown remains the precise control.
+
+---
+
+# Session Update — July 6 2026 (Opus) — Open Space Combat Phase D (NPC pirates)
+
+Phase D of the EVE-style combat layer (`pflx-pathway-portal`, `pathway.html`):
+live hostile ships that fight the player, using the Nova defense/weapon model
+from Phase C. Search anchor: `NPC PIRATES — Open Space combat Phase D`.
+
+## What shipped — `pflxPirates` IIFE
+- **Three pirate types = the Nova weapon triangle** (fired at the player via
+  `pflxCombat.applyDamage`):
+  - **Raider** 🛩 — kinetic, high armor-pen (0.85), fast, hp 8, bounty 18.
+  - **Gunship** 🛸 — laser, high shield-pen (0.85), hp 14, bounty 32.
+  - **Missile Frigate** 🚀 — missile, balanced pen (0.45/0.45), heavy 14 dmg,
+    hp 22, bounty 55.
+- **AI** (`step`): approach → orbit-at-range (fires on weapon cooldown) → flee
+  below 28% hull (stops firing). Per-frame motion matching the ship model.
+- **Integration:** pirates register in `window.pflxSpaceObjects` as `type:
+  'pirate'` with `hp`, so the target computer, Overview, autopilot (approach/
+  orbit/keep) and blaster all treat them as normal contacts. Added `pirate` to
+  `pflxCombat` TYPE_META ("Hostile Ship") and to the F1 blaster `wants`.
+- **Player → pirate damage:** `pflxBlaster.hit` branches to
+  `pflxPirates.damagePirate` (deals `blaster.damage()×2`); works from both the
+  SPACE auto-blaster (now prioritizes hostiles in range) and the F1 module on a
+  locked pirate. Target cards show the pirate hp bar.
+- **Kills** drop salvage-scrap / weapon-part / plasma-core + instant-credit
+  bounty XC (`pflxCargo.addXC`, Console-clamped ≤200), with a GL explosion
+  burst.
+- **Feedback:** red hull-hit vignette (`#pflxHurtVig`), cyan/red damage floaters
+  on both sides, and a **real camera shake** applied to `#nodeCanvas` — the
+  untransformed outer container, so it never fights `applyTransform` (which only
+  transforms `#nodeLayer`).
+- **Spawning:** up to 3 hostiles within ~850–1250u of the ship, only in flight
+  (chase/cockpit) and only when the ship is **>1500u from home (safe zone)**;
+  despawn beyond 2900u. Markers render in `#nodeLayer` (correct world coords,
+  same fix as crew peers). Death remains the non-punitive Phase-C hull-breach
+  warp if the player's hull hits 0.
+
+## Verification
+- Syntax gate: 4 inline `<script>` blocks, `node --check`, **0 failures**.
+- Headless core harness (`/tmp/pirate_harness.js`, extracts the REAL pure core):
+  **19/19 pass** — approach/orbit/flee state machine, distance-closing, fire
+  cadence + no-double-fire + no-fire-while-fleeing, the full Nova triangle per
+  type, non-lethal vs lethal damage, kill reward (bounty XC + always-salvage),
+  dead-pirate ignores further hits, `pickType` validity + weighting.
+- **NOT play-tested in a browser** (sandbox). Ennis: fly >1500u from your start
+  node in chase/cockpit → hostiles should spawn, orbit and shoot (screen shakes
+  + red vignette on hits); lock one (click its marker) and F1/SPACE to kill it
+  for salvage + XC; check the camera-shake direction feels right and that pirates
+  don't spawn in the home area.
+
+## Phase D follow-ups (not built)
+- Weapon-type resistance readout / smarter target priority AI (focus-fire,
+  fleeing to regroup), pirate loot rarity tiers (Nova component rarity).
+- Real GLTF pirate meshes in the GL scene (currently DOM markers).
+- Optional: a "bounty board" / wanted-level that scales spawn rate with time in
+  deep space; distress-call events near clusters.
+- Overview still labels pirates generically if `TYPE_META` isn't consulted for a
+  given surface — cosmetic.
