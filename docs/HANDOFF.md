@@ -3316,3 +3316,82 @@ implemented in `defense.apply()`:
   with weapon-type profiles (kinetic = high armor-pen, laser = high shield-pen,
   missile = balanced — the Nova triangle), loot drops, hit feedback (camera
   shake, damage numbers). The defense substrate + autopilot are ready for it.
+
+---
+
+# Session Update — July 6 2026 (Opus) — TIERED HOST ACCESS, Phase 1 (platform)
+
+New workstream (Ennis): a five-tier host access model on the Console
+(`pflx-platform`, `preview.html`). Decisions locked with Ennis:
+existing `admin` accounts become **Master Host** (keep everything); assignment
+of tier + scope will live in the **Player Manager**; build **foundation
+first**, one phase per pass with play-testing between.
+
+## The five tiers (capability matrix)
+| Capability | Master | Admin | Co-Host | Instructor | Guest |
+|---|---|---|---|---|---|
+| Full Console control | ✓ | ✓ | scoped | scoped | scoped |
+| Plus: history / auto-backup / override / restore | ✓ | — | — | — | — |
+| Approve X-Tracker reward requests | ✓ | ✓ | — | — | — |
+| Approve MC task submissions | all | all | ✓ | ✓ | ✓ |
+| Approve Core Pathway nodes | all | all | ✓ | ✓ | ✓ |
+| Approve X-Coin trades | ✓ | ✓ | ✓ | ✓ | — |
+| Approve X-Coin barter | ✓ | ✓ | — | ✓ | — |
+| Manage cohorts' Mission Control | all | all | multiple | single | — |
+| Manage a Project | ✓ | ✓ | ✓ | ✓ | ✓ (one) |
+| Scope | global | global | cohort set | 1 cohort | 1 project/node |
+
+## What shipped — Phase 1 foundation ONLY (purely additive, no gate changed)
+Inserted right after `normalizeRole` (search `TIERED HOST ACCESS — Phase 1`).
+A self-contained IIFE exposing a tier + capability engine on `window`:
+- **`pflxHostTier(session?)`** → `master|admin|cohost|instructor|guest|null`.
+  Resolves an explicit `session.hostTier` if valid, else DERIVES from the legacy
+  role: `admin`→`master`, `host`→`admin`, `instructor`/`teacher`→`instructor`,
+  else `null`. So **existing accounts are unchanged** (admins keep everything).
+  `cohost` and `guest` only ever come from an explicit `hostTier` assignment.
+- **`pflxCan(capability, ctx?)`** — the single gate Phase 3 will route every
+  host check through. `ctx` may carry `{cohort, nodeId, projectId}` for scoped
+  tiers. Capability list: `console.full`, `plus.history|backup|override|restore`,
+  `approve.reward|task|node|trade|barter`, `manage.cohorts|project|nodes|players`,
+  `assign.tiers`.
+- **Scope model** (Phase 2 UI will populate): `session.managedCohorts[]`
+  (cohost/instructor), `session.managedNodes[]` (any scoped tier),
+  `session.managedProjectId` (guest). **Unset scope = permissive in Phase 1**
+  so nothing is prematurely restricted; Phase 3 flips these strict at the call
+  sites.
+- Also: `pflxIsHostTier`, `pflxTierMeta`, `pflxTierRank`, `pflxHasPlus`,
+  `pflxAccessDebug(session?)` (console diagnostic → tier/label/plus/scope/caps),
+  and the `window.pflxAccess` namespace + `PFLX_TIER_META` / `PFLX_TIER_ORDER`.
+
+**Phase 1 changes NO existing behavior** — the ~5 legacy host helpers
+(`mcIsHost`, `pflxIsHost`, `_pflxRoleIsHost`, `isHostOrCohost`, `isHostRole`)
+and the `pflxPlayerCanAccessApp` host short-circuit are untouched. New tiers
+(cohost/guest) get an underlying host `role`, so those helpers still treat them
+as host; the finer restriction arrives in Phase 3 via `pflxCan`.
+
+## Verification
+- Node harness (`/tmp/tier_harness.js`, extracts the REAL IIFE from preview.html
+  and runs it under stubs): **34/34 pass** — tier derivation (incl. bogus
+  hostTier fallback + explicit-wins), plus-feature gating (master only),
+  full approvals matrix per tier (reward master/admin-only, barter excludes
+  cohost, guest excludes trade/cohort-mgmt), and scope enforcement (in/out of
+  managedCohorts, guest project scope, node scope, master ignores scope,
+  unset-scope permissive).
+- `node --check` on the extracted IIFE and on the full 94k-char containing
+  `<script>` block: **both clean**. (Full-file gate is too slow on 55k lines;
+  preview.html is served static — the browser is the runtime check.)
+- Nothing to play-test yet (no UI surface in Phase 1). Inspect in the browser
+  console: `pflxAccessDebug()` shows the signed-in user's resolved tier.
+
+## Next — Phase 2 (assignment) → 3 (enforcement) → 4 (plus gating)
+- **Phase 2:** Player Manager gains a **Tier** dropdown (Master/Admin/Co-Host/
+  Instructor/Guest) + a scope picker (multi-cohort for Co-Host, single cohort
+  for Instructor, node/module multiselect, single Project for Guest). Writes
+  `hostTier` + `managedCohorts/managedNodes/managedProjectId` onto the PLAYERS
+  record. Only `assign.tiers` holders (master/admin) see it.
+- **Phase 3:** route the cohort/player/approval renderers + the
+  `pflxPlayerCanAccessApp` short-circuit through `pflxCan(...)` with scope
+  context; flip `inScope` unset-behavior from permissive → strict for scoped
+  tiers. Filter each approval stream per `approve.*` capability + scope.
+- **Phase 4:** gate the plus features (Save Point / lockdown-freeze-override
+  maintenance panel / restore) behind `pflxCan('plus.*')` — Master only.
