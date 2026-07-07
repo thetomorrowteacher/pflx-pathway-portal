@@ -3512,9 +3512,57 @@ one cohort (barter allowed); a **Guest** only its project's task/node items;
   sees everything.
 
 ## Remaining
-- **Phase 4 (plus gating):** Save Point / lockdown / freeze / restore behind
-  `pflxCan('plus.*')` — Master only.
+- **Phase 4 (plus gating):** ✅ SHIPPED — see next entry.
 - **Optional Phase 3b:** scope the *player list* and *cohort views* themselves so
   a Co-Host/Instructor only sees their cohorts' players (currently still global —
   only approvals are scoped this pass). Wire the same `pflxCan('manage.cohorts',
   {cohort})` / `manage.players` into `mcRenderPlayers` + cohort renderers.
+
+---
+
+# Session Update — July 6 2026 (Opus) — TIERED HOST ACCESS, Phase 4 (plus features) — **MODEL COMPLETE**
+
+Phase 4 locks the Master-only plus features (`pflx-platform`, `preview.html`).
+With this the whole five-tier model (Phases 1→4) is in place.
+
+## What shipped
+Master is the only tier holding a `plus.*` capability. Two layers, both
+**fail-open** if the tier engine ever fails to load (`window.pflxCan` absent →
+legacy behavior preserved, nothing hidden/blocked):
+1. **Function guards** via `pflxRequirePlus(cap, label)` (toast + return if
+   denied) on:
+   - `pflxCreateSavePoint` → `plus.backup` (auto-backup / restore reference)
+   - `hmcToggleAppLock`, `hmcLockdownToggle` → `plus.override` (system override)
+   - `hmcFreezeAll`, `hmcResumeAll` → `plus.override`
+2. **UI gating** via `pflxApplyPlusGating()` (called from `hmcRefreshDashboard`
+   so it re-applies on every Host panel render): hides the 🛟 Create Save Point
+   button, disables the four app-lock toggles, and hides the Freeze All / Resume
+   All / Lockdown Mode buttons for non-Master hosts.
+
+Left as normal host tools (NOT gated — operational, not override/backup): XC
+Drop, Broadcast, Reload All/Reload App, per-player freeze.
+
+Existing `admin`-role accounts resolve to **Master** (Phase 1 rule) → they keep
+every plus feature. Plain `host`-role → **Admin** tier → loses plus features, as
+the model intends ("Admin Host: no plus features").
+
+## Verification
+- `node --check` on the containing `<script>` block (2.3M): clean.
+- Logic harness (`/tmp/plus_logic.js`, reuses the REAL engine): **8/8** —
+  master shows/uses plus, admin/cohost/instructor hidden+blocked, no-engine
+  fail-open. Underlying `plus.*`=master-only already proven in the Phase 1
+  harness (34/34).
+- NOT browser-tested. Ennis: sign in as a plain **Admin** (host role, not admin
+  role) → the Save Point button, app-lock toggles, and Freeze/Lockdown buttons
+  should be gone/disabled; as **Master** everything is present and works.
+
+## TIERED HOST ACCESS — full model status
+- Phase 1 (foundation: tiers + `pflxCan`) ✅
+- Phase 2 (Player-Manager assignment UI) ✅
+- Phase 3 (approvals enforcement + strict scope) ✅
+- Phase 4 (Master-only plus features) ✅
+- Optional follow-ups: **3b** (scope the player list / cohort views themselves —
+  currently only approvals + plus features are enforced), and richer scope
+  pickers (a real node/module multiselect instead of the comma-separated ID
+  field). The `pflxCan(cap, {cohort|nodeId|projectId})` gate is the one place to
+  extend for any further surface.
