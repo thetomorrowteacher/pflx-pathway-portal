@@ -3779,3 +3779,36 @@ Builds on slice 1 (`pflx-platform`, `preview.html`).
 - Moderation is already present (`XBOT_MOD`) on typed input; extend to ability
   presets if desired + host visibility of player AI usage.
 - Per-cohort selection of WHICH abilities unlock; usage/roster surfacing.
+
+---
+
+# Session Update — July 6 2026 (Opus) — X-Bot BYO-LLM, slice 3 (per-cohort ability selection)
+
+Hosts now choose WHICH dormant abilities a cohort's students get
+(`pflx-platform`, `preview.html`).
+
+## What shipped
+- **Central ability registry** in `pflxPlayerAI`: `ABILITIES` = studyBuddy /
+  explain / questHint / writingCoach (each `{id,label,send}`), plus
+  `abilityEnabled(id)` and `enabledAbilities()` reading `cg.ai.abilities`
+  (default: all on).
+- **Cohort control:** the Chat Controls modal (where AI mode lives) now has four
+  ability checkboxes saved to `cg.ai.abilities`.
+- **`xbotRefreshAbilities()`** renders only the host-enabled abilities for an
+  activated player (was hardcoded to all four). Single source of truth — the
+  chip labels/prompts now come from the registry.
+
+## Verification
+- Harness (`/tmp/s3_harness.js`, real module): **10/10** — default all-on,
+  explicit off (subset), all-off, explicit-on, unknown-cohort default,
+  registry shape. Slice 1/2 harnesses (17/17, 10/10) still hold.
+- `node --check` clean.
+- NOT browser-tested. Ennis: Cohort Groups → Chat Controls → uncheck e.g. Quest
+  Hint; an activated player in that cohort should no longer see the 💡 chip.
+
+## BYO-LLM feature status
+- Slice 1 (activation + security) ✅ · Slice 2 (validated connect + dormant
+  abilities) ✅ · Slice 3 (per-cohort ability selection) ✅.
+- Still open: encrypted per-cohort host key (spend control), host visibility of
+  who's activated (needs a cloud `aiConnected` flag — no keys), moderation on
+  ability presets.
