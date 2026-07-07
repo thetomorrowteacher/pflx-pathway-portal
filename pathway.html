@@ -10907,6 +10907,95 @@ const pflxCombat = (function () {
     pflxShipFlyTo(p.x, p.y, function () { if (window.pflxSpaceHazards) pflxSpaceHazards.tick(); });
   }
 
+  // ═════════ AUTOPILOT (Phase C — Eve approach/orbit/keep-at-range) ═════════
+  // Continuous flight commands that hold a relationship to the active
+  // target. Unlike approach()/flyTo (a one-shot animated hop), these steer
+  // the ship every frame via pflxKeyLoop: autoDrive(dt) returns the desired
+  // heading + thrust, the key loop applies it, and ANY manual input cancels
+  // the command (Eve behavior). Works only in chase/cockpit flight; from
+  // bird's-eye an approach falls back to the one-shot flyTo.
+  var ORBIT_DEFAULT = 460, KEEP_DEFAULT = 820, APPROACH_STOP = 120;
+  var autop = {
+    mode: null,       // 'approach' | 'orbit' | 'keep'
+    tid: null,
+    range: ORBIT_DEFAULT,
+    dir: 1,           // orbit spin direction (+1 = counter-clockwise in map space)
+    _label: function () {
+      return this.mode === 'approach' ? 'APPROACH'
+        : this.mode === 'orbit' ? ('ORBIT ' + Math.round(this.range) + 'u')
+        : this.mode === 'keep' ? ('KEEP ' + Math.round(this.range) + 'u') : '';
+    },
+    active: function () { return !!this.mode; },
+    engage: function (mode, tid, range) {
+      var en = tid ? tgt.byId(tid) : tgt.active();
+      if (!en) { pflxSpaceToast('🎯', 'NO TARGET', 'Lock a contact first, then engage a flight command.', ''); return; }
+      if (en.locking) { pflxSpaceToast('🎯', 'STILL LOCKING', 'Wait for the target lock to complete, then command the ship.', ''); return; }
+      if (en.kind === 'obj' && en.ref.type === 'blackhole' && (mode === 'approach' || mode === 'keep' || mode === 'orbit')) {
+        if (mode === 'approach') { pflxSpaceToast('🕳️', 'NAV REFUSAL', 'Autopilot will not fly into a gravitational anomaly. Orbit or keep-at-range at a safe distance instead.', 'AVOID'); return; }
+      }
+      tgt.activeId = en.tid;
+      if (!inFlight()) { // bird's-eye — one-shot hop toward it
+        var p0 = entryPos(en);
+        if (p0 && typeof pflxShipFlyTo === 'function' && !pflxShip.flying) pflxShipFlyTo(p0.x, p0.y, function () { if (window.pflxSpaceHazards) pflxSpaceHazards.tick(); });
+        return;
+      }
+      this.mode = mode; this.tid = en.tid;
+      if (typeof range === 'number') this.range = range;
+      else if (mode === 'orbit') this.range = ORBIT_DEFAULT;
+      else if (mode === 'keep') this.range = KEEP_DEFAULT;
+      var meta = mode === 'approach'
+        ? ['▶', 'APPROACHING', 'Flying straight to ' + en.name + '. Any manual input drops autopilot.']
+        : mode === 'orbit'
+        ? ['⟳', 'ORBITING', 'Holding a ' + Math.round(this.range) + 'u orbit around ' + en.name + ' — good for keeping weapons on target. Manual input cancels.']
+        : ['⇄', 'KEEPING RANGE', 'Holding ' + Math.round(this.range) + 'u from ' + en.name + '. Manual input cancels.'];
+      pflxSpaceToast(meta[0], meta[1], meta[2], en.icon || '');
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+      renderTargets(); renderAutoChip();
+    },
+    cancel: function (why) {
+      if (!this.mode) return;
+      var wasApproach = this.mode === 'approach';
+      this.mode = null; this.tid = null;
+      renderAutoChip();
+      if (typeof renderTargets === 'function') renderTargets();
+      if (why === 'manual' && typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+      if (why === 'arrived' && wasApproach) { /* silent — arrival is its own feedback */ }
+    },
+    cycleRange: function (delta) {
+      if (this.mode !== 'orbit' && this.mode !== 'keep') return;
+      this.range = Math.max(160, Math.min(3000, this.range + delta));
+      renderAutoChip();
+    },
+    // pure steering solver — returns { heading (rad), thrust (0..1.6) } or null
+    drive: function () {
+      if (!this.mode) return null;
+      var en = tgt.byId(this.tid);
+      if (!en || en.locking || !entryAlive(en)) { this.cancel('lost'); return null; }
+      var p = entryPos(en);
+      if (!p) { this.cancel('lost'); return null; }
+      var dx = p.x - pflxShip.x, dy = p.y - pflxShip.y;
+      var dist = Math.hypot(dx, dy) || 0.0001;
+      var toT = Math.atan2(dy, dx);
+      if (this.mode === 'approach') {
+        if (dist <= APPROACH_STOP) { this.cancel('arrived'); return null; }
+        return { heading: toT, thrust: dist > 300 ? 1 : Math.max(0.35, (dist - APPROACH_STOP) / 300) };
+      }
+      if (this.mode === 'keep') {
+        var err = dist - this.range;
+        if (Math.abs(err) < 45) return { heading: toT, thrust: 0 }; // hold; friction parks
+        var h = err > 0 ? toT : (toT + Math.PI);
+        return { heading: h, thrust: Math.min(1, Math.abs(err) / 260) };
+      }
+      // orbit: tangential heading with a radial correction toward the set range
+      var err2 = dist - this.range;
+      var bias = Math.max(-1, Math.min(1, err2 / 240)); // >0 too far → steer inward
+      var tang = toT + this.dir * (Math.PI / 2);
+      var hx = Math.cos(tang) + Math.cos(toT) * bias * 0.9;
+      var hy = Math.sin(tang) + Math.sin(toT) * bias * 0.9;
+      return { heading: Math.atan2(hy, hx), thrust: 0.85 };
+    }
+  };
+
   // ═════════ CAPACITOR ═════════
   var cap = {
     val: 100, warnT: 0,
@@ -10927,6 +11016,107 @@ const pflxCombat = (function () {
     tick: function (dt) {
       if (this.warnT > 0) this.warnT -= dt;
       this.val = Math.min(this.max(), this.val + this.regen() * dt);
+    }
+  };
+
+  // ═════════ DEFENSE (Nova: Space Armada layered model) ═════════
+  //   Shields absorb damage and BLOCK hull hits until they drop — only a
+  //   weapon's shield-penetration fraction leaks through while shields
+  //   are up (Nova rule). Armor REDUCES body damage; a weapon's
+  //   armor-penetration ignores part of that mitigation. Hull is the
+  //   last layer; at 0 the ship suffers a (non-punitive) hull breach and
+  //   is recovered to a safe point. Shields regenerate after a lull;
+  //   armor/hull are repaired at stations / by pickups, not passively.
+  var defense = {
+    shd: { v: 0, max: 0, regen: 0, sinceHit: 99 },
+    arm: { v: 0, max: 0 },
+    hull: { v: 100, max: 100 },
+    breachT: 0,
+    recompute: function () {
+      var hasShield = !!(pflxShip.upgrades && pflxShip.upgrades.shieldAura) || pflxHasModule('shield-booster');
+      var mult = (pflxShip.upgrades && pflxShip.upgrades._speedMult) || 1;
+      var shdMax = hasShield ? Math.round(60 + mult * 40) : 0;
+      var armMax = Math.round(50 + mult * 30);
+      var hullMax = Math.round(80 + mult * 30);
+      // preserve current fill fraction across recomputes (tier swaps)
+      var sf = this.shd.max ? this.shd.v / this.shd.max : 1;
+      var af = this.arm.max ? this.arm.v / this.arm.max : 1;
+      var hf = this.hull.max ? this.hull.v / this.hull.max : 1;
+      this.shd.max = shdMax; this.shd.v = Math.round(shdMax * sf);
+      this.shd.regen = hasShield ? (4 + mult * 2) : 0;
+      this.arm.max = armMax; this.arm.v = Math.round(armMax * af);
+      this.hull.max = hullMax; this.hull.v = Math.round(hullMax * hf);
+    },
+    regenTick: function (dt) {
+      this.shd.sinceHit += dt;
+      if (this.breachT > 0) this.breachT -= dt;
+      // shield-boost module (F4) speeds the recharge and shortens the lull
+      var boosted = shieldBoostActive();
+      var delay = boosted ? 1.2 : 3.0;
+      if (this.shd.max > 0 && this.shd.v < this.shd.max && this.shd.sinceHit >= delay) {
+        this.shd.v = Math.min(this.shd.max, this.shd.v + this.shd.regen * (boosted ? 1.8 : 1) * dt);
+      }
+    },
+    // Nova damage resolution. opts: { shieldPen 0..1, armorPen 0..1, type }
+    apply: function (dmg, opts) {
+      opts = opts || {};
+      if (dmg <= 0 || this.breachT > 0) return 0;
+      var sp = Math.max(0, Math.min(1, opts.shieldPen || 0));
+      var ap = Math.max(0, Math.min(1, opts.armorPen || 0));
+      var toBody;
+      if (this.shd.v > 0) {
+        var toShield = dmg * (1 - sp);
+        var bypass = dmg * sp;
+        if (toShield >= this.shd.v) { toBody = bypass + (toShield - this.shd.v); this.shd.v = 0; }
+        else { this.shd.v -= toShield; toBody = bypass; }
+      } else {
+        toBody = dmg;
+      }
+      this.shd.sinceHit = 0;
+      if (toBody > 0 && this.arm.max > 0) {
+        var mit = (this.arm.v / (this.arm.v + 120)) * (1 - ap); // fraction mitigated
+        toBody = toBody * (1 - mit);
+        this.arm.v = Math.max(0, this.arm.v - dmg * 0.05); // armor chips over a fight
+      }
+      var before = this.hull.v;
+      this.hull.v = Math.max(0, this.hull.v - toBody);
+      var dealt = before - this.hull.v;
+      if (this.hull.v <= 0) this.breach();
+      renderBars();
+      return dealt;
+    },
+    repair: function (o) {
+      o = o || {};
+      if (o.shield) this.shd.v = Math.min(this.shd.max, this.shd.v + o.shield);
+      if (o.armor) this.arm.v = Math.min(this.arm.max, this.arm.v + o.armor);
+      if (o.hull) this.hull.v = Math.min(this.hull.max, this.hull.v + o.hull);
+      if (o.full) { this.shd.v = this.shd.max; this.arm.v = this.arm.max; this.hull.v = this.hull.max; }
+      renderBars();
+    },
+    breach: function () {
+      this.breachT = 3.5; // brief invulnerable emergency window
+      // Emergency recovery — warp to nearest station (or map home), shields
+      // down, hull limped back to 40%. NEVER costs the player XC or items.
+      var dest = null, bd = Infinity;
+      try {
+        Object.keys((typeof nodeElements !== 'undefined') ? nodeElements : {}).forEach(function (nid) {
+          var ne = nodeElements[nid]; if (!ne || !ne.el) return;
+          var nx = parseFloat(ne.el.style.left) || 0, ny = parseFloat(ne.el.style.top) || 0;
+          var d = Math.hypot(nx - pflxShip.x, ny - pflxShip.y);
+          if (d < bd) { bd = d; dest = { x: nx, y: ny }; }
+        });
+      } catch (e) {}
+      if (!dest) dest = { x: 1000, y: 1000 };
+      this.hull.v = Math.round(this.hull.max * 0.4);
+      this.arm.v = Math.round(this.arm.max * 0.5);
+      this.shd.v = 0; this.shd.sinceHit = 0;
+      if (window.pflxCombat && autop.cancel) autop.cancel('breach');
+      if (typeof pflxSpaceToast === 'function') pflxSpaceToast('🚨', 'HULL BREACH', 'Emergency systems warped you to the nearest station and stabilized the hull. Shields are down — hold position while they recharge.', 'RECOVERED');
+      if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
+      if (typeof pflxShipFlyTo === 'function' && !pflxShip.flying) {
+        try { pflxShipFlyTo(dest.x, dest.y); } catch (e) { pflxShip.x = dest.x; pflxShip.y = dest.y; }
+      } else { pflxShip.x = dest.x; pflxShip.y = dest.y; }
+      renderBars();
     }
   };
 
@@ -11093,7 +11283,36 @@ const pflxCombat = (function () {
         'letter-spacing:0.12em;color:rgba(125,249,255,0.8);border-bottom:1px solid rgba(0,212,255,0.25);cursor:pointer;user-select:none;}' +
       '#overviewBtn{position:absolute;bottom:280px;right:20px;z-index:100;background:rgba(6,10,18,0.9);border:1px solid rgba(0,212,255,0.3);' +
         'color:rgba(0,212,255,0.85);font-family:Orbitron,sans-serif;font-size:9px;font-weight:600;letter-spacing:1px;padding:8px 12px;cursor:pointer;transition:all 0.2s;}' +
-      '#overviewBtn:hover{background:rgba(0,212,255,0.15);color:#fff;}';
+      '#overviewBtn:hover{background:rgba(0,212,255,0.15);color:#fff;}' +
+      // autopilot status chip (bottom-center, above the module hub)
+      '#pflxAutoChip{position:fixed;left:50%;bottom:112px;transform:translateX(-50%);z-index:151;display:none;align-items:center;gap:9px;' +
+        'background:rgba(4,12,24,0.92);border:1px solid rgba(125,249,255,0.55);border-radius:22px;padding:6px 8px 6px 14px;' +
+        'font-family:Orbitron,sans-serif;box-shadow:0 0 18px rgba(0,212,255,0.28);}' +
+      'body.cam-chase #pflxAutoChip.on,body.cam-cockpit #pflxAutoChip.on{display:flex;}' +
+      '.pac-ico{font-size:14px;}' +
+      '.pac-lbl{font-size:10px;font-weight:800;letter-spacing:0.14em;color:#cbf6ff;}' +
+      '.pac-r{width:20px;height:20px;border-radius:50%;border:1px solid rgba(125,249,255,0.4);background:rgba(6,16,28,0.9);color:#7df9ff;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}' +
+      '.pac-r:hover{border-color:#7df9ff;background:rgba(0,212,255,0.18);}' +
+      '.pac-x{width:22px;height:22px;border-radius:50%;border:none;background:rgba(239,68,68,0.18);color:#ff9d9d;cursor:pointer;font-size:12px;line-height:1;}' +
+      '.pac-x:hover{background:rgba(239,68,68,0.35);color:#fff;}' +
+      // in-world desired-range ring (orbit / keep)
+      '#pflxRangeRing{position:absolute;pointer-events:none;z-index:4;display:none;border-radius:50%;' +
+        'border:1.5px dashed rgba(125,249,255,0.45);box-shadow:0 0 22px rgba(0,212,255,0.12) inset;}' +
+      'body.cam-birdseye #pflxRangeRing{display:none !important;}' +
+      // radial context menu
+      '#pflxRadial{position:fixed;z-index:400;display:none;width:0;height:0;}' +
+      '#pflxRadial.open{display:block;}' +
+      '#pflxRadialScrim{position:fixed;inset:0;z-index:399;display:none;}' +
+      '#pflxRadialScrim.open{display:block;}' +
+      '.prad-btn{position:absolute;width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;border:1px solid rgba(0,212,255,0.4);' +
+        'background:rgba(5,14,26,0.96);color:#cfeefe;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;' +
+        'font-family:Rajdhani,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.5);transition:transform 0.12s,border-color 0.12s,background 0.12s;opacity:0;}' +
+      '#pflxRadial.open .prad-btn{opacity:1;}' +
+      '.prad-btn:hover{border-color:#7df9ff;background:rgba(0,212,255,0.18);transform:scale(1.1);}' +
+      '.prad-ico{font-size:18px;line-height:1;}' +
+      '.prad-lbl{font-size:7.5px;letter-spacing:0.06em;color:rgba(207,238,254,0.8);text-align:center;}' +
+      '.prad-hub{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:1px solid rgba(125,249,255,0.5);' +
+        'background:rgba(4,12,24,0.95);display:flex;align-items:center;justify-content:center;font-size:15px;pointer-events:none;box-shadow:0 0 14px rgba(0,212,255,0.3);}';
     document.head.appendChild(st);
   }
 
@@ -11132,7 +11351,28 @@ const pflxCombat = (function () {
 
     ui.rackEl = document.getElementById('pchSlots');
     renderRack();
+    defense.recompute();
     renderBars();
+
+    // Autopilot status chip (bottom-center, above the hub)
+    ui.autoChip = document.createElement('div');
+    ui.autoChip.id = 'pflxAutoChip';
+    document.body.appendChild(ui.autoChip);
+
+    // In-world desired-range ring (orbit / keep)
+    ui.rangeRing = document.createElement('div');
+    ui.rangeRing.id = 'pflxRangeRing';
+    (document.getElementById('nodeLayer') || canvas).appendChild(ui.rangeRing);
+
+    // Radial context menu + scrim
+    ui.radialScrim = document.createElement('div');
+    ui.radialScrim.id = 'pflxRadialScrim';
+    ui.radialScrim.addEventListener('click', function () { closeRadial(); });
+    ui.radialScrim.addEventListener('contextmenu', function (e) { e.preventDefault(); closeRadial(); });
+    document.body.appendChild(ui.radialScrim);
+    ui.radial = document.createElement('div');
+    ui.radial.id = 'pflxRadial';
+    document.body.appendChild(ui.radial);
 
     // Overview panel + rail button
     ui.ovPanel = document.createElement('div');
@@ -11161,21 +11401,22 @@ const pflxCombat = (function () {
     (cargoBtn && cargoBtn.parentNode ? cargoBtn.parentNode : document.body).appendChild(ob);
   }
 
-  // ── SHD / ARM / HULL readout (Nova layered defense; Phase D wires damage) ──
+  // ── SHD / ARM / HULL readout — live Nova layered defense state ──
   function renderBars() {
     var el = document.getElementById('pchBars');
     if (!el) return;
-    var hasShield = !!(pflxShip.upgrades && pflxShip.upgrades.shieldAura) || pflxHasModule('shield-booster');
-    var mult = (pflxShip.upgrades && pflxShip.upgrades._speedMult) || 1;
-    var arm = Math.min(100, 40 + mult * 18);
+    var d = defense;
     var rows = [
-      { l: 'SHD', v: hasShield ? 100 : 0, c: '#7df9ff', off: !hasShield },
-      { l: 'ARM', v: arm, c: '#f5c842' },
-      { l: 'HULL', v: 100, c: '#4ade80' }
+      { l: 'SHD', v: d.shd.v, max: d.shd.max, c: '#7df9ff', off: d.shd.max === 0 },
+      { l: 'ARM', v: d.arm.v, max: d.arm.max, c: '#f5c842', off: d.arm.max === 0 },
+      { l: 'HULL', v: d.hull.v, max: d.hull.max, c: '#4ade80', off: false }
     ];
     el.innerHTML = rows.map(function (r) {
-      return '<div><div class="pch-bl"><span>' + r.l + '</span><span>' + (r.off ? 'OFFLINE' : Math.round(r.v) + '%') + '</span></div>' +
-        '<div class="pch-bar"><div style="width:' + r.v + '%;height:100%;background:' + r.c + ';box-shadow:0 0 6px ' + r.c + ';opacity:' + (r.off ? 0.25 : 1) + ';"></div></div></div>';
+      var pct = r.max > 0 ? Math.max(0, Math.min(100, (r.v / r.max) * 100)) : 0;
+      var low = r.l === 'HULL' && pct <= 30;
+      var lbl = r.off ? 'OFFLINE' : (r.l === 'SHD' && r.v <= 0 ? 'DOWN' : Math.round(pct) + '%');
+      return '<div><div class="pch-bl"><span>' + r.l + '</span><span style="' + (low ? 'color:#ef4444;' : '') + '">' + lbl + '</span></div>' +
+        '<div class="pch-bar"><div style="width:' + pct + '%;height:100%;background:' + (low ? '#ef4444' : r.c) + ';box-shadow:0 0 6px ' + (low ? '#ef4444' : r.c) + ';opacity:' + (r.off ? 0.25 : 1) + ';transition:width 0.25s;"></div></div></div>';
     }).join('');
   }
 
@@ -11204,14 +11445,16 @@ const pflxCombat = (function () {
         hp = '<div class="ptb-hp"><div style="width:' + Math.round(frac * 100) + '%;height:100%;background:' + (frac > 0.5 ? '#4ade80' : frac > 0.2 ? '#f5c842' : '#ef4444') + ';"></div></div>';
       }
       var dead = en.kind === 'obj' && (en.ref.depleted || en.ref.collected);
-      return '<div class="ptb-card' + (active ? ' active' : '') + (en.locking ? ' locking' : '') + '" onclick="pflxCombat.setActive(&quot;' + en.tid + '&quot;)">' +
-        '<div style="display:flex;align-items:center;gap:7px;">' +
+      var isAuto = autop.active() && autop.tid === en.tid;
+      return '<div class="ptb-card' + (active ? ' active' : '') + (en.locking ? ' locking' : '') + '" onclick="pflxCombat.setActive(&quot;' + en.tid + '&quot;)" oncontextmenu="return pflxCombat.cardRadial(event,&quot;' + en.tid + '&quot;)">' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
           '<span style="font-size:16px;">' + en.icon + '</span>' +
           '<div style="flex:1;min-width:0;">' +
-            '<div style="font-size:12px;font-weight:700;color:#e6f8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + en.name + '</div>' +
+            '<div style="font-size:12px;font-weight:700;color:#e6f8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + en.name + (isAuto ? ' <span style="color:#7df9ff;font-size:9px;">' + (autop.mode === 'orbit' ? '\u27f3' : autop.mode === 'keep' ? '\u21c4' : '\u25b6') + '</span>' : '') + '</div>' +
             '<div style="font-size:10px;color:rgba(125,249,255,0.7);font-family:monospace;" data-dist="' + en.tid + '">' + (en.locking ? 'LOCKING\u2026' : fmtDist(entryDist(en))) + '</div>' +
           '</div>' +
-          '<button onclick="event.stopPropagation();pflxCombat.approachTid(&quot;' + en.tid + '&quot;)" title="Approach" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.35);color:#7df9ff;border-radius:6px;font-size:10px;padding:3px 6px;cursor:pointer;">\u25b8</button>' +
+          '<button onclick="event.stopPropagation();pflxCombat.approachTid(&quot;' + en.tid + '&quot;)" title="Approach" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.35);color:#7df9ff;border-radius:6px;font-size:10px;padding:3px 6px;cursor:pointer;">\u25b6</button>' +
+          '<button onclick="event.stopPropagation();pflxCombat.cardRadialAt(this,&quot;' + en.tid + '&quot;)" title="Commands (right-click)" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.35);color:#7df9ff;border-radius:6px;font-size:11px;padding:3px 6px;cursor:pointer;">\u2299</button>' +
           '<button onclick="event.stopPropagation();pflxCombat.unlockTid(&quot;' + en.tid + '&quot;)" title="Unlock" style="background:none;border:none;color:rgba(255,255,255,0.45);cursor:pointer;font-size:12px;">\u2715</button>' +
         '</div>' + hp +
         (dead ? '<div style="font-size:9px;color:#f5c842;letter-spacing:0.12em;font-family:Orbitron,sans-serif;margin-top:3px;">\ud83d\udca5 DESTROYED</div>' : '') +
@@ -11274,6 +11517,12 @@ const pflxCombat = (function () {
       if (!r) return;
       rowEl.addEventListener('click', function () { lockRow(r); });
       rowEl.addEventListener('dblclick', function () { approachRow(r); });
+      rowEl.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        lockRow(r);
+        var en = tgt.active();
+        if (en && !en.locking) openRadial(e.clientX, e.clientY, en);
+      });
     });
   }
   function lockRow(r) {
@@ -11286,11 +11535,99 @@ const pflxCombat = (function () {
     if (typeof pflxShipFlyTo === 'function' && !pflxShip.flying) pflxShipFlyTo(r.x, r.y, function () { if (window.pflxSpaceHazards) pflxSpaceHazards.tick(); });
   }
 
+  // ═════════ AUTOPILOT chip + range ring ═════════
+  function renderAutoChip() {
+    if (!ui.autoChip) return;
+    if (!autop.active()) { ui.autoChip.classList.remove('on'); ui.autoChip.innerHTML = ''; return; }
+    var ranged = autop.mode === 'orbit' || autop.mode === 'keep';
+    ui.autoChip.innerHTML =
+      '<span class="pac-ico">' + (autop.mode === 'approach' ? '▶' : autop.mode === 'orbit' ? '⟳' : '⇄') + '</span>' +
+      '<span class="pac-lbl">' + autop._label() + '</span>' +
+      (ranged ? '<button class="pac-r" title="Tighter" onclick="pflxCombat.autoRange(-120)">−</button>' +
+                '<button class="pac-r" title="Wider" onclick="pflxCombat.autoRange(120)">+</button>' : '') +
+      '<button class="pac-x" title="Cancel (C)" onclick="pflxCombat.cancelAuto(&quot;manual&quot;)">✕</button>';
+    ui.autoChip.classList.add('on');
+  }
+  function updateRangeRing() {
+    if (!ui.rangeRing) return;
+    var show = autop.active() && (autop.mode === 'orbit' || autop.mode === 'keep') && inFlight();
+    var en = show ? tgt.byId(autop.tid) : null;
+    var p = en ? entryPos(en) : null;
+    if (!show || !p) { ui.rangeRing.style.display = 'none'; return; }
+    var d = autop.range * 2;
+    ui.rangeRing.style.display = 'block';
+    ui.rangeRing.style.width = d + 'px';
+    ui.rangeRing.style.height = d + 'px';
+    ui.rangeRing.style.left = (p.x - autop.range) + 'px';
+    ui.rangeRing.style.top = (p.y - autop.range) + 'px';
+    ui.rangeRing.style.borderColor = autop.mode === 'orbit' ? 'rgba(125,249,255,0.5)' : 'rgba(245,200,66,0.45)';
+  }
+
+  // ═════════ RADIAL CONTEXT MENU (Eve-style) ═════════
+  function radialActions(en) {
+    var acts = [];
+    var isObj = en.kind === 'obj', o = isObj ? en.ref : null;
+    var isBH = isObj && o.type === 'blackhole';
+    acts.push({ ico: '▶', lbl: 'APPROACH', on: function () { autop.engage('approach', en.tid); }, dim: isBH });
+    acts.push({ ico: '⟳', lbl: 'ORBIT', on: function () { autop.engage('orbit', en.tid); } });
+    acts.push({ ico: '⇄', lbl: 'KEEP AT', on: function () { autop.engage('keep', en.tid); } });
+    if (isObj && (o.type === 'asteroids')) acts.push({ ico: '⛏️', lbl: 'MINE', on: function () { tgt.activeId = en.tid; rack.state.mining ? null : 0; ensureModuleOn('mining'); } });
+    if (isObj && (o.type === 'derelict' || o.type === 'comet')) acts.push({ ico: '🧲', lbl: 'TRACTOR', on: function () { tgt.activeId = en.tid; ensureModuleOn('tractor'); } });
+    acts.push({ ico: '✕', lbl: 'UNLOCK', on: function () { tgt.unlock(en.tid); } });
+    return acts;
+  }
+  function ensureModuleOn(id) {
+    var st = rack.st(id);
+    if (!st.active) rack.toggle(id); else renderRack();
+  }
+  function openRadial(clientX, clientY, en) {
+    if (!ui.radial || !en) return;
+    var acts = radialActions(en);
+    var R = 78, n = acts.length;
+    var cx = Math.max(70, Math.min(window.innerWidth - 70, clientX));
+    var cy = Math.max(90, Math.min(window.innerHeight - 70, clientY));
+    ui.radial.style.left = cx + 'px';
+    ui.radial.style.top = cy + 'px';
+    ui.radial.innerHTML = '<div class="prad-hub">' + (en.icon || '🎯') + '</div>' +
+      acts.map(function (a, i) {
+        var ang = (-Math.PI / 2) + (i / n) * Math.PI * 2;
+        var x = Math.cos(ang) * R, y = Math.sin(ang) * R;
+        return '<button class="prad-btn" data-idx="' + i + '" style="left:' + x + 'px;top:' + y + 'px;' +
+          (a.dim ? 'opacity:0.4;' : '') + '"><span class="prad-ico">' + a.ico + '</span><span class="prad-lbl">' + a.lbl + '</span></button>';
+      }).join('');
+    ui._radialActs = acts;
+    Array.prototype.forEach.call(ui.radial.querySelectorAll('.prad-btn'), function (b) {
+      b.addEventListener('click', function () {
+        var a = ui._radialActs[parseInt(b.getAttribute('data-idx'), 10)];
+        closeRadial();
+        if (a && !a.dim && a.on) a.on();
+      });
+    });
+    ui.radial.classList.add('open');
+    ui.radialScrim.classList.add('open');
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  }
+  function closeRadial() {
+    if (ui.radial) ui.radial.classList.remove('open');
+    if (ui.radialScrim) ui.radialScrim.classList.remove('open');
+  }
+  // right-click anywhere in flight → radial for the active locked target
+  document.addEventListener('contextmenu', function (e) {
+    if (!inFlight()) return;
+    if (e.target.closest && (e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.skill-node'))) return;
+    if (e.target.closest && e.target.closest('#pflxTargetBar, #pflxOverview')) return; // those wire their own
+    var en = tgt.active();
+    if (!en || en.locking) return;
+    e.preventDefault();
+    openRadial(e.clientX, e.clientY, en);
+  });
+
   // ═════════ per-frame tick (driven by pflxKeyLoop) ═════════
   var _uiFrame = 0;
   function tick(dt) {
     cap.tick(dt);
     rack.tick(dt);
+    defense.regenTick(dt);
     // lock cycles + target validity
     var changed = false;
     for (var i = tgt.locked.length - 1; i >= 0; i--) {
@@ -11332,7 +11669,10 @@ const pflxCombat = (function () {
           ? 'conic-gradient(rgba(0,212,255,0.30) ' + Math.round((slot.toggle ? 1 : st.prog) * 360) + 'deg, transparent 0deg)'
           : 'none';
       });
+      // shield regen / defense bars repaint at the throttled rate
+      if (defense.shd.sinceHit < 6 || defense._dirty) { renderBars(); defense._dirty = false; }
     }
+    updateRangeRing();
     // reticle follows the ACTIVE target every frame
     var act = tgt.active();
     if (act && ui.reticle) {
@@ -11353,10 +11693,16 @@ const pflxCombat = (function () {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     var k = e.key;
     if (k === 'o' || k === 'O') { e.preventDefault(); api.toggleOverview(); return; }
+    if (k === 'Escape' && ui.radial && ui.radial.classList.contains('open')) { closeRadial(); return; }
     if (!inFlight()) return;
     var map = { F1: 'blaster', '1': 'blaster', F2: 'mining', '2': 'mining', F3: 'tractor', '3': 'tractor', F4: 'shield', '4': 'shield' };
     if (map[k]) { e.preventDefault(); rack.toggle(map[k]); return; }
-    if (k === 'Tab') { e.preventDefault(); tgt.cycle(); }
+    if (k === 'Tab') { e.preventDefault(); tgt.cycle(); return; }
+    // autopilot flight commands (Eve-style): Q approach · E orbit · R keep · C cancel
+    if (k === 'q' || k === 'Q') { e.preventDefault(); autop.engage('approach'); return; }
+    if (k === 'e' || k === 'E') { e.preventDefault(); autop.engage('orbit'); return; }
+    if (k === 'r' || k === 'R') { e.preventDefault(); autop.engage('keep'); return; }
+    if (k === 'c' || k === 'C') { e.preventDefault(); autop.cancel('manual'); return; }
   });
 
   // ═════════ boot ═════════
@@ -11374,7 +11720,33 @@ const pflxCombat = (function () {
     approachTid: function (tid) { var en = tgt.byId(tid); if (en) approach(en); },
     toggleSlot: function (id) { rack.toggle(id); },
     shieldBoostActive: shieldBoostActive,
-    refreshBars: renderBars,
+    refreshBars: function () { defense.recompute(); renderBars(); },
+    // ── Phase C autopilot ──
+    autoDrive: function () { return autop.drive(); },
+    autopilotActive: function () { return autop.active(); },
+    autoApproach: function (tid) { autop.engage('approach', tid); },
+    autoOrbit: function (tid, range) { autop.engage('orbit', tid, range); },
+    autoKeep: function (tid, range) { autop.engage('keep', tid, range); },
+    cancelAuto: function (why) { autop.cancel(why || 'manual'); },
+    autoRange: function (delta) { autop.cycleRange(delta); },
+    // radial context menu (right-click / ⊙ button)
+    cardRadial: function (ev, tid) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      var en = tgt.byId(tid); tgt.activeId = tid; renderTargets();
+      if (en && !en.locking) openRadial(ev.clientX, ev.clientY, en);
+      return false;
+    },
+    cardRadialAt: function (btnEl, tid) {
+      var en = tgt.byId(tid); tgt.activeId = tid; renderTargets();
+      if (!en || en.locking) return;
+      var r = btnEl && btnEl.getBoundingClientRect ? btnEl.getBoundingClientRect() : { left: window.innerWidth - 120, top: 140, width: 20, height: 20 };
+      openRadial(r.left + r.width / 2, r.top + r.height / 2, en);
+    },
+    closeRadial: closeRadial,
+    // ── Nova defense (Phase D wiring point) ──
+    applyDamage: function (dmg, opts) { return defense.apply(dmg, opts); },
+    repair: function (o) { defense.repair(o); },
     toggleOverview: function () {
       ui.ovOpen = !ui.ovOpen;
       ui.ovPanel.classList.toggle('open', ui.ovOpen);
@@ -11385,7 +11757,7 @@ const pflxCombat = (function () {
       if (ui.ovSort.f === f) ui.ovSort.dir *= -1; else { ui.ovSort.f = f; ui.ovSort.dir = 1; }
       renderOverview();
     },
-    _tgt: tgt, _cap: cap, _rack: rack
+    _tgt: tgt, _cap: cap, _rack: rack, _autop: autop, _def: defense
   };
   return api;
 })();
@@ -12408,21 +12780,42 @@ function pflxKeyLoop() {
   // Down arrow: thrust backward. Reads as pulling out of space.
   // Left arrow:  strafe LEFT (slide sideways without rotating).
   // Right arrow: strafe RIGHT (slide sideways without rotating).
+  // ── Phase C AUTOPILOT ── if a flight command (approach/orbit/keep) is
+  // engaged it owns heading + thrust this frame; ANY manual input drops it
+  // (Eve behavior). autoDrive() returns { heading, thrust } or null.
+  var _auto = (window.pflxCombat && pflxCombat.autoDrive) ? pflxCombat.autoDrive() : null;
+  var _manualIn = Math.abs(window._pflxMouseSteer || 0) > 0 || pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right;
+  if (_auto && _manualIn) { pflxCombat.cancelAuto('manual'); _auto = null; }
+
   let turn = (window._pflxMouseSteer || 0);
   turn = Math.max(-1.4, Math.min(1.4, turn));
-  window.pflxShipHeading += turn * 0.042;
-  window._pflxLastTurn = turn;
+  if (_auto) {
+    // smooth-turn the heading toward the autopilot's desired bearing
+    var _dh = _auto.heading - window.pflxShipHeading;
+    while (_dh > Math.PI) _dh -= Math.PI * 2;
+    while (_dh < -Math.PI) _dh += Math.PI * 2;
+    var _maxTurn = 0.075;
+    window.pflxShipHeading += Math.max(-_maxTurn, Math.min(_maxTurn, _dh));
+    window._pflxLastTurn = Math.max(-1, Math.min(1, _dh / 0.15));
+  } else {
+    window.pflxShipHeading += turn * 0.042;
+    window._pflxLastTurn = turn;
+  }
 
   // thrust input: UP = forward along heading, DOWN = brake / slow reverse,
   // and the trackpad throttle (two-finger swipe) layered on top — a swipe
   // gives a decaying burst, continuous swiping = continuous thrust
   let thrust = 0;
-  if (pflxKeys.up) thrust += 1;
-  if (pflxKeys.down) thrust -= 0.55;
-  if (window._pflxWheelThrust) {
-    thrust += window._pflxWheelThrust;
-    window._pflxWheelThrust *= 0.90;                      // burst decay
-    if (Math.abs(window._pflxWheelThrust) < 0.02) window._pflxWheelThrust = 0;
+  if (_auto) {
+    thrust = _auto.thrust;
+  } else {
+    if (pflxKeys.up) thrust += 1;
+    if (pflxKeys.down) thrust -= 0.55;
+    if (window._pflxWheelThrust) {
+      thrust += window._pflxWheelThrust;
+      window._pflxWheelThrust *= 0.90;                      // burst decay
+      if (Math.abs(window._pflxWheelThrust) < 0.02) window._pflxWheelThrust = 0;
+    }
   }
   thrust = Math.max(-1, Math.min(1.6, thrust));
 
@@ -12463,7 +12856,7 @@ function pflxKeyLoop() {
   // Including strafe in the "actively flying" check means the lateral
   // velocity from Left/Right doesn't get bled out by friction every
   // frame; it builds up like forward thrust does.
-  if (!pflxKeys.up && !pflxKeys.down && !pflxKeys.left && !pflxKeys.right) {
+  if (!pflxKeys.up && !pflxKeys.down && !pflxKeys.left && !pflxKeys.right && !(_auto && _auto.thrust !== 0)) {
     pflxShipVx *= SHIP_FRICTION;
     pflxShipVy *= SHIP_FRICTION;
   }

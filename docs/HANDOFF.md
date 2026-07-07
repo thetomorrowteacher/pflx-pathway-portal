@@ -3236,3 +3236,83 @@ Ennis: launched Side Quests not visible; "a season is not 90 days — most run 1
 
 ## 2026-07-05 — addendum: profile dropdown reorder (platform preview)
 - VIEW PORTFOLIO moved to the TOP of the profile-card dropdown (above MY WALLET / MY TASKS / LEADERBOARD / SOUND / SETTINGS / SIGN OUT), per Ennis.
+
+---
+
+# Session Update — July 6 2026 (Opus) — Open Space Combat Phase C + Nova defense substrate
+
+Continuation of the EVE-style combat layer (Phase A+B shipped July 2). This
+pass adds Phase C (autopilot flight commands + radial context menu) and lays
+the **real** Nova: Space Armada defense model under the SHD/ARM/HULL HUD so
+Phase D NPCs drop straight in. All in `pathway.html`, inside the `pflxCombat`
+IIFE. Ennis also asked to research Nova's controls/mechanics — done (see below).
+
+## Nova mechanics folded in (from the official help center)
+Nova is a fleet-strategy game (tap-select, auto-combat) — it supplies the
+STAT model, not the piloting (Eve supplies piloting). Confirmed rules now
+implemented in `defense.apply()`:
+- **Shields absorb damage and BLOCK hull hits while up** — only a weapon's
+  shield-penetration fraction leaks through until shields drop.
+- **Armor REDUCES body damage**; a weapon's armor-penetration ignores part of
+  that mitigation. Armor chips down over a fight.
+- **Hull** is the last layer; **shields regenerate after a lull**, armor/hull
+  are repaired at stations / by pickups (not passively).
+- **Ship Energy** (engine budget powering weapons) = our existing capacitor.
+- Roaming **pirates** of varying strength = Phase D NPCs (not built yet).
+
+## What shipped (search anchors in pathway.html)
+1. **`autop`** (anchor `AUTOPILOT (Phase C`) — continuous flight commands that
+   hold a relationship to the ACTIVE locked target:
+   - **Approach** (Q) — fly straight in, auto-disengage within 120u.
+   - **Orbit-at-range** (E, default 460u) — tangential heading + radial
+     correction holds a circular orbit; great for keeping weapons on target.
+   - **Keep-at-range** (R, default 820u) — hold distance, no circling.
+   - **Cancel** (C). Range +/- on the chip (orbit/keep).
+   `autop.drive()` returns `{heading, thrust}` each frame; `pflxKeyLoop`'s
+   flight model applies it (3 surgical edits: heading branch, thrust branch,
+   friction gate). **ANY manual input (WASD/arrows/mouse-steer) cancels it**
+   (Eve behavior). Bird's-eye falls back to the one-shot `pflxShipFlyTo`.
+2. **Autopilot HUD chip** (`#pflxAutoChip`, bottom-center above the module
+   hub) + **in-world desired-range ring** (`#pflxRangeRing`, dashed, follows
+   the target; cyan orbit / gold keep).
+3. **Radial context menu** (`#pflxRadial`, anchor `RADIAL CONTEXT MENU`) —
+   Eve-style ring of actions around the cursor: APPROACH / ORBIT / KEEP AT /
+   MINE or TRACTOR (context-aware) / UNLOCK. Opens on: right-click anywhere in
+   flight (acts on active target), right-click a target card, the ⊙ button on
+   each target card, or right-click an Overview row. Esc / scrim click closes.
+4. **Nova defense substrate** (`defense`, anchor `DEFENSE (Nova`) — the
+   SHD/ARM/HULL bars are now **live state**, not cosmetic:
+   - `defense.recompute()` derives maxes from ship tier/modules (shield only if
+     shield hardware present; armor/hull scale with tier speedMult).
+   - `defense.apply(dmg, {shieldPen, armorPen, type})` — the Nova resolution
+     above. Exposed as `pflxCombat.applyDamage(...)` — **this is the Phase D
+     wiring point** for NPC weapons.
+   - `defense.regenTick(dt)` shield regen (faster + shorter lull with the F4
+     shield-boost module active).
+   - **Hull-breach recovery is non-punitive**: at hull 0 the ship emergency-
+     warps to the nearest station, hull limps back to 40%, shields down, brief
+     invuln window. **Never costs XC or items.** (Death-consequence design is
+     an OPEN QUESTION for Ennis — see below.)
+   - `pflxCombat.repair({shield,armor,hull,full})` for station/pickup repairs.
+
+## Verification
+- Syntax gate: 4 inline `<script>` blocks, `node --check`, **0 failures**.
+- Behavioral harness (`/tmp/combat_harness.js` — extracts the REAL `autop` +
+  `defense` source from pathway.html and runs it under stubs): **26/26 pass** —
+  approach heading/thrust/arrival, keep-at-range toward/away/hold, orbit
+  tangential + always-thrusting, black-hole approach refusal, lost-target
+  cancel; Nova shield-gating (no-pen vs shield-pen), armor mitigation +
+  armor-pen dealing more hull damage, breach recovery to 40% + invuln window,
+  shield regen after lull vs no-regen during the delay.
+- **NOT play-tested in a browser** (sandbox limitation). Ennis must eyeball on
+  `https://pflx-pathway-portal.vercel.app/pathway.html`: orbit/keep feel, the
+  manual-override cancel, radial menu placement, range-ring visibility.
+
+## Open for Ennis / Phase D
+- **Player-death consequence** — current default is a soft hull-breach warp-to-
+  station with no penalty. Decide if you want stakes (repair cost, brief
+  cooldown, XC-at-risk) before NPC combat makes hull damage common.
+- **Phase D** — NPC pirates (orbit+fire AI) calling `pflxCombat.applyDamage`
+  with weapon-type profiles (kinetic = high armor-pen, laser = high shield-pen,
+  missile = balanced — the Nova triangle), loot drops, hit feedback (camera
+  shake, damage numbers). The defense substrate + autopilot are ready for it.
