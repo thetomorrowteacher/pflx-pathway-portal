@@ -3395,3 +3395,62 @@ as host; the finer restriction arrives in Phase 3 via `pflxCan`.
   tiers. Filter each approval stream per `approve.*` capability + scope.
 - **Phase 4:** gate the plus features (Save Point / lockdown-freeze-override
   maintenance panel / restore) behind `pflxCan('plus.*')` — Master only.
+
+---
+
+# Session Update — July 6 2026 (Opus) — TIERED HOST ACCESS, Phase 2 (assignment UI)
+
+Phase 2 of the five-tier host access model (`pflx-platform`, `preview.html`).
+Assignment lives in the **Player Manager edit modal** (Platform → Settings →
+host, `mc-player-edit-modal`), per Ennis's decision.
+
+## What shipped
+1. **ACCESS & ROLE section** in the player edit modal (`#mc-player-access-section`)
+   — visible ONLY to users who hold `assign.tiers` (Master/Admin). Contains:
+   - **Access Tier** dropdown (`#mc-player-form-tier`): Player / Guest Instructor
+     / Instructor / Co-Host / Admin Host / Master Host, with a live description.
+   - **Scope pickers** that show/hide by tier (`mcTierScopeRefresh()`):
+     Co-Host → Managed Cohort(s) (comma-separated, multiple); Instructor →
+     Managed Cohort (single — extra cohorts trimmed on save); Guest → Managed
+     Project (select, populated from `mcProjects`); all scoped tiers → Managed
+     Node/Module IDs (comma-separated, from the Core Pathways editor).
+2. **Load** (`mcPopulateTierUI(p)`) — called from `mcEditPlayer`/`mcAddPlayer`.
+   Resolves the record's current tier (via `pflxHostTier`), fills the fields,
+   and **disables tier options above the assigner's own rank** (an Admin can't
+   mint a Master).
+3. **Save** (`mcApplyTierToRecord(rec)`) — hooked into both branches of
+   `mcSavePlayerForm`. Maps tier → underlying `role` + `hostTier` + scope:
+   - master→role `admin`, admin→`host`, cohost→`host`, instructor→`instructor`,
+     guest→`instructor`; player→`player` and all tier/scope fields stripped.
+   - Writes `managedCohorts[]` / `managedNodes[]` / `managedProjectId` per tier
+     (instructor cohorts sliced to 1; master/admin scope cleared = global).
+   - **Guards:** no-op unless `pflxCan('assign.tiers')`; hard rank-ceiling check
+     (can't assign above your own tier) with an alert. The underlying `role` is
+     always a valid host role so the legacy gates keep recognizing the user as
+     host until Phase 3 adds scope enforcement.
+4. **Player list** role column now shows the real **tier label** (Master Host /
+   Admin Host / Co-Host / Instructor / Guest Instructor / Player) with a
+   per-tier color, replacing the old binary Host/Player pill.
+
+## Verification
+- Node harness (`/tmp/pm_harness.js`, extracts the REAL Phase 2 functions from
+  preview.html): **24/24 pass** — every tier→role/hostTier/scope mapping,
+  instructor single-cohort trim, guest project+nodes, master/admin scope-clear,
+  player strip, the rank-ceiling block (admin can't assign master), non-assigner
+  no-op, and `mcPlayerTier` derivation.
+- `node --check` on the full containing `<script>` block (2.3M chars): clean.
+- NOT browser-tested (sandbox). Ennis: sign in as an admin/master, edit a
+  player, confirm the ACCESS & ROLE section appears, assign Co-Host with two
+  cohorts, save, reopen → values persist; confirm a non-host session never sees
+  the section.
+
+## Still ahead
+- **Phase 3 (enforcement):** route the cohort/player/approval renderers +
+  `pflxPlayerCanAccessApp` short-circuit through `pflxCan(cap, {cohort|nodeId|
+  projectId})`; flip `inScope` unset-behavior permissive→strict; filter each
+  approval stream by capability + scope.
+- **Phase 4 (plus gating):** Save Point / lockdown / freeze / restore behind
+  `pflxCan('plus.*')` (Master only).
+- Note: the quick "Make Host / Make Player" action in the player row still flips
+  `role` admin↔player directly (→ Master/Player). The modal Tier dropdown is now
+  the precise control; consider retiring or relabeling that quick toggle.
