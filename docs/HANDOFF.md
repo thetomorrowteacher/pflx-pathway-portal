@@ -4086,6 +4086,34 @@ resources only on the detail page, which is where students actually work.
 ---
 ---
 
+# Session Update — July 6 2026 (Opus) — Fix v2: Cohort Groups still 0 — read the authoritative PLAYERS roster
+
+The prior fix (re-sync the mirror when EMPTY) wasn't enough: the mirror was
+**non-empty but stale**, so it never fell back. Screenshots confirmed the
+Settings **Cohort Manager** counts DD Core 5 = 6 via `PLAYERS.filter(p.cohort===key)`
+(line ~16108) and Player Management also reads `PLAYERS` — but the MC **Cohort
+Groups** panel read the drifting `mcPlayers` mirror.
+
+## Fix
+- New `_mcRoster()` returns the **authoritative `PLAYERS`** array whenever it has
+  data (what Player Management + the Cohort Manager use), falling back to
+  `mcPlayers` only if PLAYERS is unset.
+- Switched to `_mcRoster()`: `mcCohortMemberCount`, the Cohort Groups **TOTAL
+  PLAYERS** stat, the **Progress** dashboard player list, and the **task-form**
+  player picker — so every MC surface now agrees with Host Controls / Player
+  Management. (The earlier empty-mirror re-sync stays as a belt-and-suspenders.)
+
+## Verification
+- Harness (`/tmp/roster_harness.js`): **6/6** — prefers PLAYERS over a stale
+  mirror, DD Core 5 counts 6 (matches the Cohort Manager), the stale-mirror-only
+  path would've been 0, other cohort = 1, admin excluded, PLAYERS-empty → mirror.
+- `node --check` clean.
+- NOT browser-tested. Ennis: reopen MC → Cohort Groups; counts should now match
+  the Settings Cohort Manager (DD Core 5 = 6, etc.), and Progress + the task
+  picker read the same roster.
+
+---
+
 # Session Update — July 6 2026 (Opus) — Fix: Cohort Groups showed 0 players (mirror desync)
 
 Ennis: Cohort Groups showed "0 players" everywhere + TOTAL PLAYERS 0, though
