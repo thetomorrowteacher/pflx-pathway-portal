@@ -3842,8 +3842,66 @@ The MagicSchool-style oversight piece (`pflx-platform`, `preview.html`).
   keys.
 
 ## BYO-LLM — remaining
-- Encrypted per-cohort **host key** for spend control (X-Coin AES-GCM pattern) —
-  the one sizeable piece left; `host` mode currently uses the shared platform
-  proxy.
+- Encrypted per-cohort **host key** for spend control — ✅ SHIPPED (next entry).
 - Moderation already covers typed input (`XBOT_MOD`); could extend to ability
   presets. Per-player usage detail (beyond counts) if wanted.
+
+---
+
+# Session Update — July 6 2026 (Opus) — X-Bot BYO-LLM, slice 5 (encrypted per-cohort host key)
+
+The last major BYO-LLM piece: a host can point a cohort at their SCHOOL's own AI
+account (spend control) without the key ever reaching a student's browser.
+Spans both repos.
+
+## Secure design
+The raw key transits HTTPS to the serverless proxy exactly once, is **encrypted
+server-side (AES-256-GCM, key from `PFLX_KEY_SECRET`)**, and only the ciphertext
+is ever stored. At call time the proxy fetches the cohort's ciphertext and
+**decrypts it server-side** to make the provider call — the plaintext key never
+goes to any client (students included).
+
+## Backend — `pflx-pathway-portal/api/pflx-ai.js` (rewritten)
+- `encryptKey`/`decryptKey` (AES-256-GCM; `iv|tag|ct` base64).
+- **`POST { action:'encrypt', provider, key, adminSecret? }`** → `{ enc }`.
+  Requires `PFLX_KEY_SECRET`; if `PFLX_ADMIN_SECRET` env is set, the caller must
+  match it.
+- **`fetchCohortKey(cohort)`** reads app_data row `pflx_cohort_ai_keys` via the
+  Supabase REST anon API and decrypts the entry.
+- Generate path: if the POST carries `cohort` and a key is configured for it,
+  that provider+key **override** the platform env key; otherwise env keys as
+  before. All provider fetches now use a resolved `apiKey` var. `claude`→
+  `anthropic` provider mapping.
+- GET health adds `cohortKeys: <bool>`.
+- **NEW Vercel env (pathway-portal project) required to enable the feature:**
+  `PFLX_KEY_SECRET` (any strong random string), `SUPABASE_URL`,
+  `SUPABASE_ANON_KEY`; optional `PFLX_ADMIN_SECRET`. Without them, cohort keys
+  are simply inert and X-Bot uses the existing platform keys.
+
+## Client — `pflx-platform/preview.html`
+- `XBOT_AI.callProxy` now sends the active player's `cohort`, so the proxy can
+  apply a cohort key.
+- `pflxPlayerAI.setCohortKey/clearCohortKey/cohortKeyStatus` — setCohortKey posts
+  the raw key to the proxy's encrypt action, then stores only the returned
+  ciphertext in `pflx_cohort_ai_keys` (read-modify-write). Status returns
+  provider names only, never ciphertext.
+- Cohort **Chat Controls** modal gained a "🔐 Cohort AI key" row (provider +
+  key + Save/Clear + status line) under the AI mode/abilities.
+
+## Verification
+- `node --check api/pflx-ai.js`: clean.
+- Crypto harness (`/tmp/crypto_test.mjs`, real functions from the file): **10/10**
+  — round-trip across key shapes, ciphertext≠plaintext, **random IV → distinct
+  ciphertext**, **tampered ciphertext rejected (GCM auth)**, **wrong secret can't
+  decrypt**.
+- `node --check` on the client block: clean; slice 1/3 harnesses still pass.
+- NOT live-tested (needs the env vars + a real deploy). Ennis: set
+  `PFLX_KEY_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` on the pathway-portal
+  Vercel project; then Cohort Groups → Chat Controls → Save a school key; a
+  player in that cohort using X-Bot in Host/Both mode will run on the school key.
+
+## BYO-LLM feature — COMPLETE
+Slices 1–5 shipped: activation + security · validated connect + dormant
+abilities · per-cohort ability selection · host visibility · encrypted per-cohort
+host key. Optional extras only from here (moderation on ability presets,
+per-player usage detail, key rotation UI).
