@@ -4068,8 +4068,17 @@ features — this is built with Google's web URLs (no OAuth needed for link+embe
   Client ID + API key (+ consent screen); then wire GIS + Picker inside
   `pflxGoogle.openPicker` (scaffold + `configure()` already there) and add a
   small MC settings field to call `pflxGoogle.configure(id,key)`.
-- **Player Portal read-only render**: attachments live on the record; drop
-  `mcGoogleAttachmentsHtml(rec, kind, false)` into the player-side task/project/
-  checkpoint detail templates so students see host resources there too.
+- ~~Player Portal read-only render~~ — SHIPPED (next entry).
 - Attach control inside the edit modals (currently on the cards), and a
   cohort **Resources hub** panel if wanted.
+
+### Addendum — Player Portal read-only resources (same day)
+`mcGoogleAttachmentsHtml(rec, kind, false)` dropped into the player detail
+views — `ppRenderProjectDetail` (var `proj`, after description) and
+`ppRenderTaskDetail` (var `task`, after description) — guarded by
+`typeof mcGoogleAttachmentsHtml === 'function'`. Students now see the host's
+attached Google resources (Open + Preview) on their own task/project pages,
+read-only (no attach/remove). `node --check` clean; parseLink harness still
+20/20. Player checkpoint view is a list (no detail route) so nothing to wire
+there; the compact player task/project LIST cards (~45942/45970) still show
+resources only on the detail page, which is where students actually work.
