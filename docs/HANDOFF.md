@@ -3947,3 +3947,44 @@ Deepens the Phase D pirates (`pflx-pathway-portal`, `pathway.html`, `pflxPirates
 - Focus-fire / regroup AI; GLTF pirate meshes (Phase E); a scan showing a
   target's weakness; distress-call cluster events. The wanted/rarity substrate is
   the hook for a bounty-board / shop economy.
+
+---
+
+# Session Update — July 6 2026 (Opus) — Open Space Combat Phase D.2 (Fabrication Bay)
+
+Closes the combat economy loop (`pflx-pathway-portal`, `pathway.html`): fight →
+loot → **spend the loot**.
+
+## What shipped
+- **Item defs** for the Phase D.1 salvage: `alloy-plate` (common), `weapon-part`
+  (uncommon), `shield-cell` (rare), `quantum-core` (epic) — they now render with
+  icons/rarity in the CARGO HOLD.
+- **`pflxCargo` helpers**: `count(id)`, `canSpend(costMap)`, `spend(costMap,
+  reason)` (atomic deduct + save + re-render).
+- **`pflxFab`** (search `FABRICATION BAY`, `window.pflxFab`) — a recipe registry
+  + `canAfford(id)` / `craft(id)`:
+  - **Hull Patch** (3 scrap + 1 alloy) → `pflxCombat.repair({hull: 45% max})`
+  - **Armor Weave** (3 alloy) → armor to full
+  - **Shield Recharge** (1 shield-cell + 1 plasma-core) → shields to full
+  - **Full Refit** (1 quantum-core + 4 alloy + 2 shield-cell) → full repair
+  - **Smelt Scrap → XC** (5 scrap) → +60 XC (instant-credit path)
+  All repairs go through the Nova defense model from Phase C. `craft` refuses
+  (no deduction) when components are short.
+- **CARGO HOLD → 🛠 FAB tab**: recipe cards with per-component cost vs. what you
+  have (red when short) and a CRAFT button gated on affordability; a
+  NOT-ENOUGH-SALVAGE toast otherwise.
+
+## Verification
+- Syntax gate: 4 blocks, **0 failures**.
+- Headless harness (`/tmp/fab_harness.js`, real `pflxFab`): **17/17** — registry,
+  affordability, correct deductions per recipe, repair/armor/shield calls routed
+  to `pflxCombat.repair`, insufficient-craft refused with NO deduction, smelt →
+  +60 XC, unknown recipe safe.
+- NOT browser-tested. Ennis: destroy hostiles to gather alloy-plate / shield-cell
+  / quantum-core, open CARGO HOLD → 🛠 FAB, and craft a Hull Patch after a fight —
+  your hull should jump.
+
+## Combat loop status
+Fight (Phase C/D) → wanted-scaled threat + rarity loot (D.1) → **spend loot on
+repairs/XC (D.2)**. Natural next: a proper salvage-shop economy / bounty board,
+or Phase E GLTF graphics.

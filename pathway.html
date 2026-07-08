@@ -10414,6 +10414,11 @@ const PFLX_ITEM_DEFS = {
   'stardust':      { icon: '✨', name: 'Stardust',       rarity: 'uncommon', desc: 'Swept from the tail of a comet.' },
   'salvage-scrap': { icon: '🔩', name: 'Salvage Scrap',  rarity: 'common',   desc: 'Recovered from derelict cargo pods.' },
   'artifact':      { icon: '🛸', name: 'Alien Artifact', rarity: 'rare',     desc: 'Origin unknown. The scanner hums near it.' },
+  // hostile-ship salvage (Phase D loot → Fabrication Bay)
+  'alloy-plate':   { icon: '🔲', name: 'Alloy Plate',    rarity: 'common',   desc: 'Hull plating stripped from a wreck. Repairs armor.' },
+  'weapon-part':   { icon: '⚙️', name: 'Weapon Part',    rarity: 'uncommon', desc: 'Salvaged weapon component.' },
+  'shield-cell':   { icon: '🔋', name: 'Shield Cell',    rarity: 'rare',     desc: 'Intact shield capacitor. Recharges shields.' },
+  'quantum-core':  { icon: '🧿', name: 'Quantum Core',   rarity: 'epic',     desc: 'A pristine reactor core — the rarest salvage.' },
 };
 
 const pflxCargo = {
@@ -10465,6 +10470,20 @@ const pflxCargo = {
     this.save();
     pflxCargoUI.render();
     pflxCargoUI.bumpBadge();
+  },
+  count(id) { return this.data.items[id] || 0; },
+  canSpend(cost) { for (var k in cost) { if ((this.data.items[k] || 0) < cost[k]) return false; } return true; },
+  spend(cost, reason) {
+    if (!this.canSpend(cost)) return false;
+    for (var k in cost) {
+      this.data.items[k] -= cost[k];
+      if (this.data.items[k] <= 0) delete this.data.items[k];
+      this.data.log.unshift({ t: new Date().toISOString(), item: k, qty: -cost[k], source: reason || 'fabrication' });
+    }
+    if (this.data.log.length > 60) this.data.log.length = 60;
+    this.save();
+    if (typeof pflxCargoUI !== 'undefined') { pflxCargoUI.render(); pflxCargoUI.bumpBadge(); }
+    return true;
   },
   removeRandom() {
     const ids = Object.keys(this.data.items).filter(id => this.data.items[id] > 0);
@@ -11052,6 +11071,42 @@ const pflxPirates = (function () {
   };
 })();
 window.pflxPirates = pflxPirates;
+
+// ═══════════════════════════════════════════════════════════════════
+// FABRICATION BAY — spend hostile-ship salvage on repairs / XC (Phase D.2)
+//   Closes the combat economy loop: fight → loot (alloy-plate / weapon-part /
+//   shield-cell / quantum-core) → craft repairs via the Nova defense model
+//   (pflxCombat.repair) or smelt scrap into XC. Pure recipe registry +
+//   canAfford/craft for headless tests.
+// ═══════════════════════════════════════════════════════════════════
+const pflxFab = (function () {
+  'use strict';
+  var RECIPES = [
+    { id: 'hull-patch', name: 'Hull Patch', icon: '🔧', cost: { 'salvage-scrap': 3, 'alloy-plate': 1 }, desc: 'Repair ~45% of your hull.',
+      apply: function () { var m = (window.pflxCombat && pflxCombat._def) ? pflxCombat._def.hull.max : 100; if (window.pflxCombat && pflxCombat.repair) pflxCombat.repair({ hull: Math.round(m * 0.45) }); } },
+    { id: 'armor-weave', name: 'Armor Weave', icon: '🛡️', cost: { 'alloy-plate': 3 }, desc: 'Restore armor to full.',
+      apply: function () { if (window.pflxCombat && pflxCombat.repair) pflxCombat.repair({ armor: 99999 }); } },
+    { id: 'shield-recharge', name: 'Shield Recharge', icon: '🔋', cost: { 'shield-cell': 1, 'plasma-core': 1 }, desc: 'Restore shields to full.',
+      apply: function () { if (window.pflxCombat && pflxCombat.repair) pflxCombat.repair({ shield: 99999 }); } },
+    { id: 'full-refit', name: 'Full Refit', icon: '✨', cost: { 'quantum-core': 1, 'alloy-plate': 4, 'shield-cell': 2 }, desc: 'Full hull, armor & shield repair.',
+      apply: function () { if (window.pflxCombat && pflxCombat.repair) pflxCombat.repair({ full: true }); } },
+    { id: 'smelt', name: 'Smelt Scrap → XC', icon: '💠', cost: { 'salvage-scrap': 5 }, desc: 'Convert scrap into +60 XC (approval-free).',
+      apply: function () { if (window.pflxCargo && pflxCargo.addXC) pflxCargo.addXC(60, 'smelted scrap'); } }
+  ];
+  function byId(id) { return RECIPES.find(function (r) { return r.id === id; }); }
+  function canAfford(id) { var r = byId(id); return !!(r && window.pflxCargo && pflxCargo.canSpend(r.cost)); }
+  function craft(id) {
+    var r = byId(id); if (!r) return { ok: false, reason: 'unknown' };
+    if (!window.pflxCargo || !pflxCargo.canSpend(r.cost)) return { ok: false, reason: 'insufficient' };
+    pflxCargo.spend(r.cost, 'fabrication: ' + r.name);
+    try { r.apply(); } catch (e) {}
+    try { if (typeof pflxSpaceToast === 'function') pflxSpaceToast(r.icon, r.name.toUpperCase(), r.desc + ' Complete.', 'FABRICATED'); } catch (e) {}
+    try { if (typeof SFX !== 'undefined' && SFX.play) SFX.play('unlock'); } catch (e) {}
+    return { ok: true };
+  }
+  return { RECIPES: RECIPES, byId: byId, canAfford: canAfford, craft: craft };
+})();
+window.pflxFab = pflxFab;
 
 // ═══════════════════════════════════════════════════════════════════
 // RPG INTERACTION PROMPTS — bird's-eye is OVERVIEW/MAPPING ONLY.
@@ -12121,6 +12176,7 @@ const pflxCargoUI = {
       '<div class="cargo-tabs">' +
         '<button class="cargo-tab active" data-tab="items">ITEMS</button>' +
         '<button class="cargo-tab" data-tab="ships">SHIPS</button>' +
+        '<button class="cargo-tab" data-tab="fab">🛠 FAB</button>' +
         '<button class="cargo-tab" data-tab="log">LOG</button>' +
       '</div>' +
       '<div class="cargo-body" id="cargoBody"></div>' +
@@ -12181,6 +12237,25 @@ const pflxCargoUI = {
             return '<div class="cargo-item"><span class="ci-icon">🔧</span><span class="ci-info"><span class="ci-name">' + m.replace(/-/g, ' ').toUpperCase() + '</span></span></div>';
           }).join('')
         : '');
+    } else if (this.tab === 'fab') {
+      body.innerHTML = '<div class="cargo-section" style="margin-top:0;">🛠 FABRICATION BAY</div>' +
+        pflxFab.RECIPES.map(function (r) {
+          var afford = pflxFab.canAfford(r.id);
+          var costHtml = Object.keys(r.cost).map(function (k) {
+            var d = PFLX_ITEM_DEFS[k] || { icon: '❔', name: k };
+            var have = pflxCargo.count(k), enough = have >= r.cost[k];
+            return '<span style="margin-right:10px;color:' + (enough ? 'rgba(207,238,254,0.85)' : '#ef6a6a') + ';">' + d.icon + ' ' + r.cost[k] + '<span style="opacity:0.5;">/' + have + '</span></span>';
+          }).join('');
+          return '<div class="cargo-item" style="flex-direction:column;align-items:stretch;gap:6px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<span class="ci-icon">' + r.icon + '</span>' +
+              '<span class="ci-info"><span class="ci-name">' + r.name + '</span><span class="ci-desc">' + r.desc + '</span></span>' +
+              '<button ' + (afford ? '' : 'disabled ') + 'onclick="pflxCargoUI.craft(&quot;' + r.id + '&quot;)" style="background:' + (afford ? 'rgba(0,212,255,0.16)' : 'rgba(255,255,255,0.05)') + ';border:1px solid ' + (afford ? 'rgba(0,212,255,0.5)' : 'rgba(255,255,255,0.12)') + ';color:' + (afford ? '#7df9ff' : 'rgba(255,255,255,0.3)') + ';border-radius:7px;font-size:11px;font-weight:700;padding:5px 12px;cursor:' + (afford ? 'pointer' : 'not-allowed') + ';font-family:Orbitron,sans-serif;">CRAFT</button>' +
+            '</div>' +
+            '<div style="font-size:11px;font-family:monospace;padding-left:34px;">' + costHtml + '</div>' +
+          '</div>';
+        }).join('') +
+        '<div class="cargo-empty" style="margin-top:10px;font-size:11px;">Salvage components drop from destroyed hostiles. Rarer components come from higher wanted levels.</div>';
     } else {
       body.innerHTML = pflxCargo.data.log.length ? pflxCargo.data.log.map(function (l) {
         const def = PFLX_ITEM_DEFS[l.item] || { icon: '❔', name: l.item };
@@ -12193,6 +12268,13 @@ const pflxCargoUI = {
       '<span>PENDING CREDIT: <b>' + (pflxCargo.data.pendingXC || 0) + ' XC</b></span>' +
       '<button class="cargo-shop" onclick="pflxShipOpenUpgrades()">⬡ SHIP BAY</button>';
     this.bumpBadge();
+  },
+  craft(id) {
+    var res = window.pflxFab ? pflxFab.craft(id) : { ok: false };
+    if (!res.ok && res.reason === 'insufficient' && typeof pflxSpaceToast === 'function') {
+      pflxSpaceToast('🛠', 'NOT ENOUGH SALVAGE', 'You don\'t have the components for that yet — destroy more hostiles to gather them.', '');
+    }
+    this.render();
   },
 };
 pflxCargo.load();
