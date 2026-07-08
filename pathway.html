@@ -3644,6 +3644,36 @@ document.getElementById('pathwayTitle').textContent = pathway.title;
 document.getElementById('pathwaySubtitle').textContent = pathway.subtitle;
 document.getElementById('pathwayIconImg').src = pathway.icon;
 
+// ── Broadcast the LIVE pathway/node catalog to the Console ──
+// The Mission Control task form needs real, active Core Pathways nodes for its
+// "Assign a Core Pathway Node" dropdown (it previously used a stale hardcoded
+// list). PATHWAYS is the authoritative definition of every pathway + node, so
+// we hand the whole catalog to the parent, which caches it into
+// localStorage['pflx_mc_pathway_catalog']. Also answers an explicit request.
+function pflxBroadcastPathwayCatalog() {
+  try {
+    var catalog = Object.keys(PATHWAYS).map(function (slug) {
+      var pw = PATHWAYS[slug] || {};
+      return {
+        id: slug,
+        name: pw.title || slug,
+        nodes: (pw.nodes || []).map(function (n) { return { id: n.id, name: n.title || n.id, type: n.nodeType || 'course' }; })
+      };
+    });
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'pflx_pathway_catalog', catalog: catalog }, '*');
+    }
+  } catch (e) {}
+}
+try {
+  pflxBroadcastPathwayCatalog();
+  setTimeout(pflxBroadcastPathwayCatalog, 1200); // re-send in case the Console handler wasn't ready
+  window.addEventListener('message', function (e) {
+    var m; try { m = typeof e.data === 'object' ? e.data : JSON.parse(e.data); } catch (x) { return; }
+    if (m && m.type === 'pflx_request_pathway_catalog') pflxBroadcastPathwayCatalog();
+  });
+} catch (e) {}
+
 // ════════════════════════════════════════════════════════════════════
 // OPEN SPACE — WebGL deep-space layer (Phase 1)
 // True 3D starfield + nebulae + galaxy spirals + dust, rendered at

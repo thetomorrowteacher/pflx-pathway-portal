@@ -4086,6 +4086,44 @@ resources only on the detail page, which is where students actually work.
 ---
 ---
 
+# Session Update — July 6 2026 (Opus) — Task form fixes: live pathway nodes + cohort→players
+
+Two bugs Ennis hit in the MC **Task edit form**. Both fixed.
+
+## Bug 1 — "Assign a Core Pathway Node" showed stale/fake nodes
+The dropdown read `MC_PATHWAY_CATALOG_BASE` — a hardcoded list with fabricated
+node ids (`da-intro`, `cp-py`…) that don't exist in the live pathways. Fix
+(cross-app, live sync):
+- **`pathway.html`**: `pflxBroadcastPathwayCatalog()` builds the catalog from the
+  authoritative `PATHWAYS` const (every pathway + real node id/title/type) and
+  `postMessage({type:'pflx_pathway_catalog', catalog})` to the parent on load
+  (+1.2s resend) and on `pflx_request_pathway_catalog`.
+- **`preview.html`**: a message handler caches the catalog into
+  `localStorage['pflx_mc_pathway_catalog']` (which `mcGetPathwayCatalog()` already
+  prefers) and repopulates the dropdown; `mcPopulateTaskPathwayNodeDropdown` now
+  also pings the `corepathways-frame` (`mcRequestPathwayCatalog`) for fresh data.
+  Once the host has opened Core Pathways once, the real catalog is cached and the
+  dropdown shows live nodes (cc-storyboard, etc.).
+
+## Bug 2 — selecting a cohort showed "No players in the selected cohort(s)"
+`mcRenderTaskAssignedPlayers` mapped the checkbox value (cohort-group **id**) →
+group **name**, then matched `p.cohort` by exact string — so it missed players
+who store cohorts as an array (`p.cohorts`), by group id, or with casing/space
+drift. Rewritten to build a NORMALIZED acceptable-tag set (group id AND name, +
+raw checked values) and match if ANY of the player's cohort tags
+(`p.cohort` + `p.cohorts[]`) is in it — the same reconciliation as
+`pflxItemCohortsMatch`.
+
+## Verification
+- Harness (`/tmp/fix_harness.js`): **14/14** — cohort match by name / case+space /
+  array / group-id / defensive name-value, host + unselected excluded, no-cohort
+  = all; catalog build produces real node ids/titles/types.
+- `node --check` on the platform block + pathway.html syntax gate: clean.
+- NOT browser-tested. Ennis: open a Task, select cohorts → players list populates;
+  open Core Pathways once, then the node dropdown lists real active nodes.
+
+---
+
 # Session Update — July 6 2026 (Opus) — MC Host Progress dashboard (per-player, tier-scoped)
 
 New feature (Ennis): "see each active player's progress within a Checkpoint /
