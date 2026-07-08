@@ -4086,6 +4086,53 @@ resources only on the detail page, which is where students actually work.
 ---
 ---
 
+# Session Update — July 6 2026 (Opus) — MC Host Progress dashboard (per-player, tier-scoped)
+
+New feature (Ennis): "see each active player's progress within a Checkpoint /
+Project / Task" in a host dashboard, respecting the tiered access model.
+`pflx-platform`, `preview.html`.
+
+## What shipped
+- **Per-player progress helpers** (near the aggregate `_mcCheckpointProgress`):
+  - `pflxTaskStateForPlayer(task, pid)` → `approved | submitted | open`. Prefers a
+    per-player entry in `task.submissions[]`; else the shared single-status model
+    (`task.status` / `task.submission.submittedById`).
+  - `pflxPlayerCheckpointProgress(cp, player)` → `{total, approved, submitted,
+    pct, tasks[]}` — only the tasks **assigned/visible to that player** (direct +
+    via child projects), de-duplicated, using the canonical
+    `pflxPlayerCanSeeItem(item, pid, cohorts)` visibility walk.
+- **Progress panel** (`mc-panel-progress`) + sidebar nav **📊 Progress**
+  (`mcNav('progress')` → `mcRenderProgress`): a Checkpoint selector, a class
+  summary bar, then one row per player (avatar, cohort, progress bar,
+  approved/total + submitted count, %), each expandable to the per-task status
+  chips (✓ approved / ◐ submitted / ○ open, grouped by project).
+- **Tier scoping**: player rows filtered by Phase-3b `_pflxPlayerVisible`, so a
+  Co-Host/Instructor sees only their cohorts' players; Master/Admin see all —
+  satisfying "works in the other host access views based on permissions."
+
+## Verification
+- Headless harness (`/tmp/prog_harness.js`, real helpers under stubs): **15/15** —
+  per-player task sets by cohort/all/direct assignment, approved/submitted/open
+  counts + pct, per-player `submissions[]` state, project-name tagging,
+  cross-cohort exclusion, and dedup of a task attached both directly and via a
+  project.
+- `node --check` on the containing block: clean.
+- NOT browser-tested. Ennis: MC → 📊 Progress → pick a checkpoint; each player's
+  bar + expandable task states show. Sign in as a scoped Co-Host to confirm only
+  their cohorts' players appear.
+
+## Notes / follow-ups
+- Progress is checkpoint-centric with drill-down to that player's projects/tasks
+  (covers "within a Checkpoint, Project, or Task"). A Project-first or Player-first
+  pivot could be added later on the same helpers.
+- Completion model assumption documented in `pflxTaskStateForPlayer`: shared
+  single-status tasks count as done-for-all-assigned when globally approved;
+  tasks with `submissions[]` are tracked per player. If MC later instances tasks
+  per player, only that helper changes.
+
+---
+---
+
 # ██ SESSION CLOSE — July 6 2026 (Opus) — master summary ██
 
 Read this first when resuming. It consolidates everything shipped this session;
