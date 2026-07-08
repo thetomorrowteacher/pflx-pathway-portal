@@ -4082,3 +4082,82 @@ read-only (no attach/remove). `node --check` clean; parseLink harness still
 20/20. Player checkpoint view is a list (no detail route) so nothing to wire
 there; the compact player task/project LIST cards (~45942/45970) still show
 resources only on the detail page, which is where students actually work.
+
+---
+---
+
+# ██ SESSION CLOSE — July 6 2026 (Opus) — master summary ██
+
+Read this first when resuming. It consolidates everything shipped this session;
+the per-feature entries above have the detail + search anchors + harness names.
+
+## Repo HEADs at session close
+| Repo | Folder | HEAD |
+|------|--------|------|
+| `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `feffda0` |
+| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `177a3e7` |
+
+All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
+
+## What shipped this session (4 workstreams)
+
+**1. Open Space combat (`pathway.html`)** — a full gameplay loop:
+- Phase C `3a01761` — EVE autopilot (approach/orbit/keep, keys Q/E/R/C) + radial
+  context menu + **real Nova defense model** (`pflxCombat.applyDamage`,
+  shields gate hull, armor/shield penetration).
+- Phase D `a976075` — **NPC pirates** (`pflxPirates`): Raider/Gunship/Frigate =
+  kinetic/laser/missile triangle, approach→orbit→flee AI, blaster kills + loot,
+  camera shake + hurt vignette.
+- D.1 `cac66b9` — **wanted level 0–5** (deep-space escalation → more/tougher
+  spawns) + **loot rarity** (common→epic, scaled XC).
+- D.2 `ff35210` — **Fabrication Bay** (`pflxFab`, CARGO → 🛠 FAB): spend salvage
+  on Nova-model repairs / smelt → XC.
+- D.3 `348b4e8` — **Bounty Board** (`pflxBounties`, CARGO → 📜 BOUNTY): accept
+  contracts, track on kills, claim XC + salvage.
+
+**2. Tiered host access (`preview.html`)** — 5 tiers, one gate:
+- Phase 1 `9b7eb42` — `pflxHostTier()` + `pflxCan(cap, {cohort|nodeId|projectId})`
+  engine (existing admins → Master automatically).
+- Phase 2 `0337f57` — assignment UI in Player Manager (tier + scope, rank ceiling).
+- Phase 3 `e902c07` — approvals suite enforced by tier + scope (scoped tiers only).
+- Phase 4 `614eeda` — Master-only plus features (save point / lockdown / restore).
+- Phase 3b `6a9c342` — player lists + cohort cards scoped by managed cohorts.
+
+**3. X-Bot BYO-LLM (`preview.html` + `api/pflx-ai.js`)** — "bring your own AI":
+- Slice 1 `7499335` — per-player activation (off/host/player/both per cohort) +
+  locked educational safety prompt + connect modal + dormant gate.
+- Slice 2 `23e7894` — validated connect (test-ping, key-restore on fail) +
+  dormant abilities (Study Buddy / Explain / Quest Hint / Writing Coach).
+- Slice 3 `46cb541` — per-cohort ability selection.
+- Slice 4 `e543d35` — host visibility of activation (non-secret cloud status).
+- Slice 5 `3e0a0d6` (backend) / `3656246` (client) — **encrypted per-cohort host
+  key** (AES-256-GCM, decrypted server-side only).
+
+**4. Google Drive/Docs in Mission Control (`preview.html`)**:
+- v1 `f56e80c` — `pflxGoogle` link+embed, attach on Tasks/Projects/Checkpoints,
+  Doc-submission cards, Picker scaffolded.
+- `177a3e7` — player-portal read-only resources on task/project detail.
+
+## ⚠ ACTION ITEMS FOR ENNIS (blocking full functionality)
+1. **Play-test on `prototypeflx.com`** — none of this session's work was
+   browser-tested (sandbox limitation); each piece has passing Node harnesses +
+   `node --check`, but a human pass is the real verification. Priority:
+   combat loop (fly deep, fight, fabricate, bounties), tier scoping (sign in as a
+   scoped Co-Host), BYO-LLM (activate X-Bot in a `player`-mode cohort), Google
+   attach/preview.
+2. **Encrypted cohort keys** need Vercel env on the **pflx-pathway-portal**
+   project: `PFLX_KEY_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (optional
+   `PFLX_ADMIN_SECRET`). Inert until set — X-Bot keeps using platform keys.
+3. **Google Picker** (browse-my-Drive) needs a Google Cloud project → a Client ID
+   + API key (+ consent screen). Link+embed already works without it.
+
+## Verification method used throughout
+Every module has a pure/testable core run headlessly via extracted-from-source
+Node harnesses (all passing this session), plus `node --check` on the affected
+`<script>` block. Full-file gate is too slow on the 55k-line `preview.html`;
+`preview.html` is served static (browser is the runtime check).
+
+## Cleanest next threads (all optional)
+Combat Phase E (GLTF ships / warp-lane graphics — needs browser iteration) ·
+target-weakness scan · Google Picker wiring once creds exist · a cohort Resources
+hub. Otherwise the platform is at a solid, coherent checkpoint.
