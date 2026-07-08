@@ -3988,3 +3988,37 @@ loot → **spend the loot**.
 Fight (Phase C/D) → wanted-scaled threat + rarity loot (D.1) → **spend loot on
 repairs/XC (D.2)**. Natural next: a proper salvage-shop economy / bounty board,
 or Phase E GLTF graphics.
+
+---
+
+# Session Update — July 6 2026 (Opus) — Open Space Combat Phase D.3 (Bounty Board)
+
+Gives deep-space combat a goal beyond survival (`pflx-pathway-portal`,
+`pathway.html`).
+
+## What shipped
+- **`pflxBounties`** (search `BOUNTY BOARD`, `window.pflxBounties`) — a contract
+  state machine persisted per player (`pflx_bounties_v1_<pid>`):
+  - 5 templates (Raider Hunt / Gunship Wing / Apex Predator / Sector Cleanup /
+    Deep Purge) with a target type (or `any`), count, XC + salvage reward.
+  - `load()` keeps **3 offers** available; `accept(uid)` moves an offer to
+    active and refills; `onKill(ptype)` advances every matching active contract
+    (type or `any`), flags `claimable` at the count and toasts; `claim(uid)`
+    pays XC + components via `pflxCargo` and removes it (refuses if incomplete).
+- **Hooked into combat**: `pflxPirates` kill path calls `pflxBounties.onKill(p.ptype)`.
+- **CARGO HOLD → 📜 BOUNTY tab**: active contracts with progress bars + Claim
+  (when ready), and an Available list with Accept.
+
+## Verification
+- Syntax gate: 4 blocks, **0 failures**.
+- Headless harness (`/tmp/bounty_harness.js`, real module): **15/15** — 3 offers
+  on load, accept moves + refills, non-matching kills don't progress, reaching
+  count → claimable, progress capped after claimable, claim pays exact XC+items
+  and removes, incomplete/unknown claims refused, `any` target counts every type.
+- NOT browser-tested. Ennis: CARGO → 📜 BOUNTY → Accept a contract, destroy the
+  matching hostiles, then Claim for XC + salvage.
+
+## Combat loop — full arc
+Pilot/target (C) → enemies/damage (D) → escalating threat + rarity loot (D.1) →
+spend on repairs/XC (D.2) → **contracts/goals (D.3)**. Remaining ideas: Phase E
+GLTF graphics, a target-weakness scan, focus-fire AI.

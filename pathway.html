@@ -11023,6 +11023,7 @@ const pflxPirates = (function () {
       }
       var rw = killReward(p, wanted.level());   // loot scales with wanted + type
       wanted.bump();                            // each kill raises the heat
+      try { if (window.pflxBounties) pflxBounties.onKill(p.ptype); } catch (e) {}
       try {
         (rw.items || []).forEach(function (it) { if (window.pflxCargo && pflxCargo.add) pflxCargo.add(it.id, it.n, p.name + ' wreckage'); });
         if (window.pflxCargo && pflxCargo.addXC) pflxCargo.addXC(rw.xc, 'destroyed ' + p.name);
@@ -11107,6 +11108,85 @@ const pflxFab = (function () {
   return { RECIPES: RECIPES, byId: byId, canAfford: canAfford, craft: craft };
 })();
 window.pflxFab = pflxFab;
+
+// ═══════════════════════════════════════════════════════════════════
+// BOUNTY BOARD — combat contracts (Phase D.3)
+//   Accept a contract, work it by destroying hostiles, claim XC + salvage.
+//   Gives deep-space combat a goal beyond survival and feeds the economy.
+//   Kill progress is fed from pflxPirates on every hostile destroyed.
+//   Pure state machine (offered/active) for headless tests.
+// ═══════════════════════════════════════════════════════════════════
+const pflxBounties = (function () {
+  'use strict';
+  var MAX_OFFERED = 3;
+  var TEMPLATES = [
+    { id: 'raider-hunt',  name: 'Raider Hunt',    target: 'raider',  count: 3, xc: 150, items: { 'shield-cell': 1 },  desc: 'Destroy 3 Raiders.' },
+    { id: 'gunship-wing', name: 'Gunship Wing',   target: 'gunship', count: 2, xc: 220, items: { 'weapon-part': 2 },  desc: 'Down 2 Gunships.' },
+    { id: 'apex',         name: 'Apex Predator',  target: 'frigate', count: 1, xc: 200, items: { 'quantum-core': 1 }, desc: 'Destroy a Missile Frigate.' },
+    { id: 'cleanup',      name: 'Sector Cleanup', target: 'any',     count: 5, xc: 140, items: { 'alloy-plate': 2 },  desc: 'Destroy 5 hostiles, any type.' },
+    { id: 'purge',        name: 'Deep Purge',     target: 'any',     count: 10, xc: 340, items: { 'quantum-core': 1, 'alloy-plate': 3 }, desc: 'Destroy 10 hostiles.' }
+  ];
+  function _pid() { try { var u = JSON.parse(localStorage.getItem('pflx_user') || '{}'); return u.id || u.brand || 'local'; } catch (e) { return 'local'; } }
+  function _key() { return 'pflx_bounties_v1_' + _pid(); }
+  var state = { offered: [], active: [], seq: 1 };
+  function save() { try { localStorage.setItem(_key(), JSON.stringify(state)); } catch (e) {} }
+  function mkInstance(t) { return { uid: 'b' + (state.seq++), tmpl: t.id, name: t.name, desc: t.desc, target: t.target, count: t.count, progress: 0, xc: t.xc, items: t.items || {}, claimable: false }; }
+  function ensureOffers() {
+    var guard = 0;
+    while (state.offered.length < MAX_OFFERED && guard++ < 20) {
+      state.offered.push(mkInstance(TEMPLATES[(Math.random() * TEMPLATES.length) | 0]));
+    }
+    save();
+  }
+  function load() {
+    try { var s = localStorage.getItem(_key()); if (s) state = JSON.parse(s); } catch (e) {}
+    if (!state || !Array.isArray(state.offered)) state = { offered: [], active: [], seq: 1 };
+    if (!Array.isArray(state.active)) state.active = [];
+    if (!state.seq) state.seq = 1;
+    ensureOffers();
+  }
+  function accept(uid) {
+    var i = state.offered.findIndex(function (c) { return c.uid === uid; });
+    if (i < 0) return false;
+    var c = state.offered.splice(i, 1)[0];
+    state.active.push(c);
+    ensureOffers();
+    return true;
+  }
+  function onKill(ptype) {
+    var changed = false;
+    state.active.forEach(function (c) {
+      if (c.claimable) return;
+      if (c.target === 'any' || c.target === ptype) {
+        c.progress++;
+        changed = true;
+        if (c.progress >= c.count) {
+          c.claimable = true;
+          try { if (typeof pflxSpaceToast === 'function') pflxSpaceToast('📜', 'BOUNTY READY', '"' + c.name + '" complete — claim it in CARGO → BOUNTY.', 'CLAIM'); } catch (e) {}
+        }
+      }
+    });
+    if (changed) save();
+    return changed;
+  }
+  function claim(uid) {
+    var i = state.active.findIndex(function (c) { return c.uid === uid; });
+    if (i < 0) return { ok: false, reason: 'unknown' };
+    var c = state.active[i];
+    if (!c.claimable) return { ok: false, reason: 'incomplete' };
+    state.active.splice(i, 1);
+    try {
+      if (window.pflxCargo) {
+        if (pflxCargo.addXC) pflxCargo.addXC(c.xc, 'bounty: ' + c.name);
+        if (pflxCargo.add) Object.keys(c.items).forEach(function (k) { pflxCargo.add(k, c.items[k], 'bounty reward'); });
+      }
+    } catch (e) {}
+    save();
+    return { ok: true, xc: c.xc, items: c.items };
+  }
+  return { load: load, save: save, accept: accept, onKill: onKill, claim: claim, ensureOffers: ensureOffers, TEMPLATES: TEMPLATES, _state: function () { return state; } };
+})();
+window.pflxBounties = pflxBounties;
 
 // ═══════════════════════════════════════════════════════════════════
 // RPG INTERACTION PROMPTS — bird's-eye is OVERVIEW/MAPPING ONLY.
@@ -12177,6 +12257,7 @@ const pflxCargoUI = {
         '<button class="cargo-tab active" data-tab="items">ITEMS</button>' +
         '<button class="cargo-tab" data-tab="ships">SHIPS</button>' +
         '<button class="cargo-tab" data-tab="fab">🛠 FAB</button>' +
+        '<button class="cargo-tab" data-tab="bounty">📜 BOUNTY</button>' +
         '<button class="cargo-tab" data-tab="log">LOG</button>' +
       '</div>' +
       '<div class="cargo-body" id="cargoBody"></div>' +
@@ -12256,6 +12337,33 @@ const pflxCargoUI = {
           '</div>';
         }).join('') +
         '<div class="cargo-empty" style="margin-top:10px;font-size:11px;">Salvage components drop from destroyed hostiles. Rarer components come from higher wanted levels.</div>';
+    } else if (this.tab === 'bounty') {
+      var st = pflxBounties._state();
+      function itemsStr(items) { return Object.keys(items || {}).map(function (k) { var d = PFLX_ITEM_DEFS[k] || { icon: '❔' }; return d.icon + '×' + items[k]; }).join(' '); }
+      var activeHtml = (st.active || []).map(function (c) {
+        var pct = Math.min(100, Math.round(c.progress / c.count * 100));
+        return '<div class="cargo-item" style="flex-direction:column;align-items:stretch;gap:5px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span class="ci-icon">📜</span>' +
+            '<span class="ci-info"><span class="ci-name">' + c.name + '</span><span class="ci-desc">' + c.desc + ' · +' + c.xc + ' XC ' + itemsStr(c.items) + '</span></span>' +
+            (c.claimable
+              ? '<button onclick="pflxCargoUI.claimBounty(&quot;' + c.uid + '&quot;)" style="background:rgba(74,222,128,0.18);border:1px solid rgba(74,222,128,0.5);color:#7df9a0;border-radius:7px;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer;font-family:Orbitron,sans-serif;">CLAIM</button>'
+              : '<span style="font-size:11px;font-family:monospace;color:rgba(125,249,255,0.8);">' + c.progress + '/' + c.count + '</span>') +
+          '</div>' +
+          '<div style="height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + (c.claimable ? '#4ade80' : '#00d4ff') + ';box-shadow:0 0 6px ' + (c.claimable ? '#4ade80' : '#00d4ff') + ';"></div></div>' +
+        '</div>';
+      }).join('');
+      var offerHtml = (st.offered || []).map(function (c) {
+        return '<div class="cargo-item">' +
+          '<span class="ci-icon">🗂</span>' +
+          '<span class="ci-info"><span class="ci-name">' + c.name + '</span><span class="ci-desc">' + c.desc + ' · +' + c.xc + ' XC ' + itemsStr(c.items) + '</span></span>' +
+          '<button onclick="pflxCargoUI.acceptBounty(&quot;' + c.uid + '&quot;)" style="background:rgba(0,212,255,0.16);border:1px solid rgba(0,212,255,0.5);color:#7df9ff;border-radius:7px;font-size:11px;font-weight:700;padding:5px 12px;cursor:pointer;font-family:Orbitron,sans-serif;">ACCEPT</button>' +
+        '</div>';
+      }).join('');
+      body.innerHTML =
+        '<div class="cargo-section" style="margin-top:0;">📜 ACTIVE CONTRACTS</div>' +
+        (activeHtml || '<div class="cargo-empty" style="font-size:11px;">No active contracts — accept one below.</div>') +
+        '<div class="cargo-section">🗂 AVAILABLE</div>' + offerHtml;
     } else {
       body.innerHTML = pflxCargo.data.log.length ? pflxCargo.data.log.map(function (l) {
         const def = PFLX_ITEM_DEFS[l.item] || { icon: '❔', name: l.item };
@@ -12276,9 +12384,25 @@ const pflxCargoUI = {
     }
     this.render();
   },
+  acceptBounty(uid) {
+    if (window.pflxBounties) pflxBounties.accept(uid);
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+    this.render();
+  },
+  claimBounty(uid) {
+    if (!window.pflxBounties) return;
+    var res = pflxBounties.claim(uid);
+    if (res.ok && typeof pflxSpaceToast === 'function') {
+      var items = Object.keys(res.items || {}).map(function (k) { var d = PFLX_ITEM_DEFS[k] || { name: k }; return res.items[k] + '× ' + d.name; }).join(', ');
+      pflxSpaceToast('📜', 'BOUNTY CLAIMED', 'Contract paid out.' + (items ? ' Salvage: ' + items + '.' : ''), '+' + res.xc + ' XC');
+    }
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('unlock'); } catch (e) {} }
+    this.render();
+  },
 };
 pflxCargo.load();
 pflxCargoUI.init();
+try { pflxBounties.load(); } catch (e) {}
 
 // ═══════════════════════════════════════════════════════════════════
 // CREW — multiplayer presence in THIS pathway's space (v1).
