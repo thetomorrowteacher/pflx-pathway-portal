@@ -3905,3 +3905,45 @@ Slices 1–5 shipped: activation + security · validated connect + dormant
 abilities · per-cohort ability selection · host visibility · encrypted per-cohort
 host key. Optional extras only from here (moderation on ability presets,
 per-player usage detail, key rotation UI).
+
+---
+
+# Session Update — July 6 2026 (Opus) — Open Space Combat Phase D.1 (wanted level + loot rarity)
+
+Deepens the Phase D pirates (`pflx-pathway-portal`, `pathway.html`, `pflxPirates`).
+
+## What shipped
+- **Wanted level 0–5** (`pflxPirates._core.wanted`): heat rises while the player
+  lingers in **deep space** (>1500u from home) and on every kill (~0.34/kill),
+  and cools ~4× faster in the safe zone. `update(dt,inDeep)` / `bump()` /
+  `level()`. Higher wanted →
+  - **more concurrent hostiles** (`maxActive()` = 2 + level, cap 6) and **faster
+    spawns** (`spawnCd` shrinks with level),
+  - **tougher type mix** (`pickType(level)` skews toward gunships/frigates),
+  - a red **WANTED ★★★** HUD chip (chase/cockpit) + an escalation toast on
+    level-up.
+- **Nova-style loot rarity** (`RARITY`: common/uncommon/rare/epic, ×1 → ×3.2 XC,
+  component alloy-plate/weapon-part/shield-cell/quantum-core). `rollRarity(bonus)`
+  weights toward higher tiers as bonus grows; `killReward(p, wantedLvl)` sets
+  `bonus = wantedLvl + (frigate?2:gunship?1:0)`, scales XC by
+  `bounty × (1 + wanted×0.2) × rarityMult`, always drops salvage + one rarity
+  component (+ plasma-core chance at wanted ≥3). Kill shows a colored
+  "EPIC DROP" floater + rarity in the toast.
+- Refactor: `hurt()` now returns `{ killed }` only; reward is computed at the
+  kill site with the live wanted level.
+
+## Verification
+- Syntax gate: 4 blocks, **0 failures**.
+- Headless harness (`/tmp/wanted_harness.js`, real core): **19/19** — heat
+  rise/cool, cap at 5, kills bump level, `maxActive` scaling, rarity distribution
+  shifts with bonus (low mostly common, high more epic, always valid), reward XC
+  rises with wanted, frigate loot > raider (averaged), always-salvage + rarity
+  component + label/color, wanted-aware type mix.
+- NOT browser-tested. Ennis: fly deep (>1500u) and linger/kill — the WANTED chip
+  should climb, spawns intensify, and drops should show rarity tiers; return to
+  the safe zone to cool it down.
+
+## Combat follow-ups still open
+- Focus-fire / regroup AI; GLTF pirate meshes (Phase E); a scan showing a
+  target's weakness; distress-call cluster events. The wanted/rarity substrate is
+  the hook for a bounty-board / shop economy.

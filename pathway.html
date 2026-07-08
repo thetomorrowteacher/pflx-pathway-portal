@@ -10800,32 +10800,85 @@ const pflxPirates = (function () {
     var w = p.weapon;
     return { dmg: w.dmg, shieldPen: w.shieldPen, armorPen: w.armorPen, type: w.kind };
   }
-  // apply player damage to a pirate; returns { killed, reward }
+  // apply player damage to a pirate; returns { killed }
   function hurt(p, dmg) {
     if (p.dead) return { killed: false };
     p.hp -= dmg; p.hitFlash = 1;
-    if (p.hp <= 0) { p.hp = 0; p.dead = true; return { killed: true, reward: killReward(p) }; }
+    if (p.hp <= 0) { p.hp = 0; p.dead = true; return { killed: true }; }
     return { killed: false };
   }
-  function killReward(p) {
+
+  // ── WANTED LEVEL (0–5) ── heat rises while the player lingers in deep space
+  // and on each kill; cools fast in the safe zone. Higher wanted = more and
+  // tougher hostiles + better loot (the deep-space risk/reward loop).
+  var wanted = {
+    heat: 0, lvl: 0, MAXLVL: 5,
+    update: function (dt, inDeep) {
+      this.heat += inDeep ? dt * 0.03 : -dt * 0.12; // ~33s/level up, cools ~4× faster
+      this.heat = Math.max(0, Math.min(this.MAXLVL, this.heat));
+      this.lvl = Math.floor(this.heat);
+      return this.lvl;
+    },
+    bump: function (n) { this.heat = Math.min(this.MAXLVL, this.heat + (n || 0.34)); this.lvl = Math.floor(this.heat); },
+    level: function () { return this.lvl; }
+  };
+
+  // ── Nova-style loot rarity ──
+  var RARITY = [
+    { id: 'common', label: 'Common', color: '#9aa7c0', mult: 1.0, comp: 'alloy-plate' },
+    { id: 'uncommon', label: 'Uncommon', color: '#4ade80', mult: 1.4, comp: 'weapon-part' },
+    { id: 'rare', label: 'Rare', color: '#38bdf8', mult: 2.0, comp: 'shield-cell' },
+    { id: 'epic', label: 'Epic', color: '#c084fc', mult: 3.2, comp: 'quantum-core' }
+  ];
+  function rollRarity(bonus) {
+    bonus = Math.max(0, bonus || 0);
+    // bonus shifts weight away from common toward the higher tiers
+    var weights = [Math.max(2, 60 - bonus * 8), 26 + bonus * 2, 10 + bonus * 3, 4 + bonus * 2.5];
+    var total = weights.reduce(function (a, b) { return a + b; }, 0);
+    var r = Math.random() * total, acc = 0;
+    for (var i = 0; i < RARITY.length; i++) { acc += weights[i]; if (r <= acc) return RARITY[i]; }
+    return RARITY[0];
+  }
+  function killReward(p, wantedLvl) {
+    wantedLvl = wantedLvl || 0;
+    var bonus = wantedLvl + (p.ptype === 'frigate' ? 2 : p.ptype === 'gunship' ? 1 : 0);
+    var rar = rollRarity(bonus);
+    var xc = Math.round(p.bounty * (1 + wantedLvl * 0.2) * rar.mult);
     var items = [{ id: 'salvage-scrap', n: 1 + ((Math.random() * 2) | 0) }];
-    if (Math.random() < 0.5) items.push({ id: 'weapon-part', n: 1 });
-    if (Math.random() < 0.15) items.push({ id: 'plasma-core', n: 1 });
-    return { xc: p.bounty, items: items };
+    items.push({ id: rar.comp, n: 1, rarity: rar.id });
+    if (wantedLvl >= 3 && Math.random() < 0.3) items.push({ id: 'plasma-core', n: 1 });
+    return { xc: xc, items: items, rarity: rar.id, rarityLabel: rar.label, rarityColor: rar.color };
   }
-  function pickType() {
+  // wanted-aware type mix: higher wanted → more gunships/frigates
+  function pickType(w) {
+    w = Math.max(0, Math.min(5, w || 0));
+    var pFrig = 0.08 + w * 0.05, pGun = 0.28 + w * 0.04;
     var r = Math.random();
-    return r < 0.55 ? 'raider' : r < 0.85 ? 'gunship' : 'frigate';
+    if (r < pFrig) return 'frigate';
+    if (r < pFrig + pGun) return 'gunship';
+    return 'raider';
   }
+  function maxActive() { return Math.min(6, 2 + wanted.level()); }
 
   // ───────── live state + integration ─────────
   var list = [];
   var spawnCd = 5;
   var _shakeT = 0, _shakeMag = 0;
-  var _hurtEl = null;
+  var _hurtEl = null, _wantedEl = null, _lastWantedLvl = 0;
 
   function inFlight() { return typeof pflxCamera !== 'undefined' && pflxCamera.mode !== 'birdseye'; }
   function layer() { return document.getElementById('nodeLayer') || canvas; }
+  function updateWantedHud(flight) {
+    if (!_wantedEl) return;
+    var lvl = wanted.level();
+    if (!flight || lvl <= 0) { _wantedEl.classList.remove('on'); _lastWantedLvl = lvl; return; }
+    _wantedEl.classList.add('on');
+    _wantedEl.textContent = 'WANTED ' + '★'.repeat(lvl) + '☆'.repeat(Math.max(0, wanted.MAXLVL - lvl));
+    if (lvl > _lastWantedLvl) {
+      pflxSpaceToast('⚠️', 'WANTED LEVEL ' + lvl, 'Deep-space patrols are escalating — more and tougher hostiles, but richer bounties and rarer salvage.', '★'.repeat(lvl));
+    }
+    _lastWantedLvl = lvl;
+  }
 
   function boot() {
     var st = document.createElement('style');
@@ -10838,11 +10891,16 @@ const pflxPirates = (function () {
       '.pflx-pirate .pp-hp>div{height:100%;background:#ff5a3c;box-shadow:0 0 6px #ff5a3c;transition:width 0.15s;}' +
       '#pflxHurtVig{position:fixed;inset:0;z-index:140;pointer-events:none;opacity:0;transition:opacity 0.25s ease-out;' +
         'box-shadow:inset 0 0 160px 40px rgba(220,30,30,0.55);background:radial-gradient(circle,transparent 55%,rgba(180,10,10,0.18));}' +
-      'body.cam-birdseye .pflx-pirate{opacity:0.85;}';
+      'body.cam-birdseye .pflx-pirate{opacity:0.85;}' +
+      '#pflxWanted{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:151;display:none;font-family:Orbitron,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.14em;color:#ff9a3c;text-shadow:0 0 10px rgba(255,90,40,0.7);background:rgba(20,4,4,0.55);border:1px solid rgba(255,90,40,0.4);border-radius:20px;padding:4px 14px;}' +
+      'body.cam-chase #pflxWanted.on,body.cam-cockpit #pflxWanted.on{display:block;}';
     document.head.appendChild(st);
     _hurtEl = document.createElement('div');
     _hurtEl.id = 'pflxHurtVig';
     document.body.appendChild(_hurtEl);
+    _wantedEl = document.createElement('div');
+    _wantedEl.id = 'pflxWanted';
+    document.body.appendChild(_wantedEl);
   }
 
   function trySpawn() {
@@ -10851,7 +10909,7 @@ const pflxPirates = (function () {
     if (Math.hypot(pflxShip.x - HOME_X, pflxShip.y - HOME_Y) < SAFE_R) return;
     var ang = Math.random() * Math.PI * 2, d = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
     var x = pflxShip.x + Math.cos(ang) * d, y = pflxShip.y + Math.sin(ang) * d;
-    var p = makePirate(pickType(), x, y);
+    var p = makePirate(pickType(wanted.level()), x, y);
     list.push(p);
     if (window.pflxSpaceObjects) window.pflxSpaceObjects.push(p);
     renderMarker(p, true);
@@ -10944,12 +11002,14 @@ const pflxPirates = (function () {
         pflxSpace.burst(p.x, p.y, '255,200,110', 40, { speed: 170, size: 9, dur: 1.1 });
         pflxSpace.burst(p.x, p.y, '255,120,60', 22, { speed: 60, size: 12, dur: 1.5, maxOp: 0.8 });
       }
-      var rw = res.reward;
+      var rw = killReward(p, wanted.level());   // loot scales with wanted + type
+      wanted.bump();                            // each kill raises the heat
       try {
         (rw.items || []).forEach(function (it) { if (window.pflxCargo && pflxCargo.add) pflxCargo.add(it.id, it.n, p.name + ' wreckage'); });
         if (window.pflxCargo && pflxCargo.addXC) pflxCargo.addXC(rw.xc, 'destroyed ' + p.name);
       } catch (e) {}
-      pflxSpaceToast('💥', p.name.toUpperCase() + ' DESTROYED', 'Hostile down. Salvage and a bounty were swept into the hold.', '+SALVAGE · +' + rw.xc + ' XC');
+      floater(p.x, p.y - 42, rw.rarityLabel.toUpperCase() + ' DROP', rw.rarityColor);
+      pflxSpaceToast('💥', p.name.toUpperCase() + ' DESTROYED', rw.rarityLabel + ' component salvaged from the wreck.', '+' + rw.rarityLabel.toUpperCase() + ' · +' + rw.xc + ' XC');
       shake(10);
       removePirate(p);
     }
@@ -10965,8 +11025,11 @@ const pflxPirates = (function () {
     }
     if (typeof pflxShip === 'undefined') return;
     var flight = inFlight();
+    var inDeep = flight && Math.hypot(pflxShip.x - HOME_X, pflxShip.y - HOME_Y) > SAFE_R;
+    wanted.update(dt, inDeep);
+    updateWantedHud(flight);
     spawnCd -= dt;
-    if (flight && list.length < MAX && spawnCd <= 0) { spawnCd = 4 + Math.random() * 5; trySpawn(); }
+    if (flight && list.length < maxActive() && spawnCd <= 0) { spawnCd = Math.max(1.6, 5 - wanted.level() * 0.7) + Math.random() * 3; trySpawn(); }
     for (var i = list.length - 1; i >= 0; i--) {
       var p = list[i];
       if (p.dead) { removePirate(p); continue; }
@@ -10985,7 +11048,7 @@ const pflxPirates = (function () {
     damagePirate: damagePirate,
     count: function () { return list.length; },
     clear: function () { list.slice().forEach(removePirate); },
-    _core: { TYPES: TYPES, makePirate: makePirate, step: step, weaponPayload: weaponPayload, hurt: hurt, killReward: killReward, pickType: pickType, MAX: MAX, SAFE_R: SAFE_R, FLEE_FRAC: FLEE_FRAC }
+    _core: { TYPES: TYPES, makePirate: makePirate, step: step, weaponPayload: weaponPayload, hurt: hurt, killReward: killReward, pickType: pickType, MAX: MAX, SAFE_R: SAFE_R, FLEE_FRAC: FLEE_FRAC, wanted: wanted, RARITY: RARITY, rollRarity: rollRarity, maxActive: maxActive }
   };
 })();
 window.pflxPirates = pflxPirates;
