@@ -4086,6 +4086,41 @@ resources only on the detail page, which is where students actually work.
 ---
 ---
 
+# Session Update — July 6 2026 (Opus) — Fix: Cohort Groups showed 0 players (mirror desync)
+
+Ennis: Cohort Groups showed "0 players" everywhere + TOTAL PLAYERS 0, though
+Player Management had players. `pflx-platform`, `preview.html`.
+
+## Root cause
+Two player sources: the master **`PLAYERS`** (what the Settings Player Manager /
+`hmcRenderPlayers` shows) and the MC mirror **`mcPlayers`** (from
+`pflx_mc_players`), which Cohort Groups / Progress / the task-form picker read.
+The mirror had gone empty/stale independently of PLAYERS, and the seed-once guard
+(`pflx_mc_seeded`) meant `mcLoadData` never re-synced it. Separately, the seed
+map that builds the mirror **dropped `p.cohorts[]`**, so even a populated mirror
+failed cohort membership.
+
+## Fix
+- **`mcLoadData`**: after the seed block, if the mirror is empty but `PLAYERS`
+  has players, **re-sync `mcPlayers` from `PLAYERS`** (real roster, not a mock
+  seed — safe post-guard) and now carry `cohorts[]` + the tier fields
+  (`hostTier`/`managedCohorts`/…). Fixes every `mcPlayers` consumer at once.
+- **`mcCohortMemberCount(cg)`**: new robust counter — matches a group by NAME or
+  id against `p.cohort` OR `p.cohorts[]`, normalized; falls back to `PLAYERS` if
+  the mirror is momentarily empty. Used for the per-cohort count.
+- **Cohort Groups TOTAL PLAYERS** stat now also falls back to `PLAYERS`.
+
+## Verification
+- Harness (`/tmp/cc_harness.js`): **5/5** — count by name/case/array/id, exclude
+  other-cohort + admin, mirror-empty → PLAYERS fallback, both-empty → 0, sync map
+  preserves `cohorts[]` and matches on it.
+- `node --check` on the block: clean.
+- NOT browser-tested. Ennis: reopen Cohort Groups — per-cohort counts + TOTAL
+  PLAYERS should reflect real players. (Also benefits Progress + the task-form
+  player picker, which read the same mirror.)
+
+---
+
 # Session Update — July 6 2026 (Opus) — Task form fixes: live pathway nodes + cohort→players
 
 Two bugs Ennis hit in the MC **Task edit form**. Both fixed.
