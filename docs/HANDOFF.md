@@ -4022,3 +4022,54 @@ Gives deep-space combat a goal beyond survival (`pflx-pathway-portal`,
 Pilot/target (C) → enemies/damage (D) → escalating threat + rarity loot (D.1) →
 spend on repairs/XC (D.2) → **contracts/goals (D.3)**. Remaining ideas: Phase E
 GLTF graphics, a target-weakness scan, focus-fire AI.
+
+---
+
+# Session Update — July 6 2026 (Opus) — Google Drive / Docs in Mission Control (v1)
+
+New feature (Ennis): attach Google Docs/Drive to MC. Decisions: **links now +
+Picker scaffolded**, on **Tasks / Projects / Checkpoints**, **both directions**
+(host resources + player Doc submissions). `pflx-platform`, `preview.html`.
+NOTE: the Google MCP connectors in the session are Claude's tools, not app
+features — this is built with Google's web URLs (no OAuth needed for link+embed).
+
+## What shipped
+- **`pflxGoogle`** (search `GOOGLE DRIVE / DOCS in Mission Control`,
+  `window.pflxGoogle`):
+  - `parseLink(url)` recognizes Google Docs / Sheets / Slides / Forms, Drive
+    `file/d/`, Drive `drive/folders/`, and `open?id=` / `uc?id=` → `{kind,
+    fileId, url, embedUrl, icon, label}`. Correct `/preview` + `embeddedfolderview`
+    embed URLs.
+  - `cardHtml` (XSS-escaped) with **Open** + inline **Preview** (`togglePreview`
+    injects a Drive iframe), `linkCardIfGoogle(url)` (renders only if Google),
+    `attachModal` (paste-link, validated), and a **Picker scaffold**
+    (`configure/isConfigured/openPicker`) that currently falls back to the link
+    modal — ready to wire once a Google Cloud Client ID + API key are provided.
+- **MC glue**: `mcGoogleAttach(kind,id)` / `mcGoogleRemove(kind,id,attId)` mutate
+  `record.attachments[]` + `mcSaveData` + re-render; `mcGoogleAttachmentsHtml(rec,
+  kind, editable)` is a one-line drop-in (📎 Resources list + Attach button).
+- **Wired into all three card renders**: `mcRenderCheckpoints` (var `cp`),
+  `mcRenderProjects` (var `p`), `mcRenderTasks` (var `t`) — host can attach/remove
+  Google files, everyone sees them with Open/Preview.
+- **Player Doc submissions**: on the task card, if `t.submission.link` is a
+  Google link it renders as a Doc card (the "students submit Docs" direction).
+
+## Verification
+- Headless harness (`/tmp/gdrive_harness.js`, real module): **20/20** — every
+  Google URL form incl. http, non-Google → null, empty/junk → null, embed-URL
+  shapes, `cardHtml` XSS-escape, `linkCardIfGoogle` gating.
+- `node --check` on the containing block: clean.
+- NOT browser-tested. Ennis: open a Task/Project/Checkpoint card → 📎 Attach a
+  Google Doc share link → Open/Preview should work (ensure the doc's sharing lets
+  students view). A player whose submission link is a Google Doc shows a Doc card.
+
+## Follow-ups
+- **Google Picker (browse-my-Drive)**: needs a Google Cloud project → give me a
+  Client ID + API key (+ consent screen); then wire GIS + Picker inside
+  `pflxGoogle.openPicker` (scaffold + `configure()` already there) and add a
+  small MC settings field to call `pflxGoogle.configure(id,key)`.
+- **Player Portal read-only render**: attachments live on the record; drop
+  `mcGoogleAttachmentsHtml(rec, kind, false)` into the player-side task/project/
+  checkpoint detail templates so students see host resources there too.
+- Attach control inside the edit modals (currently on the cards), and a
+  cohort **Resources hub** panel if wanted.
