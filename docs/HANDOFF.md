@@ -4086,6 +4086,63 @@ resources only on the detail page, which is where students actually work.
 ---
 ---
 
+# Session Update — July 6 2026 (Opus) — Badge economy fixes (XC credit on approval + portfolio images)
+
+Ennis: task badge rewards should read live X-Coin, credit XC to all totals when
+earned, and show in players' portfolios WITH the badge image. `pflx-platform`,
+`preview.html`. (Full economy map from a subagent — see that report if resuming.)
+
+## Bugs found (via subagent map)
+1. **Badge XC lost on approval.** `mcSaveTaskForm` saves `task.rewardBadges` as
+   bare **id strings** (line ~28533), so `mcApproveTask` built a badge object
+   with no `xcValue`/`category`, and `PflxDataBus.award`'s XC-credit block
+   (`if (b.xcValue>0)`) never fired. Badge XC never reached `xc`/`totalXcoin`.
+2. **Portfolio never showed earned badges** — it read only `badgeCounts` counts
+   (which weren't incremented either, since no `category`), never listed the
+   badges or their artwork.
+3. **Picker could go stale** — built once on form open, no re-render on X-Coin
+   badge sync.
+
+## Fixes
+- **`mcApproveTask`**: each `rewardBadges` entry is now **resolved via
+  `mcFindBadge()`** (the live `mcGetAllBadges()` catalog) → full
+  `{id, name, category(key), xcValue, image}` before `PflxDataBus.award`. So the
+  badge's XC is credited to `xc`/`totalXcoin` (and propagates to toolbar / hero /
+  leaderboard / sub-apps via the bus), `badgeCounts[category]` increments, and
+  the id lands in `player.badges`.
+- **`_pflxBadgeCategoryKey()`** maps any catalog label/tier →
+  `primary|premium|executive|signature` (the keys `badgeCounts` + the portfolio
+  grid use) so counts + tiles are correct.
+- **`mcGetAllBadges()`** now carries `image` (from X-Coin's `image/img/imageUrl/
+  photo/artwork` fields) through the catalog.
+- **`portfolioRenderBadges`**: after the category tiles, renders an **Earned
+  Badges** grid — resolves the player's `badges` (or legacy array) against the
+  catalog and shows each badge's **artwork image** (falls back to the emoji icon)
+  + name + XC.
+- **Freshness**: `mcRefreshBadgePickers()` rebuilds the OPEN task badge checklist
+  (preserving selections) whenever an X-Coin `badges` push arrives; and
+  `mcShowTaskForm` calls `mcRequestXCoinData()` on open to pull the latest.
+
+## Verification
+- Harness (`/tmp/badge_harness.js`, real `_pflxBadgeCategoryKey` + replicated
+  award()): **18/18** — category-key mapping, bare-id → xcValue/category/image
+  resolution, award credits badge XC (1000→6000 for a 5000 badge) + increments
+  `badgeCounts.signature` + pushes to `player.badges`, portfolio resolves the
+  earned badge's image, unknown badge → 0 XC / primary.
+- `node --check` on both affected blocks: clean.
+- NOT browser-tested. Ennis: approve a task with badge rewards → the player's XC
+  jumps by the badge XC and the badge (with image) shows in their Portfolio.
+
+## Follow-ups
+- The **checkpoint** (`mcCPSelectedBadges` saves `{name,xc}`), **project**, and
+  **Core Pathways node-completion** award paths pass badges to `PflxDataBus.award`
+  with the same under-resolved shape — apply the same `mcFindBadge` resolution so
+  their badge XC + images propagate too.
+- X-Coin's badge `image` field name is assumed (`image/img/imageUrl/photo/
+  artwork`); confirm the actual key X-Coin stores and trim the list if needed.
+
+---
+
 # Session Update — July 6 2026 (Opus) — Fix v2: Cohort Groups still 0 — read the authoritative PLAYERS roster
 
 The prior fix (re-sync the mirror when EMPTY) wasn't enough: the mirror was
