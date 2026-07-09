@@ -4312,7 +4312,7 @@ the per-feature entries above have the detail + search anchors + harness names.
 | Repo | Folder | HEAD |
 |------|--------|------|
 | `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `b4654b2` |
-| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `6263118` |
+| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `9ce8389` |
 
 All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
 (Newer entries below this summary block — MC Progress dashboard, Google Docs, and
@@ -4376,6 +4376,19 @@ the run of bug fixes — are folded into workstream 5 below.)
   credited to all totals + `badgeCounts` increments; the **portfolio now shows
   earned badges with their artwork image**; the badge picker refreshes live on
   X-Coin sync. (coinsub zeroes badge xcValue to avoid double-credit.)
+- **Fix: badge sync shape mismatch** `9ce8389` — the piece that makes the artwork
+  fix work end-to-end. X-Coin's `PflxBridge` answers the `badges` request with the
+  **nested** `COIN_CATEGORIES` (`[{ name, coins:[{ name, xc, image }] }]`), but MC's
+  `mcBadges` is a **flat** list that `mcGetAllBadges` / `mcFindBadge` / the pickers /
+  the portfolio grid / the XC resolver all read. Receipt stored the nested payload
+  raw, so every real badge (and its uploaded `image` + `xc`) was stranded inside
+  `cat.coins[]` and the catalog surfaced only empty category shells. New
+  `mcNormalizeBadges()` flattens the nested shape (carries each coin's `image`+`xc`,
+  derives `tier`/`color`/`icon` from its category; already-flat input passes
+  through) and is applied at all three assignment sites (cloud receipt, localStorage
+  load, generic setter). `_pflxCoinDef` rewritten to read the flat unified catalog.
+  Confirmed X-Coin source: artwork field is `image`, reward field is `xc`. 13/13
+  Node harness + `node --check`.
 
 ## ⚠ ACTION ITEMS FOR ENNIS (blocking full functionality)
 1. **Play-test on `prototypeflx.com`** — none of this session's work was
@@ -4389,9 +4402,15 @@ the run of bug fixes — are folded into workstream 5 below.)
    `PFLX_ADMIN_SECRET`). Inert until set — X-Bot keeps using platform keys.
 3. **Google Picker** (browse-my-Drive) needs a Google Cloud project → a Client ID
    + API key (+ consent screen). Link+embed already works without it.
-4. **Badge artwork field** — the badge-image fix reads X-Coin fields
-   `image/img/imageUrl/photo/artwork`. If your X-Coin badges store artwork under a
-   different key, tell me the field and I'll match it so portfolio images render.
+4. ~~**Badge artwork field**~~ ✅ **RESOLVED `9ce8389`** — confirmed against the
+   X-Coin source: badge artwork is stored under `image` (base64 or URL) on the
+   `Coin` type (`app/lib/data.ts`), reward under `xc`. Both were already the
+   first-priority fields in the Console mapping, BUT confirming this surfaced the
+   real bug (see workstream 5, badge-sync fix below): X-Coin's PflxBridge ships the
+   `badges` payload as the **nested** `COIN_CATEGORIES` while MC's `mcBadges` is a
+   **flat** schema — the raw nested payload stranded every real badge (and its
+   uploaded image) inside `cat.coins[]`, so the catalog surfaced only empty
+   category shells. Fixed. Portfolio artwork now renders from live X-Coin badges.
 
 ## Verification method used throughout
 Every module has a pure/testable core run headlessly via extracted-from-source
