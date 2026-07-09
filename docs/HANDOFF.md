@@ -4308,13 +4308,15 @@ Project / Task" in a host dashboard, respecting the tiered access model.
 Read this first when resuming. It consolidates everything shipped this session;
 the per-feature entries above have the detail + search anchors + harness names.
 
-## Repo HEADs at session close
+## Repo HEADs at session close (updated)
 | Repo | Folder | HEAD |
 |------|--------|------|
-| `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `feffda0` |
-| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `177a3e7` |
+| `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `b4654b2` |
+| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `6263118` |
 
 All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
+(Newer entries below this summary block — MC Progress dashboard, Google Docs, and
+the run of bug fixes — are folded into workstream 5 below.)
 
 ## What shipped this session (4 workstreams)
 
@@ -4355,6 +4357,26 @@ All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
   Doc-submission cards, Picker scaffolded.
 - `177a3e7` — player-portal read-only resources on task/project detail.
 
+**5. Mission Control features + bug fixes (`preview.html`, some `pathway.html`)**:
+- **Host Progress dashboard** `9283996` — MC → 📊 Progress: per-player checkpoint
+  progress (only tasks assigned to each player, per-task states), tier-scoped
+  rows (`_pflxPlayerVisible`).
+- **Fix: task form node dropdown** `61125d3`/`fcdd26d` — read the LIVE Core
+  Pathways node catalog (pathway.html broadcasts `PATHWAYS` → Console caches into
+  `pflx_mc_pathway_catalog`), replacing the stale hardcoded list.
+- **Fix: task form cohort→players** `61125d3` — robust cohort match (id/name/
+  array/case) so selecting a cohort surfaces its players.
+- **Fix: Cohort Groups showed 0 players** `b253abe` → `dc01751` — read the
+  authoritative `PLAYERS` roster (`_mcRoster()`) in cohort count / Progress /
+  task picker, matching the Settings Cohort Manager (the MC mirror `mcPlayers`
+  had drifted stale).
+- **Fix: badge economy** `40ba21c` → `6263118` — badge rewards resolve against
+  the live X-Coin catalog via `_pflxResolveAwardBadge` on EVERY award path (task/
+  checkpoint/project/module/node/automation/xtracker/coinsub), so badge XC is
+  credited to all totals + `badgeCounts` increments; the **portfolio now shows
+  earned badges with their artwork image**; the badge picker refreshes live on
+  X-Coin sync. (coinsub zeroes badge xcValue to avoid double-credit.)
+
 ## ⚠ ACTION ITEMS FOR ENNIS (blocking full functionality)
 1. **Play-test on `prototypeflx.com`** — none of this session's work was
    browser-tested (sandbox limitation); each piece has passing Node harnesses +
@@ -4367,6 +4389,9 @@ All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
    `PFLX_ADMIN_SECRET`). Inert until set — X-Bot keeps using platform keys.
 3. **Google Picker** (browse-my-Drive) needs a Google Cloud project → a Client ID
    + API key (+ consent screen). Link+embed already works without it.
+4. **Badge artwork field** — the badge-image fix reads X-Coin fields
+   `image/img/imageUrl/photo/artwork`. If your X-Coin badges store artwork under a
+   different key, tell me the field and I'll match it so portfolio images render.
 
 ## Verification method used throughout
 Every module has a pure/testable core run headlessly via extracted-from-source
@@ -4377,4 +4402,11 @@ Node harnesses (all passing this session), plus `node --check` on the affected
 ## Cleanest next threads (all optional)
 Combat Phase E (GLTF ships / warp-lane graphics — needs browser iteration) ·
 target-weakness scan · Google Picker wiring once creds exist · a cohort Resources
-hub. Otherwise the platform is at a solid, coherent checkpoint.
+hub · Progress dashboard Project-first / player-first pivots. Otherwise the
+platform is at a solid, coherent checkpoint.
+
+## Late-session bug-fix run (all fixed + pushed)
+Task-form node dropdown (live Core Pathways nodes) · task-form cohort→players
+match · Cohort Groups 0-players (authoritative PLAYERS roster) · badge economy
+(XC credit on approval + portfolio artwork across every award path). Details in
+the per-feature entries above the master summary.
