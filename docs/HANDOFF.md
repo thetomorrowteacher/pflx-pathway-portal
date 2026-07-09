@@ -4312,11 +4312,49 @@ the per-feature entries above have the detail + search anchors + harness names.
 | Repo | Folder | HEAD |
 |------|--------|------|
 | `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `b4654b2` |
-| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `9ce8389` |
+| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `421c740` |
 
 All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
 (Newer entries below this summary block — MC Progress dashboard, Google Docs, and
-the run of bug fixes — are folded into workstream 5 below.)
+the run of bug fixes — are folded into workstream 5 below. Workstream 6 = the
+X-Coin modifier engine + notifications + ticker, July 9.)
+
+## 6. X-Coin modifiers function platform-wide + notifications + ticker (July 9)
+Origin is X-Coin (it only *edits* Upgrades / Modifiers / Fines / Penalties); the
+Console now makes them FUNCTION everywhere. Design: honor each modifier's own
+`autoApply` flag; all four apply-paths requested.
+- **Engine `2c42917`** — `pflxModifiers` (after the `PflxDataBus` IIFE in
+  `preview.html`): resolves the live `mcModifiers` catalog and `applyToPlayer`
+  routes each `effectType` through the canonical authorities — `xc_add`/`xc_deduct`
+  → `PflxDataBus.award` (+/- XC), `xc_multiply` → time-boxed ledger grant that
+  `award()` now multiplies EARNED XC by (centralized in `award()`, so every path
+  incl. sub-apps honors it), `deadline_extend` → shifts the task/checkpoint due
+  date, `freeze` → per-player freeze broadcast. Per-player ledger in
+  `mcPlayerModifiers` (`pflx_mc_player_modifiers`). `fireEvent(trigger,ctx)`
+  dispatcher fires ONLY `autoApply` modifiers matching the trigger+scope. Every
+  application emits the canonical `pflx_xcoin_event` (kind badge|upgrade|fine).
+  Badge grants emit the same event from inside `award()`. New `upgrade`/`fine`/
+  `ticker` SFX cases. (14/14 harness.)
+- **Notification `2c9b9d4`** — `pflxNotify` consumes `pflx_xcoin_event`: the
+  AFFECTED player (only) gets a centered, detached popup over a dimmed console
+  with the item's uploaded artwork and a sound unique to the kind; ✕ or 10s
+  auto-timeout. Offline players → event queued on their cloud-synced record
+  (`pendingXcoinEvents`, added to `WRITABLE_FIELDS`) and replayed by
+  `drainForCurrent()` on next login (hooked after session-set). (6/6 harness.)
+- **Ticker `dae1ce1`** — `pflxTickerPush` appends live happenings to the bottom
+  ticker with a chime per update; host gear (host-only) → ticker settings:
+  enable, hide player names (anonymize), chime toggle, and PER-COHORT overrides
+  that win over the global default. Settings in `pflx_ticker_settings`. (8/8.)
+- **Host apply UI `421c740`** — 🎁 Apply Modifier on the player-detail actions
+  opens a picker of the live catalog (Upgrades/Bonuses vs Fines/Penalties, with
+  artwork + effect summary); selecting fires `applyToPlayer`. Closes the loop.
+
+Remaining in this workstream (next `continue`): **Slice 3** auto-trigger wiring
+(call `pflxModifiers.fireEvent` at the real event sites — task_approved,
+checkpoint_completed, incomplete_submission, missed-deadline scans); **Slice 4**
+player upgrade store (buy with XC/badges → consume grants); **Slice 5** cross-app
+enforcement (sub-apps honor freeze / multiplier / deadline via the broadcast, +
+pathway.html consumer).
 
 ## What shipped this session (4 workstreams)
 
