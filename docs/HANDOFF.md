@@ -4134,12 +4134,24 @@ earned, and show in players' portfolios WITH the badge image. `pflx-platform`,
   jumps by the badge XC and the badge (with image) shows in their Portfolio.
 
 ## Follow-ups
-- The **checkpoint** (`mcCPSelectedBadges` saves `{name,xc}`), **project**, and
-  **Core Pathways node-completion** award paths pass badges to `PflxDataBus.award`
-  with the same under-resolved shape — apply the same `mcFindBadge` resolution so
-  their badge XC + images propagate too.
+- ~~checkpoint / project / node-completion award paths~~ — DONE (next entry).
 - X-Coin's badge `image` field name is assumed (`image/img/imageUrl/photo/
   artwork`); confirm the actual key X-Coin stores and trim the list if needed.
+
+### Addendum — badge resolution applied to ALL award paths (same day)
+Extracted the resolution into one helper **`_pflxResolveAwardBadge(badgeRef)`**
+(id/name/partial-object → `{id, name, category(key), xcValue, image}` via the live
+catalog) and routed EVERY `PflxDataBus.award` badge site through it:
+task (`mcApproveTask`), **checkpoint** + **project** reward distribution,
+**module completion** (`mcApproveItem`), **Core Pathways node completion**
+(`pflx_pathway_node_complete`), **automations**, and **X-Tracker** reward
+requests. The **coinsub** (X-Coin submission) path also resolves the badge for
+image/category but **zeroes `xcValue`** because that path already credits XC via
+an explicit `xc` field (avoids double-credit). Verified: 0 remaining
+under-resolved badge literals; resolver harness (`/tmp/res_harness.js`) **6/6**
+(id/name/object resolution, unknown→0-xc/primary/synthetic-id, category respected,
+coinsub double-credit guard); `node --check` clean. So badge XC + artwork now
+propagate no matter which surface grants the badge.
 
 ---
 
