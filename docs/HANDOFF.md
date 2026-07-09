@@ -4410,3 +4410,19 @@ Task-form node dropdown (live Core Pathways nodes) · task-form cohort→players
 match · Cohort Groups 0-players (authoritative PLAYERS roster) · badge economy
 (XC credit on approval + portfolio artwork across every award path). Details in
 the per-feature entries above the master summary.
+
+---
+
+# Session Update — July 6 2026 — Cleanup + persistence audit (arena build 2026-07-06.1)
+
+## Folder + backup cleanup (Ennis-approved)
+- Deleted permanently (not in git, confirmed with Ennis): root `PFLX Apps/preview.html` (Apr 23 orphan), `PFLX Overlay/preview.html` (Apr 19 orphan), `pflx-supabase-backup-2026-03-31.json` (superseded — **2026-06-12 backup kept**).
+- Deleted (git history keeps them): 4× `preview-savepoint-2026-04-04-*.html` + `preview-checkpoint-2026-04-03.html` (pflx-overlay), `Dashboard copy.png` ×2. Commits 9d07a96 (overlay) / c9e8c83 (platform), pushed.
+- Junk: 13× .DS_Store, 184+ git tmp_obj_* removed. `git gc --prune=now`: platform-check .git 514→369MB, overlay 140→125MB (~160MB reclaimed). iCloud mirror re-synced via REFRESH_ICLOUD_BACKUP (rsync --delete propagated all removals).
+
+## Persistence audit — Supabase KV is the cross-device truth
+VERIFIED GOOD: baDecks/baGames/baSessions/baLive/baMaps, esports config+media (arena_esports_config/_media), MC data (players/checkpoints/tasks/projects/seasons via the sync map + upserts), mcSeasons reader.
+INTENTIONALLY DEVICE-LOCAL (fine): pflx_sess_lvl_* (per-player season level), pflx_bgm_muted, pflx_user (session identity).
+FIXED THIS PASS (were localStorage-only → host-created content never reached players' devices):
+1. **CUSTOM_MODES** → new KV row `pflx_ba_custom_modes` {modes[]}; saveCustomModes writes cloud+cache; loadCustomModes boots from cache then overrides from cloud + re-renders.
+2. **Esports matches** → new KV row `pflx_esports_matches` {matches[]}; saveEsportsState writes cloud+cache; boot loads cloud-first. (Simple whole-row write — single-host editing assumed; RMW upgrade if co-hosting matches becomes real.)
