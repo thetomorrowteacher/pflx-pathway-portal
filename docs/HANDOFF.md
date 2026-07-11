@@ -4575,3 +4575,7 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 - Every REGISTERED row in the Cohort Hub now has a ⚙ PERMS button that selects the cohort in the permissions card and scrolls to it. populateCohortSelect() runs with each hub render, and now guards against a missing select.
 - Settings → Cohort Manager tab kept as a pointer stub ("MOVED — ONE PAGE NOW") with a button that routes to Host Controls → Organizations, so old muscle memory still lands.
 - The Organizations page is now the complete lifecycle: org cards (subscription/app access/feature flags) → Cohort Hub (create/rename/merge/delete/assign/register) → Cohort Permissions (per-cohort overrides).
+
+## FIX — "Season name is required" with a name entered (July 10)
+- Root cause: DUPLICATE element ID. The MC dashboard season bar had `<div id="mc-season-name">` (display) earlier in the DOM than the season form's `<input id="mc-season-name">`. getElementById returned the div → form save always read '' (alert even with a name typed) and edit-populate wrote the name nowhere. Display div renamed `mc-season-bar-name` + pflxRenderSeasonBar updated; form keeps `mc-season-name`. All mc-season-* IDs verified unique.
+- NOTED TECH DEBT (same bug class, not yet hit): global duplicate-ID scan shows the Sound Engine panel IDs (se-*), toggle-sfx/bgm/login-music, toolbar-profile-avatar-img exist 2×, and pip-xcoin/pip-sysevents/pip-livesession 12× — any getElementById against these hits only the first. Sweep when touching those panels.
