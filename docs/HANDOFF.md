@@ -4569,3 +4569,9 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 - **UI**: Host Master Controls → Organizations now has a COHORT MANAGER table under the org cards — every cohort with org dropdown, member count, REGISTERED/PLAYERS-ONLY status (+1-click REGISTER), duplicate warning with 1-click MERGE, RENAME/MERGE/DELETE (members auto-move to PlayerPool on delete), and a + ADD COHORT row.
 - **All pickers unified**: getAllCohorts (player editor), org editor cohort checkboxes, Settings → Cohort Manager dropdown (unregistered cohorts listed disabled with pointer to the hub) now read the hub. 'Player Pool' duplicate seed removed from COHORTS.
 - Per-cohort app/feature toggles stay in Settings → Cohort Manager (unchanged) — the hub handles identity/membership/org, settings panel handles permissions.
+
+## ONE PAGE — Settings→Cohort Manager merged into Host Controls→Organizations (July 10)
+- The per-cohort APPS & FEATURES permissions panel (selector + info card + toggles + save) physically moved from Settings → Cohort Manager into the Organizations page, as a COHORT PERMISSIONS card directly below the Cohort Hub table. Element IDs unchanged, so populateCohortSelect / loadCohortSettings / saveCohortSettings work as before — only the location moved.
+- Every REGISTERED row in the Cohort Hub now has a ⚙ PERMS button that selects the cohort in the permissions card and scrolls to it. populateCohortSelect() runs with each hub render, and now guards against a missing select.
+- Settings → Cohort Manager tab kept as a pointer stub ("MOVED — ONE PAGE NOW") with a button that routes to Host Controls → Organizations, so old muscle memory still lands.
+- The Organizations page is now the complete lifecycle: org cards (subscription/app access/feature flags) → Cohort Hub (create/rename/merge/delete/assign/register) → Cohort Permissions (per-cohort overrides).
