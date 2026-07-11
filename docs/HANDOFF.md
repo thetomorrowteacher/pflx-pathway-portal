@@ -4534,3 +4534,8 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 ## Studios wave 2d — X-COIN MARKET PAGE (July 9)
 - `pflx-xcoin-check/app/admin/studios/page.tsx`: reads `pflx_studio_market` KV via supabase client; new 4-card MARKET INDEX strip above the studio cards — per-house index, ▲/▼ delta, 30-pt SVG sparkline, 💰 fund (stake capital), 👑 weekly champion. esbuild-transpile clean (Vercel is final typecheck).
 - Remaining Studios work: DarkCampus profile chips + house-first suggestions; X-Coin flat 10% corporateTaxRate → defer to the rank stake ladder (double-collection guard).
+
+## Studios wave 2e — BOTTOM TICKER carries the Studios economy live (July 9)
+- New generic `window.pflxTickerRaw(icon, color, text)` on the unified ticker engine — any PFLX system can push a line the moment something happens (joins _liveEvents, capped 40, sfx + immediate re-render).
+- **Rotation items** (buildMCTickerEvents): every house's live quote "🏢 INNOV8 112.4 ▲3.1% · fund 1,240 XC" in its color + "👑 House Pride: <house> won the week".
+- **Instant pushes**: market re-price → "📈/📉 STUDIO MARKET: <house> +x.x% → index" (biggest mover); dividend payout → "👑 HOUSE PRIDE DIVIDEND…"; recruit sent → "🏢 <HOUSE> is scouting new talent…"; recruit accepted → "🎉 @player joined <House>!".
