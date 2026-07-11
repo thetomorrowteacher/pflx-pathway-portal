@@ -4515,3 +4515,9 @@ Ennis's vision (LOCKED): Studios = fraternity/sorority-style houses for EVERY pl
 - Home Base, senior members: "🏢 SCOUTING — GROW <HOUSE>" panel — top-4 prospects from OTHER/no houses (name, badges, XC, portfolio score) + RECRUIT button (`pflxRecruitSend`) → pending invite (deduped per studio+player).
 - Home Base, invitee: house-colored "You've been scouted!" card (studio chip + recruiter) with JOIN HOUSE / DECLINE (`pflxRecruitRespond`). Accept → studioId change + mcSaveData('players') → flows to 'users' row → X-Coin/Arena. **One house-change per active MC season** (p.studioChangeSeason), 30-day cooldown fallback when no season.
 - Remaining wave 2: X-Coin market chart page, house pride dividend, STUDIO WAR Live Play mode, DarkCampus profile chips + house-first suggestions, Cyber Agents default agent = player's house.
+
+## Studios wave 2b — 🏢 STUDIO WAR shipped (arena build 2026-07-09.2)
+- Live Play team select is now: Solo / 🔵🔴 NOVA vs ION / 🏢 STUDIO WAR. ev.teams = false | 'duo' | 'studios' (legacy true handled as duo).
+- STUDIO WAR joins: player's squad = their REAL house (state.player.studioId from the roster); unaffiliated players get drafted into the smallest studio squad for that event.
+- Event leaderboard in studios mode: up to 4 house columns (logo, color, member scores, house total) + "🏢 <HOUSE> LEADS THE WAR" headline; card meta shows YOUR HOUSE.
+- Remaining wave 2: X-Coin market chart page, house pride dividend, DarkCampus chips + house-first suggestions, Cyber Agents default agent = house.
