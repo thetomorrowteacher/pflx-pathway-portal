@@ -4539,3 +4539,8 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 - New generic `window.pflxTickerRaw(icon, color, text)` on the unified ticker engine — any PFLX system can push a line the moment something happens (joins _liveEvents, capped 40, sfx + immediate re-render).
 - **Rotation items** (buildMCTickerEvents): every house's live quote "🏢 INNOV8 112.4 ▲3.1% · fund 1,240 XC" in its color + "👑 House Pride: <house> won the week".
 - **Instant pushes**: market re-price → "📈/📉 STUDIO MARKET: <house> +x.x% → index" (biggest mover); dividend payout → "👑 HOUSE PRIDE DIVIDEND…"; recruit sent → "🏢 <HOUSE> is scouting new talent…"; recruit accepted → "🎉 @player joined <House>!".
+
+## Studios wave 2f — DARKCAMPUS house tags (July 9) — STUDIOS BLUEPRINT COMPLETE
+- `/api/players` now exposes studioId (from the shared 'users' row).
+- MessageFeed: `StudioTag` chip (house-colored dot + name) next to every author name in the terminal feed; terminal passes a playerStudios map (brand → studioId). esbuild-clean.
+- STARTUP STUDIOS STATUS: every blueprint item shipped — placement, Home Base chip, recruitment, stakes/market, dividend, STUDIO WAR, Cyber Agents house default, X-Coin market strip, ticker integration, DarkCampus tags. Remaining polish idea (unscheduled): DarkCampus house-first member suggestions panel when a directory/suggestions view exists (terminal is feed-based today); X-Coin flat tax → rank ladder dedupe.
