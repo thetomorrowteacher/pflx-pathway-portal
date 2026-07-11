@@ -4509,3 +4509,9 @@ Ennis's vision (LOCKED): Studios = fraternity/sorority-style houses for EVERY pl
 3. **Studio effects**: members earn small XC bonus when their studio index is #1 for a full week ("house pride dividend"); Battle Arena Live Play team mode option "STUDIO WAR" (squads = studios, not NOVA/ION).
 4. **DarkCampus profile headers** show the studio chip; studio-mates surface first in network suggestions ("brothers/sisters of the house").
 5. Cyber Agents game already uses the four studios as its agents — link agent pick to the player's ACTUAL studio (default agent = your house).
+
+## Studios wave 2a — RECRUITMENT shipped (July 9, console)
+- `pflxStudioRecruit` (KV `pflx_studio_recruit` {invites[≤200]}): MIN_RANK 5 to scout; portfolioScore = badges×50 + totalXC/20 + level×30.
+- Home Base, senior members: "🏢 SCOUTING — GROW <HOUSE>" panel — top-4 prospects from OTHER/no houses (name, badges, XC, portfolio score) + RECRUIT button (`pflxRecruitSend`) → pending invite (deduped per studio+player).
+- Home Base, invitee: house-colored "You've been scouted!" card (studio chip + recruiter) with JOIN HOUSE / DECLINE (`pflxRecruitRespond`). Accept → studioId change + mcSaveData('players') → flows to 'users' row → X-Coin/Arena. **One house-change per active MC season** (p.studioChangeSeason), 30-day cooldown fallback when no season.
+- Remaining wave 2: X-Coin market chart page, house pride dividend, STUDIO WAR Live Play mode, DarkCampus profile chips + house-first suggestions, Cyber Agents default agent = player's house.
