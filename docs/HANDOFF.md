@@ -4483,3 +4483,29 @@ INTENTIONALLY DEVICE-LOCAL (fine): pflx_sess_lvl_* (per-player season level), pf
 FIXED THIS PASS (were localStorage-only → host-created content never reached players' devices):
 1. **CUSTOM_MODES** → new KV row `pflx_ba_custom_modes` {modes[]}; saveCustomModes writes cloud+cache; loadCustomModes boots from cache then overrides from cloud + re-renders.
 2. **Esports matches** → new KV row `pflx_esports_matches` {matches[]}; saveEsportsState writes cloud+cache; boot loads cloud-first. (Simple whole-row write — single-host editing assumed; RMW upgrade if co-hosting matches becomes real.)
+
+---
+
+# Session Update — July 9 2026 — STARTUP STUDIOS: cross-platform house/faction system, wave 1
+
+Ennis's vision (LOCKED): Studios = fraternity/sorority-style houses for EVERY player, cross-cohort. Auto-placed by diagnostic/vision directive; recruitable by high-evo members scouting quality portfolios; each studio's XC value fluctuates like a stock from its members' seasonal activity; brand + portfolio building is THE core PFLX goal; visible everywhere (Home Base logo-in-color indicator per his reference cards).
+
+## What already existed (audit)
+- Canonical PFLX_STUDIOS defs in console (from Studios Guide PDF) + `cadAssignStudio(diagnostic)` matrix (pathways × storyteller/technologist × vision keywords) wired into onboarding → `player.studioId`.
+- `studioId` lives on the shared **'users' KV row** — console → X-Coin roster → Arena buildPlayers all read it. That row is the cross-app identity backbone.
+- X-Coin: host Studios panel (pools/tax/stakes) + card view; logos `studio-*.png` (now copied into platform + arena public/).
+- MC: Studios panel (mcRenderStudios), player bulk-assign, MC_STUDIO_LABELS; player view already has a primary-studio stake/equity panel.
+
+## Wave 1 shipped (console `pflx-platform`, arena build 2026-07-09.1)
+1. **Visual canon unified** to Ennis's reference: MindForge SILVER #94a3b8 (was red in console), eMagination #2563eb, GenTech #06b6d4, Innov8 #9333ea. `PFLX_STUDIO_VISUAL` + `pflxStudioMeta(sid)`.
+2. **`pflxStudioChipHtml(sid)`** — the logo-in-color chip (white logo tile on the studio's color, name + live market quote with ▲/▼). **Rendered on Home Base player header** next to the streak flame.
+3. **Auto-assign backfill `pflxStudioBackfill()`** (boots +2.5s with market): any player without studioId → pathway-vs-corePathways match, balanced by house size, stable hash tiebreak → saved to players + 'users' sync. Diagnostic assignment at onboarding remains primary; backfill guarantees NOBODY floats houseless.
+4. **Studio Market `pflxStudioMarket`** (KV `pflx_studio_market` {history[≤160], snap, updatedAt}): every studio starts at index 100; one tick max per 6h (any host boot): price moves on REAL activity — studio's share of all member XC earned since last tick vs even split (drive clamped −5%..+8%) + small deterministic daily wobble. `quote(sid)` {value,prev,delta}, `sparkHtml(sid)` SVG. **Market strip in MC Studios panel** (per-studio card: logo, index, ▲/▼ %, 30-pt sparkline).
+5. **Arena**: roster now carries studioId; `ARENA_STUDIOS` + `arenaStudioChip()`; nav avatar shows the member's studio chip. Logos in arena public/.
+
+## Wave 2 blueprint (NEXT SESSION — build in this order)
+1. **Recruitment** (KV `pflx_studio_recruit` {invites:[{id,playerId,studioId,byId,byName,at,status,note}]}): DarkCampus is the scouting floor — high-evo members (rank ≥ 5) browsing portfolios get a "🏢 RECRUIT TO <STUDIO>" button on portfolio cards; invitee sees invite card on Home Base (studio chip + recruiter + accept/decline); accept → studioId change (LIMIT: one house-change per season; joining logged to studio history). Roster/portfolio quality signal = badges + totalXC + portfolio item count.
+2. **X-Coin market chart**: Next.js studios page reads `pflx_studio_market` → full line chart + member roll; pool value display = xcPool × (index/100).
+3. **Studio effects**: members earn small XC bonus when their studio index is #1 for a full week ("house pride dividend"); Battle Arena Live Play team mode option "STUDIO WAR" (squads = studios, not NOVA/ION).
+4. **DarkCampus profile headers** show the studio chip; studio-mates surface first in network suggestions ("brothers/sisters of the house").
+5. Cyber Agents game already uses the four studios as its agents — link agent pick to the player's ACTUAL studio (default agent = your house).
