@@ -4530,3 +4530,7 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 - **House Pride Dividend**: each new ISO week, top-priced studio's members each get +25 XC (row.lastDividend/{Week}); MC market strip shows 👑 WEEKLY CHAMPION + 💰 fund size.
 - **Cyber Agents**: cartridge deck payload now carries player.studioId (contract-additive, arena 2026-07-09.3); the game pre-selects YOUR house's agent (MindForge/Innov8/GenTech/eMagination) — recruits fight for home.
 - NOTE for X-Coin alignment: X-Coin's flat corporateTaxRate 10% should later defer to this rank ladder (avoid double collection); its xcPool can display base pool + row.funds.
+
+## Studios wave 2d — X-COIN MARKET PAGE (July 9)
+- `pflx-xcoin-check/app/admin/studios/page.tsx`: reads `pflx_studio_market` KV via supabase client; new 4-card MARKET INDEX strip above the studio cards — per-house index, ▲/▼ delta, 30-pt SVG sparkline, 💰 fund (stake capital), 👑 weekly champion. esbuild-transpile clean (Vercel is final typecheck).
+- Remaining Studios work: DarkCampus profile chips + house-first suggestions; X-Coin flat 10% corporateTaxRate → defer to the rank stake ladder (double-collection guard).
