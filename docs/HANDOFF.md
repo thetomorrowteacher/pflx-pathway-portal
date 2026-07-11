@@ -4521,3 +4521,12 @@ Ennis's vision (LOCKED): Studios = fraternity/sorority-style houses for EVERY pl
 - STUDIO WAR joins: player's squad = their REAL house (state.player.studioId from the roster); unaffiliated players get drafted into the smallest studio squad for that event.
 - Event leaderboard in studios mode: up to 4 house columns (logo, color, member scores, house total) + "🏢 <HOUSE> LEADS THE WAR" headline; card meta shows YOUR HOUSE.
 - Remaining wave 2: X-Coin market chart page, house pride dividend, DarkCampus chips + house-first suggestions, Cyber Agents default agent = house.
+
+## Studios wave 2c — STAKE ECONOMY + house pride dividend + Cyber Agents = your house (July 9)
+Ennis: "a certain amount gained goes into the Startup Studio investment funding as a stake from each player; that stake raises as the player's evo rank grows."
+- **Stake ladder** (`pflxStudioMarket.stakeRate`): rank 1-2→5%, 3-4→7%, 5-6→10%, 7-8→12%, 9+→15% of XC GAINED each tick period.
+- **collectStakes()** (runs inside every market tick): per-player totalXcoin snapshot (`row.psnap`) → gained since last tick → stake deducted from spendable `xcoin`, credited to `row.funds[studioId]` AND to the player's `studioStakeXC`; `studioStakePercent` = their share of the house fund (feeds the existing player-view equity panel). Saved via mcSaveData('players') → 'users' row.
+- **Price formula (the answer to "how does the value fluctuate")**: newIndex = lastIndex × (1 + activity + capital + wobble), where activity = clamp((studio's share of ALL member XC earned since last tick − 25%) × 0.6, −5%, +8%); capital = clamp(freshStakes / fund × 0.5, 0, +5%); wobble = deterministic ±1.2% daily texture. One tick max per 6h. Outperform the other houses → price climbs; go quiet → it decays.
+- **House Pride Dividend**: each new ISO week, top-priced studio's members each get +25 XC (row.lastDividend/{Week}); MC market strip shows 👑 WEEKLY CHAMPION + 💰 fund size.
+- **Cyber Agents**: cartridge deck payload now carries player.studioId (contract-additive, arena 2026-07-09.3); the game pre-selects YOUR house's agent (MindForge/Innov8/GenTech/eMagination) — recruits fight for home.
+- NOTE for X-Coin alignment: X-Coin's flat corporateTaxRate 10% should later defer to this rank ladder (avoid double collection); its xcPool can display base pool + row.funds.
