@@ -6661,7 +6661,11 @@ function getNextRank(totalXcoin) {
   const submissions = allNodes.reduce((sum, n) => sum + (n.submissions ? n.submissions.length : 0), 0);
 
   // Ship tier
-  const shipData = typeof pflxShip !== 'undefined' ? pflxShip : {};
+  // TDZ FIX (July 12): pflxShip is a `const` declared LATER in this same
+  // script scope — for const, even `typeof` throws in the temporal dead
+  // zone. This killed initPlayerCard on every load (unhandled rejection):
+  // the card half-rendered and the identity sync below never ran.
+  const shipData = (function () { try { return pflxShip || {}; } catch (e) { return (window.pflxShip || {}); } })();
   const SHIP_NAMES = ['Scout MK-I', 'Viper II', 'Phantom III', 'Nova IV', 'Titan V', 'FX-824'];
   const shipTierIdx = user.shipTier || shipData.tier || 0;
   const shipName = SHIP_NAMES[shipTierIdx] || SHIP_NAMES[0];
@@ -12477,7 +12481,19 @@ const pflxCrew = {
       } catch (e) {}
       if (!this.me.brand) this.me.brand = 'Explorer';
       if (!this.me.id) this.me.id = (this.me.brand || 'explorer').replace(/\s+/g, '-').toLowerCase() + '-' + Math.random().toString(36).slice(2, 7);
-      const key = String(this.me.id);
+      // PER-TAB presence key (July 12). Two players on the SAME device
+      // (school lab, host testing two accounts in two tabs) shared the
+      // localStorage identity → identical presence key → Supabase merged
+      // them into ONE client and neither ever saw the other's ship. A
+      // per-tab nonce keeps every tab a distinct crew member; the payload
+      // carries pid so your own other-tab ghost is labeled "(you)".
+      var tabNonce = '';
+      try {
+        tabNonce = sessionStorage.getItem('pflx_tab_nonce') || '';
+        if (!tabNonce) { tabNonce = Math.random().toString(36).slice(2, 8); sessionStorage.setItem('pflx_tab_nonce', tabNonce); }
+      } catch (e) { tabNonce = Math.random().toString(36).slice(2, 8); }
+      const key = String(this.me.id) + '·' + tabNonce;
+      this._key = key;
       const self = this;
       this.channel = window._supabase.channel('pflx-space-' + pathwaySlug, { config: { presence: { key: key } } });
       this.channel
@@ -12493,6 +12509,7 @@ const pflxCrew = {
     if (!this.channel) return;
     const payload = {
       brand: this.me.brand,
+      pid: this.me.id,
       x: Math.round(pflxShip.x), y: Math.round(pflxShip.y),
       mode: (typeof pflxCamera !== 'undefined') ? pflxCamera.mode : 'birdseye',
       nodeId: pflxShip.currentNodeId || '',
@@ -12512,7 +12529,7 @@ const pflxCrew = {
   syncPeers() {
     if (!this.channel) return;
     const state = this.channel.presenceState();
-    const meKey = String(this.me.id);
+    const meKey = String(this._key || this.me.id);
     const seen = {};
     const self = this;
     Object.keys(state).forEach(function (k) {
@@ -12548,7 +12565,7 @@ const pflxCrew = {
           'background:radial-gradient(circle at 35% 30%,rgba(167,139,250,0.5),rgba(0,212,255,0.18));' +
           'border:1.5px solid rgba(167,139,250,0.8);box-shadow:0 0 14px rgba(167,139,250,0.55);font-size:16px;">🚀</div>' +
         '<div class="crew-label" style="margin-top:3px;font-size:9px;font-weight:700;letter-spacing:0.08em;color:rgba(207,238,254,0.85);' +
-          'text-shadow:0 0 6px rgba(0,0,0,0.9);white-space:nowrap;">' + (d.brand || 'Explorer') + '</div>';
+          'text-shadow:0 0 6px rgba(0,0,0,0.9);white-space:nowrap;">' + (d.brand || 'Explorer') + (d.pid && String(d.pid) === String(this.me.id) ? ' (you)' : '') + '</div>';
       const self = this;
       el.addEventListener('click', function (e) { e.stopPropagation(); self.peerMenu(k, d, e); });
       // CRITICAL: append into #nodeLayer, NOT #nodeCanvas. The world
@@ -12707,13 +12724,13 @@ const pflxCrew = {
   },
 
   onWave(p) {
-    if (!p || String(p.to) !== String(this.me.id)) return;
+    if (!p || (String(p.to) !== String(this._key || '') && String(p.to) !== String(this.me.id))) return;
     pflxSpaceToast('👋', 'INCOMING WAVE', (p.fromBrand || 'A fellow explorer') + ' waved at you!', '');
     if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
   },
 
   onInvite(p) {
-    if (!p || String(p.to) !== String(this.me.id)) return;
+    if (!p || (String(p.to) !== String(this._key || '') && String(p.to) !== String(this.me.id))) return;
     const self = this;
     let box = document.getElementById('pflxEncounterPrompt');
     if (box) box.remove();

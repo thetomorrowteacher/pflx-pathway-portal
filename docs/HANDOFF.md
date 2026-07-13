@@ -4600,3 +4600,16 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 - **Sound Engine**: static #host-sound markup is a boot placeholder replaced by buildAdvancedSoundPanel() ~1.5s after load, but its 26 duplicate ids (se-*, toggle-bgm/sfx/login-music, loading-music-*) could shadow the live panel during that window — all suffixed `-boot`.
 - **hmc-online-count**: Players panel + Live Session panel shared the id; only the first updated. Live Session copy → `hmc-online-count-ls`, writer sets both.
 - Remaining scan hits are false positives: pip-xcoin/sysevents/livesession ×12 are `data-pip-id` attributes (one real id each); toolbar-profile-avatar-img ×2 is a runtime innerHTML replacement (never two in DOM). Console now has zero live duplicate element ids.
+
+## CORE PATHWAYS — crew ship visibility investigation + fixes (July 12)
+- **Verified live**: Supabase Realtime presence WORKS on the project (2-client Node test) and pathway.html's crew system works end-to-end (jsdom instance saw a Node peer, rendered .crew-peer at world coords in #nodeLayer, CREW chip updated). Prod serves the same crew code as the repo (hash-matched).
+- **Root causes players "never see each other":**
+  1. **Same-device identity collision** — two players on one device (school lab / host testing 2 tabs) share localStorage identity → SAME presence key → Supabase merges them into one client → neither sees the other. FIX: per-tab presence key (id + sessionStorage nonce), payload carries pid, your own other-tab ghost labeled "(you)", waves/invites accept key or pid addressing.
+  2. **TDZ crash in initPlayerCard** — `typeof pflxShip` on a later `const` THROWS; the async IIFE died on every load (unhandled rejection): player card half-rendered and its identity sync never ran (weakening crew identity resolution). FIX: try/catch access.
+  3. **BY DESIGN: sectors are per-pathway** — channel = 'pflx-space-' + ?p= slug. Players only meet on the SAME pathway. Cross-pathway presence (galaxy-wide roster) would be a design change, not a bug.
+- Testing tip for Ennis: two tabs same browser now works; players must open the same pathway.
+
+## MC — season/checkpoint banner images not saving (July 12)
+- Cloud rows showed Checkpoint Alpha banner = 399KB ✓ saved, but Season + Checkpoint Beta = EMPTY. Cause: season/checkpoint uploads stored RAW dataURLs (a screenshot ≈ 3-6 MB); the debounced cloud upsert (payload doubled by legacy mirror) silently failed/timed out on slow connections AND `_mcCloudFlush` cleared its queue before knowing the result — failures lost data with only a console.warn.
+- FIX: mcUploadSeasonBanner + mcUploadCPBanner now downscale via _mcDownscaleImageDataUrl (1600×900 JPEG 0.82, ~150-300 KB — same as project banners already did); _mcCloudFlush re-queues failed rows (rebuilt from the rows payload), retries in 5s, and toasts "⚠ Cloud save failed — retrying…" so failures are visible.
+- Ennis: re-upload the season + Checkpoint Beta banners once the deploy is live — they'll compress on upload and stick.
