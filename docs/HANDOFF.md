@@ -4643,3 +4643,9 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 ## HOME BASE — Active Season indicator with banner image (July 12)
 - Full-width season card under the Home Base player header (above studio recruitment): season banner image as backdrop (Storage URL or legacy dataURL) with a dark gradient for text legibility, 🏆 ACTIVE SEASON label, name, date range, DAYS LEFT pill, and a gold→violet progress bar along the bottom edge showing season elapsed %.
 - Active-season resolution = platform-canonical rule (status 'active'/legacy .active AND today inside the date window, flagged-only fallback). Cohort-scoped seasons hide the card from players outside the scope (hosts always see it). No banner uploaded → card renders without the image.
+
+## SEASON INDICATOR everywhere — MC bar upgraded + X-Coin (July 12)
+- Ennis: top MC bar showed "ACTIVE SEASON —" while the new Home Base card below worked. Cause: pflxRenderSeasonBar only re-ran on tab nav — first paint happened before the boot pull and views that never navigate (player portal) stayed empty forever. Fixed: _mcAfterCloudChange now re-renders the bar on every cloud apply.
+- **MC bar redesigned** to the same banner-card look as Home Base: full innerHTML rebuild inside pflxRenderSeasonBar — banner image backdrop + gradient, ACTIVE SEASON + name + dates, live stat pills (players/checkpoints/tasks/awaiting), SCOPE pill, DAYS LEFT pill, progress line.
+- **X-Coin**: new `app/components/SeasonBanner.tsx` — reads pflx_mc_seasons via supabaseClient, canonical active rule, cohort-scope aware (players outside scope see nothing; hosts always see it). Mounted on Player Home + Host Dashboard (esbuild-clean; Vercel is final typecheck).
+- Indicator now lives in: Console Home Base, Mission Control bar (all MC views incl. player portal), X-Coin player home, X-Coin host dashboard.
