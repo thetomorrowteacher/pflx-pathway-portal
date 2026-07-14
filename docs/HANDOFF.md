@@ -4655,3 +4655,6 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## FIX 2 — Home Base season card timing (July 12)
 - Card still missing: Home Base builds BEFORE the cloud boot pull populates mcSeasons, and (unlike the MC bar) never re-rendered — the one-shot render saw zero seasons and skipped the card permanently. Now: a persistent #home-season-card container always mounts (hidden when empty) and `pflxUpdateHomeSeasonCard()` fills it — called at build, at +2.5s/+6s retries, and from _mcAfterCloudChange on every cloud apply. Viewer scope (cohorts/role) is derived from activeSession at call time.
+
+## Season indicator dedupe (July 12)
+- Ennis: "not needed twice — keep it at the top." Removed the inline season card from the MC player home (the top MC bar above that view already shows the full banner indicator). Final placement: MC top bar (all MC views) · top-level Home Base #home-season-card · X-Coin player home + host dashboard.
