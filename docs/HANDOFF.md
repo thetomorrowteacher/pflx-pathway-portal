@@ -4652,3 +4652,6 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## FIX — season indicator on the REAL Home Base (July 12)
 - The earlier card had landed on MC's player home ("Welcome back…" view), not the top-level Home Base (profile hero + Launch Apps). Extracted a shared builder `pflxSeasonCardHtml(opts)` (window-exposed, next to pflxRenderSeasonBar) and mounted it on Home Base as a full-width card between the profile hero and Launch Apps — same banner/date/days-left/progress design, cohort-scope aware via opts.myCohorts/isHost. (MC player home still uses its earlier inline copy of the same design — harmless duplication, swap to the shared builder when next touched.)
+
+## FIX 2 — Home Base season card timing (July 12)
+- Card still missing: Home Base builds BEFORE the cloud boot pull populates mcSeasons, and (unlike the MC bar) never re-rendered — the one-shot render saw zero seasons and skipped the card permanently. Now: a persistent #home-season-card container always mounts (hidden when empty) and `pflxUpdateHomeSeasonCard()` fills it — called at build, at +2.5s/+6s retries, and from _mcAfterCloudChange on every cloud apply. Viewer scope (cohorts/role) is derived from activeSession at call time.
