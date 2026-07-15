@@ -4658,3 +4658,6 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## Season indicator dedupe (July 12)
 - Ennis: "not needed twice — keep it at the top." Removed the inline season card from the MC player home (the top MC bar above that view already shows the full banner indicator). Final placement: MC top bar (all MC views) · top-level Home Base #home-season-card · X-Coin player home + host dashboard.
+
+## FIX — MC player-home welcome avatar showed the PFLX logo (July 12)
+- The "Welcome back, <player>" circle hardcoded public/PFLX Core Flat 6.png. Now uses the player's brand image (canonical mcPlayers record → session → PFLX logo fallback, object-fit cover for photos / contain for the logo, onerror falls back to the logo).
