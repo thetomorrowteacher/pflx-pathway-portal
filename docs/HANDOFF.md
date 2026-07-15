@@ -4698,3 +4698,6 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## Player-fence bypass for host tiers + high Evo ranks (July 12)
 - Gate 2b refinement: Guest/Instructor/Admin/Master Host sessions AND Executive-tier Evo ranks (level 9+) bypass the player-level assignment fence — they see every item within their cohort scope (the cohort fence still applies). Bypass only when the viewer is checking their OWN visibility (pid === activeSession.id), so per-player counts/renders for other players stay accurate.
+
+## FIX — project player picker showed only a fraction of the cohort (July 12)
+- Three causes: (1) pool read only mcPlayers (the MC mirror) instead of the authoritative live PLAYERS roster (_mcRoster) — freshly claimed accounts were missing; (2) role filter required role === 'player' EXACTLY, dropping legacy role spellings — now "anyone who isn't a host tier / godTier"; (3) norm didn't collapse internal whitespace in cohort strings. All fixed in mcRenderProjectAssignedPlayers.
