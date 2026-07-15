@@ -4687,3 +4687,6 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## DUPLICATE action for Projects / Tasks / Jobs / Seasons (July 12)
 - New ⧉ button (violet) on every list row, next to Edit: `window.mcDuplicateItem(type, index)` — deep clone with fresh id + "(Copy)" name, inserted directly below the original, saved (mcSaveData) + re-rendered. Per-instance state resets so copies start clean: tasks → status open, submissions/approvals cleared; projects → planning, subtask checks cleared; jobs → open, applicants/filledBy cleared; seasons → upcoming.
+
+## INACTIVE status for Seasons / Checkpoints / Projects (July 12)
+- Seasons already had 'inactive'; Checkpoints + Projects gained an "inactive (hidden from players)" status option. Semantics: host drafts for future use — visible/editable in MC lists, but NEVER reach players: ppGetCheckpoints/ppGetProjects filter them out, and the season-bar/season-card live-checkpoint counter (__cpLive) ignores them. Seasons: 'inactive' already excluded everywhere by the status==='active' rule. Pair with the new ⧉ Duplicate to prep next term's content in advance.
