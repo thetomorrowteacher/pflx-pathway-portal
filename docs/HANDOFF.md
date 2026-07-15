@@ -4661,3 +4661,8 @@ Ennis: "a certain amount gained goes into the Startup Studio investment funding 
 
 ## FIX — MC player-home welcome avatar showed the PFLX logo (July 12)
 - The "Welcome back, <player>" circle hardcoded public/PFLX Core Flat 6.png. Now uses the player's brand image (canonical mcPlayers record → session → PFLX logo fallback, object-fit cover for photos / contain for the logo, onerror falls back to the logo).
+
+## FRESH-PROFILE SYNC — retrying boot pull + cross-device live stream (July 12)
+- Ennis logged into a NEW browser profile: no season, no checkpoints, theater OFFLINE (all fine in the installed PFLX). Two roots:
+  1. **One-shot boot pull** — mcCloudPull fired once at 800ms with no retry; a slow/failed first attempt left the console on empty data forever (the installed profile was cushioned by localStorage). Now: retrying pull with backoff (4s/10s/20s/40s… until first success, `window._mcPullDone`), then a 60s health re-pull for the whole session (covers realtime-less environments too).
+  2. **Live stream state was localStorage-ONLY** (`pflx_live_stream`) — other devices/profiles could never see a broadcast. Now mirrored to the cloud row `pflx_live_stream` on every pflxSetLiveStream (echo-guarded via pflxApplyCloudStream), applied on boot pull, via MC realtime, and by the health re-pull. Theater/ticker LIVE state is now cross-device.
