@@ -4912,3 +4912,7 @@ Source: PFLX FeedForward Form responses (11 reports, Checkpoint ALPHA testers, J
 - DATA FIX: 3 project tasks now carry roundId='round-1' + projectId='proj-1782930375890'; the (Copy) task carries roundId='round-1' and is registered in Alpha's taskIds. Both pflx_mc_tasks + legacy tasks, updatedAt stamped.
 - CODE FIX (pflx-platform): `ppItemInCheckpoint` walks cp.projectIds → project.taskIds and honors item.projectId ∈ cp.projectIds. 5-case unit test (two-hop, forward projectId, reverse taskIds, forward roundId, exclusion) all PASS; syntax gate clean.
 - Player-visible result: Checkpoints card + detail now show real per-player counts (e.g. Kaitlin 3/3 → 100% once her Alpha work is fully approved).
+
+## PATCH v1.9 addendum — Terminology (Copy) fenced to its actual users (July 25)
+- With the (Copy) task registered under Alpha it would count against EVERY cohort player (3/4 forever for those never assigned it). Fenced via assignedPlayers to the 5 players who actually submitted it: MARIQUE, IMPACT, LU3UR, LIVSTUDIOS, LUMINA.
+- Resulting per-player Alpha math (verified from live submissions): KAITLIN/BIJO/KABIR 3/3 = 100% · IMPACT/LU3UR/LUMINA 4/4 = 100% · LIVSTUDIOS 3/4 (her Copy is rejected — host decision pending) · 1LLU510N15T/N1L4/NEUROFLUX 2 of their 3 approved · RUM 1/3. Rule confirmed with Ennis: all assigned tasks approved → N/N and a 100% bar.
