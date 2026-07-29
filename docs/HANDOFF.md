@@ -4312,12 +4312,71 @@ the per-feature entries above have the detail + search anchors + harness names.
 | Repo | Folder | HEAD |
 |------|--------|------|
 | `pflx-pathway-portal` | `Core Pathway Development/pflx-pathway-portal` | `b4654b2` |
-| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `421c740` |
+| `pflx-platform` | `PFLX Overlay/pflx-platform-check` | `09303b4` |
 
 All pushed to `main`; Vercel auto-deploys both to `prototypeflx.com`.
 (Newer entries below this summary block — MC Progress dashboard, Google Docs, and
 the run of bug fixes — are folded into workstream 5 below. Workstream 6 = the
-X-Coin modifier engine + notifications + ticker, July 9.)
+X-Coin modifier engine + notifications + ticker, July 9. Workstream 7 = the
+X-Bot dock + P2P chat + broadcast + KB, and the persistence overhaul, July 9.)
+
+## 7. X-Bot dock, P2P chat, broadcasts, KB, and the PERSISTENCE OVERHAUL (July 9)
+All in `pflx-platform/preview.html`. HEAD `09303b4`.
+
+**X-Bot / chat / broadcast / knowledge**
+- **PFLX Dock `c7365a0`→`c697a3c`** — merged the X-Bot AI panel + PFLX Chat into
+  ONE floating, movable, resizable window anchored to a single pulsating X-Bot
+  icon (NW-open, click-toggles, 4-corner resize, distinct tabs, `👥 P2P CHAT`
+  label). Web-Speech read-aloud (last message + auto-read toggle). Panels are
+  reparented into a tabbed dock body; `toggleXBotPanel`/`pflxChatToggle` drive it.
+- **Live-roster DM + green glow `9e7692d`** — click an online player → `pflxChatStartDM`
+  opens a P2P DM; the recipient's icon glows green (larger pulse + dot) while
+  unread (`pflxDockSetUnread` wired into `_pcRefreshBadge`).
+- **P2P avatars `cb8104e`** — brand icon per player in the thread list + per
+  incoming message; group avatar (uploaded via ⚙ group settings, or auto-adopted
+  from a Project's image via `pflxChatEnsureGroupThread`).
+- **Host broadcast + ticker alert `b552783`** — composer above the X-Bot tabs
+  posts a broadcast → real-time `NEW BROADCAST — open X-Bot` bottom-ticker alert
+  on every client (host-control + Supabase `pflx_broadcasts` realtime, deduped),
+  lands in X-Bot + the MC General group chat. Channel multi-select (MC General +
+  host-defined Discord channels). **Discord send is STUBBED** (`pflxPostToDiscord`)
+  — needs a webhook/bot token + channel IDs before it posts.
+- **X-Bot knowledge base `0441d8d`** — baked-in PFLX platform guide (always
+  grounds X-Bot) + auto-loaded served digest `public/pflx-knowledge.md` (refreshed
+  every 15 min) + host-addable live source URLs (e.g. a FeedForward published CSV).
+  Retrieval spans core + system + host docs.
+- **Checkpoints** — empty checkpoints now save as template holders `e47dd9c`;
+  `pflxScaffoldProgram()` + button seeds Alpha…Omega inactive `a47be73`; embed
+  media (YouTube/Vimeo/Slides/Docs/Canva) on the checkpoint cover via
+  `pflxEmbedSrc`/`pflxCoverMediaEl` `8e8cdcf` (project cover + a form field to SET
+  cp.embedUrl are the only unfinished bits).
+
+**PERSISTENCE OVERHAUL — the "approvals/progress/deletes/XC keep reverting" class.**
+Root cause: cloud pulls AND pushes were WHOLESALE-replacing shared `app_data`
+rows, so any client with a partial/stale copy deleted another writer's data.
+Confirmed against the live DB (project `hyxiagexyptzvetqjmnj`): Aadhya/@C1RC3 had
+0 submissions, 0 XC, 0 activity after being approved — fully clobbered. Fixes:
+- **Merge-on-read `f3de9b5`/`9a856d8`** — tasks (submission-level), chat threads,
+  checkpoints, projects merge (union by id, LWW by `updatedAt`) instead of replace.
+  `_mcMergeTasks`+`_mcMergeTaskSubs` (approved never reverts to a stale pending),
+  `_mcMergeById`, `_pcMergeThreads`. Google attachments stamp `updatedAt`.
+- **Read-merge-write on push `0f8181f`** — `_mcMergeQueueWithCloud` (in
+  `_mcCloudFlush`→`_mcCloudFlushWrite`) fetches the current cloud row and merges
+  before upserting tasks/checkpoints/projects/players — no push can drop another
+  writer's submissions.
+- **Tombstones for deletes `d93dab0`** — `_mcTombstone`/`_mcDropTombstoned`
+  (cloud-synced `pflx_mc_tombstones`) so union-merge can't resurrect a deleted
+  item; task/project delete detaches from parents' `taskIds`/`projectIds` and
+  confirms when connected.
+- **Earnings-safe player merge `09303b4`** — `_mcMergePlayers` (monotonic
+  `totalXcoin` + activity pick the current record; badges union; a stale zero
+  can NEVER wipe XC/badges), wired into read-merge-write + generic apply.
+- Codified as the **`pflx-persistence-guardrail`** skill. Every fix has a passing
+  Node harness. Pre-fix data losses (e.g. Aadhya) are NOT recoverable — resubmit
+  once, then it holds.
+- **Still open:** the X-Coin bridge's own `mockTasks.splice` write path is still
+  wholesale; the Console's read-merge-write corrects the row after (eventual
+  consistency), but folding merge into the X-Coin bridge would remove the window.
 
 ## 6. X-Coin modifiers function platform-wide + notifications + ticker (July 9)
 Origin is X-Coin (it only *edits* Upgrades / Modifiers / Fines / Penalties); the
