@@ -4378,6 +4378,40 @@ Confirmed against the live DB (project `hyxiagexyptzvetqjmnj`): Aadhya/@C1RC3 ha
   wholesale; the Console's read-merge-write corrects the row after (eventual
   consistency), but folding merge into the X-Coin bridge would remove the window.
 
+## 8. Slack/Discord relays, DarkCampus project bridge, embeds, data fix (July 30)
+Repo HEADs: `pflx-platform 0527856`, `pflx-pathway-portal 8b62069`,
+`pflx-darkcampus 6e5f37c`.
+- **Slack + Discord relays** — new serverless fns `api/pflx-slack.js` +
+  `api/pflx-discord.js` in **pflx-pathway-portal** (env-driven, CORS). Console
+  `pflxPostToSlack/Discord` now POST to them (fire-and-forget). LIVE once Vercel
+  env vars are set on the pflx-pathway-portal project:
+  `DISCORD_WEBHOOKS` (JSON channel→webhook) [+ `DISCORD_WEBHOOK_URL` fallback];
+  Slack: `SLACK_WEBHOOKS` (JSON) or `SLACK_BOT_TOKEN` (xoxb, chat:write)
+  [+ `SLACK_WEBHOOK_URL`]. Channel names match the picker (case-insensitive, # optional).
+- **Broadcast Slack mirror** — the X-Bot broadcast Channels picker now has Slack
+  alongside Discord (`targets.slack`, `pflx_slack_channels`).
+- **Project → DarkCampus bridge** — MC Project form has a **Link DarkCampus
+  Channel** dropdown (`project.dcChannelId`, from `dc_project_channels`).
+  `pflxEmitProjectEvent`/`pflxTaskProjectNotify` emit task-completion / deadline /
+  @tag events → live `pflx_project_event` + durable `pflx_project_events` row.
+  DarkCampus `project-feed` route now DRAINS `pflx_project_events` and posts each
+  to the linked channel's Slack/Discord via `sendToLink` (respects feedOptions,
+  deduped by `pflx_project_events_seen`). End-to-end code-complete; goes live with
+  the same webhook env vars above.
+- **Checkpoint embed** — `mc-cp-embed` field → `cp.embedUrl`; hero renders an
+  interactive embed (YouTube/Vimeo/Slides/Docs/Canva via `pflxEmbedSrc`).
+- **10-week program** — Greek-alphabetical, Theta dropped, Omicron kept:
+  Alpha,Beta,Gamma,Delta,Zeta,Nu,Omicron,Sigma,Psi,Omega. `pflxScaffoldProgram`
+  retires empty Theta template holders (tombstoned) + re-sorts in order every run.
+- **DATA FIX (Supabase surgery)** — PASSIONSTUDIOS login failed because a ghost
+  self-created account (`pflx_player_player-1784131817914-eh9fq`, brand
+  BOSESTUDIOS, PIN 2222, **name field = "PASSIONSTUDIOS"**, 0 XC/0 badges) was
+  resolved by the brand-login matcher, rejecting the real PIN. Deleted that row →
+  brand "passionstudios" now uniquely resolves to the canonical account
+  (id `player-import-1774891628716-72`, Sarah Bose, PIN **4068**, 102,000 XC).
+  BoseStudios terminated; nothing to merge (it was empty). Her real email
+  sarahbose.2027@gmail.com lives only on the deleted ghost — not carried over.
+
 ## 6. X-Coin modifiers function platform-wide + notifications + ticker (July 9)
 Origin is X-Coin (it only *edits* Upgrades / Modifiers / Fines / Penalties); the
 Console now makes them FUNCTION everywhere. Design: honor each modifier's own
