@@ -26,15 +26,33 @@ function loadMap() {
 }
 function norm(s) { return String(s || '').trim().replace(/^#/, '').toLowerCase(); }
 
+// Fallback config from Supabase app_data key `pflx_integrations`
+// ({ slack: { webhooks:{}, default:"", botToken:"" } }). Env vars win.
+async function loadSupabaseConfig() {
+  const url = process.env.SUPABASE_URL, anon = process.env.SUPABASE_ANON_KEY;
+  if (!url || !anon) return { map: {}, fallback: '', token: '' };
+  try {
+    const r = await fetch(`${url}/rest/v1/app_data?key=eq.pflx_integrations&select=data`, {
+      headers: { apikey: anon, authorization: `Bearer ${anon}` },
+    });
+    if (!r.ok) return { map: {}, fallback: '', token: '' };
+    const rows = await r.json();
+    const s = (rows && rows[0] && rows[0].data && rows[0].data.slack) || {};
+    return { map: s.webhooks || {}, fallback: s.default || '', token: s.botToken || '' };
+  } catch (e) { return { map: {}, fallback: '', token: '' }; }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const map = loadMap();
-  const fallback = process.env.SLACK_WEBHOOK_URL || '';
-  const token = process.env.SLACK_BOT_TOKEN || '';
+  const envMap = loadMap();
+  const sb = await loadSupabaseConfig();
+  const map = Object.assign({}, sb.map, envMap);
+  const fallback = process.env.SLACK_WEBHOOK_URL || sb.fallback || '';
+  const token = process.env.SLACK_BOT_TOKEN || sb.token || '';
   const configured = Object.keys(map).length > 0 || !!fallback || !!token;
 
   if (req.method === 'GET') return res.status(200).json({ ok: true, configured });
