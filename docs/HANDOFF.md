@@ -5087,3 +5087,10 @@ Source: PFLX FeedForward Form responses (11 reports, Checkpoint ALPHA testers, J
 - AUTO-BUMP WIRING: updated the `pflx-handoff-update` skill (saved, overwrite) — new mandatory step 2 "Bump the version": every PLATFORM patch increments `PFLX_PATCH` (kept aligned to the PLATFORM patch minor) and sets `PFLX_BUILD` to current YYYY.MM. So the displayed system version now moves with every patch, per Ennis.
 - Verified: syntax gate clean (13 blocks, 0 failures); inserted version <script> node --check OK; asset PNGs confirmed 2000×2000 white-on-transparent (lockup aspect 6.36, mark 1.35). Commit pflx-platform `eda2127`.
 - HOST ACTIONS: none. NOTE for next patch: bump `PFLX_PATCH` to 16 (this is the last patch to set it by hand as a reminder — the skill now enforces it).
+
+## PATCH PLATFORM v1.16 — TTT CREDIT LOGO WAS TOO SMALL (July 31, Ennis)
+- SYMPTOM: On the live login the credit showed only a tiny mark fragment + "| PRODUCTION"; the "THE TOMORROW TEACHER" wordmark was effectively invisible ("way too small, not like the preview").
+- ROOT CAUSE: `.ttt-credit-logo` was `height:22px`. At 22px the thin white wordmark strokes vanish on the dark login bg (only the bold T-mark survives). The mock preview used ~46px.
+- FIX: `.ttt-credit-logo` → `height:46px` (login/loading); About-panel inline overrides `20px` → `32px`. Also raised base opacity 0.6→0.82, label font 9→11px, letter-spacing 3→4px, divider bar 12→22px for balance at the larger size. `PFLX_PATCH` 15→16.
+- Verified: syntax gate clean (13 blocks, 0 failures); live site returns `height: 46px` + `PFLX_PATCH = 16` (deploy READY). Commit pflx-platform `20c4ea3`.
+- NOTE: browser screenshot verification blocked by an unrelated Chrome-extension conflict in the session; verified via live-CSS grep instead.
