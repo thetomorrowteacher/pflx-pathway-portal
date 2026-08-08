@@ -7872,6 +7872,23 @@ editorOverlay.addEventListener('click', e => {
 });
 
 function _doSaveNode() {
+  // ── EXTERNAL URL NORMALIZER (v1.16, July 29) ──
+  // Hosts type domains the way they read them ("www.playdna.lovable.app").
+  // Without a scheme the browser treats that as a RELATIVE path, so the link
+  // resolves against the portal and 404s. Add https:// when the value clearly
+  // names a domain. Deliberately conservative: anything already carrying a
+  // scheme, an absolute path, a data/blob URI, an anchor, or a relative course
+  // file (courses/x.html) is returned untouched.
+  function pflxNormalizeExternalUrl(raw) {
+    var u = String(raw == null ? '' : raw).trim();
+    if (!u) return '';
+    if (/^(https?:|mailto:|tel:|data:|blob:|\/\/|\/|#|\?)/i.test(u)) return u;
+    // looks like host.tld or host.tld/path (no spaces, has a dot before any slash)
+    var head = u.split(/[\/?#]/)[0];
+    if (/^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(head) && !/\s/.test(u)) return 'https://' + u;
+    return u;   // relative asset path — leave alone
+  }
+  window.pflxNormalizeExternalUrl = pflxNormalizeExternalUrl;
   try {
     console.log('[PFLX] _doSaveNode called, editorNode:', editorNode ? editorNode.id : 'NULL');
     if (!editorNode) {
@@ -7879,40 +7896,62 @@ function _doSaveNode() {
       showSaveToast('Save failed: no node selected');
       return;
     }
-    editorNode.title = document.getElementById('neNodeTitle').value || 'Untitled';
-    editorNode.emoji = document.getElementById('neEmoji').value || '📦';
-    editorNode.desc = document.getElementById('neDesc').value || '';
-    editorNode.url = document.getElementById('neUrl').value || '';
+    // ── v1.16 (July 29, Ennis: "node is not saving or opening") ──
+    // Every field below used to be read as document.getElementById(id).value
+    // with no null guard, so ONE missing/renamed field in the editor markup
+    // threw and aborted the WHOLE save — the node silently never persisted.
+    // These readers degrade to a default instead, and record what was missing
+    // so the cause shows up in the console instead of a blank failure.
+    var __neMissing = [];
+    function neVal(id, dflt) {
+      var el = document.getElementById(id);
+      if (!el) { __neMissing.push(id); return dflt !== undefined ? dflt : ''; }
+      return el.value;
+    }
+    function neChecked(id) {
+      var el = document.getElementById(id);
+      if (!el) { __neMissing.push(id); return false; }
+      return !!el.checked;
+    }
+    function neInt(id, dflt) { return parseInt(neVal(id, ''), 10) || (dflt || 0); }
+    editorNode.title = neVal('neNodeTitle') || 'Untitled';
+    editorNode.emoji = neVal('neEmoji') || '📦';
+    editorNode.desc = neVal('neDesc') || '';
+    // URL normalization — a host typing "www.playdna.lovable.app" (no scheme)
+    // produced window.open('www…') which the browser resolved RELATIVE to the
+    // portal, giving pflx-pathway-portal.vercel.app/www.playdna.lovable.app
+    // → 404. Normalize on save so the stored value is always openable.
+    editorNode.url = pflxNormalizeExternalUrl(neVal('neUrl'));
     const oldStatus = editorNode.status;
-    editorNode.status = document.getElementById('neStatus').value || 'locked';
-    editorNode.requiredBadge = document.getElementById('neBadge').value || '';
-    editorNode.comingSoon = document.getElementById('neComingSoon').checked;
-    editorNode.imageFit = document.getElementById('neImageFit').value || 'cover';
+    editorNode.status = neVal('neStatus') || 'locked';
+    editorNode.requiredBadge = neVal('neBadge') || '';
+    editorNode.comingSoon = neChecked('neComingSoon');
+    editorNode.imageFit = neVal('neImageFit') || 'cover';
     // New fields
-    editorNode.nodeType = document.getElementById('neNodeType').value || '';
-    editorNode.xcReward = parseInt(document.getElementById('neXcReward').value) || 0;
-    editorNode.xcCost = parseInt(document.getElementById('neXcCost').value) || 0;
-    editorNode.contentUrl = document.getElementById('neContentUrl').value || '';
-    var __neEv2 = document.getElementById('neEntryVideo');
-    editorNode.entryVideo = (__neEv2 && __neEv2.value || '').trim();
-    editorNode.coursePackage = document.getElementById('neCoursePackage').value.trim() || '';
-    var mcType = document.getElementById('neMcTagType').value;
-    var mcName = document.getElementById('neMcTagName').value;
+    editorNode.nodeType = neVal('neNodeType') || '';
+    editorNode.xcReward = neInt('neXcReward');
+    editorNode.xcCost = neInt('neXcCost');
+    editorNode.contentUrl = pflxNormalizeExternalUrl(neVal('neContentUrl'));
+    editorNode.entryVideo = String(neVal('neEntryVideo') || '').trim();
+    editorNode.coursePackage = String(neVal('neCoursePackage') || '').trim();
+    var mcType = neVal('neMcTagType');
+    var mcName = neVal('neMcTagName');
     editorNode.mcTag = mcType && mcName ? { type: mcType, name: mcName } : null;
     editorNode.submission = {
-      link: document.getElementById('neSubLink').checked,
-      screenshot: document.getElementById('neSubScreenshot').checked,
-      html: document.getElementById('neSubHtml').checked,
-      description: document.getElementById('neSubDesc').checked
+      link: neChecked('neSubLink'),
+      screenshot: neChecked('neSubScreenshot'),
+      html: neChecked('neSubHtml'),
+      description: neChecked('neSubDesc')
     };
-    editorNode.hasProgressBar = document.getElementById('neHasProgressBar').checked;
+    editorNode.hasProgressBar = neChecked('neHasProgressBar');
     // ── Multiplayer & entry requirements (Host) ──
-    editorNode.coopEnabled = document.getElementById('neCoopEnabled').checked;
+    editorNode.coopEnabled = neChecked('neCoopEnabled');
     // platform-wide co-op cap is 4 (locked decision); host picks 2–4
-    editorNode.coopMax = Math.max(2, Math.min(4, parseInt(document.getElementById('neCoopMax').value) || 4));
-    editorNode.entryMinXC = parseInt(document.getElementById('neEntryMinXC').value) || 0;
-    editorNode.entryBadge = (document.getElementById('neEntryBadge') || {}).value || '';
-    editorNode.checkpointXC = parseInt(document.getElementById('neCheckpointXC').value) || 0;
+    editorNode.coopMax = Math.max(2, Math.min(4, neInt('neCoopMax', 4)));
+    editorNode.entryMinXC = neInt('neEntryMinXC');
+    editorNode.entryBadge = neVal('neEntryBadge');
+    editorNode.checkpointXC = neInt('neCheckpointXC');
+    if (__neMissing.length) console.warn('[PFLX] node editor fields missing (defaults used):', __neMissing.join(', '));
     editorNode.taggedBadges = _neTaggedBadges.length > 0 ? [..._neTaggedBadges] : [];
     console.log('[PFLX] Node updated:', editorNode.title, 'type:', editorNode.nodeType, 'url:', editorNode.url);
 
@@ -9262,7 +9301,10 @@ function showLaunchOverlay(node) {
           toggleBtn.style.color = taskPanelOpen ? '#00d4ff' : 'rgba(0,212,255,0.7)';
         };
 
-        courseFrame.src = node.contentUrl;
+        // v1.16: same normalization for the embedded frame — a scheme-less
+        // contentUrl loaded the portal itself into the iframe (404 shell).
+        courseFrame.src = (typeof pflxNormalizeExternalUrl === 'function')
+          ? pflxNormalizeExternalUrl(node.contentUrl) : node.contentUrl;
         courseContainer.style.display = 'block';
         warpActive = false;
 
@@ -9520,7 +9562,13 @@ function showLaunchOverlay(node) {
       // External URL: open in new tab
       document.getElementById('launchTitle').textContent = 'Warp Complete';
       document.getElementById('launchSubtitle').textContent = 'Mission launched — ' + node.title;
-      if (node.url) window.open(node.url, '_blank');
+      // v1.16: normalize at OPEN time too — nodes saved before the fix still
+      // hold a bare domain, and this makes them work without a re-save.
+      if (node.url) {
+        var __openUrl = (typeof pflxNormalizeExternalUrl === 'function')
+          ? pflxNormalizeExternalUrl(node.url) : node.url;
+        window.open(__openUrl, '_blank');
+      }
     }
   }, 1500);
 
