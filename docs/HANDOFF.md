@@ -5339,3 +5339,12 @@ Source: PFLX FeedForward Form responses (11 reports, Checkpoint ALPHA testers, J
 - `task-1784129249777` "Download and Install Discord", player `player-1784134468099-flroa` (MARIQUE): submission set to **rejected** with a `note` and `feedback` explaining the upload arrived corrupt (182 characters of base64 — a fragment, not an image), that it was not her fault, and to re-upload and resubmit. Task status returned to `submitted`.
 - Her other two submissions (Terminology Doc, Onboarding Diagnostic) were left untouched — both approved, neither had a file.
 - ⚠️ FLAG FOR ENNIS: she had already been APPROVED on this task, which carries **50 XC**, so she was very likely already paid. The denial does NOT claw that back — reversing a student's currency is a host decision, not a data-repair one. If the 50 XC should come back, say so and it can be reversed through the same PflxDataBus path that paid it.
+
+## PATCH DARKCAMPUS v1.19 — SPEC ITEM 6: REACTIONS · POLLS · EVENT CONFIRMATIONS (Aug 9, Ennis)
+- FIX (pflx-darkcampus `6ef92d3`): NEW `lib/engagement.ts`. Three primitives sharing one problem — PFLX has concepts Discord and Slack do not — so each DEGRADES rather than breaks.
+  · **PFLX_REACTIONS**: the six-reaction set (⚡XC, 🏆badge, ✅done, 👀seen, 🔥fire, 🤝collab), each carrying the native platform emoji to bridge as; a `null` native would mean PFLX-only and a short text line instead. Nothing vanishes across a bridge.
+  · **`/poll Question | A | B`** → a tally BLOCK, not a native widget. Deliberate: native poll widgets do not survive a bridge, a tally does, so DarkCampus, Discord and Slack all show the same numbers. 2–6 options.
+  · **`/event Sunday check-in 8pm`** → Going / Can't / Maybe roster. The time is deliberately NOT parsed — members write it a dozen ways and a wrong parse is worse than none. Feeds the weekly check-in ("every focus area needs a representative").
+- STORAGE: `dc_polls` / `dc_events`, append-only. Kept OUT of `pflx_mc_*` on purpose — these are conversation artifacts, and today's 15 MB incident is a standing reminder not to grow a hot row with content that is not load-bearing.
+- Verified: 14-case unit test ALL PASS (option limits, trimming, empty poll renders 0% with no NaN, tally maths, RSVP counts, `/poll` and `/event` not confused for each other, reaction set integrity). `tsc --noEmit` clean.
+- REMAINING IN THE SPEC: 7 native tokens (`!` `+` `$` `%` `^`) · 8 MC → Project channel routing · 9 GitHub inbound + badges · 10 broadcast queue · 11 auto-tax rails.
