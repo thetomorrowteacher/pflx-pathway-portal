@@ -5443,3 +5443,32 @@ Source: PFLX FeedForward Form responses (11 reports, Checkpoint ALPHA testers, J
 - FIX: replaced all three `escapeAttr(...)` calls with `escapeHtml(...)`, matching the pattern used everywhere else in the file (e.g. the Quick-form player picker's `value="' + escapeHtml(p.id) + '"`).
 - Verified: 13-block syntax gate clean; confirmed no remaining `escapeAttr` references anywhere in the file. New Node test against the ACTUAL extracted `mcShowJobForm` function, 10 cases covering both real code paths: opening for a NEW job (idx -1, the exact case that crashed) — no throw, all three dropdowns/checkboxes populate, form becomes visible, and values containing `"`/`&` render HTML-escaped rather than raw; and opening to EDIT an existing job (idx >= 0) — no throw, fields pre-fill, the job's saved cohort renders pre-checked. All 10 PASS.
 - PFLX_PATCH 36 → 37, build 2026.08.
+
+### CROSS-REFERENCE: Aug 9 PFLX Check-In Recap vs. v1.35–v1.37 (Aug 10, Ennis)
+Ennis uploaded the Aug 9 "PFLX Check-In!" meeting recap (interns + Ennis,
+notes via Read AI) the day after these three patches shipped. Several
+reported symptoms line up closely enough with the v1.36 root cause to record
+the connection here — not confirmed fixed by testers yet, but the mechanism
+matches:
+- "Checkpoint Beta tasks intermittently invisible or replaced by Alpha"
+  (multiple attendees, incl. Alivia Vimal, Kaitlin Francis) — consistent with
+  different views reading `pflx_mc_tasks` (always current) vs. the legacy
+  flat `tasks` key (was silently going stale per the v1.36 root cause) and
+  showing different snapshots depending on which path served the screen.
+- "Deleted/old tasks reappear" — consistent with a delete reaching
+  `pflx_mc_tasks` but never reaching the flat `tasks` key under the same
+  pre-v1.36 mechanism, so a stale-key read shows the "deleted" task as if it
+  never left.
+- "Some users missing badges and coins" (Aad and others, recurring daily
+  reports) — the exact class of bug `_mcMergePlayers`/`_mcPlayerToXCoinUser`
+  (v1.36) targeted directly.
+- NOT explained by v1.36, still open: the storyboarding/storybuilding course
+  missing-badge + wrong-coin-total reports (Hannah Rodrigues, Alivia Vimal)
+  and the Project X resume-progress connection error (Hannah Rodrigues) —
+  these are course-completion reward logic and a separate connection
+  failure, not the tasks/checkpoints/players sync path v1.36 touched.
+  Scoping these next.
+- ACTION ITEM FROM THE RECAP: "Ennis Johnson will push another fix and
+  announce the update via Discord" — v1.35/v1.36/v1.37 are that fix; a
+  draft X-Bot-voiced Discord/Slack announcement was prepared same-day for
+  Ennis to post.
