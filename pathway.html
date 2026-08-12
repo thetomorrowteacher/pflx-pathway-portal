@@ -5461,7 +5461,7 @@ pathway.nodes.forEach(n => {
   const nodeTypeLabels = { course: 'COURSE', project: 'PROJECT', program: 'PROGRAM', quest: 'QUEST', challenge: 'CHALLENGE' };
 
   const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
-  const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
+  const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'contain'}">` : '';
   const typeTagHTML = n.nodeType ? `<div class="node-type-tag" data-type="${n.nodeType}">${nodeTypeLabels[n.nodeType] || n.nodeType.toUpperCase()}</div>` : '';
   const xcRewardHTML = n.xcReward ? `<div class="node-xc-badge reward">${Number(n.xcReward).toLocaleString()} XC</div>` : '';
   const xcCostHTML = n.xcCost ? `<div class="node-xc-badge cost" style="bottom:-18px;">${Number(n.xcCost).toLocaleString()} XC FEE</div>` : '';
@@ -7226,11 +7226,11 @@ async function savePathwayEdits() {
         submission: n.submission || null,
         hasProgressBar: n.hasProgressBar || false,
         taggedBadges: n.taggedBadges || [],
-        imageFit: n.imageFit || 'cover',
+        imageFit: n.imageFit || 'contain',
       };
       if (n.image) {
         obj.image = await compressImage(n.image, 256, 256);
-        obj.imageFit = n.imageFit || 'cover';
+        obj.imageFit = n.imageFit || 'contain';
       }
       if (n.titleGraphic) {
         obj.titleGraphic = await compressImage(n.titleGraphic, 800, 450);
@@ -7420,7 +7420,7 @@ async function injectPitchedNodes() {
           };
           if (pitch.image) {
             newNode.image = pitch.image;
-            newNode.imageFit = 'cover';
+            newNode.imageFit = 'contain';
           }
           pathway.nodes.push(newNode);
           console.log('[PFLX] Added pitched node:', newNode.id, newNode.title);
@@ -7531,7 +7531,7 @@ function rebuildNodes() {
 
     const nodeTypeLabels = { course: 'COURSE', project: 'PROJECT', program: 'PROGRAM', quest: 'QUEST', challenge: 'CHALLENGE' };
     const badgeHTML = n.requiredBadge ? `<div class="badge-indicator" title="Completion Badge: ${n.requiredBadge}">🏅</div>` : '';
-    const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'cover'}">` : '';
+    const imageHTML = n.image ? `<img class="node-image" src="${n.image}" alt="" style="object-fit:${n.imageFit||'contain'}">` : '';
     const typeTagHTML = n.nodeType ? `<div class="node-type-tag" data-type="${n.nodeType}">${nodeTypeLabels[n.nodeType] || n.nodeType.toUpperCase()}</div>` : '';
     const xcRewardHTML = n.xcReward ? `<div class="node-xc-badge reward">${Number(n.xcReward).toLocaleString()} XC</div>` : '';
     const xcCostHTML = n.xcCost ? `<div class="node-xc-badge cost" style="bottom:-18px;">${Number(n.xcCost).toLocaleString()} XC FEE</div>` : '';
@@ -7806,7 +7806,7 @@ function openNodeEditor(node, isNew) {
   badgeSelect.value = node.requiredBadge || '';
 
   document.getElementById('neComingSoon').checked = node.comingSoon || false;
-  document.getElementById('neImageFit').value = node.imageFit || 'cover';
+  document.getElementById('neImageFit').value = node.imageFit || 'contain';
   // New fields
   document.getElementById('neNodeType').value = node.nodeType || '';
   document.getElementById('neXcReward').value = node.xcReward || '';
@@ -7865,7 +7865,7 @@ function openNodeEditor(node, isNew) {
   const preview = document.getElementById('neImagePreview');
   const placeholder = document.getElementById('neImagePlaceholder');
   if (node.image) {
-    preview.innerHTML = `<img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'cover'};">`;
+    preview.innerHTML = `<img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'contain'};">`;
   } else {
     preview.innerHTML = `<span style="color:rgba(255,255,255,0.3);font-size:20px;" id="neImagePlaceholder">📷</span>`;
   }
@@ -7937,7 +7937,7 @@ function _doSaveNode() {
     editorNode.status = neVal('neStatus') || 'locked';
     editorNode.requiredBadge = neVal('neBadge') || '';
     editorNode.comingSoon = neChecked('neComingSoon');
-    editorNode.imageFit = neVal('neImageFit') || 'cover';
+    editorNode.imageFit = neVal('neImageFit') || 'contain';
     // New fields
     editorNode.nodeType = neVal('neNodeType') || '';
     editorNode.xcReward = neInt('neXcReward');
@@ -8021,7 +8021,7 @@ document.getElementById('neImageUpload').addEventListener('click', () => {
     reader.onload = re => {
       editorNode.image = re.target.result;
       const preview = document.getElementById('neImagePreview');
-      const fit = document.getElementById('neImageFit').value || 'cover';
+      const fit = document.getElementById('neImageFit').value || 'contain';
       preview.innerHTML = `<img src="${re.target.result}" style="width:100%;height:100%;object-fit:${fit};">`;
     };
     reader.readAsDataURL(file);
@@ -8208,7 +8208,7 @@ function openImageUpload(node) {
     const reader = new FileReader();
     reader.onload = re => {
       node.image = re.target.result;
-      node.imageFit = node.imageFit || 'cover';
+      node.imageFit = node.imageFit || 'contain';
       savePathwayEdits();
       rebuildNodes();
       // Open image adjust dialog
@@ -8232,7 +8232,7 @@ function openImageAdjust(node) {
       </div>
       <div class="ne-body" style="text-align:center;">
         <div style="width:120px;height:120px;border-radius:50%;overflow:hidden;margin:0 auto 16px;border:2px solid rgba(0,212,255,0.3);position:relative;">
-          <img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'cover'};" id="imgPreview">
+          <img src="${node.image}" style="width:100%;height:100%;object-fit:${node.imageFit||'contain'};" id="imgPreview">
         </div>
         <div class="ne-field">
           <label class="ne-label">Image Fit</label>
