@@ -5731,3 +5731,13 @@ matches:
 - Verified: syntax gate clean (13/13 blocks). 21 jsdom/vm unit-test scenarios against the real extracted code, all PASS: (1) `_pflxProgramCohortNames` — 6 scenarios covering empty/missing input, multi-cohort group resolution, single-name fallback, cross-group dedup, and a silently-skipped unresolvable group id. (2) `mcSaveProgramTabForm` — 15 scenarios covering badge/cohort checkbox reads, the Checkpoint cascade (linked checkpoints updated, a checkpoint on a DIFFERENT program left alone, All-Cohorts leaving existing checkpoints untouched), the banner preserve/remove/upload sentinel behavior (3 cases), and the existing season/name required-field guard clauses still working unchanged.
 - HOST ACTIONS: none required. Existing programs with no `cohortIds`/`rewardBadges`/`bannerImage` saved will simply show "All Cohorts," no badges checked, and no cover image the next time the form is opened — nothing is lost, the new fields are purely additive.
 - BACKLOG (per Ennis's agreed build order): the Gimkit/Blooket-style end-of-Checkpoint/Project report popup with leaderboards and background music remains the last unscoped item.
+
+## PATCH PLATFORM v1.50 — SEASONS NAV/HEADER LABEL CLEANUP (Aug 12, Ennis)
+- REQUEST: "Only refer to Seasons as Seasons. Remove & Evo Ranks and remove Game Periods" (re: the sidebar nav button and the panel header on the Seasons tab).
+- FIX: two label-only edits, no logic touched —
+  - Sidebar nav button (`data-mc="seasons"`, preview.html ~7350): "Seasons & Evo Ranks" → "Seasons". (Evolution Rankings already has its own dedicated nav entry under SYSTEM, so the qualifier on the Seasons button was redundant.)
+  - Seasons panel header (`#mc-panel-seasons` → `.mc-page-title`, preview.html ~9991): "Seasons & Game Periods" → "Seasons".
+- Confirmed no other UI copy still reads "Seasons & Evo Ranks" or "Seasons & Game Periods" (grepped for both variants across the file — only match left is an unrelated internal AI-context description block, not user-facing UI, and a couple of unrelated "All Evo Ranks" dropdown filter options in a different feature).
+- Files: `pflx-platform/preview.html` only. `PFLX_PATCH` 49→50, `PFLX_BUILD` unchanged (2026.08).
+- Verified: syntax gate clean (13/13 blocks). Label-only change — no logic to unit test; verified via grep that exactly one nav button and one panel header exist for Seasons and both now read the plain string.
+- HOST ACTIONS: none.
