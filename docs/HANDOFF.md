@@ -5517,3 +5517,59 @@ matches:
   each kind's player correctly, comment bank add/delete persisting to
   localStorage and surviving a re-render, cancel doing nothing, empty-items
   no-op, and the onDone callback firing after confirm. All 18 PASS.
+
+## PATCH PLATFORM v1.39 — COLLAPSIBLE SIDEBARS ACROSS MISSION CONTROL, X-COIN, DARKCAMPUS (Aug 12, Ennis)
+- REQUEST: Ennis flagged that the fixed left sidebar in every sub-app hurts
+  mobile UX badly in portrait ("the App seems to work better in landscape
+  on my iPhone") and asked for it to be collapsible with a toggle, freeing
+  up viewing room — desktop included, not just mobile.
+- SCOPE NOTE: Mission Control already had a <768px off-canvas drawer for
+  its sidebar (v1.33, shipped Aug 10, hamburger + backdrop +
+  `mcToggleMobileSidebar()`). X-Coin and DarkCampus had NO collapse
+  mechanism at all — fixed-width sidebars, zero responsive handling. This
+  patch (a) adds a manual DESKTOP/tablet collapse to Mission Control on
+  top of its existing phone drawer, and (b) builds the collapse feature
+  from scratch for X-Coin and DarkCampus.
+- MISSION CONTROL (`preview.html`, PFLX_PATCH 38→39): new
+  `.mc-sidebar-collapsed` class on `.mission-control-view` (separate from
+  the existing `.mc-sidebar-open` phone-drawer class so the two systems
+  never fight), toggled by `window.mcToggleDesktopSidebar(forceCollapsed)`.
+  Collapsed → `.mc-sidebar { display:none }`; `.mc-content` is `flex:1` on
+  the same `.mc-layout` row so it reclaims the width automatically, no
+  extra layout rule needed. A small "‹" button sits on the sidebar's edge
+  to collapse; a fixed "☰" button appears top-left to re-expand when
+  collapsed. Both are hidden under 768px via `!important` so they never
+  double up with the existing phone hamburger/drawer, which keeps owning
+  visibility there. Preference persists to `localStorage`
+  (`pflx_mc_sidebar_collapsed`) and restores on load.
+- X-COIN (`SideNav.tsx`, no dedicated repo version counter — footer says
+  "SYS v1.0.0" but isn't bumped per patch): new `sidebarCollapsed` state,
+  synced from `localStorage` (`pflx_xcoin_sidebar_collapsed`) in a
+  `useEffect` — added AFTER the existing `isEmbed`/`soundOn` hooks and
+  BEFORE the `if (isEmbed) return null;` line specifically to respect this
+  file's own documented Rules-of-Hooks constraint (a prior bug here was
+  exactly "Rendered fewer hooks than expected" from an early return above
+  a hook). Collapsed → the component returns just a fixed "☰" button
+  instead of the 230px `<nav>`; expanded → the same `<nav>` as before plus
+  a small "‹" collapse button on its edge. No `<SideNav/>` caller (10+
+  pages) needed touching — the same "return null instead of hiding via CSS"
+  trick `isEmbed` already used here works for any flex layout, since the
+  node leaves the DOM entirely.
+- DARKCAMPUS (`ChannelSidebar.tsx`, only one caller — `terminal/page.tsx`,
+  inside a `flex-1 flex` row so the message feed reclaims width for free):
+  same pattern — `collapsed` state synced from `localStorage`
+  (`pflx_darkcampus_sidebar_collapsed`), collapsed renders a fixed "☰"
+  button, expanded renders the sidebar with a "‹" collapse button added.
+- Verified: `preview.html` syntax gate clean (13/13) plus a 10-case jsdom
+  harness against the real extracted `mcToggleDesktopSidebar` +
+  load-restore logic (default expanded, toggle flips + persists, explicit
+  force true/false, stored "1" restores collapsed on load, missing
+  `.mission-control-view` doesn't throw) — all PASS. X-Coin: `tsc --noEmit`
+  clean (the one pre-existing `task-management/page.tsx` TS1381 error is
+  unrelated — confirmed present even with this change stashed out) and a
+  full `next build` compiled and statically generated all 41 routes.
+  DarkCampus: `tsc --noEmit` clean with zero errors, and a full `next build`
+  compiled cleanly including `/terminal`.
+- HOST ACTION: none required — this is host-facing chrome, no data
+  migration. First load after deploy defaults to expanded everywhere;
+  collapsing is a manual per-device choice from here on.
