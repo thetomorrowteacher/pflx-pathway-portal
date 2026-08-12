@@ -6646,7 +6646,21 @@ function getNextRank(totalXcoin) {
           if (xcUser.digitalBadges !== undefined) user.digitalBadges = xcUser.digitalBadges;
           if (xcUser.level !== undefined) user.level = xcUser.level;
           if (xcUser.rank !== undefined) user.rank = xcUser.rank;
-          if (xcUser.image) user.image = xcUser.image;
+          // BUGFIX (Aug 12, Ennis) — "my avatar in the player card didn't
+          // update". This used to unconditionally overwrite user.image with
+          // whatever the cloud 'users' row had. That row is populated by a
+          // multi-hop MC pipeline (PLAYERS -> mcPlayers id-match ->
+          // mcCloudSync) that silently drops the new avatar whenever the
+          // player's id isn't found in the host's in-memory mcPlayers array
+          // — the toolbar (which reads activeSession.image directly, no
+          // cloud round-trip) showed the fresh photo immediately, while this
+          // card kept clobbering the already-correct local copy with a
+          // stale/blank cloud value on every load. Every OTHER identity
+          // field merged from pflx_user above already follows "only fill in
+          // if missing locally" — image now matches that same rule: trust a
+          // local image we already have, and only pull from the cloud row
+          // as a fallback when we don't have one yet (e.g. a fresh device).
+          if (xcUser.image && !user.image) user.image = xcUser.image;
           if (xcUser.brandName) user.brandName = xcUser.brandName;
           if (xcUser.name) user.name = xcUser.name;
           if (xcUser.isHost !== undefined) user.isHost = xcUser.isHost;
