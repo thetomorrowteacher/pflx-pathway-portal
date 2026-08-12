@@ -6247,7 +6247,18 @@ function showDetail(n) {
           submittedAt: submissionData.timestamp,
           source: 'player',
           nodeId: n.id,
-          pathwayId: submissionData.pathwayId
+          // nodeTitle/pathwaySlug/reward mirror the Module Completion Record
+          // shape (see the pflx_mod_complete handler below) so the Console's
+          // unified Approvals Queue can treat a non-module node submission
+          // exactly like a module completion — same automatic reward-through-
+          // the-node math, same host approval surface. Reward is snapshotted
+          // HERE (not looked up later by MC) so it always reflects what this
+          // node was actually configured to pay at submission time.
+          nodeTitle: n.title || n.id,
+          pathwayId: submissionData.pathwayId,
+          pathwaySlug: submissionData.pathwayId,
+          reward: { xc: parseInt(n.xcReward, 10) || 0, badgeIds: Array.isArray(n.taggedBadges) ? n.taggedBadges : [] },
+          submission: { link: submissionData.link || '', description: submissionData.description || '' }
         };
         if (window._supabase) {
           window._supabase.from('app_data').select('data').eq('key', 'submissions').maybeSingle()
