@@ -5472,3 +5472,48 @@ matches:
   announce the update via Discord" — v1.35/v1.36/v1.37 are that fix; a
   draft X-Bot-voiced Discord/Slack announcement was prepared same-day for
   Ennis to post.
+
+## PATCH PLATFORM v1.38 — RICH DENY MODAL: SAVED COMMENTS + PARTIAL BADGE/TAX/XC ON DENIAL (Aug 12, Ennis)
+- REQUEST: Ennis wants more control when denying a submission than the old
+  native `prompt()` gave — a saved comment bank (multi-select), quick
+  Digital Badge selection, PFLX Taxes selection, and a custom XC amount,
+  all from the same dialog.
+- WHAT SHIPPED: `pflxShowDenyModal(items, onDone)` replaces the prompt()
+  in both the individual DENY button and the bulk "DENY SELECTED" flow on
+  the Homebase Approvals card (`pflxHomeResolve` / `homeApprovalBulk`).
+  The modal has four sections:
+  - SAVED COMMENTS — host-editable bank (localStorage key
+    `pflx_deny_comment_bank`, best-effort Supabase mirror under the same
+    key so it isn't tied to one browser). Multi-select checkboxes feed the
+    note textarea (still freely editable); a "+ SAVE" field adds new
+    comments, a "✕" removes them — both persist immediately, no separate
+    settings screen needed. Seeded with 5 starter comments.
+  - DIGITAL BADGE — picks from the live badge catalog (`mcGetAllBadges`).
+    Per Ennis: selecting a badge AWARDS it through the same
+    `PflxDataBus.award(..., {badge})` / `_pflxResolveAwardBadge` path a
+    normal approval uses, so it still lands in X-Coin and the player's
+    Portfolio — partial credit despite the denial, not just a note.
+  - PFLX TAXES — reuses the live X-Coin modifier catalog
+    (`window.pflxModifiers.catalog()` filtered to `type==='tax'`).
+    Selecting one deducts XC immediately via the existing
+    `pflxModifiers.applyToPlayer()` (same call the "Incomplete Submission
+    Tax" auto-fire and the host's manual modifier picker already use).
+  - CUSTOM XC AWARD — preset chips (10/25/50/100/200/500/1000) + a free
+    number field; awards XC via `PflxDataBus.award` as partial credit.
+  All four apply per-player: `_pflxDenyResolvePlayerId(kind,id)` resolves
+  the player for tasksub/task/reward/coinsub kinds (mirrors the same
+  lookups `renderApprovalsCard()` uses to build the list). Bulk deny opens
+  ONE modal for every non-arena selected item; the same picks apply to
+  every item/player. Arena-external denials are unchanged (still reject
+  immediately, no note UI yet — out of scope this patch).
+- NOT changed this patch: the separate MC-tab Approvals list
+  (`mcRejectItem`) still uses its old fixed rejection message — the
+  screenshot Ennis sent was the Homebase Approvals card, which is what
+  this patch covers. Wiring `mcRejectItem` into the same modal is a
+  reasonable follow-up if he wants parity there too.
+- Verified: syntax gate clean (13/13 blocks). 18-case jsdom harness
+  against the real extracted `openModal` + `pflxShowDenyModal` functions
+  (not a reimplementation) — single-item deny, 3-kind bulk deny resolving
+  each kind's player correctly, comment bank add/delete persisting to
+  localStorage and surviving a re-render, cancel doing nothing, empty-items
+  no-op, and the onDone callback firing after confirm. All 18 PASS.
