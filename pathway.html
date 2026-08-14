@@ -6307,7 +6307,15 @@ function showDetail(n) {
     } else {
       btn.textContent = n.status === 'in_progress' ? 'CONTINUE ▶' : 'START ▶';
     }
-    if (n.url || n.contentUrl) {
+    // v1.2 — this used to only check n.url / n.contentUrl, so a node
+    // configured with ONLY a coursePackage (the Node Editor's "Course
+    // Package" field, e.g. "graphic-design-concepts") got no onclick at
+    // all — clicking Start silently did nothing. showLaunchOverlay's own
+    // resolvedCourseUrl() has always been able to resolve a coursePackage
+    // into a real content URL; this button just never checked for it.
+    // Matches the "Start does nothing" reports for pathways whose intro
+    // node was wired via Course Package rather than an external URL.
+    if (n.url || n.contentUrl || n.coursePackage) {
       btn.onclick = () => {
         if (hasEntryFee) {
           // Get player's current XC balance
@@ -6346,6 +6354,16 @@ function showDetail(n) {
         detailOverlay.classList.remove('active');
         detailOverlay.style.display = 'none';
         showLaunchOverlay(n);
+      };
+    } else {
+      // v1.2 — was previously left with no onclick at all (silent no-op).
+      // A node in this state has no url/contentUrl/coursePackage configured
+      // yet, so there's genuinely nothing to launch — tell the player that
+      // instead of a dead button, and (for hosts) point at the fix.
+      btn.onclick = () => {
+        showSaveToast(isHostViewActive()
+          ? '⚠️ This node has no content configured yet — set a URL or Course Package in the Node Editor.'
+          : '⚠️ This course isn’t set up yet — check back soon, or let your host know.');
       };
     }
   }
@@ -7110,6 +7128,20 @@ setInterval(function() {
 // ==================== HOST EDIT MODE ====================
 const SAVE_KEY = 'pflx_pathway_edits_' + pathwaySlug;
 
+// PATHWAY v1.2 (Aug 14) — explicit deletion tracking, used by savePathwayEdits()
+// below to tell "a node the host's local tab doesn't know about" apart from
+// "a node the host actually deleted." Only deleteNode() adds to this set.
+// ROOT CAUSE this closes: savePathwayEdits() used to upsert pathway.nodes as
+// the WHOLE new value of the pathway_<slug> cloud row — a classic
+// wholesale-array/last-write-wins overwrite. A host node (e.g. "Project X")
+// added by someone else, or added in a session that started before this
+// tab loaded, would never make it into this tab's in-memory pathway.nodes —
+// so ANY save from that tab (even just dragging an unrelated node) silently
+// wrote a cloud record missing that node, and it vanished for every player
+// on the very next load. Matches Hannah Rodrigues's escalating reports:
+// connection error → progress loss on resume → "not there at all."
+var _pflxDeletedNodeIds = new Set();
+
 // Show edit toggle for host users
 (async function initEditMode() {
   // Ensure clean state on load
@@ -7265,6 +7297,30 @@ async function savePathwayEdits() {
       }
       data.push(obj);
     }
+    // v1.2 — merge-safe save. Before overwriting the cloud row, re-fetch
+    // its CURRENT contents and carry forward any node that's present there
+    // but missing from this tab's local `data` — unless the host actually
+    // deleted it this session (_pflxDeletedNodeIds). Without this, a stale
+    // tab's save silently wipes any node added elsewhere since this tab
+    // loaded (see the v1.2 note on _pflxDeletedNodeIds above).
+    try {
+      const { data: cloudRow, error: cloudErr } = await _supabase
+        .from('app_data').select('data').eq('key', 'pathway_' + pathwaySlug).single();
+      if (!cloudErr && cloudRow && Array.isArray(cloudRow.data)) {
+        const localIds = new Set(data.map(n => n.id));
+        let restored = 0;
+        cloudRow.data.forEach(cn => {
+          if (cn && cn.id && !localIds.has(cn.id) && !_pflxDeletedNodeIds.has(cn.id)) {
+            data.push(cn);
+            restored++;
+          }
+        });
+        if (restored > 0) {
+          console.log('[PFLX] savePathwayEdits: carried forward', restored, 'node(s) present in the cloud but missing from this tab (not deleted by this session)');
+        }
+      }
+    } catch (mergeErr) { console.warn('[PFLX] savePathwayEdits: cloud pre-fetch for merge-safety failed, saving local view as-is:', mergeErr); }
+
     console.log('[PFLX] savePathwayEdits: saving', data.length, 'nodes, key=pathway_' + pathwaySlug);
 
     // Save to localStorage as instant cache
@@ -8120,6 +8176,9 @@ function deleteNode(node) {
   });
   // Remove node itself
   pathway.nodes = pathway.nodes.filter(n => n.id !== node.id);
+  // v1.2 — record this as a REAL deletion so savePathwayEdits() knows to
+  // let it through instead of restoring it from the cloud copy.
+  _pflxDeletedNodeIds.add(node.id);
   savePathwayEdits();
   rebuildNodes();
 }
