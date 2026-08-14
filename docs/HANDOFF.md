@@ -6018,3 +6018,20 @@ Scope boundary for this sweep — logged so they're not lost, but genuinely not 
 - Slack's bot-message-filtering asymmetry in DarkCampus (noted as a scope note on the DC_CHAT patch).
 - The `LinkGate.tsx` alternate explanation for DarkCampus messages vanishing — likely superseded by the DARKCAMPUS v1.23 `loadMessages()` fix, but never explicitly confirmed/ruled out.
 - Mobile Core Pathways layout overlap, Kabir's cockpit-UI screenshot re-ask, leaderboard XC-ranking mismatch, X-Coin wallet render failure, task-count inconsistencies, DarkCampus chat-presence privacy leak, Core Pathways top-bar typing lag (all P2/P3 from the triage report above).
+
+## ⚠️ URGENT ADDENDUM TO XCOIN v1.3 — THE GEMINI API KEY ITSELF HAS BEEN REVOKED BY GOOGLE AS LEAKED (HOST ACTION, SECURITY)
+
+Immediately after the v1.3 deploy went READY, I re-verified the fix live against production and found a NEW failure — proof the model-name fix itself worked (no more 404 "model not found"), but exposing a different, more urgent problem underneath:
+
+```
+HTTP 403 {"error":"api_key_invalid","details":"...\"message\": \"Your API key was reported as leaked. Please use another API key.\",\n  \"status\": \"PERMISSION_DENIED\"..."}
+```
+
+Google's own automated key-scanning has revoked the `GEMINI_API_KEY` currently set on the `pflx-xcoin-app` Vercel project because it was detected exposed somewhere public (`pflx-xcoin-app` is a public GitHub repo — the key was very likely committed in plaintext at some point in its history, in this file or elsewhere, or logged/echoed somewhere a scraper found it).
+
+**HOST ACTIONS — please do both, and treat this as a security item, not just a bug:**
+1. Generate a brand-new Gemini API key in Google AI Studio / Google Cloud Console, and set it as `GEMINI_API_KEY` in the `pflx-xcoin-app` Vercel project's environment variables (Project Settings → Environment Variables), then redeploy so it picks up the new value.
+2. **Explicitly revoke the old leaked key** in Google AI Studio/Cloud Console if it isn't already fully dead — Google's message suggests it's already blocked from use, but confirming/rotating it fully closes the exposure.
+3. Worth a quick `git log -p -- app/api/gemini/route.ts` (and a repo-wide secret scan, e.g. `gh secret-scanning` or `trufflehog`) across `pflx-xcoin-app` to find exactly where/when the key was committed, so it doesn't happen again — I did not do this myself since it involves reading full git history I don't have local access to search efficiently, and any further key material shouldn't be handled by an agent regardless.
+
+Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 should work end-to-end — the model-name fix is confirmed correct and deployed; only the key is now blocking it.
