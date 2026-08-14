@@ -10778,6 +10778,27 @@ const pflxBlaster = {
     if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
   },
 
+  // Aug 14 addition — click-to-fire toward wherever the cursor is aimed
+  // (Essence's FeedForward 8/11 fix spec). wx/wy are world coordinates,
+  // already converted from the click's screen position by
+  // pflxScreenToWorld. A live target near the aim point still gets
+  // credited a hit (same forgiving radius the existing click-to-lock
+  // hit-test uses) — otherwise the bolt just flies to where you aimed.
+  fireAt(wx, wy) {
+    if (typeof pflxShip === 'undefined' || pflxShip.flying) return;
+    if (this.cooldown > 0) return;
+    this.cooldown = this.fireRate();
+    let target = null, bestD = 140;
+    (window.pflxSpaceObjects || []).forEach(function (o) {
+      if (o.depleted || o.collected) return;
+      if (o.type !== 'asteroids' && o.type !== 'pirate') return;
+      const d = Math.hypot(o.x - wx, o.y - wy);
+      if (d < bestD) { target = o; bestD = d; }
+    });
+    this.boltFX(pflxShip.x, pflxShip.y, target ? target.x : wx, target ? target.y : wy, target);
+    if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('click'); } catch (e) {} }
+  },
+
   boltFX(sx, sy, tx, ty, target) {
     const bolt = document.createElement('div');
     const ang = Math.atan2(ty - sy, tx - sx) * 180 / Math.PI;
@@ -11357,9 +11378,18 @@ canvas.addEventListener('click', function (e) {
   if (document.body.classList.contains('connect-mode')) return;
   if (e.target.closest('.skill-node') || e.target.closest('.detail-panel')) return;
   if (!window.pflxSpaceObjects || !window.pflxSpaceObjects.length) return;
-  const rect = canvas.getBoundingClientRect();
-  const lx = (e.clientX - rect.left - panX) / zoom;
-  const ly = (e.clientY - rect.top - panY) / zoom;
+  // Aug 14 fix: this used to skip the flight-model world-rotation that
+  // chase/cockpit applies (map spins around the ship so heading stays
+  // up-screen), so a click landed on the wrong world point the moment the
+  // ship had turned away from its start heading — targets near the ship
+  // would silently fail to lock. pflxScreenToWorld (added alongside the
+  // click-to-fire feature below) accounts for it; in birdseye the world
+  // rotation is always 0 so this is unchanged there.
+  const _w = (typeof pflxScreenToWorld === 'function') ? pflxScreenToWorld(e.clientX, e.clientY) : (function () {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left - panX) / zoom, y: (e.clientY - rect.top - panY) / zoom };
+  })();
+  const lx = _w.x, ly = _w.y;
   const birdseye = (typeof pflxCamera !== 'undefined' && pflxCamera.mode === 'birdseye');
   let best = null, bestD = Infinity;
   window.pflxSpaceObjects.forEach(function (o) {
@@ -13184,7 +13214,7 @@ const pflxTour = {
   KEY: 'pflx_pathway_tour_v1',
   steps: [
     { sel: '.skill-node', title: 'STATION NODES', body: 'Every station is a course, project, or challenge. Click one to open its briefing — entry video, requirements, your saved progress — then hit START to dock and launch the module. Complete it for XC and badges.' },
-    { sel: '.camera-toggle', title: 'CAMERA MODES', body: 'BIRD\'S-EYE is your star map — pan, zoom, and click anything in space for intel. Switch to CHASE or COCKPIT to take the stick: ↑ thrusts you forward into deep space, ↓ brakes, steer with ←/→ or your mouse, SHIFT boosts, SPACE fires at asteroid fields for XC and ore.' },
+    { sel: '.camera-toggle', title: 'CAMERA MODES', body: 'BIRD\'S-EYE is your star map — pan, zoom, and click anything in space for intel. Switch to CHASE or COCKPIT to take the stick: ↑ thrusts you forward into deep space, ↓ brakes, steer with ←/→, SHIFT boosts, click (or SPACE) fires at asteroid fields for XC and ore.' },
     { sel: '#cargoBtn', title: 'CARGO HOLD', body: 'Everything you collect out there — ore, crystals, salvage, stardust — lands here, along with your pending XC. The SHIP BAY link takes you to the X-Coin Marketplace for stronger hulls and ship systems.' },
     { sel: '.minimap', title: 'MINIMAP', body: 'Your sector at a glance. Click or drag anywhere on it to jump the camera across the map.' },
     { sel: '.progress-bar-container', title: 'PATHWAY PROGRESS', body: 'How many stations you\'ve completed on this pathway. Finish them all to master the discipline — and watch for distant galaxy clusters only warp-capable ships can reach.' },
@@ -13366,29 +13396,76 @@ function pflxSetCamera(mode) {
 
 const pflxKeys = { up: false, down: false, left: false, right: false, shift: false, fire: false };
 
-// ── FLIGHT MODEL (June 2026 rework) ──
+// ── FLIGHT MODEL (June 2026 rework; mouse-steer removed Aug 14) ──
 // In chase/cockpit the ship flies like a real spacecraft:
 //   UP / W      → thrust FORWARD along the ship's heading (deeper into space)
 //   DOWN / S    → brake, then slow reverse
 //   LEFT/RIGHT  → turn the heading
-//   MOUSE / TRACKPAD → steer: move the pointer toward a screen edge to
-//     bank the ship that way (center ≈ dead zone, flies straight)
+//   MOUSE       → aim reticle only (click/hold to fire — see pflxScreenToWorld
+//     and the mousedown listener below). It no longer steers the ship.
 // The WORLD rotates around the ship so your heading is always up-screen.
+//
+// Aug 14 fix (Essence, FeedForward 8/8 + 8/11 — "camera spinning around
+// over and over in a 360 repeatedly" / "disconnect the camera from the
+// cursor that's following"): mouse-steer used to add a turn RATE
+// proportional to how far the cursor sat from screen-center every single
+// frame, with a dead zone covering only the middle 16% of the screen. In
+// practice the cursor is almost never parked in that narrow strip, so the
+// heading kept accumulating turn indefinitely — reading exactly like an
+// uncontrollable spin, since nothing about resting the mouse anywhere off
+// -center ever stopped it. The mouse no longer drives heading at all;
+// Left/Right (arrows or A/D) are the sole turn control again, and the
+// cursor's screen position is used only to aim the blaster (below).
 window.pflxShipHeading = -Math.PI / 2;   // radians; -90° = "north"
 window.pflxViewRotDeg = 0;               // world rotation applied in applyTransform
-window._pflxMouseSteer = 0;
+window._pflxMouseSteer = 0;              // no longer wired to anything; left at 0 for any stale reads
 window._pflxLastTurn = 0;
+window._pflxMouseClientX = null;
+window._pflxMouseClientY = null;
 document.addEventListener('mousemove', function (e) {
-  try {
-    if (typeof pflxCamera === 'undefined' || pflxCamera.mode === 'birdseye') { window._pflxMouseSteer = 0; return; }
-    // pointer over UI → don't steer
-    if (e.target && e.target.closest && e.target.closest('.detail-panel, #cargoPanel, button, select, input, .node-editor, #pflxEncounterPrompt, .camera-toggle, .ship-mode-toggle, .minimap')) {
-      window._pflxMouseSteer = 0; return;
-    }
-    var nx = (e.clientX / window.innerWidth) * 2 - 1;   // -1 … 1
-    var dead = 0.16;
-    window._pflxMouseSteer = Math.abs(nx) < dead ? 0 : Math.sign(nx) * Math.min(1, (Math.abs(nx) - dead) / 0.55);
-  } catch (er) {}
+  // Track raw cursor position for click-to-fire aiming only (see
+  // pflxScreenToWorld / the canvas mousedown listener below) — this no
+  // longer feeds ship steering.
+  window._pflxMouseClientX = e.clientX;
+  window._pflxMouseClientY = e.clientY;
+});
+
+// ── AIM-FIRE: screen → world conversion for click-to-shoot ──
+// Aug 14 addition (Essence, FeedForward 8/11 fix spec): "get the mouse
+// position on the screen, convert it to world coordinates, find the
+// direction vector from the gun to that point, and apply velocity to the
+// bullet along that direction." Inverts the pan/zoom + flight-model world
+// -rotation applied in applyTransform() (chase/cockpit spin the map around
+// the ship so the heading stays up-screen — ignoring that rotation is why
+// the pre-existing birdseye click-to-target math below silently mis-hit in
+// flight modes). The cosmetic 3D rotateX tilt is intentionally NOT
+// inverted here, matching the approximation the existing click-to-lock
+// handler already uses — gameplay coordinates (ship/asteroid/pirate x,y)
+// are flat 2D; the tilt is a visual-only depth effect.
+function pflxScreenToWorld(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  let wx = (clientX - rect.left - panX) / zoom;
+  let wy = (clientY - rect.top - panY) / zoom;
+  const viewRot = (typeof window.pflxViewRotDeg === 'number') ? window.pflxViewRotDeg : 0;
+  if (viewRot && typeof pflxShip !== 'undefined') {
+    const rad = -viewRot * Math.PI / 180;
+    const dx = wx - pflxShip.x, dy = wy - pflxShip.y;
+    wx = pflxShip.x + dx * Math.cos(rad) - dy * Math.sin(rad);
+    wy = pflxShip.y + dx * Math.sin(rad) + dy * Math.cos(rad);
+  }
+  return { x: wx, y: wy };
+}
+window.pflxScreenToWorld = pflxScreenToWorld;
+
+// Left-click (or press-and-hold) in chase/cockpit fires the blaster
+// toward wherever the cursor is aimed — the "hold your mouse down or tap"
+// control most games use, alongside the existing SPACE auto-target fire.
+canvas.addEventListener('mousedown', function (e) {
+  if (e.button !== 0) return;
+  if (typeof pflxCamera === 'undefined' || pflxCamera.mode === 'birdseye') return;
+  if (e.target && e.target.closest && e.target.closest('.detail-panel, #cargoPanel, button, select, input, .node-editor, #pflxEncounterPrompt, .camera-toggle, .ship-mode-toggle, .minimap')) return;
+  const w = pflxScreenToWorld(e.clientX, e.clientY);
+  if (window.pflxBlaster && pflxBlaster.fireAt) pflxBlaster.fireAt(w.x, w.y);
 });
 let pflxKeyAnimFrame = null;
 let pflxShipAngle = 0;      // current heading in degrees (0 = up)
@@ -13430,28 +13507,29 @@ function pflxKeyLoop() {
   if (pflxShip.flying) { pflxKeyAnimFrame = requestAnimationFrame(pflxKeyLoop); return; }
 
   // ── HEADING + THRUST flight model ──
-  // Aim model (June 2026 rewrite): the MOUSE / TRACKPAD is the sole aim
-  // input. Arrow Left/Right used to spin the ship continuously, which
-  // felt like fighting the controls — the player would press right to
-  // "look right" and the whole world would tumble. Now Left/Right
-  // STRAFE laterally (perpendicular to the cursor-aimed heading) and
-  // the cursor position is the only thing that turns the ship.
+  // Aug 14 fix: heading turn now comes ONLY from Left/Right (arrows or
+  // A/D) — the mouse used to also drive a turn rate (see the mousemove
+  // handler above) and that dual-input setup is exactly what produced
+  // Essence's "camera spinning around over and over in a 360" report.
+  // Left/Right no longer strafe (that traded turning away for lateral
+  // slide, which only made sense while the mouse still did the turning);
+  // they're the sole heading control again, same as a classic arcade
+  // flight scheme.
   //
-  // Up arrow: thrust forward along the heading the cursor is pointing.
-  //           Visually this reads as flying INTO space (camera "zooms"
-  //           closer to whatever's ahead).
+  // Up arrow: thrust forward along the current heading. Visually this
+  //           reads as flying INTO space (camera "zooms" closer to
+  //           whatever's ahead).
   // Down arrow: thrust backward. Reads as pulling out of space.
-  // Left arrow:  strafe LEFT (slide sideways without rotating).
-  // Right arrow: strafe RIGHT (slide sideways without rotating).
   // ── Phase C AUTOPILOT ── if a flight command (approach/orbit/keep) is
   // engaged it owns heading + thrust this frame; ANY manual input drops it
   // (Eve behavior). autoDrive() returns { heading, thrust } or null.
   var _auto = (window.pflxCombat && pflxCombat.autoDrive) ? pflxCombat.autoDrive() : null;
-  var _manualIn = Math.abs(window._pflxMouseSteer || 0) > 0 || pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right;
+  var _manualIn = pflxKeys.up || pflxKeys.down || pflxKeys.left || pflxKeys.right;
   if (_auto && _manualIn) { pflxCombat.cancelAuto('manual'); _auto = null; }
 
-  let turn = (window._pflxMouseSteer || 0);
-  turn = Math.max(-1.4, Math.min(1.4, turn));
+  let turn = 0;
+  if (pflxKeys.left) turn -= 1;
+  if (pflxKeys.right) turn += 1;
   if (_auto) {
     // smooth-turn the heading toward the autopilot's desired bearing
     var _dh = _auto.heading - window.pflxShipHeading;
@@ -13461,7 +13539,7 @@ function pflxKeyLoop() {
     window.pflxShipHeading += Math.max(-_maxTurn, Math.min(_maxTurn, _dh));
     window._pflxLastTurn = Math.max(-1, Math.min(1, _dh / 0.15));
   } else {
-    window.pflxShipHeading += turn * 0.042;
+    window.pflxShipHeading += turn * 0.035;
     window._pflxLastTurn = turn;
   }
 
@@ -13482,27 +13560,10 @@ function pflxKeyLoop() {
   }
   thrust = Math.max(-1, Math.min(1.6, thrust));
 
-  // Strafe input: Left/Right arrows slide the ship sideways without
-  // rotating it. Heading-perpendicular = heading + 90° (right) or - 90°
-  // (left). Strafe accel is slightly weaker than forward thrust so it
-  // feels like a maneuvering thruster, not a primary drive.
-  let strafe = 0;
-  if (pflxKeys.left) strafe -= 1;
-  if (pflxKeys.right) strafe += 1;
-
   const maxSpd = pflxKeys.shift ? SHIP_BOOST_MAX : SHIP_MAX_SPEED;
   const tierMult = pflxShip.upgrades._speedMult || 1;
   let ax = Math.cos(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
   let ay = Math.sin(window.pflxShipHeading) * SHIP_ACCEL * thrust * tierMult;
-
-  // Lateral strafe — perpendicular to heading. cos(h + π/2) = -sin(h),
-  // sin(h + π/2) = cos(h). Strafe at 0.65× the forward accel so it reads
-  // as maneuvering, not the primary drive.
-  if (strafe !== 0) {
-    const STRAFE_ACCEL = SHIP_ACCEL * 0.65 * tierMult;
-    ax += -Math.sin(window.pflxShipHeading) * STRAFE_ACCEL * strafe;
-    ay +=  Math.cos(window.pflxShipHeading) * STRAFE_ACCEL * strafe;
-  }
 
   pflxShipVx += ax;
   pflxShipVy += ay;
@@ -13514,12 +13575,10 @@ function pflxKeyLoop() {
     pflxShipVy = (pflxShipVy / spd) * maxSpd * tierMult;
   }
 
-  // Friction when not thrusting OR strafing (drag applies to the whole
-  // velocity vector — turning no longer bleeds speed on one axis only).
-  // Including strafe in the "actively flying" check means the lateral
-  // velocity from Left/Right doesn't get bled out by friction every
-  // frame; it builds up like forward thrust does.
-  if (!pflxKeys.up && !pflxKeys.down && !pflxKeys.left && !pflxKeys.right && !(_auto && _auto.thrust !== 0)) {
+  // Friction when not thrusting (drag applies to the whole velocity
+  // vector). Left/Right only turn the heading now — they don't add
+  // velocity — so friction is gated on Up/Down thrust only.
+  if (!pflxKeys.up && !pflxKeys.down && !(_auto && _auto.thrust !== 0)) {
     pflxShipVx *= SHIP_FRICTION;
     pflxShipVy *= SHIP_FRICTION;
   }
@@ -14204,7 +14263,7 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
 </div>
 
 <!-- Arrow Key Hint -->
-<div class="arrow-key-hint" id="arrowKeyHint">swipe / ↑ to thrust forward · ↓ brake · steer with ←/→ or your mouse · SHIFT boost · SPACE fire</div>
+<div class="arrow-key-hint" id="arrowKeyHint">swipe / ↑ to thrust forward · ↓ brake · steer with ←/→ · SHIFT boost · click or SPACE to fire</div>
 
 <!-- Boost speed streaks + vignette (game feel; opacity driven by pflxKeyLoop) -->
 <div id="speedStreaks"></div>
