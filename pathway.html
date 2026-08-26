@@ -6349,6 +6349,27 @@ function showDetail(n) {
             }
           } catch(e) {}
         }
+        // ── Mission Control enrollment ping (CP_MC_WIRING phase 1) ──
+        // Fired every time a player presses Start/Continue on a node, not
+        // just the first time — Console's _pflxFinalizeNodeEnrollment is
+        // idempotent (checks before mutating), so this just needs to tell
+        // Mission Control "this player is in this node right now" and let
+        // it decide whether anything actually changes (Project activation,
+        // Program roster). Safe no-op if there's no linked Project yet.
+        try {
+          var _puEnroll = {};
+          try { _puEnroll = JSON.parse(localStorage.getItem('pflxUser') || '{}') || {}; } catch (eU) {}
+          if (window.parent !== window && _puEnroll.id) {
+            window.parent.postMessage(JSON.stringify({
+              type: 'pflx_node_enrolled',
+              playerId: _puEnroll.id,
+              brand: _puEnroll.brand || _puEnroll.brandName || '',
+              pathwayId: pathway.id || currentPathway,
+              nodeId: n.id,
+              nodeName: n.title || n.id
+            }), '*');
+          }
+        } catch (eEnroll) { console.warn('[Pathways] enrollment ping failed', eEnroll); }
         // Close detail panel before launching
         detailPanel.classList.remove('active');
         detailOverlay.classList.remove('active');
