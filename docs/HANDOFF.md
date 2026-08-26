@@ -6451,3 +6451,120 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
 - Verified: syntax gate clean on the live file (13/13 blocks). 16-case test against the extracted live `award()`, `broadcastPlayerChange()`, `pflxRefreshHomePanels()`, and `pflxAwardOnboardingSignature()` — XC-only award fires exactly one `xc` event with correct delta and no spurious `badge` event; badge award still fires only `badge`, never `xc` (regression check); an award crossing a rank threshold fires `rank` + `onRankUp` with the correct target rank id; an award staying within the same rank fires neither; a deduction fires a negative-delta `xc` event with no rank event or `onRankUp` — plus static source checks confirming the 3 smaller structural edits landed. All 16 PASS.
 - NOT DONE — deliberately: this phase only closes the reward-broadcast gap. It does NOT yet touch: the Signature-Badge residual-royalty economy (10% base / +2% per additional badge along a path, multi-owner splits — needs Ennis's confirmation on exact rules before implementing), Battle Arena's currently wide-open, unauthenticated XC-award endpoint (a real security gap, flagged for Phase 4), Program host-facing stats (viewers/active users/submission & completion totals/Signature Badges earned) and the "Program Indicator" new-player notice UI, badge-type leaderboards feeding the bottom ticker, or the Darkcampus morning digest. Those remain Phases 3–5 of the same design doc.
 - HOST ACTIONS: none required — this is fully automatic for every existing award path. Hosts who have automations set to trigger "On Rank Up" in the automation editor will see them fire for the first time starting now (previously silently dead).
+
+## PATCH PLATFORM v1.97 — SIGNATURE BADGE RESIDUAL ROYALTY ENGINE (Aug 26, Ennis)
+
+- SYMPTOM: n/a — this is a new feature, Phase 3 of the Core Pathways ↔
+  Mission Control ↔ X-Coin unification (Phase 1 = v1.95 node
+  auto-activation, Phase 2 = v1.96 central reward-broadcast hook). Ennis's
+  ask: every node has one official "Signature Badge"; earning it pays the
+  Project's host(s) a residual XC royalty — "10% base, +2% for each
+  additional Signature Badge earned further along the same path" — framed
+  explicitly as a residual-income / NFT-like value system for badges,
+  splittable across multiple project owners.
+
+- ROOT CAUSE / DESIGN: no prior mechanism existed for "this badge is the
+  official one for this node, and earning it pays the assigned host(s) a
+  cut." Two existing systems were reused rather than rebuilt:
+  - **Host assignment**: the existing `managedScope`/`hostTier`/
+    `scopeGrants` system (`window.pflxHostTier`, `window.pflxManagedScope`,
+    `window.pflxScopeGrants`, ~L68118-68360) already lets Player Manager
+    assign a cohost/instructor/guest as project-scoped host — Phase 3
+    reads from this via reverse lookup rather than adding new UI.
+  - **Residual-percentage-of-XC-value pattern**: mirrors
+    `processResidualPayment(node)` in `pathway.html` (~L7371), which pays a
+    pitched node's creator a percentage of `node.xcValue` on completion.
+    Phase 3's royalty is the same shape (percentage of a configured XC
+    value) applied to a different trigger (badge award, not node
+    completion).
+
+- FIX (6 edits, `preview.html`):
+  1. New "Official Signature Badge" `<select>` in the Project form's Badge
+     Rewards block (after the existing Reward Badges checklist).
+  2. `mcShowProjectForm` — populate/restore that select from the same
+     `allBadges` catalog, restoring `mcProjects[index].signatureBadgeId`.
+  3. `mcSaveProjectForm` — persist `signatureBadgeId` (string) and
+     `signatureRoyaltyPaid` (array, idempotency log) on the project object,
+     preserved across re-saves exactly like `fineTaxIds`/`links`.
+  4. `award()` badge branch — new call site to
+     `window._pflxProcessSignatureBadgeRoyalty(playerId, badge.id,
+     badgeXcDelta, updated.badges)`, positioned right after the existing
+     badge-ticker-emission block from Phase 2.
+  5. New function `_pflxProcessSignatureBadgeRoyalty` (exported as
+     `window._pflxProcessSignatureBadgeRoyalty`), inserted after Phase 1's
+     `_pflxFinalizeNodeEnrollment` export. For each `mcProjects` entry whose
+     `signatureBadgeId` matches the badge just earned:
+     - skips if this player already collected this project's royalty
+       (`signatureRoyaltyPaid`) — **one-time payout per player per badge**,
+       not an ongoing tax on future badges;
+     - skips if the badge has no configured XC value (0% of 0 is 0);
+     - computes rank by counting how many Signature Badges *along the same
+       `pathway`* this player has **already earned** (by earn-order, not
+       node-authored position) — 1st = 10%, 2nd = 12%, 3rd = 14%, etc., no
+       ceiling enforced;
+     - resolves owner(s) via `managedScope`/`scopeGrants` for
+       cohost/instructor/guest tiers scoped to that project — **deliberately
+       excludes Master/Admin** from auto-collecting, to avoid a global-admin
+       XC sink (my call, not explicitly confirmed by Ennis — flagging here);
+     - if no host is assigned, **pays nothing and logs a console warning**
+       rather than guessing an owner;
+     - splits the royalty evenly (rounded) across multiple assigned hosts;
+     - pays via `window.PflxDataBus.award()`, marks the player in
+       `signatureRoyaltyPaid`, saves via `mcSaveData('projects')`, and emits
+       a `pflxEmitProjectEvent(..., 'alerts', ...)` so it floods the
+       platform like every other award.
+  6. `PFLX_PATCH`: 96 → 97.
+
+- ASSUMPTIONS MADE UNDER "CONTINUE" (no explicit confirming answer to my
+  follow-up question — flagging for Ennis to override if any of these
+  don't match intent):
+  - One-time payout per player per badge, not an ongoing royalty on every
+    future badge that player earns elsewhere.
+  - Multi-owner split is even (rounded), not weighted.
+  - Master/Admin are excluded from auto-collecting royalties even if scope
+    grants would otherwise match them.
+  - No royalty percentage ceiling is enforced (10% + 2% per prior badge,
+    uncapped).
+  - Reversal-on-badge-revocation is **not implemented** — a revoked badge
+    does not claw back a paid royalty (flagged as a known gap).
+  - "Further along the same pathway" is computed by **earn order** for that
+    player, not the nodes' authored sequence position — simpler and doesn't
+    need a reliable cross-project node-ordering field, but means two
+    players could see different % for the "same" badge if they earned
+    pathway badges in a different order.
+
+- APPLY METHOD (worth recording): the live Mac `preview.html` was patched
+  via a mechanically-extracted, self-verifying Python patcher (base64
+  old/new pairs pulled directly from the verified draft, each checked to
+  match exactly once before being embedded) rather than hand-typed
+  find/replace — safer for a ~4.9MB single file with heavy Unicode
+  (em-dashes, curly quotes, emoji) in the inserted comments/strings. Two
+  anchor mismatches (indentation drift between the draft copy and the live
+  v1.96 file, at the edit-3 and edit-4 insertion points) were caught by the
+  patcher's own `count != 1: sys.exit(1)` abort guard on a first dry run —
+  nothing was written to disk until all 6 anchors were re-verified unique
+  against the actual live file content. Second run applied cleanly:
+  `orig_len=4877888 new_len=4887647`.
+
+- Verified: syntax gate clean (13/13 blocks) both before and after; 12-case
+  unit test (`test_phase3_royalty.js`) all PASS — fresh earn w/ one host
+  pays 10%; idempotent re-fire pays nothing; 2nd Signature Badge in same
+  pathway pays 12%; no assigned host → no payout; badge with no XC value →
+  no payout; multiple hosts split evenly; a host with a mixed
+  `managedScope` (unrelated grant + the relevant one) still resolves.
+  Phase 1 (`test_node_enrollment.js`) and Phase 2
+  (`test_phase2_wiring.js`) regression tests re-run clean — no
+  interference from Phase 3 touching the same `award()` function.
+
+- HOST ACTIONS / BACKLOG:
+  - To use this: open a Project, pick one badge from "Official Signature
+    Badge," and assign a cohost/instructor/guest as that Project's scoped
+    host in Player Manager (existing UI) — the royalty pays that person
+    when a player earns the badge.
+  - Flag to Ennis: confirm the 5 assumptions above match intent, especially
+    Master/Admin exclusion and one-time-vs-ongoing payout, since only
+    "continue" was received rather than an explicit answer to the design
+    question.
+  - Phase 4 (Battle Arena approval gating / unauthenticated XC-award
+    endpoint) and Phase 5 (badge-type leaderboards, Program host-stats
+    dashboard, Darkcampus morning digest) remain unstarted.
