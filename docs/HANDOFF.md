@@ -6878,3 +6878,78 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   Program host-stats dashboard, DarkCampus morning digest, and now
   optionally a Project-scoped leaderboard per the question above) remains
   unstarted — paused mid-pick to fix this live regression first.
+
+## PATCH PLATFORM v1.104 — GOOGLE SLIDES EMBED FULLSCREEN TOGGLE + PROGRAM EMBEDS BUILT FROM SCRATCH (Aug 27, Ennis-requested)
+- REQUEST (Ennis): "Can we make a full screen toggle for the Google Slides
+  embed in Programs and Projects? The Canva embed already has it." Programs
+  had zero embed-related code at all at the time of the request (confirmed
+  by grep before scoping) — asked Ennis via AskUserQuestion how to handle
+  Programs; Ennis chose the larger scope: **"Also build Program embeds from
+  scratch."** This patch is both: a Slides-only fullscreen button, and a
+  brand-new Program embed field mirroring Checkpoint/Project's existing one.
+- WHY SLIDES NEEDED A NEW BUTTON, CANVA DIDN'T: Canva's own embed chrome
+  draws its own expand/fullscreen icon (unchangeable, per v1.98's research
+  into Canva's embed API). Google Slides is deliberately embedded with
+  `rm=minimal` (kiosk mode, added in v1.98 so in-slide navigation links
+  aren't competed with by Google's control bar) — which also strips Slides'
+  own fullscreen button along with everything else in that bar. So Slides
+  was the one embed type left with no way to go fullscreen at all.
+- FIX 1 — new global toggle: `window.pflxToggleEmbedFullscreen(id)` targets
+  a specific element by id (`document.getElementById(id).requestFullscreen()`
+  with webkit/moz/ms prefixes, toggling to `exitFullscreen()` if already
+  fullscreen). This is distinct from the existing `pflxToggleFullscreen()`
+  (whole-document fullscreen, used by the login screen/toolbar) which can't
+  target a single embed.
+- FIX 2 — `pflxCoverMediaEl(embedUrl, imgUrl)` (the shared function behind
+  every card/detail-header cover — Checkpoint, Project, and now Program)
+  now wraps its iframe in a `position:relative` div and detects Google
+  Slides via `/docs\.google\.com\/presentation\//.test(resolvedEmbedSrc)`
+  (catches both normal `/d/<id>/embed` and published `/d/e/<token>/embed`
+  URLs — `pflxEmbedSrc` resolves both forms). Only when that matches does it
+  overlay a ⛶ button (`pflxToggleEmbedFullscreen`) on a unique per-instance
+  iframe id (`pflx-embed-<timestamp>-<rand>`), so multiple embeds on the
+  same page never collide. Canva/YouTube/Vimeo/Google Docs embeds render
+  exactly as before — no wrapper behavior change beyond the harmless
+  `position:relative` div, no button.
+- FIX 3 — Program embeds built from scratch: added a `mc-program-tab-embed`
+  input to the TOP-LEVEL Program form (`mc-program-tab-form` — the one with
+  banner/badges/cohorts, populated/saved by `mcShowProgramTabForm`/
+  `mcSaveProgramTabForm`, rendered as cards by `mcRenderProgramsTab`),
+  wired to a new `embedUrl` field on the Program record exactly mirroring
+  Project's existing `embedUrl`. Deliberately did NOT touch the separate,
+  lighter Season-nested Program editor (`mcSeasonNewProgram`/
+  `mcSeasonEditProgram`) — that editor has no banner support at all and
+  isn't the card-rendering path; out of scope.
+  - `mcRenderProgramsTab`: card banner now calls `pflxCoverMediaEl(pg.embedUrl, pg.bannerImage)`
+    when either is set (embed takes priority), same pattern as
+    Checkpoint/Project cards.
+  - `ppRenderProgramDetail` (player-facing): now calls `ppBannerHeader({image, embed, title, accent, titleFont, kicker})`
+    — the same shared function `ppRenderProjectDetail` already uses — when a
+    Program has a banner or embed. `ppBannerHeader` returns `''` when
+    neither is set, so a Program with no cover renders EXACTLY the old
+    plain gradient header, unchanged — zero visual regression for every
+    existing Program; this only engages once a host sets a cover.
+- Verified: syntax gate 13/13 clean (test copy, then again on the live
+  file post-patch). 21-case Node unit test run against the functions
+  EXTRACTED from the live-patched file (not reimplemented):
+  - `pflxCoverMediaEl`: Slides (normal + published link forms) gets the
+    button with a matching iframe id in its onclick; Canva/YouTube/Vimeo/
+    Google Docs do NOT get the button but still render correctly;
+    image-only and empty-input cases unaffected.
+  - `pflxToggleEmbedFullscreen`: missing element id doesn't throw; calls
+    `requestFullscreen` on the exact id passed; toggles to `exitFullscreen`
+    when already fullscreen (doesn't call `requestFullscreen` again); a
+    `requestFullscreen()` that returns a rejected-promise-like thenable
+    doesn't throw synchronously (covers a permissions-policy denial).
+  - Program `embedUrl` save/populate: trims pasted whitespace, empty field
+    yields `''` not `undefined`, populate round-trips an existing value and
+    falls back to `''` for both a legacy Program (no `embedUrl` field yet)
+    and a brand-new one.
+- HOST ACTIONS: none required to get the fix — existing Programs are
+  unaffected until a host opens Edit Program and pastes something into the
+  new "Embed Cover" field. To use the new fullscreen button, embed a Google
+  Slides deck (not Canva) in a Checkpoint, Project, or Program.
+- BACKLOG (unchanged from v1.103): Phase 5 (badge-type leaderboards,
+  Program host-stats dashboard, DarkCampus morning digest, and a possible
+  Project-scoped leaderboard) remains unstarted — this patch and v1.103
+  both preempted it with live/requested work.
