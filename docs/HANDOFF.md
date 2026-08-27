@@ -6656,3 +6656,225 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
     for patterns.
   - Phase 5 (badge-type leaderboards, Program host-stats dashboard,
     Darkcampus morning digest) remains unstarted.
+
+## PATCH PLATFORM v1.98 — PROJECT EMBED COVERS (CANVA/GOOGLE SLIDES) + pflxEmbedSrc FIXES (Aug 27, shipped this date, backfilled)
+- NOTE: this entry is a backfill. v1.98–v1.102 shipped (commits authored
+  "Claude", present on `main`, confirmed live) without a Handoff entry at
+  the time — reconstructed here from the commit messages so the doc stays
+  the accurate memory of what's actually live. Original authoring session
+  did real verification work (see each entry); nothing below is guessed.
+- SYMPTOM: Projects could only carry a static banner image. Checkpoints
+  have supported a live embed cover (`cp.embedUrl`) since v1.6; Projects
+  were never wired up. Separately, a published Google Slides deck
+  (`/presentation/d/e/<2PACX-token>/pub` — the exact form of the Nexus
+  Narratives briefing deck) fell through to the generic `/d/<id>` regex in
+  `pflxEmbedSrc()`, which captured the literal "e" as the deck id and
+  produced a 404'ing `/presentation/d/e/embed`. Canva `/view` links were
+  passed through without `?embed`, so they rendered full Canva chrome or
+  refused to frame outright.
+- FIX: `ppBannerHeader()` gains `opts.embed` — renders a 16:9 iframe via
+  `pflxCoverMediaEl` and drops the gradient/absolute title (which would
+  otherwise sit on top of the deck's own next/prev arrows); title moves
+  below the frame. Player project detail and the MC project card both pass
+  `proj.embedUrl` through, matching the checkpoint treatment. Project
+  form gained `#mc-project-embed`, mirroring `#mc-cp-embed`.
+  `pflxEmbedSrc()`: published-Slides form now matched before the generic
+  `/d/<id>` regex; Canva links get `?embed` appended with the share token
+  preserved. Live embed-field hints added (green for a known host, amber
+  fix-it for an un-embeddable `canva.link/*` short link — Canva serves
+  `x-frame-options: deny` on those and there's no client-side way to
+  resolve the redirect). Google Slides embeds with `rm=minimal` (no
+  control bar/branding) since decks are meant to be navigated by
+  in-slide links; cover/module iframes gained
+  `allow-popups-to-escape-sandbox` + `allow-forms` so a link inside a deck
+  can open without inheriting a null-origin sandboxed context. Canva is
+  now the lead placeholder/example in both embed fields (it draws its own
+  arrows with no way to suppress them; Slides renders bare).
+- KNOWN LIMIT: `canva.link/*` short links can't be resolved client-side —
+  the full `canva.com/design/...` URL is required.
+- Verified (per commit message): `node --check` on all 13 inline script
+  blocks; extracted-function harness over 10 URL shapes plus
+  image-only/empty/embed-only regressions.
+- Commit: `dd9a39a` — "PATCH v1.98: Project embed covers (Canva primary) +
+  pflxEmbedSrc fixes (#1)".
+
+## PATCH PLATFORM v1.99 — EMBED COVER WAS WIPED BY QUICK PROJECT SAVE + NESTED EMBED PERMISSIONS (Aug 27, backfilled)
+- SYMPTOM: setting a Canva cover via the Advanced Project form, then
+  touching that same project through the Quick save path, silently
+  blanked `embedUrl`. Confirmed against the live cloud row — every
+  project had `embedUrl` absent despite the row having just been
+  rewritten.
+- ROOT CAUSE: Quick Project save rebuilds the project object field-by-field
+  (~20 fields carried across explicitly) and simply never included
+  `embedUrl` — the same class of bug flagged in the comment directly above
+  it in the code. Quick Checkpoint save has always carried this field;
+  Projects were never given it.
+- FIX: `embedUrl` added to the Quick Project save field list. Separately,
+  widened iframe sandbox/permissions so a cross-origin embed placed INSIDE
+  a Canva/Slides deck (YouTube, Nearpod, Docs, a coded app) can actually
+  run — a nested iframe inherits the outer sandbox, and Permissions Policy
+  doesn't reach nested frames unless delegated with `*`. Added
+  `allow-modals`, `allow-downloads`, `allow-pointer-lock`,
+  `allow-orientation-lock`, `allow-storage-access-by-user-activation`,
+  `allow-top-navigation-by-user-activation` across all 5 host-supplied
+  embed iframes; delegated `accelerometer`/`autoplay`/`clipboard-write`/
+  `encrypted-media`/`fullscreen`/`gyroscope`/`picture-in-picture`/
+  `web-share`/`microphone`/`camera` with `*`. Three iframes still on the
+  old narrow sandbox also gained `allow-popups-to-escape-sandbox` +
+  `allow-forms` for parity with v1.98.
+- Commit: `56fa1b1` — "PATCH v1.99: fix embed cover being wiped by Quick
+  Project save + nested embed permissions".
+
+## PATCH PLATFORM v1.100 — CARD SIZE SLIDER HAD NO EFFECT ON PROJECTS (Aug 27, backfilled)
+- SYMPTOM: dragging the Card Size slider (or hiding the sidebar to free
+  width) changed the CSS var and its px readout but Project cards never
+  visibly resized.
+- ROOT CAUSE: `#mc-projects-list` was the only one of the 5 card
+  containers hard-coded to a rigid 2-column grid
+  (`grid-template-columns:1fr 1fr`). Its children — the per-FLP-bucket
+  grids — already used `repeat(auto-fill, minmax(var(--pflx-card-min),
+  1fr))`, but boxed inside a fixed `1fr 1fr` parent they could never
+  exceed half the container width.
+- FIX: container switched to `display:block` so each bucket grid spans
+  full width and picks its own column count from the slider, matching how
+  Seasons/Checkpoints already worked. Slider ceiling for Projects raised
+  640 → 1400 (matching Seasons/Tasks) — the old max sat below one column's
+  width on a wide screen, so one-card-per-row was unreachable regardless
+  of slider position.
+- Commit: `ba57d62` — "PATCH v1.100: Card Size slider had no effect on
+  Projects; cards now use full width".
+
+## PATCH PLATFORM v1.101 — RICH TEXT IN DESCRIPTIONS + FORMATTING TOOLBAR (Aug 27, backfilled)
+- SYMPTOM: every description rendered as a single collapsed paragraph —
+  line breaks an author typed were silently lost. (Yesterday's BrandBuilder
+  description reads as a wall of text for exactly this reason.)
+- ROOT CAUSE: `pflxLinkify` escaped text and linkified URLs but never
+  converted newlines to markup.
+- FIX: `pflxLinkify` now renders (from plain text held unchanged in
+  storage) `**bold**`, `*italic*`, `__underline__`, `~~strike~~`,
+  `` `code` ``, `-`/`*` and `1.` lists as real `<ul>`/`<ol>`, single
+  newline → `<br>`, blank line → paragraph gap, leading whitespace
+  preserved for indents; URLs still linkified last. Storing plain text and
+  rendering the markup client-side is deliberate — descriptions already
+  flow into `innerHTML` at ~10 sites, so storing HTML would mean
+  sanitizing at every one; generating the tags from fully-escaped text
+  makes injection impossible by construction, needs no schema change, and
+  upgrades every description already in the database. A formatting
+  toolbar (B/I/U/S/code/bullet/numbered/indent) mounts into the existing
+  `[data-ai-toolbar]` slot, so every description box that already had AI
+  assist gained it — project, task, checkpoint, program, and their Quick
+  variants. Operates on the plain `<textarea>`; save/merge behavior
+  unchanged.
+- Verified (per commit message): `<script>` tags and event-handler
+  attributes come out inert after rendering.
+- Commit: `4993bbe` — "PATCH v1.101: rich text in descriptions +
+  formatting toolbar".
+
+## PATCH PLATFORM v1.102 — DRAG-REORDER TASKS + AUTHOR SECTIONS FROM THE PROJECT CARD (Aug 27, backfilled)
+- SYMPTOM: task order and Sections (topics) were only reachable from the
+  Advanced Project form — a host had to leave the board to organize a
+  project.
+- FIX: task rows on the Project card are now draggable, scoped by
+  `projectId` so a drag can never cross projects — reuses the existing
+  `mcDragStart`/`Drop` machinery Checkpoint/Project/Program cards already
+  use, adding `kind:'task'`. A grip handle keeps the rest of the row a
+  click-to-open target. Reordering moves the task inside the single
+  global `mcTasks` array, which is exactly the order a Project renders —
+  same "the array IS the order" model as the other 3 card types, so no
+  new sort field. Both moved rows are stamped `updatedAt` so the new order
+  survives `_mcMergeById` instead of being reverted by a stale cloud
+  write. A "+ SECTION" button on the card appends to `project.topics`; a
+  per-row dropdown moves a task between sections — schema unchanged
+  (`project.topics=[{id,name}]`, `task.topicId`, exactly what
+  `_pflxGroupTasksByTopic` already read).
+- PLAYER VIEW: removed the priority/urgency re-sort in
+  `ppRenderProjectDetail` — it silently overrode whatever order the host
+  arranged, so a host's reorder could never reach the player. Left as a
+  disabled code path rather than deleted, for reference.
+- Verified (per commit message): reordering tasks in one project leaves
+  other projects' task order untouched.
+- Commit: `2ae2e5a` — "PATCH v1.102: drag-reorder tasks + author Sections
+  from the Project card".
+- HOST ACTIONS / BACKLOG: confirmed live on production (`www.prototypeflx.com`,
+  `PFLX_PATCH=102`) as of this backfill (Aug 27).
+
+## PATCH PLATFORM v1.103 — SECTIONS: TASK-DRAG DIDN'T ACTUALLY MOVE THE TASK BETWEEN SECTIONS, TOPICS COULDN'T BE REORDERED OR EDITED (Aug 27, Ennis-reported live within minutes of v1.102 shipping)
+- SYMPTOM (Ennis, live on the Project card v1.102 just shipped): "I cant add
+  more then 1 task per topic. I cant move the topic. I cant simply move
+  tasks in order under each topic. I cant right click or control click and
+  have some UI edit options." Also asked whether any of this reaches the
+  Player Dashboard, and how to reach "the project leaderboard."
+- ROOT CAUSE (the real bug): `mcDragDrop`'s `kind==='task'` branch (added in
+  v1.102) repositioned the dragged task inside the flat `mcTasks` array but
+  never touched its `topicId`. `_mcGroupTasksByTopic` groups purely by
+  `topicId`, not by array adjacency, so dropping a task onto a row that
+  lived in a DIFFERENT Section moved it in the array but it kept rendering
+  under its OLD Section — from the host's chair, dragging a 2nd task onto a
+  Section did nothing, which reads exactly like "can't add more than 1 task
+  per topic." Reordering two tasks already in the SAME Section worked fine
+  (topicId was already equal on both sides), which is why v1.102's own
+  regression test ("reordering one project leaves other projects
+  untouched") passed without catching this — it never tried a cross-Section
+  drop.
+- FIX 1 (`mcDragDrop`, kind 'task'): on a successful move, the dragged task
+  now also adopts the target row's `topicId` — dragging onto a row in
+  Section X files the task into Section X; dragging onto a "No Section" row
+  clears it back out. Same-Section drags are unaffected (topicId was
+  already equal).
+- FIX 2 (`I can't move the topic`): Sections had zero drag/reorder support
+  at all — only "+ SECTION" to append one existed. Section headers are now
+  draggable (`kind:'topic'`, scoped by projectId — same cross-project guard
+  the task/checkpoint/program branches already use) and reorder
+  `project.topics`, which is the array `_mcGroupTasksByTopic` already
+  renders in order.
+- FIX 3 (`I can't right click... have UI edit options`): added inline
+  rename (✏️) and delete (🗑) controls directly on each Section header —
+  `mcRenameTopicInline` / `mcDeleteTopicInline` — using the same
+  `prompt()`/`confirm()` pattern the rest of the Console already uses for
+  quick edits (e.g. `mcCreateBadge`). Deleting a Section clears `topicId`
+  on its former tasks (they fall back to "No Section") rather than
+  deleting the tasks. A right-click context menu was considered but would
+  be a new interaction pattern nowhere else in the Console; inline icon
+  buttons match the existing house style and are more discoverable than a
+  right-click (which nothing else in the app currently supports either).
+- ANSWERED — "does this reach the Player Dashboard?": yes, by design.
+  `ppRenderProjectDetail` already calls `_mcGroupTasksByTopic(tasks,
+  proj.topics)` and its priority/urgency auto-sort was disabled in v1.102
+  specifically so the host's arrangement shows up unmodified. That was
+  already correct in v1.102 — the reason it looked broken end-to-end was
+  entirely FIX 1 above (the host's own drags weren't landing where
+  intended, so there was nothing correct yet for the player side to
+  reflect).
+- ANSWERED — "how do I access the project leaderboard?": there is no
+  Project-specific leaderboard anywhere in the codebase today. What exists:
+  (a) X-Coin owns the one player-facing leaderboard — Mission Control's own
+  Master Leaderboard tab was intentionally retired in favor of it (see the
+  `mcLBTab`/`mcRenderLeaderboard` no-op stubs, "leaderboard lives in
+  X-Coin"); (b) a host-only "tier leaderboard" modal
+  (`pflxOpenTierLeaderboard`, groups players into starter/novice/pro tiers
+  by XC) exists in `preview.html` but has **zero callers anywhere** — no
+  button, menu item, or slash command reaches it; it is dead code today;
+  (c) DarkCampus QuickChat has a `/leaderboard` slash command, unrelated to
+  Projects. None of these are scoped to a single Project (e.g. "who's
+  completed the most tasks in THIS project"). If a Project-scoped
+  leaderboard is wanted, that's new work, not a bug — flagging as a
+  candidate for Phase 5 rather than guessing at scope and building it
+  unasked.
+- Verified: syntax gate 13/13 clean. 16-case Node unit test run against the
+  functions EXTRACTED from the live-patched file (not reimplemented) —
+  cross-Section drag adopts target topicId (the actual fix), a 2nd task can
+  now join an existing Section via drag (direct regression check for the
+  reported symptom), dropping onto a "No Section" row clears topicId,
+  cross-project drag/topic-drag remain no-ops (v1.102's guard preserved),
+  Section reorder, rename (incl. cancel), delete incl. task fallback to No
+  Section (incl. cancel) — all 16 PASS.
+- KNOWN LIMIT (not fixed here, noted rather than silently shipped): a
+  brand-new, empty Section has no task rows to drop onto yet, so a task
+  can't be dragged into it until it has at least one task — the per-row
+  topic `<select>` dropdown (unchanged, already worked) is the way to
+  populate an empty Section's first task.
+- HOST ACTIONS / BACKLOG: none required — this only touches
+  `pflx-platform-check/preview.html`. Phase 5 (badge-type leaderboards,
+  Program host-stats dashboard, DarkCampus morning digest, and now
+  optionally a Project-scoped leaderboard per the question above) remains
+  unstarted — paused mid-pick to fix this live regression first.
