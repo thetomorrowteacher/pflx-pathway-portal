@@ -6568,3 +6568,91 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   - Phase 4 (Battle Arena approval gating / unauthenticated XC-award
     endpoint) and Phase 5 (badge-type leaderboards, Program host-stats
     dashboard, Darkcampus morning digest) remain unstarted.
+
+## PATCH XCOIN v1.0 — BATTLE ARENA XC-AWARD ENDPOINT: QUICK HARDEN (Aug 26, Ennis-requested, Phase 4 of CP↔MC↔X-Coin design doc)
+
+- SYMPTOM: n/a — proactive hardening, not a tester-reported bug. Flagged in
+  the original design doc as "the real security fix" for Battle Arena's
+  unauthenticated XC-award endpoint, queued as Phase 4 after Phases 1-3
+  (v1.95-v1.97, all in `pflx-platform`).
+
+- ROOT CAUSE: `app/api/pflx-bridge/route.ts` (pflx-xcoin-app) has **no
+  per-player authentication** on its `xc_update` action. `playerId` is
+  whatever the caller's request body says it is — it is never tied to a
+  verified session. Battle Arena's entire match/battle system
+  (`pflx-arena-check/app/lib/store.ts` — `createBattle`/`joinBattle`/
+  `endBattle`) runs 100% client-side in a Zustand store: the winner is
+  determined in the player's own browser, then the client calls
+  `awardXC(winnerId, prizePool, ...)`, which is just a `fetch()` POST to
+  this endpoint. There is no server-side battle record anywhere to validate
+  against. Concretely, anyone with a browser console (or curl) could POST
+  `{action:"xc_update", playerId:"<any id>", delta: 999999999, ...}` directly
+  and mint (or drain) XC for any player, no battle required. Also, CORS was
+  wide open (`Access-Control-Allow-Origin: "*"`).
+
+- WHAT THIS PATCH DOES NOT FIX (discussed with Ennis, "Quick harden now"
+  chosen over "Full server-side fix"): it does **not** add real
+  authentication binding `playerId` to a verified caller, and it does
+  **not** validate battle outcomes server-side. That requires Battle Arena
+  reporting raw match state to a new endpoint that independently computes
+  the winner/payout — real work, not yet built. This patch narrows the
+  blast radius of the easiest exploit (one call, unbounded delta) without
+  changing how legitimate wagers/awards work today.
+
+- FIX (`app/api/pflx-bridge/route.ts`):
+  1. **CORS allowlist** — `Access-Control-Allow-Origin` now echoes the
+     request's `Origin` only when it's one of the known PFLX app origins
+     (`pflx-battle-arena`, `pflx-darkcampus`, `pflx-overlay`,
+     `pflx-pathway-portal`, `pflx-xcoin-app` .vercel.app, plus
+     prototypeflx.com apex/www, plus localhost for dev). A disallowed/
+     missing Origin gets no ACAO header at all. **Caveat, called out in the
+     code comment**: CORS is a browser response-reading policy, not
+     server-side authorization — it stops a third-party website from
+     silently firing a cross-site request through a visitor's browser, but
+     does nothing against a direct curl/devtools call from the legitimate
+     origin. Real defense is items 2-4.
+  2. **Hard per-call cap** — `xc_update` now rejects (400) any `|delta| >
+     500,000`. Calibrated against real production data: the highest actual
+     player balance today is ~202,000 XC, so the largest legitimate single
+     award (an all-in wager, doubled) is ~404,000 — the cap sits comfortably
+     above that without constraining real high-roller play, while stopping
+     a "delta: 999999999"-style single-shot exploit outright.
+  3. **Best-effort rate limiting** — max 30 `xc_update` calls per
+     `playerId` per rolling 5-minute window, in-memory. **Caveat**: this is
+     per warm serverless instance only — a cold start or a different Vercel
+     instance resets it, so treat it as a speed bump against a single
+     rapid-fire script, not a real distributed limiter.
+  4. **Anomaly logging** — any `xc_update` at/above 10,000 XC (allowed or
+     rejected) is now written to Supabase `app_data` key `xc_anomaly_log`
+     (capped at the last 500 entries: playerId, delta, reason, sourceApp,
+     outcome, old/new XC, timestamp) plus a `console.warn` for Vercel log
+     visibility — so unusual activity is visible for review instead of
+     silent.
+
+- Verified: new file type-checks clean under `tsc --strict` (isolated
+  check against stub types for the two local imports, since this working
+  copy's `node_modules` isn't installed — full `next build` should still be
+  run before the next real feature change touches this file). 14-case
+  logic unit test (origin allowlist incl. subdomain-spoof rejection,
+  localhost dev, cap boundary, suspicious-threshold boundary, rate-limit
+  window behavior including calls spread outside the window) all PASS.
+  Confirmed live via `curl -X OPTIONS` with an allowed vs. a random Origin
+  header — allowed origin gets `Access-Control-Allow-Origin` echoed back,
+  everything else gets no ACAO header.
+
+- HOST ACTIONS / BACKLOG:
+  - The real fix — server-side battle validation — is still open. Until
+    then, this endpoint is meaningfully harder to abuse in bulk but not
+    provably safe against a determined, patient attacker (e.g., many
+    accounts each staying just under the rate limit).
+  - Worth deciding: should `xc_update` also require a shared-secret header
+    between PFLX satellite apps (something Battle Arena's client can't see,
+    injected server-side)? That's not possible today because the call
+    originates from the BROWSER (client-side `xcoin-bridge.ts`), not a
+    server — a shared secret embedded in client JS is visible to anyone who
+    opens devtools, so it wouldn't add real protection without moving the
+    award call server-side first.
+  - Recommend periodically reviewing `xc_anomaly_log` (Supabase `app_data`)
+    for patterns.
+  - Phase 5 (badge-type leaderboards, Program host-stats dashboard,
+    Darkcampus morning digest) remains unstarted.
