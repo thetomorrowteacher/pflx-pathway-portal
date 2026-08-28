@@ -7177,3 +7177,91 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   (PLAYER, not ADMIN) — all 22 cases pass, including the untouched ones
   confirming the compact toolbar-profile card still stays host-pinned.
 - HOST ACTIONS: none.
+
+
+## PATCH PLATFORM v1.108 — TASK DETAIL/SUBMIT NOW ENFORCES THE SAME COHORT/PLAYER/PROJECT CASCADE THE LISTS ALREADY USE (Aug 28, Ennis-reported bug, with screenshots)
+- SYMPTOM (Ennis, with 3 screenshots): a player ("@EXPLORIQUE") submitted a
+  Task ("Add your New Logo as your Profile Picture from Your Brand Board.")
+  belonging to Project "Branding & Identity" — a Project whose own
+  "ASSIGN TO COHORTS" is tagged ONLY `SeasonPass`, and whose own
+  "ASSIGN PLAYERS" is scoped to `VYBE` only (Vybe's own cohorts:
+  PlayerPool, SeasonPass). Explorique's cohort is `Global Digital Intern` —
+  not SeasonPass, not Vybe. The Project is linked under Checkpoint Alpha,
+  which Global Digital Intern DOES have access to, but per Ennis's explicit
+  spec: *"the project will first obey the assigned cohorts/players in its
+  settings first... If a task is directly tied to a player or a selection
+  of players then they will only be tasked with the task, not the full
+  cohort... logic is passed up through each layer heading to the top [only]
+  if no setting contradicts the parent holder."*
+- ROOT CAUSE (confirmed, not guessed): the hierarchical cascade Ennis
+  described is ALREADY exactly what `pflxPlayerCanSeeItem` implements
+  (own player-scope fence → own cohort tag match/reject → walk up to
+  parent ONLY when the current layer has no own setting at all), and every
+  LIST surface (My Tasks, Checkpoint detail, Project detail) already
+  filters through it via `ppItemAssignedToActivePlayer`. Traced the exact
+  reported scenario through that function by hand: Project
+  `Branding & Identity`'s own `assignedPlayers: ['Vybe']` alone already
+  hard-fences the whole project (and every task under it) to Vybe only,
+  BEFORE the cohort check even runs — Explorique should never have been
+  able to see it in any list. But `ppRenderTaskDetail` (the Task detail /
+  submission-form view) and `ppSubmitTask` / `ppResubmitTask` (the actual
+  submit and reopen handlers) NEVER called this check at all — a task id
+  reaching the detail view by ANY path (a stale cached list from before
+  Ennis narrowed the Project's scope, browser back/forward, a shared
+  link, or simply typing/loading `ppNav('task-detail', {id:...})`)
+  rendered the full task and accepted a submission with zero
+  authorization check, completely bypassing every cohort/player/project
+  restriction the list views enforce. This is precisely how Explorique
+  got a submission into the host's Approval queue for a task they should
+  never have been able to open.
+- FIX — new `pflxPlayerCanAccessTask(t)` helper (mirrors the existing
+  host-tier-bypass pattern used by `pflxPlayerCanEnterItem`): host tiers
+  always pass; every other player must pass
+  `ppItemAssignedToActivePlayer(t)` — the SAME cascade the lists already
+  use, so this is not new logic, just the missing enforcement point.
+  Wired into THREE places:
+  1. `ppRenderTaskDetail` — an unauthorized task id now renders a
+     "🔒 NOT ASSIGNED TO YOU" lock card instead of the task title,
+     description, or submission form (no data leak — the task's content
+     is never written into the DOM for a player who fails the check).
+  2. `ppSubmitTask` — hard-blocks the actual submit call (this is the
+     real fix; the render-level lock screen is UI only and would not by
+     itself stop a call made outside the normal click path). Shows a
+     "This task is not assigned to you." toast and leaves the task
+     untouched (no submission recorded, status unchanged).
+  3. `ppResubmitTask` — same hard block on the reopen-for-resubmission
+     path, so a rejected task can only be reopened by a player actually
+     authorized to see it.
+  The cascade logic itself (`pflxPlayerCanSeeItem`, `pflxItemCohortsMatch`,
+  `pflxItemHasOwnCohort`, `pflxEffectiveAssignees`) was NOT changed — it
+  already matched Ennis's spec exactly; this patch closes the enforcement
+  gap around it.
+- Verified: syntax gate 13/13 (test copy, then again on the live file
+  post-patch). 16-case Node unit test run against functions EXTRACTED
+  from the live-patched file (not reimplemented), using fixtures that
+  mirror the real reported data (Project `Branding & Identity` with
+  `cohortIds:['SeasonPass']` + `assignedPlayers:['Vybe']`, linked to
+  Checkpoint Alpha; a Vybe player fixture cohorts `[PlayerPool,
+  SeasonPass]`; an Explorique player fixture cohort `Global Digital
+  Intern`, mirroring the real Supabase record):
+  - `pflxPlayerCanAccessTask`: Explorique (wrong cohort, not an assigned
+    player) → false; Vybe (the assigned player) → true; a host-tier
+    session → always true (host still browsing the Player Portal
+    directly, not via Mimic, keeps full access).
+  - `ppRenderTaskDetail`: Explorique gets the lock card and the task's
+    real title/description never appear in the rendered HTML; Vybe gets
+    the normal task detail.
+  - `ppSubmitTask`: Explorique's submit is rejected — task status stays
+    `open`, no submission is recorded, a blocking toast fires; Vybe's
+    submit on the SAME task immediately after succeeds normally (status
+    → `submitted`, submission recorded, normal success toast — proving
+    the gate doesn't collaterally block the legitimately-assigned player).
+  - `ppResubmitTask`: Explorique cannot clear Vybe's rejected submission
+    entry; Vybe can reopen their own rejected submission normally.
+- HOST ACTIONS: Explorique's existing pending submission on that task
+  (visible in the Approvals queue, screenshot 3) was NOT touched by this
+  patch — it's existing data, not something the fix retroactively
+  reaches. Ennis should Deny it by hand from the Approvals queue (the
+  Approve/Deny buttons Ennis screenshotted are the right place). Going
+  forward this exact bypass can no longer happen — the enforcement is now
+  at the actual submit call, not just in what the UI happens to list.
