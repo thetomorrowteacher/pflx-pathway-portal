@@ -6953,3 +6953,115 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   Program host-stats dashboard, DarkCampus morning digest, and a possible
   Project-scoped leaderboard) remains unstarted — this patch and v1.103
   both preempted it with live/requested work.
+
+## PATCH PLATFORM v1.105 — SLIDESHOW MARKET-PREVIEW LOCK + JOB→PROJECT ACCESS FIX (Aug 28, Ennis-requested)
+- REQUEST (Ennis, verbatim, condensed): "Add a lock for the slideshow — first
+  2 slides only — if the Project or Program has Apply to Join active.
+  Accepted players get the full slideshow. This gives everyone a preview of
+  what's available on the Program and Project market... The same logic
+  should apply to jobs turned into tasks: if a Task is attached to a
+  Project, the approved player should get access to the Project. If that
+  Project is attached to a Program, that should NOT automatically grant
+  Program access — Programs require higher acceptance. The pipeline always
+  points upward: Task → Project, never automatically → Program." The full
+  message also described a Season/10-week/2-week-Checkpoint cadence and a
+  credentials/portfolio system — logged below as BACKLOG, not built this
+  patch (see SCOPING).
+- SCOPING: Asked Ennis via AskUserQuestion across 4 axes. Ennis explicitly
+  confirmed **including the Job→Project access fix** (restating "task
+  access then Project but NOT Program access"). The other 3 answers weren't
+  explicit in the reply, so I proceeded on the recommended default for each
+  and am flagging them here for correction if wrong: (1) lock mechanism =
+  static 2-image preview (not a live-embed restriction — see ROOT CAUSE
+  below for why), (2) scope = Google Slides only, matching the v1.104
+  fullscreen-button precedent (Canva/YouTube/Vimeo untouched), (3) the
+  Season-cadence / credentials-portfolio narrative = backlog context only,
+  not new work this patch.
+- ROOT CAUSE / WHY STATIC IMAGES: confirmed via research that Google
+  Slides' embed has no mechanism to cap in-deck navigation at N slides —
+  no `slide=`/`startSlide` param exists, only the `rm=minimal` kiosk mode
+  already in use since v1.98. A locked (not-yet-accepted) viewer can
+  therefore never be handed the live interactive deck at all — the only
+  reliable lock is to render static preview images instead, on the
+  *existing* 🔒 Apply-to-Join screen that already early-returns for
+  `!canEnter` viewers (`ppRenderProgramDetail` / `ppRenderProjectDetail`).
+  Once accepted, those functions skip the lock screen entirely and the full
+  live embed renders exactly as before — zero change to the entered path.
+- FIX 1 — new shared helper `pflxLockedSlidesPreviewHtml(item)`: returns
+  `''` unless `item.embedUrl` resolves (via `pflxEmbedSrc`) to a
+  `docs.google.com/presentation/` URL. Prefers the two new
+  `lockPreviewSlide1`/`lockPreviewSlide2` images (dedicated upload slots,
+  see FIX 2); falls back to the existing single `bannerImage` if the host
+  hasn't uploaded those; returns `''` if there's truly nothing to show —
+  so a Program/Project with no cover renders identically to before this
+  patch. Spliced into both lock screens right after the 🔒 emoji, before
+  the status text.
+- FIX 2 — new "🔒 Locked Preview" 2-image upload field on both the Project
+  form and the top-level Program form (`mc-program-tab-form`), reusing the
+  existing banner pipeline: `_mcDownscaleImageDataUrl` (1000×750, JPEG 0.8)
+  → `pflxUploadBannerToStorage(dataUrl, kind+'-preview-slide'+slot)`. New
+  shared functions `mcUploadLockPreviewSlide(input, kind, slot)` /
+  `mcRemoveLockPreviewSlide(kind, slot)` cover both entity types and both
+  slots via `window['mc'+Kind+'PreviewSlide'+slot+'Data']` — avoided 4
+  near-duplicate functions. New module vars use `''` (untouched) /
+  `'__REMOVED__'` (explicit clear) / URL, kept in a **separate**
+  populate/reset path from `mcResetProjectBannerPreview`/
+  `mcResetProgramBannerPreview` deliberately — folding it into those would
+  have wiped preview slides any time a record simply has no bannerImage,
+  even if it DOES have preview slides. `mcSaveProjectForm`/
+  `mcSaveProgramTabForm` persist `lockPreviewSlide1`/`lockPreviewSlide2`
+  with the same preserve-on-save idiom as `bannerImage`.
+- FIX 3 — Job→Project access grant: `_mcSyncJobHiresToTasks` already
+  creates a Task per hired player and links it into the Project's
+  `taskIds[]`, but never touched the Project's own access-gate fields — so
+  a hired player could complete their task but hit the 🔒 lock screen on
+  the parent Project's own detail page. Now pushes every id in
+  `savedJob.hired` into `project.hired[]` (deduped) whenever
+  `savedJob.projectId` is set — confirmed via grep that `item.hired[]` is
+  the codebase's existing generic direct-assignment array (already used
+  identically on Job records, checked by `pflxPlayerCanSeeItem`'s
+  step-1 short-circuit), so this is idiomatically correct and requires no
+  new gating mechanism. Runs on every save (not just newly-created tasks)
+  so it also self-heals players hired before this patch shipped. Does
+  **not** touch any Program field — nothing wires a Project's `projectId`
+  → parent Program relationship into the Program's access gate, so "hired
+  ≠ automatic Program access" was already true; confirmed, not newly built.
+  DESIGN NOTE: considered pushing the id into `project.assignedTo[]`
+  instead (also checked by the same step-1 short-circuit) but rejected it
+  — `assignedTo` is semantically a COHORT-TAG field elsewhere (rendered as
+  cohort chips, matched via `pflxItemCohortsMatch`) and would have polluted
+  the host's cohort-chip UI for that Project.
+- FIX 4 (disclosed bonus, same gap) — `mcConvertJobToProject` (a separate
+  job→project pathway that builds a brand-new Project from a Job) had the
+  identical latent gap: it sets `team: (j.hired||[]).slice()` but `team` is
+  never checked by any access-gate function. Added a matching
+  `hired: (j.hired||[]).slice()` on the new project object.
+- Verified: syntax gate 13/13 (test copy, then again on the live file
+  post-patch). 20-case Node unit test run against functions EXTRACTED from
+  the live-patched file (not reimplemented):
+  - `pflxLockedSlidesPreviewHtml`: Slides + both preview slides → 2 images
+    with "first 2 slides" caption; Slides + bannerImage only → 1-image
+    fallback with plain "Preview" caption; Slides + nothing → `''`; Canva
+    embed → `''` even with images set (Slides-only); no `embedUrl` → `''`;
+    `null` item → `''` (no throw); only slide1 set → 1 image.
+  - `_mcSyncJobHiresToTasks`: hire pushes player into `project.hired[]`
+    exactly once; re-saving the same hire is idempotent (no duplicate);
+    self-heals a project missing the `.hired` array entirely; never
+    touches any Program-related field or calls `mcSaveData('programs')`;
+    a job with no `projectId` doesn't crash or touch an unrelated project.
+  - `mcConvertJobToProject`: new project gets `hired[]` matching the job's
+    hires exactly; pre-existing `team[]` field still set too, unaffected.
+- HOST ACTIONS: to use the new lock preview, open Edit Project / Edit
+  Program, paste a Google Slides link into Embed Cover, and upload 1–2
+  images into the new "🔒 Locked Preview" field — existing Projects/
+  Programs are unaffected until a host does this (falls back to the
+  existing banner image, or shows nothing, exactly as before). No action
+  needed for the Job→Project access fix — it applies automatically,
+  including self-healing players already hired before this patch.
+- BACKLOG (from Ennis's fuller message, not built this patch): Programs
+  run on a Seasonal 10-week cadence with Checkpoints normally in 2-week
+  increments; Checkpoints are meant to be universal/open but personalized
+  per-Cohort; Projects award certifications/endorsements/credentials to a
+  player portfolio. Also unstarted: Phase 5 (badge-type leaderboards,
+  Program host-stats dashboard, DarkCampus morning digest, Project-scoped
+  leaderboard).
