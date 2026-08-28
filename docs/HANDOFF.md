@@ -7150,3 +7150,30 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   player's stats instead (e.g. for quick player-stat checks while
   impersonating), that's a one-line change to revert (drop the override in
   `pflxRenderProfileDropdown`).
+
+## PATCH PLATFORM v1.107 — MIMIC PROFILE DROPDOWN SHOWS THE PLAYER, NOT THE HOST (Aug 28, Ennis follow-up on v1.106)
+- REQUEST (Ennis, follow-up on v1.106's disclosed scoping question): "ok,
+  yes. Switch to theirs." — v1.106 pinned BOTH the compact toolbar-profile
+  card (avatar + name) AND the dropdown it opens to the master host's own
+  identity while mimicking. Ennis confirmed the dropdown specifically
+  should instead show the MIMICKED PLAYER's stats (a quick way to check
+  their XC/badges/rank without leaving the Console) — only the compact
+  card itself should stay pinned to the host.
+- FIX — removed the v1.106 host-pin override from
+  `pflxRenderProfileDropdown()` (the 4-line block that swapped `s` to
+  `window.pflxMimicHostSession()`'s result before reading name/role/xc/
+  badges/rank). `window.activeSession` is already the mimicked player
+  throughout mimic (v1.106's root-cause fix, unchanged), so simply
+  removing the override restores that default — the dropdown reads
+  whoever is currently being mimicked, same as every other identity-
+  derived surface. `updateToolbarStatus()`'s host-pin on the compact
+  toolbar-profile card (avatar + name) is UNCHANGED — that one stays
+  pinned to the real host, per the original v1.106 request.
+- Verified: syntax gate 13/13 (test copy, then again on the live file
+  post-patch). Re-ran the v1.106 22-case Node unit test against the
+  EXTRACTED live-patched functions with the two dropdown assertions
+  updated to their new expected values: the dropdown now shows the
+  mimicked player's brand (EXPLORIQUE, not "Mr. Johnson") and role
+  (PLAYER, not ADMIN) — all 22 cases pass, including the untouched ones
+  confirming the compact toolbar-profile card still stays host-pinned.
+- HOST ACTIONS: none.
