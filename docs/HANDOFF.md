@@ -7065,3 +7065,88 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   player portfolio. Also unstarted: Phase 5 (badge-type leaderboards,
   Program host-stats dashboard, DarkCampus morning digest, Project-scoped
   leaderboard).
+
+## PATCH PLATFORM v1.106 — MIMIC MODE ACTUALLY MIMICS (FULL PLAYER FIDELITY) + HOST PROFILE CARD PINNED (Aug 28, Ennis-reported bug)
+- SYMPTOM (Ennis, with screenshots): "When using mimic I still see my avatar.
+  I should have full access of the players dashboard. You can keep my
+  profile card on the top right corner...but everything else should
+  function like the mimicked player." Screenshots showed the Home Base hero
+  card reading "EXPLORIQUE / admin · N/A" and "My Tasks" full of host-only
+  admin tasks (Project Management & Administration, Economy Management &
+  Oversight) while the bottom MIMIC MODE banner correctly said "→ Sharran
+  Shajy · EXPLORIQUE" — the banner knew who was being mimicked, but nothing
+  else on the page did.
+- ROOT CAUSE (confirmed, not guessed): the Console's session variable is a
+  top-level `let activeSession = null;` (line ~15579) — a LEXICAL binding,
+  distinct from a `window.activeSession` property. Both exist and can hold
+  DIFFERENT objects. Grepped the whole file: 362 places read/write the bare
+  `activeSession` name (including `initPlatform`'s hero card, My Tasks, Job
+  Board, and most of `updateToolbarStatus`'s XC/Position/Rank logic) vs. 248
+  places that explicitly say `window.activeSession`. Login already knew
+  about this split — right after building the session it does BOTH
+  `activeSession = {...}` and then `window.activeSession = activeSession;`
+  to keep them in sync. Mimic Mode (`pflxMimicEnter`/`pflxMimicExit`,
+  v1.65–v1.73) only ever did `window.activeSession = newSession;` — never
+  touched the bare binding — so the ~60% of the app that reads bare
+  `activeSession` kept rendering the MASTER HOST's own session the entire
+  time mimic was "active." Verified against live Supabase data: the
+  mimicked player (Sharran Shajy, brand EXPLORIQUE) actually has
+  `role: 'player'` and `cohort: 'Global Digital Intern'` — the "admin · N/A"
+  shown was literally the host's own `role`/`cohort` values, proving the
+  swap never reached that code path.
+- FIX 1 — `pflxMimicEnter`/`pflxMimicExit` now also assign the bare
+  `activeSession` binding (`activeSession = newSession;` / `activeSession =
+  stash.session || null;`, no `var`/`let` — resolves to the same top-level
+  binding since it's already declared) right alongside the existing
+  `window.activeSession =` line. This is the actual fix: the hero card,
+  subtitle (role/cohort), avatar image, My Tasks, Job Board, and the
+  toolbar's XC/Position/Rank stats all now genuinely reflect the mimicked
+  player, because the code that renders them was reading the bare name all
+  along.
+- FIX 2 — new `window.pflxMimicHostSession()` helper: returns the stashed
+  MASTER HOST session while mimic is active (null otherwise), reading the
+  same `pflx_mimic_stash_v1` sessionStorage key `pflxMimicEnter` already
+  wrote. Used to satisfy the other half of Ennis's request — "keep my
+  profile card in the top right corner": `updateToolbarStatus()` now
+  re-stamps ONLY the `.toolbar-profile` card (avatar image + name — the
+  compact "MR. JOHNSON / Online" card in the top-right corner) from the
+  host stash AFTER computing XC/Position/Rank from the (now correctly
+  mimicked) `activeSession` — so the stat tiles show the player's real
+  numbers while the identity card next to them stays visibly "you, the
+  host." `pflxRenderProfileDropdown()` (the panel that card opens) got the
+  same override so the dropdown never contradicts what the compact card
+  just showed — clicking it reveals the host's own XC/badges/rank, not the
+  mimicked player's.
+- Both fixes are no-ops when mimic isn't active — `pflxMimicHostSession()`
+  returns null immediately if `pflxMimicIsActive()` is false, so ordinary
+  (non-mimicking) login/toolbar behavior is byte-for-byte unchanged.
+- Verified: syntax gate 13/13 (test copy, then again on the live file
+  post-patch). 22-case Node unit test run against functions EXTRACTED from
+  the live-patched file (not reimplemented), using a 2-player fixture (a
+  host "Mr. Johnson" role=admin, and a mimic target "Sharran Shajy" brand
+  EXPLORIQUE role=player, mirroring the real Supabase records):
+  - `pflxMimicEnter`: bare `activeSession` switches to the mimicked
+    player's id/role/cohort (was previously stuck on the host's); `window.
+    activeSession` still switches too (unchanged prior behavior); both are
+    now the SAME object post-fix.
+  - `pflxMimicHostSession`: returns the stashed host (not the mimicked
+    player) while mimic is active.
+  - `updateToolbarStatus`: toolbar XC reflects the mimicked player's real
+    balance (4,200), not the host's (1,000,245) — "full access of the
+    player's dashboard"; the `.toolbar-profile` card's name + avatar stay
+    pinned to the host's own name/image throughout, never leaking the
+    mimicked player's image.
+  - `pflxRenderProfileDropdown`: shows the host's own name/role (not the
+    mimicked player's) so opening the card is internally consistent.
+  - `pflxMimicExit`: bare AND window `activeSession` both restore to the
+    host; a post-exit `updateToolbarStatus` call shows the host's own XC
+    again with no lingering override.
+- HOST ACTIONS: none. This is a pure bug fix + a scoped, disclosed UI
+  choice (which single element — the toolbar-profile card — stays
+  host-pinned during mimic); every other identity-derived surface now
+  mimics fully. Flagging for Ennis to confirm: I scoped "my profile card"
+  to the compact avatar+name pill AND the dropdown it opens (both now show
+  the host consistently) — if the dropdown was meant to show the mimicked
+  player's stats instead (e.g. for quick player-stat checks while
+  impersonating), that's a one-line change to revert (drop the override in
+  `pflxRenderProfileDropdown`).
