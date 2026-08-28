@@ -7265,3 +7265,86 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   Approve/Deny buttons Ennis screenshotted are the right place). Going
   forward this exact bypass can no longer happen — the enforcement is now
   at the actual submit call, not just in what the UI happens to list.
+
+## PATCH PLATFORM v1.109 — LIFETIME XC SYNC/CORRECTION FIX (Aug 28, Ennis)
+- SYMPTOM: Kaitlin (Discord, Aug 26) reported her Portfolio's "Lifetime XC"
+  showing different values on different devices — 3,400 on her laptop
+  (confirmed after a hard refresh) vs 4,400 on her phone — "the badge/XC
+  issue has remained despite several patch updates." Screenshots also
+  showed a mixed badge-count display (7 vs 10 badges across views).
+- DATA CHECK FIRST: queried Supabase `app_data` directly for both
+  `pflx_mc_players` (Kaitlin's `mcPlayers` row) and
+  `pflx_player_player-import-1784088654295-23` (her `PLAYERS` row) —
+  BOTH already read `xc: 3400, totalXcoin: 3400`. The cloud was already
+  correct; the bug was purely a client-side stale-local-cache issue on
+  one device (her phone), not ongoing data corruption.
+- ROOT CAUSE: `totalXcoin` ("Lifetime XC") is deliberately monotonic —
+  never allowed to decrease — so a genuine host correction (e.g. undoing
+  a duplicate badge over-award) could reach the cloud but could never
+  propagate back down to a device whose local cache had already cached
+  the old, higher number. Traced across 5 places:
+  1. `_mcMergePlayers` (the one function on the device→cloud merge path,
+     called only from `_mcApplyCollection('players', items)` — `local` is
+     always this device's own cache, `incoming` is always a fresh
+     Supabase pull, never two devices racing each other) applied
+     `merged.totalXcoin = Math.max(aTot, bTot)` UNCONDITIONALLY, so a
+     fresher, corrected cloud pull could never override a stale local max.
+  2. `mcBulkAdjustXC` (host bulk-XC tool) had a field-name typo —
+     `p.totalXc` instead of `p.totalXcoin` — so positive bulk awards never
+     actually moved Lifetime XC anywhere it's displayed.
+  3 & 4. `mcSavePlayerForm` ("Edit Player" modal): the primary
+     `mcPlayers[idx]` write never touched `totalXcoin` at all, and its
+     PLAYERS-mirror block (added by the Aug 24 Kaitlin/Nirmal drift fix)
+     only let `totalXcoin` increase — so a host's deliberate downward
+     correction here silently never stuck.
+  5. `hmcEditPlayer`'s "Player Management" modal save handler set `p.xc`
+     from the host's typed value but never touched `p.totalXcoin` at all.
+  6. `broadcastPlayerChange` (syncs an edited record into an already-open
+     session) re-clamped `activeSession.totalXcoin` up to
+     `Math.max(old, player.xc)`, so even a freshly-corrected record could
+     get overridden back to a stale in-session value.
+- FIX (7 edits, `preview.html`):
+  - `_mcMergePlayers`: only fall back to the never-decrease `Math.max`
+    floor when recency can't be determined (neither/both side has
+    `updatedAt`); when `incoming` (the fresh cloud pull) has a strictly
+    newer `updatedAt`, trust its `totalXcoin` directly — including
+    downward. Safe specifically because this function's one call site
+    never pits two devices against each other.
+  - `mcBulkAdjustXC`: fixed `p.totalXc` → `p.totalXcoin` typo.
+  - `mcSavePlayerForm`: both the primary `mcPlayers[idx]` write and the
+    PLAYERS mirror now set `totalXcoin = xc` directly (this modal is a
+    host DECLARING the authoritative current XC, not an incremental
+    award).
+  - `hmcEditPlayer`: save handler now also sets `p.totalXcoin = p.xc`.
+  - `broadcastPlayerChange`: trusts the just-edited record's own
+    `totalXcoin` directly when the caller sets it; only falls back to the
+    old never-decrease guard for legacy call sites that don't.
+  - Version bump: `PFLX_PATCH` 108 → 109.
+- Verified: syntax gate 13/13 (test copy, then again on the live file
+  post-patch). 13-case Node unit test run against functions EXTRACTED
+  from the live-patched file (not reimplemented):
+  - `_mcMergePlayers` (5 cases): a fresher incoming cloud pull corrects
+    `totalXcoin` downward (Kaitlin's exact 4400→3400 scenario) — PASS;
+    `xc` also corrected — PASS; a STALER incoming pull does not regress a
+    fresher local record — PASS; with no recency signal at all the
+    earnings-safe floor still applies — PASS; a fresher incoming pull
+    with a genuine XC gain is adopted normally — PASS.
+  - `mcBulkAdjustXC` (5 cases): positive award raises `xc` — PASS;
+    positive award raises `totalXcoin` (typo fix verified) — PASS;
+    unselected player untouched — PASS; negative delta (fine) reduces
+    `xc` — PASS; negative delta leaves lifetime `totalXcoin` untouched
+    (a fine doesn't un-earn history) — PASS.
+  - `broadcastPlayerChange` (3 cases): a host correction reaches an
+    already-open session for that same player — PASS; `xc` also
+    corrected on the live session — PASS; a caller without `totalXcoin`
+    still falls back to the never-decrease guard — PASS.
+- HOST ACTIONS / BACKLOG: this patch fixes the MECHANISM going forward —
+  Kaitlin's own devices should self-correct the next time each syncs
+  fresh cloud data (the cloud is already correct at 3,400), no manual
+  Supabase edit needed. Separately, Kaitlin's `badges` array in Supabase
+  mixes full badge objects with bare string entries (e.g.
+  `"badge-resilient-learner"`), consistent with a duplicate/legacy-format
+  award at some point — deliberately NOT touched by this patch (badge
+  dedup is a different, harder-to-safely-automate problem than the
+  numeric XC fix) — flagged here as an open follow-on item for a future
+  patch.
