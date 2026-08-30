@@ -7348,3 +7348,48 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   dedup is a different, harder-to-safely-automate problem than the
   numeric XC fix) — flagged here as an open follow-on item for a future
   patch.
+
+## PATCH PLATFORM v1.110 — PROFILE PHOTOS NEVER DISPLAYED, ANY PLAYER (Aug 30, Ennis-reported)
+- SYMPTOM: Ennis screenshotted the live Home Base/toolbar for the `THETOMORROWTEACHER`
+  (Mr. Johnson) host account — the toolbar showed a "T" letter-initial avatar and the
+  Home hero card showed the generic PFLX logo, instead of the real uploaded profile
+  photo. "Wait something went wrong with the Profile Pictures."
+- ROOT CAUSE: `PLAYERS` (~L15346) is a compile-time hardcoded seed array of 141
+  login-identity records (id/brand/pin/name/email/cohort/role/xc) — it has never
+  carried an `image` field for anyone, including both host accounts. Real uploaded
+  photos are written by `mcPlayerPhotoUpload()` into the live, Supabase-synced
+  `mcPlayers` collection only. `_pflxRosterFind()` checks the hardcoded `PLAYERS`
+  array FIRST and only falls back to `mcPlayers` for ids not already present in
+  `PLAYERS` — since every one of the 141 seeded ids IS already in `PLAYERS`,
+  `mcPlayers` was never consulted for them. `loginUser()` set
+  `activeSession.image` from that hardcoded record (always empty), and
+  `updateToolbarStatus()` — called after login and on every XC/checkpoint change —
+  re-stamped `activeSession.image` from the same hardcoded array on every refresh,
+  permanently overwriting any correct value. Verified directly against Supabase:
+  admin-1's `pflx_mc_players` record has a real 14,947-char uploaded photo that
+  never once reached `activeSession.image`.
+  IMPACT: every claimed player who has ever uploaded a profile photo (67 of the
+  133 registered players, per the live X-Bot briefing count) has been affected —
+  this is very likely the primary root cause behind the broader avatar-inconsistency
+  pattern tracked informally as an open item (multiple divergent fallback paths
+  across Console + Battle Arena), not just a PFLX-Lite-specific cosmetic issue.
+- FIX: added `pflxResolvePlayerImage(id)` (~L15478) — looks up the live `mcPlayers`
+  record by id and returns its `image` when present, falling back to the hardcoded
+  record's (always-empty) `image` only as a last resort. Wired into both
+  `loginUser()`'s initial `activeSession.image` assignment and
+  `updateToolbarStatus()`'s refresh assignment — the two places that were reading
+  straight off the hardcoded `PLAYERS` array. No other avatar-fallback logic
+  changed (Home Base hero and toolbar both already read `activeSession.image`, so
+  fixing the source fixes both renders).
+- Verified: syntax gate clean (13 blocks, 0 failures). 7-case unit test against the
+  planned logic, then 6 more cases run against the function extracted verbatim from
+  the shipped file (not a reimplementation) — covers: real photo resolves, a player
+  who never uploaded stays correctly empty, unknown/falsy id, `mcPlayers` not yet
+  loaded (no throw), and a later re-upload correctly winning on the next refresh.
+  All PASS.
+- HOST ACTIONS: none required — existing uploaded photos (including yours) should
+  now appear on next login/refresh with no re-upload needed.
+- BACKLOG: the broader avatar-fallback inconsistency (letter-initial vs. PFLX logo
+  vs. other treatments across Battle Arena/Portfolio) is still tracked as an open
+  follow-on — this patch fixes the data-source bug, not the remaining cosmetic
+  divergence between fallback *styles* when a player truly has no photo at all.
