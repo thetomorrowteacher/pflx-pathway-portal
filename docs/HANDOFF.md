@@ -7393,3 +7393,76 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   vs. other treatments across Battle Arena/Portfolio) is still tracked as an open
   follow-on — this patch fixes the data-source bug, not the remaining cosmetic
   divergence between fallback *styles* when a player truly has no photo at all.
+
+## PATCH PLATFORM v1.111 — PFLX LITE REBRANDED TO PFLX LIVE + LIVE SESSIONS WIRING (Aug 30, Ennis-requested)
+- REQUEST: Ennis asked to rebrand PFLX Lite to PFLX Live, connect it to the
+  Console's existing Live Sessions system (join code / roster / host
+  controls) so it works like Classcraft/ClassDojo, with a TooHuman-style
+  leveling avatar builder, connected to Battle Arena and potentially Core
+  Pathways via "the ship system."
+- DISCOVERY (before writing any code): what was diagnosed last patch as "PFLX
+  Lite is an empty placeholder" was WRONG — a stale read. The `pflx-lite`
+  repo is a real, actively-developed app (`index.html`, EXO spec v1.1 Phase
+  4+4b) with a host dashboard, leaderboards, teams, a privileges shop
+  ("UPGRADES"), and its own Blooket-style room-code game (`games/vault-
+  rush.html`) — last deployed ~30 minutes before this session touched it.
+  Separately, Battle Arena already has a full "EXO" avatar system (4
+  creature lines × 5 evolution stages × 5 colorways, procedurally rendered,
+  hatched/leveled in Battle Arena's "EXO Bay") which `pflx-lite` already
+  displays read-only via a synced `exoCoreSVG()` copy — this IS the
+  TooHuman-style leveling avatar Ennis described; it already exists.
+  Core Pathways' "ship system" is also real: `src/pflx3d/ship.ts` in
+  pflx-pathway-portal, a Three.js placeholder ship (Phase 1 of a 5-phase
+  WebGL migration, see `docs/THREEJS_MIGRATION_PLAN.md`) flown via a chase
+  camera over the skill-node map — currently a pure visual/navigation
+  metaphor with no leveling or stats, and no existing tie to EXO.
+- SCOPE THIS PATCH (per Ennis, after the discovery above): rebrand only +
+  deepen the Live Sessions connection. Explicitly deferred to a future
+  patch: a bigger/new avatar builder (EXO already covers this for now) and
+  any EXO ↔ Ship visual tie-in across Battle Arena / Core Pathways.
+- FIX (pflx-platform, PATCH v1.111):
+  - Console nav button (`data-view="lite"`, ~L6660): label "PFLX Lite" →
+    "PFLX Live", emoji swapped 🏫→📡 (broadcast reads better for "Live"
+    than a school-building glyph).
+  - "Refresh PFLX Lite" tooltip and "Loading PFLX Lite..." iframe-loader
+    text → "PFLX Live" (~L11582, ~L11587).
+  - Internal identifiers intentionally UNCHANGED: `data-view="lite"`,
+    `APP_BASE_URLS.lite`, `lite-view` CSS class, `lite-loader` id,
+    `data-app="lite"` on the iframe. Renaming these would touch ~10 call
+    sites across `loginUser`/`updateToolbarStatus`/`refreshApp`/
+    `navigateTo`/`mcBroadcastToApps` for zero user-visible benefit — the
+    product is now branded PFLX Live, the plumbing stays "lite" on purpose.
+  - `mcBroadcastToApps()` needed NO changes — its generic
+    `iframe[data-app]` fallback loop already reaches the PFLX Lite/Live
+    iframe (it has `data-app="lite"` but no explicit `id`, so it was never
+    excluded from the fan-out); this patch only adds a LISTENER on the
+    receiving end.
+- FIX (`pflx-lite` repo, v0.2):
+  - Rebrand: `<title>`, loading screen, header logo markup ("PFLX
+    <b>LIVE</b>"), demo-mode banner, and both watermark strings (normal +
+    projector mode).
+  - New `L.liveSession` state + three `window.addEventListener('message',
+    ...)` branches for `pflx_mc_pflx_session_started`,
+    `pflx_mc_pflx_session_live_broadcast`, and `pflx_mc_pflx_session_ended`
+    — the exact events `mcStartLiveSession()`/`mcEndLiveSession()` already
+    broadcast from the Console, previously never listened for here.
+  - New `sessionAppliesToMe()` + `liveSessionBanner()` — a 🔴 LIVE banner
+    (title, join code) shown across every tab when a session is active,
+    cohort-scoped the same way the Console scopes sessions (`allCohorts` OR
+    the player's own cohort in `cohorts[]`; hosts always see it). No host-
+    control mirroring (pause/lock/slide state) in this patch — the
+    Console's own `pflxShowLiveSessionOverlay` already owns that
+    interactive layer; PFLX Live only surfaces "a session is live."
+- Verified: both `index.html` `<script>` blocks pass `node --check`.
+  preview.html syntax gate clean (13 blocks, 0 failures). 7-case unit test
+  of `sessionAppliesToMe()` + the two message-handler reducers, extracted
+  verbatim from the shipped file — covers: no session, cohort-scoped
+  hide/show, `allCohorts` override, host always-sees, matching `ended`
+  clears state, and a stale/out-of-order `ended` event NOT clobbering a
+  newer session. All PASS.
+- BACKLOG (explicitly deferred, per Ennis): a bigger/new part-by-part
+  avatar builder beyond EXO; an EXO ↔ Core Pathways ship visual tie-in
+  (EXO's line/stage/colorway reskinning the Pathways ship) so progress in
+  Battle Arena/PFLX Live visibly changes what a player flies in Core
+  Pathways too; full host-control mirroring (pause/lock/slide state) inside
+  PFLX Live itself.
