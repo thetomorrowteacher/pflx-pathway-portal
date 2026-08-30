@@ -7517,3 +7517,104 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   Canva share link.
 - BACKLOG: none opened by this patch — embed support itself was already
   complete platform-wide.
+
+## PATCH PLATFORM v1.113 — AGENDA / GUIDE FOR PFLX LIVE + JOIN LIVE + NOISE METER (Aug 30, Ennis-requested)
+- REQUEST: "think about Classroom screen and its flexibility and tools... I want
+  the ability to guide learning through clicking join Live button once a PFLX
+  Live is started for a cohort. Also add an Agenda feature within PFLX Live"
+  — modeled on a referenced "Daily Lesson Guide" artifact (day-based ordered
+  activity slides — Mindful Moment, Project Work, Game/Media, Social Sprint,
+  Think-Pair-Share, Exit Ticket, Custom — each with an optional countdown
+  timer, a checklist, and a presenter view).
+- SCOPING (confirmed with Ennis via 3 questions before building):
+  1. Join Live → build a live view INSIDE PFLX Live itself (not a hand-off to
+     the Console's overlay).
+  2. Agenda/Guide → a new timed activity agenda, matching the reference
+     artifact's activity-type catalog and timer/checklist model.
+  3. Classroom tools → focus timer + noise meter + random picker.
+- DISCOVERY (before building — same pattern as this session's earlier
+  patches): PFLX Live's 🎲 TOOLS tab already has a Randomizer (`wheelOpen()`)
+  and a preset Timer (`timerStart()`) — 2 of the 3 requested tools already
+  exist. The Console ALSO already has a full host-side Noise Meter
+  (`mcToggleNoiseMeter`, getUserMedia + AnalyserNode, ClassDojo-style
+  green/yellow/red) — but only inside the Console's own live-session panel,
+  never in PFLX Live where teachers actually run day-to-day class. The
+  Console's Live Sessions already had `slides`/`currentSlideIndex` for
+  interactive polls/quizzes and a full join-by-code + overlay flow
+  (`pflxJoinSessionByCode`/`pflxShowLiveSessionOverlay`) — but that's a
+  different thing from a timed lesson-pacing agenda, and it's Console-side
+  only; PFLX Live (v1.111) only showed a passive "session is live" banner
+  with no click-through. The real gaps were: a genuine Agenda/Guide content
+  system, a live view for it inside PFLX Live, and a Noise Meter ported into
+  PFLX Live specifically.
+- FIX (pflx-platform / Console):
+  - New `agenda: []` / `currentAgendaIndex: 0` fields on session records,
+    plus `MC_AGENDA_TYPE_META` (mindful/activity/project/game/social/
+    thinkpair/exit/custom, each with an icon, default title/prompt, and
+    default timer length) mirroring the reference artifact's catalog.
+  - New host authoring section in the session form — "Agenda / Guide" —
+    parallel to the existing Activities & Slides builder:
+    `mcAddAgendaItem()`/`mcRemoveAgendaItem()`/`mcMoveAgendaItem()`/
+    `mcRenderAgendaItems()`, backed by a `mcSessionFormAgenda` array wired
+    into `mcShowSessionForm`/`mcSaveSessionForm`/`mcCancelSessionForm` the
+    same way `mcSessionFormSlides` already was.
+  - New host live-session controls — `mcAgendaNext()`/`mcAgendaPrev()` step
+    through `sess.currentAgendaIndex` (bounds-checked, no under/overflow),
+    persist via `mcSaveData('sessions')`, re-render a new
+    `mc-session-live-agenda-panel` in the live panel, and re-broadcast via
+    `mcAgendaBroadcastState()`.
+  - Extended the existing `pflx_session_started` / `pflx_session_live_broadcast`
+    broadcasts (already fanned out to every `iframe[data-app]` including
+    PFLX Live, per v1.111) to also carry `agenda`, `currentAgendaIndex`, and
+    `hostControls` — no new broadcast plumbing needed, same channel PFLX Live
+    already listens on.
+- FIX (`pflx-lite` repo, PATCH LITE v0.3):
+  - `L.liveSession` now also carries `agenda`/`currentAgendaIndex`, merged
+    from the broadcast without ever clobbering a previously-received agenda
+    when a stray broadcast omits the field.
+  - `liveSessionBanner()` now shows a real "▶ JOIN LIVE" button (instead of
+    a passive status line) whenever the live session has an agenda —
+    `joinLiveAgenda()` switches to a new `liveagenda` screen.
+  - New `rLiveAgenda()` screen: an agenda rail (all steps, current one
+    highlighted) + a main stage (icon, title, prompt, read-only checklist,
+    and a local countdown ring that restarts whenever the host's current
+    step changes) + a Leave button (`leaveLiveAgenda()`) that returns to
+    whichever tab the player was on before joining.
+  - Scope note: this screen is READ-ONLY for host and players alike in this
+    patch — the host still advances the agenda from the Console (where it's
+    authored); PFLX Live only displays where the class currently is. There's
+    no reverse (iframe → Console) write channel yet to let the host drive it
+    from inside PFLX Live — tracked below as a deferred follow-on.
+  - New Noise Meter (`toggleNoiseMeter()`/`startNoiseMeter()`/
+    `stopNoiseMeter()`) ported into the 🎲 TOOLS tab — same getUserMedia +
+    AnalyserNode approach as the Console's `mcToggleNoiseMeter`, re-skinned
+    to PFLX Live's own visual language. Mic stream is released on tab
+    switch (`go()`) and on `beforeunload` so it never stays hot in the
+    background.
+- Verified: both `index.html` `<script>` blocks pass `node --check`.
+  preview.html syntax gate clean (13 blocks, 0 failures). 13-case unit test
+  against `mcAgendaNext`/`mcAgendaPrev`/`mcAgendaBroadcastState`/
+  `mcUpdateNoiseMeterUI` extracted verbatim from the shipped Console file —
+  covers: advance/step-back bounds checking (no overflow past the last item,
+  no underflow below the first), persistence + re-broadcast on every real
+  advance, a safe no-op on an unknown session index, and the noise-band
+  color/label thresholds. 16-case unit test against PFLX Live's message-
+  handler merge logic, `joinLiveAgenda`/`leaveLiveAgenda`, and its own
+  noise-band thresholds extracted verbatim — covers: agenda/index merge from
+  a fresh broadcast, the local timer restarting only when both the index
+  actually changed AND the player is on the live agenda screen (not on a
+  same-index re-broadcast, not while off-screen), a missing `agenda` field
+  never wiping a previously-received one, refusing to join when there's no
+  agenda yet, and remembering/restoring the return tab. All PASS (29/29
+  total across both files).
+- HOST ACTIONS: to use this, add at least one Agenda step to a Live Session
+  (new "Agenda / Guide" section in the session editor) before launching it —
+  without one, players still see the old passive LIVE banner (no Join Live
+  button) exactly as before this patch, so nothing changes for existing
+  sessions with no agenda.
+- BACKLOG (explicitly deferred): a reverse write channel so the host can
+  advance the agenda from inside PFLX Live itself, not just from the
+  Console; host-control mirroring (pause/lock) reflected visually in the
+  PFLX Live agenda view; folding "Classroom screen" flexibility beyond the
+  noise meter (seating chart, attendance tracker — raised and explicitly
+  deferred by Ennis in scoping) into a future patch.
