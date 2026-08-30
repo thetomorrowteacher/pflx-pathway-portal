@@ -7466,3 +7466,54 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   Battle Arena/PFLX Live visibly changes what a player flies in Core
   Pathways too; full host-control mirroring (pause/lock/slide state) inside
   PFLX Live itself.
+
+## PATCH PLATFORM v1.112 — RESERVED "CANVA DIGITAL PORTFOLIO" PROJECT SLOT (Aug 30, Ennis-requested)
+- REQUEST: "Allow players the ability to add slideshow embeds under projects
+  on their ePortfolio. One Project slot should have a place holder for
+  Canva Digital Portfolio. This is to be embedded from Canva."
+- DISCOVERY: the slideshow-embed mechanism already exists, extensively —
+  `window.pflxEmbedSrc(url)` already normalizes Canva share links
+  (`https://www.canva.com/design/{id}/{shareId}/view?embed`), Google
+  Slides `/pub` decks, YouTube, and Vimeo into an embeddable iframe `src`,
+  and `portfolioRenderProjectMedia(p)` already renders it per-project in a
+  sandboxed iframe across Programs, Checkpoints, Tasks, and Projects. There
+  was no missing embed capability — the actual gap was narrower: a
+  reserved, recognized "Canva Digital Portfolio" project slot with its own
+  placeholder card, so every player's portfolio has an obvious, dedicated
+  spot for it instead of players inventing their own project and hoping it
+  reads as the "official" one.
+- FIX: added a `slotKey` marker (not a title match — a project titled
+  "Canva Digital Portfolio" through the regular +ADD PROJECT flow does NOT
+  count as filling the slot; the slot is only marked filled via the
+  dedicated CTA, and survives the player renaming the project afterward).
+  - New hidden field `#pf-proj-slotkey` on the New Project form; read and
+    persisted (`slotKey: slotKey || null`) in `portfolioSaveNewProject()`.
+  - New `PFLX_CANVA_SLOT_KEY = 'canva-digital-portfolio'`,
+    `portfolioCanvaPlaceholderCard()` (dashed-border "+ ADD EMBED" card),
+    and `portfolioAddCanvaSlotProject()` (opens the New Project form
+    pre-filled: title "Canva Digital Portfolio", media type "slides", a
+    Canva-specific placeholder in the URL field, and `slotKey` set) so the
+    slot is one click away.
+  - `portfolioRenderProjects(data)` now computes `canvaSlotFilled` (any
+    project with `slotKey === PFLX_CANVA_SLOT_KEY`) and
+    `showCanvaPlaceholder` (`portfolioEditMode && !canvaSlotFilled`),
+    prepending the placeholder card to the grid when appropriate and
+    reusing the existing `portfolioEditMode` visibility gate already used
+    by the +ADD PROJECT button — public portfolio viewers never see the
+    placeholder, only the owner in edit mode, and only until they fill it.
+- Verified: syntax gate clean (13 blocks, 0 failures). 7-case unit test
+  against `portfolioRenderProjects`'s exact gate logic extracted verbatim
+  (not a reimplementation) — covers: empty portfolio + editing (placeholder
+  shown, old empty-state suppressed), empty + viewing (no placeholder,
+  normal empty state), other projects present + slot still unfilled
+  (placeholder still shows), slot filled + editing (placeholder gone), slot
+  filled + viewing (nothing extra for viewers), a renamed project keeping
+  its `slotKey` (still recognized as filled), and a project merely titled
+  "Canva Digital Portfolio" without `slotKey` (does NOT count as filled).
+  All PASS.
+- HOST ACTIONS: none required. Players will see the new "Canva Digital
+  Portfolio" placeholder card the next time they open their ePortfolio in
+  edit mode; clicking "+ ADD EMBED" walks them straight to pasting their
+  Canva share link.
+- BACKLOG: none opened by this patch — embed support itself was already
+  complete platform-wide.
