@@ -7618,3 +7618,84 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   PFLX Live agenda view; folding "Classroom screen" flexibility beyond the
   noise meter (seating chart, attendance tracker — raised and explicitly
   deferred by Ennis in scoping) into a future patch.
+
+## PATCH PLATFORM v1.114 — NEUROFLUX LOGIN GLITCH: THREE NEW THEORIES RULED OUT, DUPLICATE CLOUD ROW FINALLY MERGED (Aug 31, Ennis-reported)
+- SYMPTOM (Ennis, Aug 31): "Neuroflux is having logging in issues still. Her
+  screen is glitching and flashing during the login screen. She is not able
+  to move past that. It seems like it is reseting." Third report touching
+  NeuroFlux (Essence Johnson) and the login screen, after v1.69 (Aug 15,
+  "login-screen refresh loop") and v1.70 (Aug 16, roster-cache-bloat theory)
+  — both of which explicitly noted the root cause was never confirmed
+  because no screenshot/recording/console log was ever provided despite
+  being asked.
+- INVESTIGATION — three fresh mechanisms checked this round, all ruled out
+  with direct evidence (not guessed away):
+  1. Datalist-rebuild theory: `pflxStartRosterSubscriber()`'s realtime
+     handler calls `populateBrandSelect()` on every one of ~150+ active
+     players' `app_data` updates platform-wide, rebuilding
+     `<datalist id="brand-datalist">`'s options. Checked the actual login
+     markup (`#brand-select`, line ~7096): it's a static
+     `<input list="brand-datalist">`, never itself recreated, and rebuilding
+     a linked `<datalist>`'s `<option>` children is a browser-standard
+     operation that does not reset an associated input's typed value or
+     focus — datalists are a disconnected suggestion list. Ruled out.
+  2. PIN-desync theory: two live cloud rows existed for brand NEUROFLUX
+     (`...-25` and `...-m7xam`, confirmed still both present, 2+ weeks after
+     v1.69 flagged it — see FIX below). Checked whether
+     `BRANDS['NEUROFLUX']` could resolve to two different PINs depending on
+     which row's realtime tick landed last, which would explain an
+     intermittent "correct PIN suddenly rejected" loop. Queried both rows'
+     actual `pin` field directly: identical (`"esse"`) on both. This can't
+     produce a PIN mismatch. Ruled out as a login-blocking mechanism —
+     though the duplicate rows were still real, unresolved debt (below).
+  3. Re-examined the "malformed badge array" bare-string entries flagged in
+     the prior session as a new defect (NeuroFlux, C1RC3, CALLIA all have
+     plain badge-id strings like `"badge-global-digital-intern-level-1"`
+     mixed into their `badges[]` alongside object entries). Traced every
+     consumer in the file — `mcRenderPlayerBadges`, `portfolioRenderBadges`
+     (`mcFindBadge`), `pmBadgeNormalize`/`renderBadgeListHtml`, and the
+     X-Coin badge-award/revoke sync handlers — and confirmed every single
+     one already explicitly branches on `typeof b === 'string'`. This is a
+     deliberately dual-shape field (documented in-code as far back as the
+     Aug 9 fix comment on `renderBadgeListHtml`), not corruption, and not a
+     crash risk anywhere it's read. **Retracting** the "new defect" framing
+     from the last session's notes — nothing to fix here.
+- FIX (data only — no `preview.html` code changed this patch):
+  - Finished the NeuroFlux row-merge that was started Aug 9 but never
+    completed. Evidence it stalled: a `backup_neuroflux_merge_20260809_*`
+    snapshot exists, but the live `pflx_player_player-1778102469849-m7xam`
+    row was written to AGAIN on Aug 11 — 2 days after that backup — almost
+    certainly why whoever ran the Aug 9 cleanup stopped short of deleting
+    it (a live write mid-merge is exactly the kind of thing that should
+    abort a manual cleanup).
+  - Confirmed `-m7xam` has been untouched since Aug 11 (3+ weeks): stale
+    100,000 XC round-number placeholder, 0 badges, a 508KB legacy embedded
+    image, vs. the canonical `-25` row's 104,550 XC / 12 badges / actively
+    growing. `pflx_mc_players.items` (the Console roster collection) had
+    already been correctly deduped to one NEUROFLUX entry by the Aug 9
+    attempt — it was only the individual `pflx_player_<id>` `app_data` row
+    that never got cleaned up.
+  - Took a fresh safety snapshot of BOTH rows under new
+    `backup_neuroflux_merge_20260831_*` keys, then deleted the stale
+    `pflx_player_player-1778102469849-m7xam` row from the live table.
+- Verified: SQL SELECT immediately after the DELETE confirms exactly one
+  live `app_data` row for brand NEUROFLUX (`pflx_player_player-import-
+  1774891628716-25`); `pflx_mc_players.items` already had exactly one.
+  Both pre-delete snapshots (Aug 9 and Aug 31) remain in `app_data` under
+  `backup_neuroflux_merge_*` keys for rollback if ever needed. No code
+  changed, so no syntax gate / unit test / redeploy applicable this patch.
+- HOST ACTIONS: none required.
+- STILL UNRESOLVED: the actual glitching/flashing/"can't get past login"
+  symptom has now been investigated across THREE separate sessions
+  (v1.69, v1.70, this one) and every code-visible mechanism checked so far
+  — refresh loops, roster-cache bloat, datalist rebuilds, PIN desync,
+  badge-array shape, and (now, finally) the duplicate cloud row itself —
+  has been ruled out or fixed without reproducing the reported symptom.
+  Requesting, for the fourth time on this same underlying issue: a phone
+  screen recording of the glitch as it happens, OR whatever shows up in
+  the browser's DevTools console (on the affected device: press F12 or
+  right-click → Inspect → Console tab, then look for red error text) at
+  the moment it happens. Code-only investigation has now covered every
+  mechanism visible from the code and data alone — direct evidence from
+  the live incident is very likely the only way to move this forward from
+  here.
