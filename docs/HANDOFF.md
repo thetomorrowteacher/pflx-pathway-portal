@@ -7699,3 +7699,97 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   mechanism visible from the code and data alone — direct evidence from
   the live incident is very likely the only way to move this forward from
   here.
+
+## PATCH PLATFORM v1.115 — badgeCounts NEVER DERIVED FROM THE REAL BADGES ARRAY, KAITLIN'S 10-VS-7 BADGE COUNT FINALLY CLOSED (Sept 2, Kaitlin-reported via Discord)
+- SYMPTOM (Kaitlin, Discord, Sept 1): posted a full status update covering
+  the Aug 26 report (v1.109). "Fixed" per her: device/XC syncing, now
+  correctly 3,400 XC everywhere. "Not Fixed": badge syncing — Portfolio
+  shows 10 badges, X-Coin Dashboard shows 7, both against the same 3,400 XC.
+  "New issues": Mission Control/Checkpoint Alpha/Beta showing new/incomplete
+  tasks and reduced % progress despite her having completed everything
+  originally assigned, and some Beta tasks showing "Submitted" with the
+  submission description missing when opened.
+- INVESTIGATION — queried Supabase directly rather than trusting the report
+  at face value, per this project's standing rule:
+  - Badge count: her canonical `pflx_player_player-import-1784088654295-23`
+    row has `badges: []` with exactly 7 distinct entries (a mix of full
+    objects and legacy bare-id strings, several carrying `endorsements: 2`
+    from repeat awards) but `badgeCounts: {primary:7, premium:0,
+    executive:0, signature:3}` — summing to 10. `pflx_mc_players`' matching
+    entry showed the identical inflated `{primary:7,signature:3}`. Real,
+    live, confirmed data — not a display bug.
+  - Checkpoint/task regression: pulled every task assigned to her
+    (`pflx_mc_tasks`, matched by `assignedTo` + her cohort `cg-seed-gdi`'s
+    "PFLX Intern Onboarding" project for Checkpoint Alpha). ALL of her
+    tasks — 3 under Alpha, 4 under Beta — show her own `submissions[]`
+    entry at `status: "approved"` with a full `description`. Traced the
+    actual live progress-computation path (`pflxPlayerCheckpointProgress`
+    → `pflxTaskStateForPlayer`): it already correctly reads each player's
+    OWN entry in `task.submissions[]` (no global-status fallback — that
+    exact class of bug was fixed July 15, per the in-code comment) and
+    would compute 3/3 and 4/4 (100%) for her on both checkpoints today.
+    This does NOT reproduce from current live code + data — every task
+    her own device would need to show as done already reads as approved
+    server-side. Most likely a stale client-side cache on whichever device
+    she took the screenshots on, same root-cause family as the Aug 26/
+    v1.109 XC bug (also client-cache, also self-corrected once confirmed).
+    No code changed for this part this patch — see HOST ACTIONS.
+- ROOT CAUSE (badge count — a real, ongoing, self-perpetuating bug, not a
+  one-time leftover): `_mcReconcilePlayersFromMc()` (added by v1.93 to
+  close the MC↔X-Coin sync gap, and wired to fire on EVERY
+  `mcSaveData('players')` call — i.e. constantly, on any host action that
+  touches a player) reconciled `badgeCounts` as two INDEPENDENT counters,
+  taking the category-wise MAX between `mcPlayers.badgeCounts` and
+  `PLAYERS.badgeCounts` — never derived from the actual `badges[]` array.
+  The Aug 24/v1.93 manual data-surgery reconcile itself set Kaitlin's
+  badgeCounts to `{primary:7,signature:3}=10` while her `badges` array was
+  unioned to only 7 real distinct entries — a genuine mismatch introduced
+  at that moment. Because the ongoing reconcile function only ever
+  ratchets `badgeCounts` UP and never re-derives it, that one bad value
+  became permanent and was re-applied every single time the function ran
+  since — which is why "several patch updates" never touched it: nothing
+  had ever recomputed it from source of truth.
+- FIX (`preview.html`, `_mcReconcilePlayersFromMc`): badgeCounts is now
+  DERIVED from the final `badges[]` array (after any union step) whenever
+  it's out of sync — same one-count-per-distinct-entry,
+  type-defaults-to-primary logic `mcRemovePlayerBadge`'s revoke path
+  already uses — instead of merged as two independently-tracked numbers.
+  This makes badgeCounts a pure function of the real badges going forward
+  (it can never drift ahead of reality again) AND self-heals any
+  already-existing drift — Kaitlin's included, and anyone else silently
+  affected who hasn't reported it yet — the next time a host action
+  anywhere touches `mcPlayers`.
+  - Version bump: `PFLX_PATCH` 113 → 115 (114 was the Aug 31 NeuroFlux
+    data-only patch, no code/version change that time).
+- DATA (Supabase, one transaction, verification SELECT after): rather than
+  wait for the next host action to trigger the self-heal, corrected
+  Kaitlin's badgeCounts on both live rows right now —
+  `pflx_mc_players` (array index 128) and
+  `pflx_player_player-import-1784088654295-23` — both
+  `{primary:7,premium:0,executive:0,signature:3}` → `{primary:6,premium:0,
+  executive:0,signature:1}` (sum 7, matching her real 7-badge array).
+  Verified both rows post-write via a follow-up SELECT.
+- Verified: syntax gate clean (13 non-empty `<script>` blocks, `node
+  --check` on each, 0 failures). 10-case Node unit test against
+  `_mcReconcilePlayersFromMc`/`_pflxUnionBadgeArrays` extracted verbatim
+  from the shipped file — covers: Kaitlin's exact real Supabase shape
+  (badgeCounts sum corrected 10→7, recomputes to the exact
+  `{primary:6,signature:1}` now live in Supabase, badges array itself
+  left untouched since both sides already agreed); an already-consistent
+  record is a true no-op; a genuinely NEW mc-side badge still unions in
+  and badgeCounts recomputes from the result (not merged); XC/totalXcoin
+  monotonic-max behavior is unchanged (regression guard); admin/host rows
+  are still skipped entirely; brand-fallback id matching across differing
+  ids still resolves; a single bare-string legacy badge recomputes to
+  exactly 1 (was inflated to 3 in that test's setup). All 10/10 PASS.
+- HOST ACTIONS: none required for the badge count — both Supabase rows are
+  already corrected above, Kaitlin should see 7 badges everywhere on her
+  next load (no manual Supabase edit needed going forward either, since
+  the mechanism now self-heals). For the checkpoint/task "new issues": ask
+  Kaitlin to fully close and reopen PFLX (or hard-refresh) the device she
+  screenshotted — every task and checkpoint she flagged already reads
+  100% complete server-side, so this looks like the same stale-cache
+  pattern the Aug 26/v1.109 patch fixed for XC, just not yet confirmed
+  fixed for her specifically. If a hard refresh does NOT resolve it,
+  that's new information worth a fresh look (this patch did not change
+  anything on the checkpoint/task path).
