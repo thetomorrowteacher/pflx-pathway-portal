@@ -7793,3 +7793,60 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   fixed for her specifically. If a hard refresh does NOT resolve it,
   that's new information worth a fresh look (this patch did not change
   anything on the checkpoint/task path).
+
+## PATCH XCOIN v1.4 — ADMIN GRANT MODAL: MULTI-SELECT + SEARCH/COHORT FILTER; MARKETPLACE PURCHASE XC-DEDUCTION FIXED (Sept 2, Ennis-requested + FeedForward)
+- FEATURE (Ennis-requested): the admin "Grant Digital Badge" modal
+  (`app/admin/coins/page.tsx`) only let a host pick one player at a time from
+  an unfiltered scrollable list. Ennis: "I need a better selection screen for
+  digital badges. I should be able to search, or choose a cohort, or other
+  filtering options. I should be able to select multiple players." Rebuilt:
+  - `grantTarget.playerId: string` → `grantTarget.playerIds: string[]`.
+  - New search input (matches name or brand name) + cohort `<select>`
+    (populated from the existing `getMockCohorts()`), Select All (unions the
+    currently-filtered rows into the selection) and Clear buttons.
+  - Player rows are now checkbox-style multi-select (visual checkmark +
+    border/background state), single-column (unchanged from the last
+    overflow fix) to avoid the long-name grid-track overflow from Aug 12.
+  - `handleGrantCoin()` now loops `playerIds`, applying the same per-player
+    side effects (XC award w/ tax, submission history entry, Console-identity
+    broadcast via `pflx_player_award`, Discord/Slack `notifyBadgeAwarded`)
+    each already had, then fires ONE batched `playReward()` + save/toast
+    after the loop (pluralized: "granted to N players — saved to cloud ✓").
+  - Amount-preview text and the footer Confirm button now reflect the
+    multi-select count ("+X XP each", "→ N players", "Confirm Grant (N)"),
+    and Cancel/Confirm both reset the search/cohort filters.
+- BUG (FeedForward sweep, Hannah Rodrigues, Aug 12 submission: "Booster XC
+  not deducted" — part of a bundle also covering novice-only difficulty,
+  already fixed v1.63, and PLAYDNA XP, which is a 3rd-party integration with
+  no PFLX code path): confirmed by tracing `purchaseUpgrade()` in
+  `app/player/marketplace/page.tsx`. The eligibility check reads
+  `user.xcoin` (the real spendable-balance field on `User`), but the actual
+  deduction line wrote `xp: user.xcoin - mod.costXcoin, xc: user.digitalBadges
+  - mod.costXcoin` — `xp` and `xc` are NOT fields on `User` (confirmed
+  against the interface in `app/lib/data.ts`; the real balance field is
+  `xcoin`, `xc` is an unrelated field on the `DigitalBadge` type). The spread
+  silently tacked two bogus, unused properties onto `updatedUser` while
+  `user.xcoin` itself passed straight through untouched — so every purchase
+  in the marketplace (72-Hour Extension, Late-Entry Pass, XC Multiplier,
+  Checkpoint Bonus, Task Completion Booster) visibly cost nothing, no matter
+  how many times a player bought one.
+- FIX: `updatedUser` now sets `xcoin: user.xcoin - mod.costXcoin, digitalBadges:
+  user.digitalBadges - mod.costBadge` — the two fields the eligibility check
+  two lines above already uses. (`costBadge` is 0 on every current upgrade,
+  so this also fixes the latent badge-cost path for whenever one ships.)
+- Verified: `npx tsc --noEmit` clean on both touched files (one pre-existing,
+  unrelated `TS1381` in `app/admin/task-management/page.tsx` untouched by
+  this change — confirmed via `git diff --stat` that file was never edited).
+  7-case Node unit test against the exact `updatedUser` expression extracted
+  verbatim from the shipped file (not reimplemented) — covers: Hannah's
+  real-world 72-Hour-Extension purchase (3000→1500 XC, badges untouched);
+  a hypothetical badge-cost item deducts `digitalBadges` correctly; no bogus
+  `xp`/`xc` properties on the result; original `user` object not mutated;
+  exact-balance purchase lands at 0, not negative. All 7/7 PASS.
+- Commit `404649a` on `pflx-xcoin-app` (repo: `thetomorrowteacher/pflx-xcoin-app`),
+  pushed to `main`, Vercel deploy `dpl_7rHPjHxiLjbU6m2R3vuVkEiZpe76` READY
+  (confirmed via Vercel MCP) at `pflx-xcoin-app.vercel.app`.
+- HOST ACTIONS: none required — both fixes are live. Any tester who bought a
+  marketplace upgrade before this patch and saw no XC deducted got that
+  upgrade for free; no retroactive charge is being applied (out of scope —
+  flag if Ennis wants a retroactive reconciliation).
