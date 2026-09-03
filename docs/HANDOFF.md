@@ -8061,3 +8061,61 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   rank-1/6/7 likely never actually match a real earned badge today. Worth
   its own investigation/patch; deliberately out of scope here since it's
   rank-progression logic, not the badge-picker bug Ennis reported.
+
+## PATCH PLATFORM v1.119 — AADHYA KHANNA REBRAND C1RC3 → CIR3 + LEFTOVER DUPLICATE-ACCOUNT CLEANUP (Sept 3, Ennis-confirmed, data-only, no code/version change)
+- CONTEXT: v1.116 (this same session) recorded Aadhya Khanna's live brand as
+  "C1RC3" per the DB at the time. Ennis flagged this as wrong ("Aurora/Aadhya
+  Khanna is current CIR3"); re-verified live against Supabase, confirmed the
+  DB genuinely held "C1RC3" (matching a dozen+ independent Handoff entries
+  back to v1.59) — not a transcription error on my end. Ennis then confirmed:
+  *"yes its C1RC3. Aadhya did rebrand. Please merge accounts."* — she
+  genuinely changed her brand identity from C1RC3 to CIR3.
+- REBRAND: updated `brand`/`brandName` C1RC3 → CIR3 on her live claimed
+  record (`player-1784385012246-jylqd`, akhanna.29@asdubai.org), in both
+  `pflx_mc_players.items[]` and her individual `pflx_player_<id>` row.
+  xc/totalXcoin/badges/digitalBadges untouched.
+- DUPLICATE-ACCOUNT CLEANUP: searching for a second/duplicate record to
+  merge (per Ennis's "merge accounts") turned up
+  `pflx_player_player-import-1774891628714-0` — brand "AURORA" (her original
+  host-imported brand, pre-dating her C1RC3 self-created account; matches
+  the SELF-CREATED-vs-IMPORTED duplicate-account pattern already documented
+  for her back in the ~July "9 testers had duplicate claimed accounts"
+  Handoff entry), email aadhyakhanna@icloud.com, claimed:true, PIN set,
+  0 XC, 0 badges, NOT present in `pflx_mc_players.items[]`.
+  Checked `pflx_player_tombstones`: this exact id (and `b:AURORA`) was
+  ALREADY tombstoned back then (timestamp 1784521452799, matching the other
+  9 ids tombstoned in that same original cleanup) — the tombstone write
+  succeeded at the time but the "delete the individual row" half of that
+  patch silently never ran for this one. Since it's already tombstoned
+  (inert to every client via `pflxPurgeTombstoned()`/tombstone-merge on
+  every cloud pull) and carries zero XC/zero badges, there was nothing to
+  fold in — deleted the leftover orphaned row outright to finish what that
+  older patch missed. Nothing removed from `pflx_mc_players.items[]` (it
+  was never in there).
+- FINDING while investigating (not fixed, flagging for a decision): a real
+  XC discrepancy on Aadhya's OWN main record — `pflx_mc_players` bulk entry
+  has `xc: 100050` while her individual `pflx_player_<id>` row has
+  `xc: 325950` (totalXcoin/digitalBadges/badges all agree at 325950/8/8 in
+  both stores — only current spendable `xc` disagrees). Bulk's `updatedAt`
+  is null (looks never independently stamped); individual's `updatedAt` is
+  a real recent timestamp (1788110116663, ~Aug 28), suggesting the
+  individual row is the fresher/correct one and bulk is stale — but this
+  wasn't part of what Ennis asked for this round, so left untouched pending
+  his call rather than guessing on a ~226K XC swing for a real student.
+- ADDITIONAL FINDING (broader sweep while checking tombstone consistency):
+  10 MORE player ids from that same original tombstone batch
+  (`player-1784131817914-eh9fq`, and 9 more `player-import-1784088653*`/
+  `player-import-1774891628716-72` ids) are ALSO already tombstoned but
+  STILL have a live `pflx_player_<id>` row sitting in Supabase — the same
+  "tombstone recorded, row-delete step silently skipped" gap as Aadhya's
+  AURORA row above, just never noticed because nothing surfaced them until
+  now. All already inert to every client (tombstone purge already hides
+  them); this is pure leftover-row cleanup, not a live bug. Not touched
+  this patch — different players, out of the scope Ennis asked for today.
+- HOST ACTIONS: (1) confirm whether to reconcile Aadhya's xc drift, and if
+  so to which value (325,950 individually-stored value looks like the
+  fresher one, but this materially changes a real student's spendable
+  balance so it needs a yes, not a guess). (2) say the word and the other
+  10 leftover already-tombstoned zombie rows get deleted the same way
+  AURORA's was — zero risk, they're already invisible to every client,
+  purely tidying stale Supabase rows.
