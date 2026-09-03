@@ -7850,3 +7850,82 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   marketplace upgrade before this patch and saw no XC deducted got that
   upgrade for free; no retroactive charge is being applied (out of scope —
   flag if Ennis wants a retroactive reconciliation).
+
+## PATCH PLATFORM v1.116 — LEGACY X-COIN BALANCE MIGRATION FROM OLD SYSTEM (89 PLAYERS), 2 MORE DUPLICATE-ACCOUNT PAIRS MERGED (Sept 3, Ennis-provided export, data-only, no code/version change)
+- SOURCE: Ennis uploaded "XCoin Students Export" (92 rows, First/Last Name,
+  Email, Group, House, Balance, Store Manager) — legacy point balances from
+  the platform's old (pre-PFLX) system, to be folded into live PFLX profiles.
+- MATCHING: matched by email against `pflx_mc_players`. 89/92 real rows
+  matched cleanly; 3 rows (`player1/2/3@prototypeflx.com`, "Player 1/2/3")
+  were placeholder/test accounts, excluded. 2 rows had no roster match under
+  the CSV's export-time email and were re-matched by name at Ennis's
+  direction: Aurora/Aadhya Khanna → live account is now branded "C1RC3"
+  under `akhanna.29@asdubai.org` (her real school email, confirmed via her
+  own FeedForward submissions — the CSV's `aadhyakhanna@prototypeflx.com`
+  is stale); Vyatech/Kaavya Singh → `kaavya.m.singh@gmail.com` (CSV's
+  `kaavyasingh@prototypeflx.com` likewise stale).
+- DUPLICATE ACCOUNTS (Ennis's call: merge first, then credit): 4 CSV rows
+  (Bronx/John Khoury, VoYder/Cameron Miller, Matrix/Ryan Kamel,
+  Trinity/Naiya Baigmohamed) each had TWO `pflx_mc_players` records sharing
+  one email — an older `claimed:true` record (joined Jul 29, the one the
+  student actually logs into, PIN set) at 0 XC, and a newer `claimed:false`
+  Aug 12/13 import-batch record matching the CSV's cohort/brand formatting
+  more closely. Same root pattern as the Aug 24/v1.93 NeuroFlux duplicate
+  fixed in v1.114/v1.115 — two cloud rows for one real player, one of them
+  dead weight. Trinity's import-batch record held real progress (3,900 XC,
+  12 digitalBadges) her claimed account didn't have. Merged: folded the
+  import-batch record's xc/totalXcoin/digitalBadges into the claimed record
+  (max, same pattern `_mcReconcilePlayersFromMc` already uses), then removed
+  all 4 unclaimed import-batch records from BOTH `pflx_mc_players.items[]`
+  and their own `pflx_player_<id>` rows. Verified zero duplicate emails left
+  in the roster afterward.
+- CREDIT (Ennis's call: add CSV balance on top of current live XC, not
+  replace): applied `xc += balance, totalXcoin += balance` to all 89 matched
+  players, in both `pflx_mc_players.items[]` and each player's individual
+  `pflx_player_<id>` row. Total credited: 4,714,200 XC across 89 players
+  (median credit 1,700; largest PassionStudios/Sarah Bose +855,900 → new
+  total 1,057,900; smallest +1,000 flat on ~35 players whose old-system
+  balance never moved past the starting grant).
+- DATA-INTEGRITY FINDINGS surfaced while applying this (none caused by this
+  patch, all pre-existing — flagging since this is the same failure family
+  as the Aug 24 NeuroFlux bug and worth a dedicated look):
+  - Sarah Bose/PassionStudios's individual `pflx_player_player-import-…-72`
+    row carries `role: "instructor"` while her `pflx_mc_players` bulk entry
+    (and everywhere else she's referenced) is `role: "player"` — a stray
+    label mismatch between the two stores for one id. Synced the credit
+    through by value rather than by the role filter; the role field itself
+    was left alone (not this patch's problem to fix, but worth a look).
+  - Carl Demirjian/Spark's `pflx_mc_players` entry already had `xc: 10000`
+    but `totalXcoin: 0` before this patch (xc > totalXcoin, which should be
+    impossible — totalXcoin is meant to be the lifetime high-water mark).
+    Credited both fields on top as instructed; did not attempt to correct
+    the pre-existing inconsistency itself — separate bug, needs its own
+    investigation.
+  - TWO MORE claimed, PIN-set player identities turned up that are NOT in
+    `pflx_mc_players` at all — only as orphaned `pflx_player_<id>` rows:
+    `player-1781605187212-fbf2a` (Carl Demirjian/Spark, PIN 7777) and
+    `player-1782292247387-dbt2s` (Naiya Baigmohamed/Trinity, PIN 1917).
+    Same duplicate-account family as the 4 above, but discovered only
+    because this migration's email-match touched them — NOT yet decided on
+    by Ennis, so NOT merged or credited. My blanket by-email credit UPDATE
+    initially touched both (they matched by email); reverted both back to
+    their pre-patch xc:0/totalXcoin:0 before finishing, so nothing is
+    silently sitting on a phantom balance. Needs the same merge-or-review
+    call Ennis made for the other 4 — HOST ACTION below.
+- Verified: ran the full match/merge/credit as staged SQL against Supabase
+  with a verification SELECT after each step — zero duplicate emails
+  remaining in `pflx_mc_players` post-merge; zero drift between the bulk
+  roster and each of the 89 matched players' individual rows post-credit
+  (explicit `is distinct from` check both ways, re-run clean after fixing 3
+  rows the initial blanket update missed due to the role-filter/pre-existing
+  drift issues above); credited-row count (89) and total (4,714,200) both
+  matched the source CSV's row count and Balance sum exactly.
+- HOST ACTIONS: (1) decide whether `player-1781605187212-fbf2a` and
+  `player-1782292247387-dbt2s` should be merged into Carl Demirjian's and
+  Naiya Baigmohamed's live accounts the same way the other 4 were — they're
+  currently untouched or (2) if Ennis wants a broader sweep for any other
+  claimed-but-not-in-roster orphan player rows across the whole platform,
+  since this migration only surfaced these 2 by accident (email overlap
+  with the CSV), not by a deliberate search. (3) Spark's pre-existing
+  xc-vs-totalXcoin inconsistency and the Sarah Bose role-mismatch — both
+  logged above, neither touched, both worth a look when there's time.
