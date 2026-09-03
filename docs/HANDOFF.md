@@ -7929,3 +7929,46 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   with the CSV), not by a deliberate search. (3) Spark's pre-existing
   xc-vs-totalXcoin inconsistency and the Sarah Bose role-mismatch — both
   logged above, neither touched, both worth a look when there's time.
+
+## PATCH PLATFORM v1.117 — FIX "X" REMOVE-ROW SyntaxError ON PROJECT TOPICS (+ TASK/PROJECT SUBTASK ROWS), Sept 3, Ennis-reported
+- SYMPTOM: Ennis clicking the ✕ to remove a Topic from a Project (Projects →
+  edit Project → TOPICS) threw `Uncaught SyntaxError: Unexpected end of
+  input (line 1)` in the PFLX Error Log, and the topic was never removed.
+- ROOT CAUSE: `_mcRenderProjectTopicsEditor()` built the remove button as
+  `onclick="mcProjectRemoveTopicRow(' + JSON.stringify(tid) + ')"` and
+  concatenated that raw into a **double-quoted** `onclick="..."` HTML
+  attribute. `JSON.stringify()` always wraps its output in literal double
+  quotes, so the embedded `"` terminates the HTML attribute value early —
+  per HTML parsing rules a double-quoted attribute ends at the first raw
+  `"` it meets. The onclick handler that actually got compiled and run was
+  the truncated fragment `mcProjectRemoveTopicRow(` — invalid JS by itself,
+  hence the syntax error. Same anti-pattern was already present (silently,
+  unreported) on two sibling row-renderers: the generic task-subtask
+  remover (`_mcGenericRenderSubtaskRows`, used by `mcRemoveSubtaskRow`) and
+  the project-subtask remover (`mcRemoveProjectSubtaskRow`) — both would
+  have thrown the identical error the first time anyone tried to remove a
+  subtask row via those two paths.
+  This exact class of bug was already recognized and fixed elsewhere in the
+  same file: `mcQLRemove`/`mcQBadgeToggle`/`mcQFineToggle` all wrap with
+  `escapeHtml(JSON.stringify(...))` for precisely this reason — the 3
+  remove-row buttons above were simply missed when that pattern was
+  established.
+- FIX: wrapped `JSON.stringify(...)` in `escapeHtml(...)` at all 4 affected
+  onclick handlers (`preview.html` ~lines 37031, 37067, 37678, 37760),
+  matching the established safe pattern. `escapeHtml` turns the embedded
+  `"` into `&quot;`, which the HTML parser only decodes back to a real
+  quote *after* it has correctly delimited the full attribute value — so
+  the compiled handler now sees the complete, valid
+  `mcProjectRemoveTopicRow("topic-...")` call.
+- Verified: syntax gate clean (13/13 inline `<script>` blocks, `node
+  --check` each). 2-case unit test (`topic_x_fix_test.js`, extracted the
+  real `escapeHtml` + simulated HTML double-quoted-attribute truncation and
+  handler compilation) — confirms the OLD code throws a SyntaxError under
+  every realistic handler-compilation wrapping, and the NEW code compiles
+  cleanly and invokes the target handler with the correct row id, for 2
+  representative auto-generated ids — both cases PASS. `PFLX_PATCH` bumped
+  115 → 117 (`PFLX_BUILD` already `2026.09`).
+- HOST ACTIONS: none — this was a pure display/interaction bug, no data
+  was corrupted (removing a topic simply never took effect client-side).
+  Worth a quick regression check next login: open a Project with 2+ topics
+  and confirm the ✕ now actually removes the row.
