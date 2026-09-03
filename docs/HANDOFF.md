@@ -8446,3 +8446,60 @@ scoping decision before starting — see chat):
   image was supplied. Scoping questions (which screens, how literally to
   follow the reference vs. adapt to PFLX's existing cyan/purple/gold
   palette) posed to Ennis before starting; not begun this patch.
+
+## PATCH LITE v0.4 — PFLX LIVE ROSTER WIRED TO LIVE DATA, FIXES 0-PLAYER COHORTS (Sept 3, Ennis-reported via screenshot)
+- SYMPTOM: Ennis flagged (with a screenshot of the Host Dashboard) that PFLX
+  Live shows "PLAYERS (0)" for real, active cohorts — specifically "Global
+  Digital Intern" — even though the cohort itself is selectable in the
+  dropdown and clearly has enrolled players everywhere else in PFLX.
+- ROOT CAUSE: `loadRoster()` sourced `L.roster` entirely from
+  `XCOIN_SEED_URL` (`https://pflx-xcoin-app.vercel.app/seed-data.json`) — a
+  static, point-in-time snapshot (94 users) that was never wired to update.
+  Its cohort set (Player Pool/DD Studio 2/3/7/DD Core 1/2/3/5/Falcon
+  Studios/Falcon Studios (MS Division)/Cohort 2/Cohort 3/N/A) predates
+  "Global Digital Intern" entirely, so any player only tagged with that
+  cohort could never appear — not a filter bug, a data-source bug. The
+  cohort *dropdown* was never broken: `loadCohortGroups()` already reads
+  the live canonical `cohortGroups` registry via Supabase, which is exactly
+  why "Global Digital Intern" was selectable despite the roster having zero
+  matches for it.
+- FIX: `loadRoster()` now tries the live Console roster FIRST — Supabase
+  `app_data` key `pflx_mc_players` (`{items:[...]}`, 141 players as of this
+  patch, the same data Mission Control/X-Coin/Battle Arena already read and
+  every host action keeps current) — via the app's existing `kvLoad()`
+  helper (already used for `cohortGroups`/`pflx_lite_config`, no new
+  Supabase wiring needed). Only if that fails or returns nothing does it
+  fall back to the static `XCOIN_SEED_URL` snapshot, then `DEMO_ROSTER` as
+  last resort — same safety net as before, just re-ordered so live data is
+  tried first. Extracted the per-user field mapping into a shared
+  `mapRosterUser(u)` used by both the live and fallback paths (live records
+  use `xcoin`/`brandName`/`digitalBadges`; the old seed used
+  `xcoin`/`brandName` too but `mapRosterUser` also tolerates the legacy
+  `xc`/`brand`/array-of-badges shapes so neither path silently drops a
+  player over a field-name mismatch). Filter (`role === 'player'`, admins
+  excluded) is unchanged and applies to both sources.
+- Verified: syntax gate clean (both inline `<script>` blocks, node --check
+  0/2 failures). 26-check, 6-case Node unit test against the extracted live
+  `mapRosterUser`/`loadRoster()` source (stubbed `kvLoad`/`fetch`, real
+  logic): (1) live data containing the exact reported cohort ("Global
+  Digital Intern") resolves to real players with the seed fetch never
+  called, (2) field-mapping fallbacks (legacy `xc` vs `xcoin`, badge-array
+  length vs `digitalBadges` count) map correctly, (3) live returning an
+  empty roster falls through to the seed fetch, (4) `kvLoad` throwing
+  (Supabase/network error) falls through to the seed fetch, (5) both
+  sources failing falls through to `DEMO_ROSTER`, (6) a live roster that's
+  entirely admins (filtered to empty) correctly falls through to the seed
+  rather than showing 0 players. All 26/26 PASS. Also confirmed directly
+  against Supabase: `pflx_mc_players` has 141 players (2 admins excluded by
+  the role filter) and includes real "Global Digital Intern" records.
+- Also bumped the in-file version header (this app tracks its own `PATCH
+  LITE vX.Y` line independent of `PFLX_PATCH`, since it's a standalone repo
+  or `thetomorrowteacher/pflx-lite`) 0.2/0.3 (stale/inconsistent in the
+  header comment vs. inline comments) → 0.4, matching this patch.
+- Files: `pflx-lite-check/index.html` (repo `pflx-lite`) — `loadRoster()`
+  rewritten, new `mapRosterUser()` helper, header comment version bump. No
+  changes needed to `preview.html`/Console or X-Coin — this was entirely a
+  PFLX Live-side data-source fix.
+- HOST ACTIONS: none — live for every host/tester on deploy. Any cohort a
+  host has already created in the Cohort Manager will now show its real
+  players in PFLX Live immediately, no re-seed or re-sync needed.
