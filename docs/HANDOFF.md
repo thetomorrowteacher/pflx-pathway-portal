@@ -7972,3 +7972,92 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   was corrupted (removing a topic simply never took effect client-side).
   Worth a quick regression check next login: open a Project with 2+ topics
   and confirm the ✕ now actually removes the row.
+
+## PATCH PLATFORM v1.118 — BADGE CATALOG NEVER ACTUALLY SYNCED FROM X-COIN; NEW BADGES INVISIBLE TO CONSOLE PICKERS, Sept 3, Ennis-reported
+- SYMPTOM: Ennis — *"Im trying to select a new signature digital badge but
+  its not showing up. I also see badges that are not in X-Coin."* Trying to
+  set a Project's Official Signature Badge to his newly-created "BrandBuilder"
+  badge (3000 XC, added to X-Coin's Signature Badges category), it wasn't in
+  the dropdown at all. Meanwhile the same dropdown/picker listed several
+  badges — "Cert: Photoshop", "Cert: Premiere", "Master Builder" — that don't
+  exist anywhere in X-Coin's actual badge catalog.
+- ROOT CAUSE (bigger than it looked — the sync this feature's own code
+  comment claims exists has never actually run):
+  - The Console's badge catalog (`mcBadges`, cached to `pflx_mc_badges`) is
+    supposed to mirror X-Coin's real catalog, stored under Supabase key
+    `coinCategories` (the exact data X-Coin's own admin/coins page reads and
+    writes — confirmed live: `coinCategories` DOES contain BrandBuilder,
+    3000 XC, added under "Signature Badges (Skill Mastery)"; `pflx_mc_badges`
+    does NOT).
+  - The comment above `mcNormalizeBadges` in `preview.html` claims *"Any new
+    badge created in X-Coin admin/badges automatically surfaces in the MC
+    dropdowns"* — false. The only live-sync path that exists is a
+    `postMessage` listener for `msg.key === 'badges'` (`preview.html` ~line
+    26718) — but grepping the ENTIRE `pflx-xcoin-app` repo, nothing ever
+    sends a message shaped like that. X-Coin's coin-catalog save
+    (`app/admin/coins/page.tsx` → `saveCoinCategories()` → `saveAndToast`)
+    only writes Supabase and shows a local toast; it never notifies the
+    parent Console at all. The only postMessage X-Coin sends related to
+    badges is a per-grant `pflx_player_award` message (one specific player
+    earning one specific badge) — a completely different message, not a
+    catalog sync.
+  - Separately, `mcCloudPull` (the Console's periodic/boot cloud refresh)
+    only fetches Supabase keys matching `pflx_mc_%` — which `coinCategories`
+    does not match — so it re-pulls the Console's own stale
+    `pflx_mc_badges` snapshot every 3 minutes without ever touching the real
+    source of truth.
+  - The ONLY reason `pflx_mc_badges` had ANY real X-Coin badges in it at all
+    was a one-off manual Supabase patch done directly in a past session
+    (v1.78, syncing exactly 2 badges by hand) — not a working sync
+    mechanism. Every X-Coin badge created since then (BrandBuilder included)
+    was invisible to every Console badge picker (Project reward-badge
+    checklist, Official Signature Badge select, Task reward-badge checklist)
+    until someone repeated that manual patch.
+  - The second complaint ("badges not in X-Coin") was the mirror image: MC's
+    own hardcoded `MC_ALL_BADGES` fallback catalog carried 3 pure legacy
+    stubs — "Cert: Photoshop", "Cert: Premiere", "Master Builder" — with no
+    code dependency anywhere (confirmed via repo-wide grep) and no matching
+    entry in X-Coin's real catalog, so nothing ever deduped them out; they
+    just sat in every picker forever, alongside the genuinely-live badges.
+- FIX:
+  1. `mcCloudPull` now also pulls Supabase key `coinCategories` directly
+     (read-only — X-Coin remains the sole writer), normalizes it through the
+     existing `mcNormalizeBadges` (already built for this exact nested
+     shape, just never actually fed live data), and replaces `mcBadges` +
+     `pflx_mc_badges` on every pull (boot and the 3-minute health interval)
+     — so any badge created in X-Coin now reaches every Console picker
+     automatically, no manual patch and no dependency on the X-Coin iframe
+     ever having been opened this session.
+  2. Removed the 3 orphaned hardcoded stubs (Cert: Photoshop / Cert: Premiere
+     / Master Builder) from `MC_COIN_CATEGORIES`'s Signature Badges entry.
+     Left the OTHER legacy-named hardcoded entries — "Design Thinker L1",
+     "Digital Citizen L1", "Global Digital Intern L1", "Global Digital
+     Intern L2" — untouched: these ARE load-bearing, matched by exact string
+     in rank-1/6/7's `specificBadgeRequirements` for rank auto-promotion,
+     even though X-Coin's real catalog no longer uses these exact names
+     (it now has "Global Digital Intern (Level 1)", differently named/XC'd)
+     — flagging below rather than touching rank logic in this same patch.
+- Verified: syntax gate clean (13/13 inline `<script>` blocks). 11-case
+  Node unit test (`badge_catalog_test.js`) against the real
+  `mcNormalizeBadges`/`mcGetAllBadges`/`mcFindBadge`/`MC_COIN_CATEGORIES`
+  extracted verbatim from the file: confirms BrandBuilder is absent from
+  the picker under the OLD stale-snapshot state (reproducing the report),
+  present with correct id/xc/tier after the new `coinCategories` pull is
+  simulated, confirms the 3 stale stubs are gone, confirms the
+  rank-prerequisite badges (Design Thinker L1/Digital Citizen L1/Global
+  Digital Intern L1/L2) are untouched and still pickable, confirms
+  non-redefined hardcoded badges (e.g. Beacon of Knowledge) still resolve,
+  and confirms `mcFindBadge('badge-brandbuilder')` resolves correctly — all
+  11 PASS. `PFLX_PATCH` bumped 117 → 118.
+- HOST ACTIONS: none to restore BrandBuilder — it'll appear in every picker
+  on next Console load/cloud pull, no manual step needed. BACKLOG (found
+  while investigating, not fixed here): rank-1/6/7's
+  `specificBadgeRequirements` reference badge names ("Design Thinker L1",
+  "Digital Citizen L1", "Global Digital Intern L1"/"L2", "Personal Branding
+  L1", "PFLX User Cert") that don't exactly match X-Coin's current real
+  badge names ("Personal Branding (Level 1)", "PFLX User Certification",
+  "Global Digital Intern (Level 1)", and no "Level 2" badge currently
+  exists in X-Coin at all) — meaning rank auto-promotion prereqs for
+  rank-1/6/7 likely never actually match a real earned badge today. Worth
+  its own investigation/patch; deliberately out of scope here since it's
+  rank-progression logic, not the badge-picker bug Ennis reported.
