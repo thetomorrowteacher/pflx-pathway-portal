@@ -8387,3 +8387,62 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   No JS logic touched. `PFLX_PATCH` 119 → 120.
 - HOST ACTIONS: none required — this is a straight bug fix, live for every
   tester immediately on deploy, no config/toggle involved.
+
+## PATCH PLATFORM v1.122 — PFLX LIVE LOADING SCREEN STILL SAID "LITE" (Sept 3, Ennis-reported via screenshot)
+- SYMPTOM: Ennis flagged (with a screenshot) that the loading screen shown
+  while PFLX Live boots still displays "L I T E" in large letters, even
+  though the toolbar nav button, page header, and everywhere else in the
+  Console already correctly say "PFLX LIVE" — this survived v1.111
+  ("rebrand PFLX Lite nav to PFLX Live") despite that patch's own commit
+  message claiming "Label/icon/loading-text only" was covered.
+- ROOT CAUSE: `PFLX_LOADING.labels` (the map driving the loading-screen
+  splash text, distinct from the toolbar nav button v1.111 actually
+  touched) never had a `'lite'` key. `show(viewName)` computes `const
+  label = this.labels[viewName] || viewName.toUpperCase();` — with no
+  entry for `'lite'`, it silently fell back to the raw internal view key
+  uppercased, i.e. `'lite'.toUpperCase()` = `"LITE"`. v1.111's "loading-
+  text" claim was accurate for the toolbar/nav wiring; this specific
+  splash-screen label map was a separate spot it missed.
+- FIX: added `'lite': 'LIVE'` to `PFLX_LOADING.labels`. Internal
+  `data-view`/`APP_BASE_URLS`/CSS keys deliberately stay `'lite'`
+  (unchanged, per v1.111's own note) — only the human-facing label needed
+  the entry. The center logo swap (`PFLX_LOADING.logos`) has no `'lite'`
+  entry either and was left alone — it already falls back to the default
+  PFLX ring logo, which is correct/matches the screenshot.
+- Verified: syntax gate clean, 13/13 inline `<script>` blocks. 11-case
+  Node unit test against the extracted live `labels` map + `show()`'s
+  fallback logic: the fix itself (`'lite'` → `'LIVE'`, and confirming it
+  no longer falls back to the raw `"LITE"` key), a regression check that
+  all 8 other existing view labels are untouched, and a check that the
+  uppercase-fallback behavior still works correctly for a genuinely
+  unknown/future view key. All 11/11 PASS.
+- Files: `preview.html` — one entry added to `PFLX_LOADING.labels`.
+  `PFLX_PATCH` 120 → 121.
+- HOST ACTIONS: none — live for every tester on deploy.
+
+---
+
+Also flagged by Ennis in the same report, NOT fixed this patch (needs a
+scoping decision before starting — see chat):
+- **PFLX Live shows 0 players for real cohorts (e.g. "Global Digital
+  Intern").** Root-caused: `pflx-lite-check/index.html`'s `loadRoster()`
+  fetches `https://pflx-xcoin-app.vercel.app/seed-data.json` — a STATIC
+  seed file with only 94 users — instead of live Supabase data the rest
+  of the platform reads (`pflx_mc_players`, 151 players). Confirmed via
+  direct fetch: that seed file has no "Global Digital Intern" cohort at
+  all (its cohort set is Player Pool/DD Studio 2/3/7/DD Core 1/2/3/5/
+  Falcon Studios/Falcon Studios (MS Division)/Cohort 2/Cohort 3/N/A) — so
+  any cohort not in that old snapshot shows 0 players by construction,
+  not because of a filter bug. The cohort *dropdown* itself is fine — it
+  correctly reads the live canonical `cohortGroups` registry via Supabase,
+  which is why "Global Digital Intern" is selectable at all despite having
+  zero matches in the stale roster feed. Real fix is wiring PFLX Live's
+  roster to live data (same direct-Supabase-read pattern already
+  established for X-Coin's `playerModifiers`/`coinCategories` and the
+  Console generally) instead of the static seed file — a real chunk of
+  work, not a one-line fix, so flagged here rather than rushed.
+- **PFLX Live visual redesign request** ("futuristic HUD interface,"
+  animated background, tighter PFLX-branded logo lockup) — a reference
+  image was supplied. Scoping questions (which screens, how literally to
+  follow the reference vs. adapt to PFLX's existing cyan/purple/gold
+  palette) posed to Ennis before starting; not begun this patch.
