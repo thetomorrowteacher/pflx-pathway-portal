@@ -8119,3 +8119,13 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   10 leftover already-tombstoned zombie rows get deleted the same way
   AURORA's was — zero risk, they're already invisible to every client,
   purely tidying stale Supabase rows.
+
+### Follow-up (same day) — Aadhya's XC drift reconciled
+- Ennis: reconcile to the individual-row value. Set `pflx_mc_players` bulk
+  entry's `xc` for `player-1784385012246-jylqd` from 100050 → 325950,
+  matching her individual row (already 325950). Verified zero drift
+  remaining between bulk and individual for this player
+  (xc/totalXcoin/badges/digitalBadges all agree at 325950/325950/8/8 in
+  both stores). The 10 other leftover already-tombstoned zombie rows found
+  during this investigation are still untouched, pending a separate
+  go-ahead.
