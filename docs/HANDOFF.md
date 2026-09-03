@@ -8503,3 +8503,72 @@ scoping decision before starting — see chat):
 - HOST ACTIONS: none — live for every host/tester on deploy. Any cohort a
   host has already created in the Cohort Manager will now show its real
   players in PFLX Live immediately, no re-seed or re-sync needed.
+
+## PATCH LITE v0.5 — FUTURISTIC HUD REDESIGN ACROSS ALL PFLX LIVE SCREENS (Sept 3, Ennis-requested with reference image)
+- REQUEST: Ennis said PFLX Live's UI "is not as good as the rest of PFLX,"
+  wanted "a more advanced look... a futuristic hud interface look" with
+  "hud display animations in the background," supplied a green/blue
+  sci-fi cyberpunk HUD dashboard as a style reference, and asked for a
+  tighter "PFLX" + "LIVE" branded lockup since PFLX Live may stand alone
+  as its own product. Scoping answers: cover ALL PFLX Live screens (not
+  just the loading splash), adapt the reference's HUD structure/animation
+  language to PFLX's own cyan/purple/gold palette rather than copying the
+  reference's green colorway literally.
+- ARCHITECTURE: every screen in this app funnels through one of two render
+  paths — the main `render()` (Class/Teams/Boards/Tools/Play/Feed/Setup/Me/
+  Upgrades) and the read-only `rLiveAgenda()` — plus the full-screen
+  `#proj` Projector overlay. Rather than hand-restyling each of those
+  individually (10+ screens), the redesign targets the small set of shared
+  building blocks every screen already renders through: the `.card`/`.tab`/
+  `.bigbtn` CSS classes, the `.hd .logo` header markup emitted once inside
+  `render()`, and a single new fixed decorative layer added once to
+  `<body>` (outside `#app`, so it survives every screen swap without being
+  touched again).
+- FIX:
+  - New `#hudbg` — a fixed, `pointer-events:none`, z-index:0 layer behind
+    `#app` containing a slow-drifting cyan grid, three soft pulsing color
+    blobs (cyan/purple/gold — PFLX's palette, not the reference's green),
+    two large concentric rotating rings (one dashed, opposite directions,
+    90s/75s loops), and a translucent scan-line sweep that travels down
+    the viewport every 8s — the "HUD display animations in the background"
+    Ennis asked for, all pure CSS keyframes, no images/canvas/libraries.
+  - `.card` (used by every panel on every screen) gets HUD corner-bracket
+    accents (top-left/bottom-right, via `::before`/`::after`), a
+    cyan-tinted border, and a subtle drop shadow, so panels read as
+    instrumentation rather than flat cards.
+  - `.tab` and `.bigbtn` get an angular cut-corner `clip-path` (matches the
+    reference's angular panel language) and the active tab gets a cyan
+    glow. Both classes are shared across every screen's nav and actions.
+  - New `PFLX_LOGO_MARK` — a small self-contained inline SVG emblem
+    (segmented ring + dashed inner ring + two-tone diamond, in PFLX's cyan/
+    gold/purple) added to the header's "PFLX **LIVE**" text lockup (a slow
+    16s rotation) and to both Projector footer watermarks — the requested
+    "PFLX logo, then LIVE after it" branding, built as vector markup so
+    the app stays a single self-contained file (no new asset/network
+    dependency). A small pulsing green dot sits after "LIVE" as a live-
+    status indicator.
+  - `prefers-reduced-motion: reduce` turns off every added animation.
+  - `rLiveAgenda()` (Live Session guide screen) and the `#roster` player
+    tiles needed no direct edits — they already build on `.card`, so they
+    picked up the corner-bracket/border treatment automatically once that
+    one shared rule changed. The `#proj` Projector overlay keeps its own
+    solid background (by design, for clean classroom display) but now
+    carries the branded mark in its corner watermark.
+- Verified: syntax gate clean (both inline `<script>` blocks, node --check
+  0/2 failures). 14-check Node unit test that actually `eval()`s the
+  extracted `PFLX_LOGO_MARK` JS expression from the live file (proving it's
+  valid JS, not just visually-inspected markup), confirms the resulting
+  SVG string contains no unescaped single-quote (would have silently
+  truncated the enclosing single-quoted JS string at either call site —
+  the exact class of bug this test exists to catch), and simulates both
+  the header and Projector-watermark string concatenations to confirm
+  balanced `<div>`/`<span>` tags. All 14/14 PASS. Also confirmed via
+  `grep`/structural checks that `#hudbg` sits once in `<body>` before
+  `#app` (not duplicated per-render) and that div-tag counts across the
+  whole file stayed balanced (198 open / 198 close) before vs. after.
+- Files: `pflx-lite-check/index.html` (repo `pflx-lite`) — new `#hudbg`
+  layer + CSS keyframes, `.card`/`.tab`/`.bigbtn` restyle, new
+  `PFLX_LOGO_MARK` constant, header + Projector watermark markup updated.
+  `PATCH LITE` 0.4 → 0.5.
+- HOST ACTIONS: none — live for every host/tester on deploy, no data or
+  config changes.
