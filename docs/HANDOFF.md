@@ -8261,3 +8261,129 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   editor, check "Enable Prize Pack draws for this Season," build a pool
   (Upgrades + XC packs), pick a draw style/count, and save. Nothing fires
   until that's done.
+
+## PATCH PLATFORM v1.121 — MOBILE AUDIT: TOOLBAR (SIGN OUT UNREACHABLE), PLAYER MANAGEMENT + HOST ANALYTICS + TASK TOOLS TABLES CLIPPED (Sept 3, Ennis-authorized code-review pass, task #11)
+- REQUEST: continuation of the standing mobile-hardening backlog (v1.32,
+  v1.33). Scope for this pass: code-review + live phone-width (386-390px)
+  audit of Mission Control's host-facing views — player management,
+  approvals, task/checkpoint tools, dashboards — grepping for fixed
+  widths/missing breakpoints, then fixing what's found. Self-directed per
+  task #11's own description ("Fix crowding/touch issues found") after a
+  staleness sweep of the broader task backlog confirmed this was the one
+  genuinely open thread (v1.33's own Handoff entry explicitly scoped
+  itself to "Mission Control host screens only" and never claimed to have
+  audited player management/approvals/task-tools specifically).
+- METHOD: same same-origin-iframe technique v1.32/v1.33 established —
+  inject a 390×844 iframe into the live logged-in Console, log in a
+  second time inside it (session state isn't shared automatically despite
+  shared localStorage), then measure real `clientWidth`/`scrollWidth`/
+  `getComputedStyle` against the actual live DOM rather than guessing from
+  source.
+- BUG 1 (worst finding, GLOBAL, not MC-specific) — TOOLBAR: at true phone
+  widths the toolbar's non-shrinking sections (`.toolbar-logo-section` +
+  `.toolbar-nav`'s 7 app icons + `.toolbar-host-tools` + `.toolbar-profile`,
+  all `flex-shrink:0`) summed to MORE width than the viewport even after
+  `.toolbar-status` (the one `flex:1`/`min-width:0` section) shrank to
+  zero. `main`/`body` carry `overflow:hidden` (needed elsewhere to kill
+  page-level horizontal scroll), so that excess wasn't scrollable — it was
+  silently clipped. Measured live at 386px: `.toolbar` scrollWidth 549 vs
+  clientWidth 386, with `.toolbar-status`, `.toolbar-host-tools`, and
+  `.toolbar-profile` rendering 100% off-screen. `.toolbar-profile` is the
+  ONLY way to reach Sign Out / account settings — meaning testers on a
+  real phone could not sign out, see their XC/rank, or reach host tools,
+  on every screen, not just Mission Control. The existing 768px breakpoint
+  (shrinks nav to 34px, hides `.toolbar-branding` + `.toolbar-profile
+  .profile-info`) was a real but insufficient partial mitigation.
+  FIX: added a `max-width:480px` block — (1) `.toolbar-status { display:
+  none; }` (its XC number is already duplicated in the profile dropdown's
+  own stat row, `#pd-xc`, so nothing is lost — the same trade-off already
+  made for `.toolbar-branding`/`.profile-info` at 768px); (2)
+  `.toolbar-nav` and `.toolbar-host-tools` get `flex-shrink:1;
+  overflow-x:auto;` so if content still doesn't fit after that it's
+  swipeable inside its own strip instead of unreachable (nav also gets a
+  `min-width:44px` floor so it can never be squeezed to a literal 0px
+  sliver); (3) `.toolbar-profile` gets tighter padding and a smaller
+  30px avatar, staying `flex-shrink:0` (unchanged) so it's always the LAST
+  thing to give up space, never the first — Sign Out is now guaranteed
+  fully rendered at any phone width instead of being the thing that gets
+  squeezed out.
+- BUG 2 — PLAYER MANAGEMENT TABLE CLIPPED, NOT SCROLLABLE (contradicts
+  v1.33's claimed fix): v1.33's own `.mc-table { display:block;
+  overflow-x:auto; }` rule (768px breakpoint) is present and correct, but
+  its effect was blocked one level up — the table's wrapping `<div
+  class="mc-card" style="padding:0;overflow:hidden;">` carries an inline
+  `overflow:hidden` on BOTH axes (there for the card's rounded-corner
+  clipping on desktop). Measured live: `.mc-table` clientWidth 346 vs
+  scrollWidth 1361, no scrollbar, no way to reach the clipped ~1000px of
+  columns (email, cohort, studio, XC, evo rank, role, actions). FIX:
+  `#mc-panel-players .mc-card { overflow-x: auto !important; }` in the
+  768px block — `!important` is required because an inline style, even
+  non-important, otherwise beats any stylesheet selector regardless of
+  specificity; overflow-y stays hidden so desktop's corner rounding is
+  untouched.
+- BUG 3 — HOST SETTINGS → ANALYTICS "PLAYER USAGE & REPORTS" TABLE, same
+  bug as #2 (correcting my own first-pass read of this one: the live DOM
+  walk during verification showed `pa-player-tbody`'s table actually lives
+  under `#host-analytics` → `#settings-host` → `.settings-view` — Host
+  Settings' Analytics tab, NOT the Approvals panel; the `pa-` prefix reads
+  as "Player Analytics," not "Pending Approvals," and its line-number
+  proximity to `#mc-panel-approvals` in the source was coincidental, not
+  structural). Its wrapper also carries inline `overflow:hidden` with no
+  `overflow-x:auto` and no `min-width` on the table (7 columns: player,
+  sessions, minutes, XC, checkpoint, last seen, actions) — on a phone it
+  would crush illegibly small rather than scroll. The adjacent "Scope
+  Activity Report" table in the same tab already uses the correct pattern
+  (`overflow-x:auto` wrapper + `min-width:640px` table) — this one just
+  never got it. FIX: gave the wrapper an id (`pa-analytics-table-wrap`,
+  new this patch — it previously had none) and added
+  `#pa-analytics-table-wrap { overflow-x: auto !important; }` +
+  `#pa-analytics-table-wrap table { min-width: 640px; }` in the same
+  768px block. Approvals proper (`#mc-panel-approvals`) was also audited
+  live — no fixed-width/clipping issues found there.
+- BUG 4 — TASK/CHECKPOINT TOOLS "TABLE VIEW" HAS NO SCROLL WRAPPER AT ALL:
+  `_mcRenderTasksTable()` injects a plain `<table style="width:100%">`
+  (priority/task/status/due/XC/actions, two `white-space:nowrap` cells)
+  straight into `#mc-tasks-list` — unlike `.mc-table` elsewhere, it never
+  got any mobile treatment, so on a phone it either overflows with nothing
+  to scroll it back or gets crushed by `width:100%`. FIX: `#mc-tasks-list
+  { overflow-x: auto; }` + `#mc-tasks-list table { width: auto !important;
+  min-width: 600px; }` in the 768px block, so the list becomes the scroll
+  container and the table sizes to its actual content.
+- SCOPE NOTE: dashboards were audited and no additional fixed-width/
+  clipping issues were found beyond the toolbar bug (which affects every
+  screen including dashboards). Task tools' Kanban/board and calendar
+  views already reflow correctly at phone widths (grid-based, no fixed
+  widths found) — only the table view had the gap.
+- Verified: syntax gate clean, 13/13 inline `<script>` blocks (this patch
+  touches only CSS and one HTML `id=` attribute — no `<script>` block
+  logic was touched). CSS structural check: `<style>` block brace count
+  balanced (1646 open / 1646 close) after the edit; all five new
+  selectors (`.toolbar-status`, `#mc-panel-players .mc-card`,
+  `#mc-tasks-list`, `#pa-analytics-table-wrap` ×2, `id=
+  "pa-analytics-table-wrap"`) confirmed present exactly once. Live
+  re-verification against the deployed production build, same
+  same-origin-iframe-at-386px technique used to find the bugs: (1)
+  toolbar — `.toolbar` scrollWidth now equals clientWidth (386=386, no
+  overflow at all); `.toolbar-status` confirmed `display:none`;
+  `.toolbar-nav`/`.toolbar-host-tools` confirmed their own independent
+  scroll containers; `.toolbar-profile` confirmed fully on-screen
+  (x:300-357 of 386) — clicked it live, the dropdown opened at
+  x:76-356 (fully on-screen) with a working SIGN OUT button found and
+  readable. (2) Player Management — `#mc-panel-players .mc-card`
+  confirmed `overflow-x:auto`; `.mc-table` confirmed clientWidth 346 vs
+  scrollWidth 1361, and `scrollLeft` actually moves (set to 300, read
+  back 300) — genuinely scrollable, not just clipped-with-a-computed-
+  style. (3) Host Settings → Analytics table — same test (temporarily
+  forcing its hidden ancestor chain visible to lay it out, then
+  reverting cleanly): clientWidth 348 vs scrollWidth 640, scrollLeft
+  set/read back 200. (4) Task Tools table view — `#mc-tasks-list`
+  clientWidth 348 vs scrollWidth 601 (matches the 600px min-width),
+  scrollLeft set/read back 200. All four confirmed genuinely scrollable
+  on the live deploy, not just correct on paper.
+- Files: `preview.html` — two `@media` blocks extended (existing
+  `max-width:480px` block gets the toolbar rules; existing
+  `max-width:768px` block gets the three table-scroll rules), plus one
+  `id=` attribute added to the Host Settings Analytics table wrapper `<div>`.
+  No JS logic touched. `PFLX_PATCH` 119 → 120.
+- HOST ACTIONS: none required — this is a straight bug fix, live for every
+  tester immediately on deploy, no config/toggle involved.
