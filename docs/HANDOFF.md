@@ -8129,3 +8129,135 @@ Once the new key is live, the Pathway Guide / X-Bot chat widget fixed in v1.3 sh
   both stores). The 10 other leftover already-tombstoned zombie rows found
   during this investigation are still untouched, pending a separate
   go-ahead.
+
+## PATCH PLATFORM v1.120 — PRIZE PACK: RANDOMIZED BONUS DRAWS ON CHECKPOINT/PROJECT COMPLETION (Sept 3, Ennis-requested)
+- REQUEST: Habitica-style prize-pack system — a randomized lottery-style
+  bonus draw (XC or Upgrades) that fires automatically alongside the normal
+  XC/badge reward the moment a player completes a Checkpoint or Project,
+  revealed through the existing reward-popup system, with a "skip" that
+  just dismisses the reveal animation (the prize is always fully awarded
+  either way). Four scoping questions were answered up front (all
+  "Recommended"): (1) unify with the existing Daily Loot Box engine rather
+  than build a parallel system; (2) prize types = existing catalogs only
+  (Upgrades from X-Coin's modifier catalog, XC spendable in Battle Arena's
+  EXO Avatar Bay — no new avatar/store needed); (3) first-patch trigger
+  scope = Checkpoint + Project completion only (Arena/Task/DarkCampus
+  deferred to a later patch); (4) skip = dismiss the reveal animation only
+  (same as the existing "GOT IT" button) — never skips the actual grant.
+- ARCHITECTURE: extended the existing Daily Loot Box engine rather than
+  building a parallel mechanic. New Season-level `season.prizePack` config
+  (sibling to `lootBox`, not reusing it — `lootBox.reset` means "reclaim
+  cooldown," which doesn't fit "fires once on a completion event"):
+  `{enabled, triggers:['checkpoint_complete','project_complete'], style,
+  count, pool:[{key,label,type,icon,weight}]}`, pool authoring restricted
+  to XC packs + Upgrades only (badges/fines/mult/time stay Loot-Box-only).
+  Extracted a shared `pflxRollFromConfig(config)` pool-resolution core out
+  of the existing `pflxRollLootBox`, reused by new `pflxRollPrizePack
+  (season)` — deliberately does NOT apply the Season Pass XC multiplier
+  (v1 simplification; easy follow-up if wanted later). New central
+  dispatcher `pflxFirePrizePackTrigger(triggerKey, targetType, targetId,
+  playerId)` is the one extension point every future trigger source
+  (Arena/Task/DarkCampus) will hook into without touching anything else.
+  Hooked into the two existing completion paths, both inside their
+  existing per-player idempotency guards so a draw structurally cannot
+  double-fire: `mcSaveCPForm()`'s checkpoint reward chain, `mcSaveProjectForm()`'s
+  project reward chain, and `_mcRollupAwards()`'s automatic per-player
+  rollup (`payOut()` closure).
+- BUNDLED FIX (Daily Loot Box was silently broken): `pflxGrantLootReward()`
+  previously bypassed the entire canonical reward pipeline for xc/badge
+  wins — direct `player.totalXc`/`player.xc`/`player.badges` mutation,
+  meaning no XC multiplier, no rank-crossing check, no Signature Badge
+  royalty check ever applied to a loot box win, and reveal was a bare
+  `alert()` instead of the real popup every other reward in the platform
+  uses. Rewritten (now 3-arg: `pflxGrantLootReward(player, reward, opts)`)
+  so xc/badge route through `window.PflxDataBus.award()` — confirmed via
+  reading the live `award()` body that it already auto-emits the popup for
+  BOTH xc-only and badge-carrying awards (an "Aug 26, CP_MC_WIRING phase 2"
+  addition), so no redundant self-emit was needed. `pflxClaimDailyLootBox()`
+  updated to pass the new `opts` arg and the trailing `alert(...)` dump of
+  every reward's label was deleted outright.
+- NEW: `pflxGrantUpgradeToPlayer(playerId, modifierId, opts)` — X-Coin has
+  no existing free-grant path for Upgrades (`purchaseUpgrade()` always
+  deducts cost first; no admin/reward path anywhere writes an unpaid
+  `PlayerModifier`), and the Console can't reliably reach X-Coin's
+  postMessage bridge either (that iframe is `about:blank` until a host
+  opens the X-Coin tab, which a checkpoint/project completion routinely
+  happens without). Writes directly to the Supabase `app_data` row X-Coin
+  itself reads — confirmed live against the real DB the key is
+  `playerModifiers` (not the TS source's `mockModifiers` variable name) —
+  same direct read/write pattern v1.118's `coinCategories` sync fix already
+  established. KNOWN ACCEPTED RISK: read-modify-write, not atomic — two
+  upgrade grants within the same few hundred ms could race and clobber each
+  other's append. Same risk class every other direct `app_data` writer in
+  this file already carries (no row-locking exists anywhere in this
+  pattern today); not a new risk introduced by this feature.
+- BUG FIX (necessary for correctness, not just adjacent): `_mcRollupAwards`'s
+  `payOut(rec, kind, label)` closure previously only set its idempotency
+  guard (`rec.completionAwards[playerId]`) AFTER an early-return for a
+  $0-XC/no-badge record, or after a real flat payout — meaning a
+  Checkpoint/Project configured with NO flat reward but a Prize Pack pool
+  would have its trigger silently skipped every time. Moved the guard-set
+  to fire unconditionally right after the initial check, and the prize-pack
+  trigger call is now unconditional too (independent of whether a flat
+  reward exists). Also introduced a `didFlat` flag so the "🏆 completed"
+  toast only fires when an actual flat xc/badge was granted, not on every
+  guard-set.
+- SEASON EDITOR UI: new "🎁 Prize Pack Draws (Checkpoint/Project Bonus)"
+  block in the Season editor, modeled directly on the existing Loot Box
+  Packages block — enable checkbox (default OFF), two trigger checkboxes
+  (Checkpoint completed / Project completed), count/style controls, and a
+  pool builder restricted to Upgrades (from the live modifier catalog) +
+  5 fixed XC packs (50/100/300/500/1000). Supporting JS mirrors the
+  existing Loot Box authoring functions 1:1.
+- ROLLOUT SAFETY: `season.prizePack` defaults to absent/`enabled:false`.
+  Verified live against Supabase (`seasons` + `pflx_mc_seasons` keys) —
+  BOTH current Seasons ("PFLX SUMMER TESTING", active; "PFLX Fall Forward",
+  inactive) have no `prizePack` key at all, which the new code treats
+  identically to `enabled:false` — no live Season starts handing out
+  surprise prizes from this patch. A host must explicitly open the Season
+  editor, build a pool, and flip the switch before any prize ever fires.
+- BATTLE ARENA: zero code changes needed — confirmed `state.player.xc` in
+  the Arena app is populated purely from the Console's broadcast player
+  record, and Arena's own spends already round-trip through
+  `arenaPostAward()` → `PflxDataBus.award()` → `pflx_player_changed`
+  rebroadcast. Any XC granted via the new Prize Pack code is immediately
+  spendable in the EXO Avatar Bay with no Arena-side changes.
+- BACKLOG (flagged, NOT fixed this patch — out of scope, no visible
+  symptom today): discovered the Console's local `mcModifiers` mirror
+  (synced to `pflx_mc_modifiers`, used by the new pool-authoring UI to list
+  Upgrades) has the exact same "only refreshed via a `msg.key === 'modifiers'`
+  postMessage that X-Coin's own code likely never sends" architecture flaw
+  v1.118 fixed for the badge catalog (`mcBadges`/`coinCategories`).
+  Verified via SQL that the current cached `pflx_mc_modifiers` ids
+  (upg-1, upg-3, tax-1..16) currently exactly match the live `modifiers`
+  key — not causing a visible symptom today, so deliberately not bundled
+  into this patch. If X-Coin's modifier catalog ever changes without a
+  matching Console patch, the same staleness class of bug v1.118 fixed for
+  badges would resurface here for Upgrades. Recommend the same fix pattern
+  (direct-read on Season-editor-open, same as v1.118) whenever this
+  surfaces or as a proactive follow-up.
+- Verified: syntax gate clean, 13/13 inline `<script>` blocks. 14-case
+  Node unit test suite run against the EXACT extracted live code (not a
+  re-implementation) — weighted-pick distribution sanity (2 cases);
+  `pflxGrantLootReward` routing for xc/badge/upgrade all confirmed calling
+  `PflxDataBus.award()`/`pflxGrantUpgradeToPlayer()` (never direct player
+  mutation), plus the regression test that `alert()` is never called by any
+  grant path (4 cases); `pflxFirePrizePackTrigger` gating — disabled
+  season, trigger-not-enabled, unknown player, season-doesn't-apply-to-
+  player, and matching-config-fires-exactly-N-times (5 cases); the moved-up
+  `payOut` idempotency guard — double-call fires the flat award + prize
+  trigger exactly once, a $0/no-badge record still fires the prize trigger
+  exactly once, and the guard is set exactly once even when Prize Pack is
+  disabled (3 cases). All 14/14 PASS.
+- Files: `preview.html` — `pflxRollFromConfig`/`pflxRollLootBox`/
+  `pflxRollPrizePack`, rewritten `pflxGrantLootReward` + new
+  `pflxGrantUpgradeToPlayer`, new `pflxFirePrizePackTrigger`, the three
+  hook sites (`mcSaveCPForm`, `mcSaveProjectForm`, `_mcRollupAwards`'s
+  `payOut`), and the Season editor Prize Pack UI + authoring JS
+  (`mcSeasonRenderPrizePackPool`/`mcSeasonTogglePrize`/
+  `mcSeasonUpdatePrizeWeight`, `mcSaveSeasonForm` field). `PFLX_PATCH`
+  118 → 119.
+- HOST ACTIONS: to actually turn this on for testers, open a Season in the
+  editor, check "Enable Prize Pack draws for this Season," build a pool
+  (Upgrades + XC packs), pick a draw style/count, and save. Nothing fires
+  until that's done.
