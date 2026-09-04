@@ -8663,3 +8663,172 @@ scoping decision before starting — see chat):
   mentioning to testers only so they don't keep re-reporting it as new
   cohort members complete real work and their numbers correctly move off
   zero.
+
+## PATCH PLATFORM v1.124 — CHECKPOINT PROGRESS OVER-COUNT + STALE "SUBMITTED" CHIP + STALE LEADERBOARD POSITION (Sept 4, Kaitlin-reported via Discord, follow-up to v1.123)
+
+- SYMPTOM: same Discord thread as v1.123, Kaitlin's follow-up "Updated
+  Issues" post. After v1.123 her XC/badges read correctly (3,400 / 7), but
+  she reported: (1) leaderboard position showing 54th on the Console
+  toolbar vs 55th elsewhere; (2) Player Portal showing "5/11 completed
+  (45%), 6 remaining" with Checkpoint Alpha at 25% (1/4) and Beta at 57%
+  (4/7), both flagged Past Due, not matching her actual approved work; (3)
+  two pending tasks ("Complete the Player Onboarding", "Add your New Logo
+  as your Profile Picture from Your Brand Board") showing a "Submitted"
+  tag even though she never touched them and opening them shows no
+  submission info; (4) Checkpoint Alpha listing 3 Projects (PFLX
+  Onboarding, PFLX Player Onboarding, Branding & Identity) when only one
+  is actually hers. Ennis asked for the cascade architecture to be
+  verified and any real bug fixed for all players, not just Kaitlin.
+
+- INVESTIGATION: cross-checked every claim directly against live Supabase
+  records (checkpoints, projects, tasks, submissions) and the actual
+  render/progress functions in `preview.html`, rather than guessing from
+  the screenshots. Two Explore agents traced the exact code paths in
+  parallel (checkpoint/project/task visibility cascade, and the two
+  leaderboard-position surfaces); findings were independently re-verified
+  against live data and by extracting the real functions into a Node test
+  harness before any fix was written. Four distinct findings, three of
+  them real code bugs (now fixed) and one confirmed as-designed:
+
+  1. **Checkpoint progress over-count (real bug, fixed).**
+     `pflxPlayerCheckpointProgress()` (~L33812) pushed EVERY task under a
+     visible parent Project into the player's tally
+     (`if (projSeen || canSee(t)) push(t, ...)`), even when the task's own
+     `assignedPlayers` list explicitly excludes that player (e.g. each
+     Beta project's own per-team "Set your Discord username" task).
+     Because Kaitlin's Global Digital Intern cohort makes every one of
+     Checkpoint Beta's 5 team-projects "visible" to her (`projSeen=true`
+     for all 5), the `||` bypass counted other teams' per-member tasks
+     toward HER percentage — inflating the denominator and explaining why
+     her checkpoint read incomplete/Past Due even though her own
+     `completionAwards` entry shows the payout had already correctly
+     fired. `_mcRollupAwards` computes eligibility via this same function,
+     so the payout-vs-display disagreement was a direct symptom of this
+     one bug, not two separate problems.
+  2. **Stale "Submitted" chip on My Tasks (real bug, fixed).** The July 19
+     fix (Feba/Hannah's report) closed this exact class of leak on the
+     Checkpoint Detail page's task rows (`_rowState`/`_statusIcon`/
+     `_statusColor`, ~L29894), switching them from the shared global
+     `task.status` field to the per-player `pflxTaskStateForPlayer()`. The
+     sibling **My Tasks** page (`ppRenderMyTasks`, ~L30843) still had the
+     old pattern on its pending-row status chip
+     (`var statusChip = (t.status === 'submitted') ? ... `), so any task
+     ANY other player had submitted (or even had rejected) rendered
+     "Submitted" on every other assigned player's row too. Confirmed live:
+     both flagged tasks (`task-1787024761531` "Complete the Player
+     Onboarding", `task-1787024871268` "Add your New Logo...") have a
+     real `submissions[]` entry from a DIFFERENT player (Kabir; Explorique
+     respectively) and zero entries from Kaitlin — exactly matching "no
+     submission info inside" when she opens them.
+  3. **Stale Console toolbar leaderboard position (real bug, fixed).**
+     Two rank-displaying surfaces existed: the Console toolbar's own
+     "#N / total" badge (`updateToolbarStatus()`, ~L16093) and X-Coin's
+     canonical leaderboard. The toolbar sorted `PLAYERS` — a small
+     hardcoded boot literal seeded with only a few test rows (comment
+     confirms 3 mock players were stripped from it back in May but never
+     removed from code that still reads it) — not the full roster. The
+     real roster (`mcPlayers`, cloud-synced, same data X-Coin's
+     leaderboard reads) merges in ~600ms-4s after boot via
+     `pflxIdentityFetchRosterFromCloud`/`_mcBackfillMissingPlayerRows`,
+     but nothing ever re-ran the toolbar's position calc afterward — so a
+     toolbar rendered before that merge landed stayed off-by-however-many-
+     players-were-missing for the rest of the session. Confirmed live:
+     `player-3` (Sam Chen, 80,000 XC — well above Kaitlin) exists in
+     Supabase and in `mcPlayers`/`users` but not in the hardcoded
+     `PLAYERS` literal, undercounting everyone below him by exactly one —
+     matching the observed 54-vs-55 (±1) split exactly.
+  4. **Checkpoint Alpha listing 3 Projects (confirmed as-designed, NOT a
+     bug — no code changed here).** `ppRenderCheckpointDetail`'s Projects
+     list explicitly implements "UNIVERSAL VISIBILITY (per Ennis)" — see
+     the v1.71 comment at ~L29888: every player SEES every Project in a
+     Checkpoint; a "Cohort Required" badge (via `pflxPlayerCanEnterItem`)
+     governs whether they can actually ENTER one, not whether it's listed.
+     Verified this listing is cosmetic only — Branding & Identity
+     (cohortIds `cg-seed-seasonpass`) and PFLX Player Onboarding
+     (cohortIds `cg-seed-playerpool`/`cg-seed-seasonpass`) are correctly
+     excluded from Kaitlin's actual progress percentage and task counts by
+     the SAME cohort gate `pflxPlayerCheckpointProgress` already applies
+     (`canSee(pr)` returns false for a cohort mismatch) — bug #1 above
+     never touches this path since it only affects tasks under a
+     project the player CAN already see. If this listing behavior should
+     change, that's a product decision for Ennis, not a bug fix — flagging
+     for a separate conversation rather than silently overriding a
+     standing design choice.
+  - SEPARATE DATA OBSERVATION (not a code bug, HOST ACTION available if
+    wanted): 3 of the "6 remaining tasks" Kaitlin listed
+    (`task-1786374950090` "Test PlayDNA course", `task-1786376376515`
+    "Create a Course using the Module Creation Builder",
+    `task-1786377206301` "Create a Module") sit under the Learning &
+    Development Specialist project but — unlike their sibling "Set your
+    Discord username" tasks on all 5 Beta team-projects, which correctly
+    carry a per-team `assignedPlayers` roster — have an empty
+    `assignedPlayers`, so they're visible to the WHOLE Global Digital
+    Intern cohort (all 5 teams) rather than just the ~9 L&D team members.
+    Given the sibling tasks in the same project ARE properly per-team
+    scoped, this looks like these 3 simply never got their
+    `assignedPlayers` filled in when created. No code change can safely
+    guess the intended roster — happy to set it to the L&D team's roster
+    (mirroring `task-1785980009273-ld-discordname`'s list) if Ennis
+    confirms that's correct.
+
+- FIX:
+  1. `pflxPlayerCheckpointProgress` (~L33812, in the
+     `mcChildProjectsForCheckpoint(...).forEach(...)` loop): removed the
+     `projSeen ||` bypass — now `if (canSee(t))` alone, matching how
+     `pflxPlayerCanSeeItem` already correctly inherits visibility from a
+     visible parent for tasks with no scope of their own, while still
+     honoring a task's own narrower `assignedPlayers`/cohort exclusion.
+  2. `ppRenderMyTasks` (~L30891): pending-row `statusChip` now reads
+     `pflxTaskStateForPlayer(t, __mtPid) === 'submitted'` instead of the
+     raw `t.status === 'submitted'`.
+  3. `updateToolbarStatus()`'s Leaderboard Position IIFE (~L16093): roster
+     now sources from `mcPlayers` (live cloud-synced roster) first,
+     falling back to `PLAYERS` only if `mcPlayers` is empty. Also added a
+     call to `updateToolbarStatus()` inside the existing
+     `pflx-roster-updated` event listener (~L67105) so a delayed roster
+     merge self-heals the badge instead of freezing it stale for the rest
+     of the session.
+  `PFLX_PATCH` 122 → 123.
+
+- Verified: syntax gate clean, 14/14 inline `<script>` blocks. Two Node
+  unit-test passes against the REAL extracted live functions (not
+  reimplementations):
+  - 14-case test of `pflxPlayerCheckpointProgress`/`pflxTaskStateForPlayer`
+    against a fixture mirroring the real Beta checkpoint (5 team-projects,
+    Kaitlin only on the `comms` team): confirms other teams' per-member
+    tasks (PM/gamedev/econ/LD "Discord username" tasks) are now excluded
+    from her progress tally while her own comms task and the L&D
+    project's un-scoped cohort-wide tasks (PlayDNA/Course/Module) remain
+    correctly included; confirms Alpha's leaked Branding & Identity task
+    stays fully excluded (proves fix #1 doesn't touch the already-correct
+    cohort gate); confirms `pflxTaskStateForPlayer` reads "open" (not
+    "submitted") for a task whose only submission belongs to a different
+    player, both a `submissions[]`-array task and a legacy single-status
+    task, and "approved" for the real submitter; confirms
+    `pflxPlayerCheckpointProgress(null, player)` doesn't throw. All 14/14
+    PASS.
+  - 2-case test of the toolbar position IIFE against a fixture roster
+    where `PLAYERS` is missing a high-XC player present in `mcPlayers`
+    (mirroring the real Sam Chen gap): confirms the position and total
+    both shift to the mcPlayers-sourced (correct) values. 2/2 PASS.
+  Total 16/16 PASS.
+
+- Files: `preview.html` — `pflxPlayerCheckpointProgress` (~L33812),
+  `ppRenderMyTasks` (~L30891), `updateToolbarStatus()`'s Leaderboard
+  Position IIFE (~L16093) and the `pflx-roster-updated` listener
+  (~L67105). `PFLX_PATCH` 122 → 123.
+
+- HOST ACTIONS: none required for the 3 code fixes — live for everyone on
+  deploy, and none of them change what's already been paid out (only what
+  displays, and — for fix #1 — what a FUTURE completion check considers
+  "in scope," which can only ever shrink a denominator, never invent new
+  required work). Optional: if Ennis confirms the 3 L&D tasks noted above
+  should be restricted to the L&D team like their sibling Discord-username
+  task, a follow-up data pass can set their `assignedPlayers` — flagged,
+  not done, since guessing the intended roster risked getting it wrong.
+
+- ALSO NOTE: Checkpoint Alpha showing 3 Projects (2 of them cohort-locked)
+  is the existing, deliberate v1.71 "every player sees every Project"
+  design — nothing was changed here. Worth a explicit product-level
+  conversation with Ennis if he wants checkpoint-scoped Project lists to
+  hide (not just lock) items outside a player's own cohort going forward.
