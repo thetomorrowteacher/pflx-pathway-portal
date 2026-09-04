@@ -8832,3 +8832,166 @@ scoping decision before starting — see chat):
   design — nothing was changed here. Worth a explicit product-level
   conversation with Ennis if he wants checkpoint-scoped Project lists to
   hide (not just lock) items outside a player's own cohort going forward.
+
+## PATCH PLATFORM v1.125 — Access States (Locked/Active/Open/Closed), Scheduling, Collaborative Team Completion, Job-Hire Checkpoint Fix (Sep 4, Ennis)
+
+- SYMPTOM / REQUEST: Ennis asked for a formal 4-state access model for
+  Checkpoints/Projects/Programs/Seasons/Tasks — today's `status` field was
+  being overloaded ad hoc (e.g. `inactive` meaning "hidden from everyone
+  except the host," but directly-assigned players could still slip
+  through in some render paths) with no way to (a) let an item be visible
+  to everyone rather than just its cohort, (b) auto-transition an item's
+  access on a given date without a host manually flipping it, or (c) let
+  a Project's teammates jointly complete one shared task instead of each
+  needing their own copy approved. Also: job-hire tasks created via
+  `_mcSyncJobHiresToTasks` were not counting toward their Checkpoint's
+  progress tally.
+
+- ROOT CAUSE (job-hire bug): `_mcSyncJobHiresToTasks` stamped the new
+  Task with `checkpointId: savedJob.checkpoint || ''`, but every checkpoint-
+  tally function (`mcChildTasksForCheckpoint` etc.) only ever reads
+  `t.roundId` to associate a Task with its Checkpoint. `checkpointId` was
+  a dead field — job-hire tasks were silently orphaned from their
+  Checkpoint's math from the day that sync function was written.
+
+- FIX — 4-state model:
+  - New pure resolver `pflxResolveAccessState(status)`: `'inactive'` →
+    `locked`, `'open'` → `open`, `'completed'`/`'archived'` → `closed`,
+    everything else (including unset/legacy `upcoming`/`planning`/
+    `in_progress`/`draft`) → `active` — so every existing item with no
+    opinion on the new system keeps behaving exactly as it does today.
+  - `status` gets a new `'open'` option in the Checkpoint, Project,
+    Program, and Season admin dropdowns (Program's dropdown was also
+    missing `inactive` entirely — added). `open` means anyone can see AND
+    enter the item, cohort or not.
+  - Task gets its own separate `task.accessState` field
+    (`inherit`/`locked`/`active`/`open`/`closed`) rather than reusing
+    Task's existing `status` field (which already means
+    open/submitted/approved/rejected) — `pflxTaskAccessOverride(item)`
+    returns the Task's explicit choice, or `null` if `inherit` (defers to
+    its parent Checkpoint/Project's own state).
+  - `pflxIsTaskItem(item)` — the discriminator used throughout —
+    is `hasOwnProperty('roundId')`, which every real Task has (even as an
+    empty string) and no Project/Checkpoint/Program/Season ever does.
+  - Locked is now an ABSOLUTE host-only hide: `pflxPlayerCanSeeItem` and
+    `pflxPlayerCanEnterItem` both short-circuit to false-for-everyone-but-
+    host on Locked, replacing the old narrower inactive-hierarchy bypass
+    that let a directly-assigned player still see/enter an "inactive"
+    item in some code paths. **This is an intentional behavior change —
+    flagging as regression-risk**: a Locked item now hides from
+    EVERY player, including one explicitly assigned to it, matching what
+    Ennis described as the intended meaning of "Locked." If any host was
+    relying on assigned-player-can-still-see-inactive-items as a feature,
+    this patch removes that.
+  - New Open-hierarchy walk `pflxItemHierarchyOpen(item)` mirrors the
+    existing inactive/closed hierarchy walkers: an item (or, for a Task,
+    its parent Project then parent Checkpoint) with `status === 'open'`
+    is visible+enterable to everyone regardless of cohort.
+  - `pflxEffectiveAccessState(item)` is a UI-rendering convenience that
+    resolves the same cascade to one of the 4 bucket names, for host
+    admin displays.
+  - Per-item optional `lockMessage` (free text) now renders in place of
+    the previous hardcoded "COHORT REQUIRED" / "This Program/Project is
+    only open to its assigned cohort." text across the 5 render sites
+    that show a lock badge or panel (`renderProjects` dashboard widget,
+    `ppRenderPrograms` card grid, `ppRenderProgramDetail`,
+    `ppRenderCheckpointDetail`, `ppRenderProjectDetail`) — falls back to
+    the original copy when unset, so nothing changes for existing items.
+
+- FIX — scheduling (day-granularity, host-authored): `item.schedule =
+  [{id, at:'YYYY-MM-DD', to:'locked'|'active'|'open'|'closed',
+  firedAt:null}]`. New `pflxScheduledStatusSweep()` (host-gated,
+  idempotent) walks Programs/Checkpoints/Projects/Seasons/Tasks via
+  helper `_pflxApplyScheduleEntries(items, activeStatus)`: any entry with
+  `at <= today && !firedAt` fires exactly once (stamps `firedAt`), writing
+  to `item.accessState` for a Task or `item.status` for everything else
+  (mapped via `PFLX_SCHEDULE_TARGET_TO_STATUS`, with `'active'` resolved
+  per-collection: Project → `in_progress`, others → `active`). Wired into
+  the existing 3-minute `_mcHealthIv` interval and once on every
+  `mcLoadData()` (700ms after load) so scheduled transitions land whether
+  or not a host has the Console open at the moment they're due. Each form
+  (Program/Checkpoint/Project/Season/Task) got one new date+target field
+  in its edit form — **scope note (intentional, documented, fast-follow
+  candidate)**: this ships as a single scheduled transition per item, not
+  a full multi-row schedule editor (e.g. "go Active on the 1st, Closed on
+  the 15th" in one item requires editing the single date+target twice,
+  not queueing both up front). Flagging so it's not mistaken for an
+  oversight — the data model (`schedule` is an array) already supports
+  multiple entries; only the UI is single-row for this patch.
+
+- FIX — collaborative Project team completion: new `project.teamCompletion`
+  (boolean, default false, host toggle in the Project form) + per-task
+  `task.teamReward` (`everyone` default / `submitter-only`). When a
+  Project has `teamCompletion` on, `pflxProjectCompletion` forces a single
+  shared completion unit per task (`expected = []`, the existing
+  everyone-mode branch) instead of one unit per `assignedPlayers` entry —
+  so ANY one team member's approved submission completes that task for
+  the whole team. `mcApprovePlayerSubmission` got a new payout loop: when
+  `teamCompletion && task.teamReward !== 'submitter-only'`, every OTHER
+  member of `pflxProjectRoster(project)` (not just the submitter) is
+  awarded the same xc/badge reward via `PflxDataBus.award()`, with the
+  `mcPlayers` snapshot re-synced and `_mcRollupAwards` re-run per
+  teammate. `teamReward: 'submitter-only'` opts a specific task in a
+  team-completion Project out of the group payout (task still completes
+  for everyone, but only the actual submitter gets paid) for cases like a
+  team-lead-only bonus task.
+  - **Scope note (intentional, documented, fast-follow candidate)**: the
+    UI differentiation between "Start" and "Join" (i.e. showing a
+    teammate "Jamie already started this — join their submission" instead
+    of a plain Start button) was NOT built this patch — team completion
+    works correctly (one approval clears it for everyone, payouts fan
+    out correctly) but the player-facing task card doesn't yet visually
+    distinguish a team task from a solo one before anyone's submitted.
+    Flagging as a deliberate scope reduction, not a gap that was missed.
+
+- FIX — job-hire → Checkpoint tally: `_mcSyncJobHiresToTasks` now stamps
+  `roundId: savedJob.checkpoint || ''` instead of the dead `checkpointId`
+  field, so job-hire tasks finally count toward their Checkpoint's
+  progress the same way every other Task does.
+
+- Files: `preview.html` — new functions `pflxResolveAccessState`,
+  `pflxIsTaskItem`, `pflxTaskAccessOverride`, `pflxItemHierarchyOpen`,
+  `pflxEffectiveAccessState`, `_pflxApplyScheduleEntries`,
+  `pflxScheduledStatusSweep`; edited `pflxPlayerCanSeeItem`,
+  `pflxPlayerCanEnterItem`, `pflxProjectCompletion`,
+  `mcApprovePlayerSubmission`, `_mcSyncJobHiresToTasks`, `_mcHealthIv`
+  interval, `mcLoadData()`; Checkpoint/Project/Program/Season/Task forms
+  (status dropdowns, new lock-message/schedule/team-completion/team-
+  reward fields, save + populate-on-edit wiring) across
+  `mcShowCPForm`/`mcSaveCPForm`, `mcShowProjectForm`/`mcSaveProjectForm`,
+  `window.mcShowProgramTabForm`/`window.mcSaveProgramTabForm`,
+  `mcShowSeasonForm`/`mcSaveSeasonForm`, `mcShowTaskForm`/
+  `mcSaveTaskForm`; render sites `renderProjects`, `ppRenderPrograms`,
+  `ppRenderProgramDetail`, `ppRenderCheckpointDetail`,
+  `ppRenderProjectDetail`. `PFLX_PATCH` 123 → 124, `PFLX_BUILD` →
+  `2026.09`.
+
+- Verified: syntax gate clean, 13/13 inline `<script>` blocks, re-checked
+  after every one of the 11 patch groups plus the version bump. 29-case
+  Node unit test against the REAL extracted live functions (not
+  reimplementations) — `pflxResolveAccessState` (5 legacy/unset statuses
+  all still bucket to `active`, `inactive`→`locked`, `open`→`open`,
+  `completed`/`archived`→`closed`), `pflxIsTaskItem` (roundId
+  discriminator, 3 cases), `pflxTaskAccessOverride` (inherit/unset defer,
+  explicit wins, non-Task never reads `status` as an override — 5 cases),
+  `pflxItemHierarchyOpen` (own Project status, Task-defers-to-parent — 3
+  cases), `pflxProjectCompletion` (teamCompletion forces 1 shared unit
+  vs. 2 per-assignee units for a 2-player task — 3 cases),
+  `_pflxApplyScheduleEntries` (due entry fires once, marks `firedAt`,
+  future entry doesn't fire, re-running doesn't re-fire, Task target
+  writes `accessState` not `status` — 6 cases). All 29/29 PASS.
+
+- HOST ACTIONS: none required to get today's items behaving as before —
+  every existing Checkpoint/Project/Program/Season/Task with no
+  `accessState`/`schedule`/`teamCompletion` set falls through to the
+  exact same `active`/`inactive`/`completed` behavior as pre-v1.125.
+  Please read the Locked-absolute change above before assuming any
+  directly-assigned player can still see a Locked item — that's the one
+  real behavior change testers could notice. New capabilities (Open
+  status, lock messages, scheduling, team completion) are all opt-in via
+  the edit forms.
+
+- BACKLOG / fast-follow (flagged, not silent gaps): multi-row schedule
+  editor (data model already supports it — array of `{at, to}` entries —
+  only the UI is single-row this patch); Start-vs-Join visual
+  differentiation on team-completion task cards.
