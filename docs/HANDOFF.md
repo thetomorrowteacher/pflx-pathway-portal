@@ -8572,3 +8572,94 @@ scoping decision before starting — see chat):
   `PATCH LITE` 0.4 → 0.5.
 - HOST ACTIONS: none — live for every host/tester on deploy, no data or
   config changes.
+
+## PATCH PLATFORM v1.123 — CHECKPOINT/PROJECT COMPLETION BONUS CAN SILENTLY NEVER GET PAID (Sept 4, Kaitlin-reported via Discord)
+- SYMPTOM: Kaitlin reported the leaderboard shows "Total: 0 XC, Balance: 0,
+  Badges: 0" for many players ranked #5 and below, and separately that
+  "players who appear to have completed work/badges" don't always show
+  it. Asked whether the X-Coin Dashboard is correctly syncing.
+- INVESTIGATION: cross-checked Supabase directly (`app_data` keys `users`
+  and `pflx_mc_players`, both X-Coin's own persisted roster and the
+  Console's canonical one — confirmed identical, ruling out a sync-drift
+  bug like yesterday's PFLX Live seed issue). Of 139 players, 24 genuinely
+  have 0 xcoin/totalXcoin/digitalBadges — 21 of those are the "Global
+  Digital Intern" cohort (a single bulk-import batch, all joined
+  2026-07-29T09:45:40.901Z), the other 3 (Ryan Kamel, Cameron Miller,
+  John Khoury) are older-cohort stragglers. Checked every one of the 24
+  against `pflx_mc_tasks`' submissions and X-Coin's own `transactions`
+  collection: **zero** approved, nonzero-reward submissions and **zero**
+  transactions exist for any of them — they have not actually completed
+  any rewarded work yet. This is NOT a sync bug; 0 is the correct, honest
+  number for these 24 right now. (Their one common submission, "Complete
+  Onboarding Diagnostic," is itself a `xcReward: 0` task by design — an
+  onboarding gate, not a paid task — so "approved" status there was never
+  going to move their balance regardless.)
+- ROOT CAUSE (the real bug, found while tracing the payout pipeline to
+  rule out the above): Checkpoint/Project/Program completion bonuses
+  (`cp.rewardBadges`/`cp.xcReward` etc. — e.g. "Checkpoint Alpha," assigned
+  to Global Digital Intern, worth 1800 XC + 4 badges) are only ever paid
+  by `_mcRollupAwards(playerId)` (~L39202), and that function was only
+  ever CALLED from `mcApprovePlayerSubmission()` (~L39295) — the modern
+  per-player task-submission approval path. Two other paths that also
+  legitimately complete a player's last task never called it:
+  1. `mcApproveItem`'s `'completion'` branch (~L55087) — the actual
+     "Approve" button on the Completion Approvals queue card (populated
+     by `mcCheckCompletionApprovals()`/`_pflxPushCompletionApproval()`
+     once a player's checkpoint/project tasks are 100% approved). This
+     branch only flipped the card's own status flag (`cma.action =
+     'approved'`) and paid nothing — confirmed by reading its full source,
+     not inferred.
+  2. `mcApproveTask()`'s legacy single-submission branch (~L39397-39510) —
+     tasks without a `submissions[]` array (old `task.submission`/
+     `task.assignedTo`/`task.playerId` shapes). This branch correctly pays
+     the TASK's own `xcReward`/`rewardBadges` but never rolls up to the
+     owning checkpoint/project.
+  Net effect: a player whose final checkpoint/project task gets approved
+  through either of those two paths instead of
+  `mcApprovePlayerSubmission` would see their task-level reward land but
+  never see the checkpoint/project completion bonus — exactly the
+  "completed work but XC/badges not displaying consistently" symptom
+  Kaitlin described, just not (yet) manifested for anyone in the current
+  roster (confirmed: `pflx_mc_approvals` has never been saved to Supabase
+  — no completion card has ever been queued in production, so this bug
+  hasn't cost anyone money yet, but was one click away from doing so as
+  soon as a Global Digital Intern player finishes Checkpoint Alpha).
+- FIX: both gaps now call the SAME existing `_mcRollupAwards(playerId)` —
+  no new payout logic invented, just closing the two missing call sites
+  the exact way `mcApprovePlayerSubmission` already does it:
+  - `mcApproveItem`'s `'completion'` branch now calls
+    `_mcRollupAwards(cma.playerId)` right after flipping the card to
+    approved.
+  - `mcApproveTask`'s legacy branch now calls
+    `_mcRollupAwards(submitterId)` right after its existing task-level
+    `PflxDataBus.award` calls.
+  `_mcRollupAwards` is idempotent on its own (`rec.completionAwards
+  [playerId]` guard, unchanged) — both new call sites are safe no-ops if
+  the reward already landed via the normal path, so this cannot double-pay
+  anyone.
+- Verified: syntax gate clean, 14/14 inline `<script>` blocks. 8-check
+  Node unit test against the extracted live `_mcRollupAwards` source
+  (stubbed `PflxDataBus`/`mcCheckpoints`/`pflxPlayerCheckpointProgress`,
+  real logic): a fully-approved checkpoint pays its xc + every badge; a
+  second call for the same player is a no-op (proves the two new call
+  sites can't double-pay); an incomplete checkpoint (`pr.approved <
+  pr.total` — the actual current state of all 21 Global Digital Intern
+  zero-balance players) pays nothing (proves wiring this in is safe and
+  won't hand out money nobody's earned yet); `rollup(null)` doesn't throw.
+  Plus two structural checks confirming both new `_mcRollupAwards(...)`
+  calls actually landed in the shipped file. All 8/8 PASS.
+- Files: `preview.html` — `mcApproveItem` (~L55087) and `mcApproveTask`
+  (~L39397) each gained one call to the existing `_mcRollupAwards()`.
+  `PFLX_PATCH` 121 → 122.
+- HOST ACTIONS: none required — live for every host on deploy. No back-pay
+  needed: confirmed via Supabase that no player is currently sitting on
+  an unpaid completion (no `pflx_mc_approvals` rows exist, and none of the
+  24 zero-balance players have finished the work that would trigger it).
+  Once the Global Digital Intern cohort finishes Checkpoint Alpha, their
+  1800 XC + badge bonus will now pay correctly through whichever approval
+  path a host uses.
+- ALSO NOTE for Kaitlin's specific report: nothing to fix there — her
+  observed "0 XC" players are accurate, not a display bug. Worth
+  mentioning to testers only so they don't keep re-reporting it as new
+  cohort members complete real work and their numbers correctly move off
+  zero.
