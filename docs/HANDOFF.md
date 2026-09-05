@@ -9828,3 +9828,83 @@ scoping decision before starting — see chat):
   player from within that roster view, and auto-granting that role based on Evo Rank thresholds.
   Not yet scoped or built — needs a look at the existing `role` field on player records and any
   prior host/instructor-role precedent before implementing; will ship as its own patch.
+
+## PATCH PLATFORM v1.132 — Organization/Cohort Roster View + Instructor Host Approval via Evo Rank (Sep 5, Ennis-requested, mid-session)
+
+- SYMPTOM/REQUEST: Ennis, mid-session while PATCH v1.131 (org logos/plan tiers) was being
+  shipped: "Also, allow settings for me to see the full rosters within an organization and then
+  Cohort. I should be able to sign Instructor host roles within the rosters. This should
+  automatically be given depending on Evo Ranks as well." Clarified via AskUserQuestion (all
+  answered with the Recommended option): (1) reuse the EXISTING tier-assignment system rather
+  than a separate flag; (2) T6 "Mentor/Intern" (250,000 XC) as the Evo Rank eligibility
+  threshold; (3) the host must approve the grant — never a silent auto-promote.
+
+- FIX (`hmcRenderOrgs()`): added a green "ROSTER" button next to each org card's existing "EDIT"
+  button (`hmcOpenRoster('org', key)`), and converted the plain cohort-name `<span>` pills into
+  clickable buttons (`hmcOpenRoster('cohort', cohortName)`) — so a host can drill into either the
+  organization's FULL roster (every cohort it owns) or a single cohort's roster with one click.
+
+- FIX (new `window.hmcOpenRoster(scope, key)`): builds the real player list from `mcPlayers`
+  (godTier/admin accounts excluded) filtered to the org's/cohort's cohort name(s) — matches
+  either the `cohorts[]` array or the legacy comma/semicolon-separated `cohort` string field.
+  Each row shows the player's real avatar (or initial fallback), current host tier (via the
+  existing `mcPlayerTier()` + `window.PFLX_TIER_META`), and — when resolvable — their current Evo
+  Rank (via the existing `mcGetEvoRankObj()`). A plain player is flagged "⭐ Eligible" once their
+  Evo Rank reaches T6 "Mentor/Intern" (250,000 XC, matching Ennis's confirmed threshold) and gets
+  an "⭐ Approve Instructor" button; every other row (already-elevated hosts, or players below the
+  threshold) gets a plain "Edit Access" button instead. An empty roster shows a friendly
+  empty-state message rather than a blank list.
+
+- FIX (new `window.hmcGrantInstructor(playerId, cohortName)`): does NOT grant anything directly —
+  it closes the roster modal and opens the SAME Player Edit modal `mcEditPlayer()` already uses,
+  then pre-fills the Tier dropdown to `instructor` and the managed-cohort field to the roster's
+  cohort, calls the existing `mcTierScopeRefresh()` so the Host Control Scope checklist updates
+  for the new tier, and shows a toast telling the host nothing is granted until they review and
+  click Save. The actual grant still runs through the untouched, already-battle-tested
+  `mcSavePlayerForm()` → `mcApplyTierToRecord()` path — no parallel role flag, no new write path,
+  and no auto-grant, per Ennis's confirmed answer that the host must approve.
+
+- FIX (new `window.hmcEditPlayerFromRoster(playerId)`): plain "Edit Access" path for non-eligible
+  players — closes the roster modal and opens the normal Player Edit modal with no tier forced.
+
+- Files: `pflx-platform-check/preview.html` — `hmcRenderOrgs()` (ROSTER button + clickable
+  cohort pills), new `hmcOpenRoster()`, `hmcGrantInstructor()`, `hmcEditPlayerFromRoster()`
+  (inserted just before `hmcAddOrg()`). `PFLX_PATCH` bumped 131 → 132. Pre-patch backup at
+  `preview.html.pre-v132-backup`.
+
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean.
+  24-case Node test suite against the REAL shipped functions (extracted via brace-counting, never
+  reimplemented): org-scope roster includes players from every cohort the org owns and excludes
+  players in cohorts it doesn't own; godTier accounts are excluded entirely; an eligible plain
+  player (T6+ XC, still tier `player`) gets the Approve Instructor button while an
+  already-elevated player at the SAME XC level correctly gets Edit Access instead (no double
+  promotion path); cohort-scope roster correctly narrows to one cohort; an empty roster shows the
+  friendly empty state; `hmcGrantInstructor` closes the roster modal, calls `mcEditPlayer` (never
+  saves directly), pre-fills Tier=instructor and the cohort field only after the edit modal has
+  rendered, calls `mcTierScopeRefresh()`, and surfaces a "review and Save" toast;
+  `hmcEditPlayerFromRoster` opens the plain edit modal with no tier forced; the ROSTER
+  button/clickable cohort pills are wired correctly and the original EDIT button is untouched —
+  24/24 PASS. Re-ran the existing 41-case v1.131 regression suite (`ORG_TIER_META`/
+  `hmcOrgTierAutofill`/`hmcSaveOrgEditor`/`hmcRenderOrgs`) against the patched file — still 41/41
+  PASS, confirming the roster patch didn't disturb the org logo/plan-tier work.
+
+- GOTCHA (test-harness only, not a shipped-code defect, noted for future patches on this file):
+  the first draft used `.replace(/'/g, "\\'")` to escape a stray apostrophe in a cohort name for
+  an inline `onclick` attribute. That is valid JavaScript (confirmed by `node --check` passing),
+  but the single-quote character inside the regex literal `/'/g` fooled the house
+  brace-counting test-extraction pattern (`extractBraceBlock`, used everywhere in this codebase's
+  Node test suites) into misreading it as an unterminated string, corrupting extraction of the
+  surrounding function. Rewrote as `.split("'").join("\\'")` — identical behavior, no regex
+  literal, and now extracts cleanly. Worth remembering for any future patch: avoid `/x/`-style
+  regex literals containing a quote character inside HTML-generating template-literal code on
+  this file, since every test suite here relies on the same simple brace-counter.
+
+- HOST ACTIONS: none required to use it — open Settings → Organizations, click ROSTER on any org
+  card (or click a cohort pill) to see that roster, and Approve Instructor on any player flagged
+  ⭐ Eligible (T6 Mentor/Intern, 250,000 XC+) to open their pre-filled edit form. Review the Host
+  Control Scope checklist that appears and click Save to actually grant Instructor Host access —
+  nothing is granted until that Save.
+
+- BACKLOG: none carried forward from this request — fully scoped and shipped in one patch. The
+  separate, earlier-started X-Live "native Live Sessions" plan (Patch C1-C4 of the approved
+  X-Live plan) remains its own unrelated backlog item, unaffected by this patch.
