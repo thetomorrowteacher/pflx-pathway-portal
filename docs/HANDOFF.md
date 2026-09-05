@@ -9438,3 +9438,38 @@ scoping decision before starting — see chat):
   `pflx-lite`-slug references inside `x-live-check/index.html`'s internal
   Supabase keys / Console contract were intentionally left as-is (see FIX
   above) — not a bug, a deliberate scope boundary to avoid a data migration.
+
+## PATCH X-LIVE v0.11 — Tools Tab Cleanup: Remove Duplicate Group Maker, Drop ClassDojo Mention (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: Ennis, reviewing the live Host Dashboard's TOOLS tab with annotated
+  screenshots: "I believe that you can remove group maker and view teams now that you have the
+  teams tab... You also do not need to reference class dojo." This is patch 1 of a larger
+  4-patch effort (PATCH X-LIVE v0.11-v0.14) covering the full list of requested changes; see the
+  approved plan for the other three (real X-Coin badges/modifiers, native Live Sessions, and a
+  new link+QR broadcast tool).
+
+- FIX: Removed the "Group Maker" card (the `Teams:` input + `MAKE`/`VIEW TEAMS` buttons) from
+  `rTools()` — confirmed the dedicated TEAMS tab's `rTeams()`/`makeTeams()` already fully covers
+  drafting, redrafting, and shuffling teams (with a nicer UI than the Tools-tab duplicate ever
+  had), so this was a pure removal with zero functionality lost — `makeTeams()`/`rTeams()`
+  themselves are untouched and still power the TEAMS tab. Removing the card also fixes the
+  `grid3` (3-column) Tools layout, which now holds exactly 3 cards (Randomizer, Timer, Noise
+  Meter) instead of 4.
+
+- FIX: Reworded the Noise Meter card's description from "ClassDojo-style ambient mic level..."
+  to "Live ambient mic level — green/yellow/red, projector-friendly." — no functional change,
+  text only.
+
+- Files: `x-live-check/index.html` — `rTools()`.
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 11-case Node test against the real
+  shipped file (extracts the actual `rTools()` function body via brace-counting — never
+  reimplemented — and confirms: Group Maker markup and its `id="teamN"`/`VIEW TEAMS` bits are
+  gone; Randomizer/Timer/Noise Meter cards are all still present and still wired to
+  `wheelOpen()`/`timerStart()`/`toggleNoiseMeter()`; the Noise Meter description no longer
+  mentions ClassDojo and reads the new copy; `makeTeams()`/`rTeams()` are still defined
+  elsewhere in the file) — 11/11 PASS. Also re-ran the existing 24-case PATCH X-LIVE v0.10
+  rebrand regression test against the patched file — still 24/24 PASS (this patch didn't touch
+  anything in that area).
+
+- HOST ACTIONS: none — purely visual, no data or config migration involved.
