@@ -10058,3 +10058,111 @@ scoping decision before starting — see chat):
   systems), and Phase 3b (the "Post Link + QR" broadcast tool) remain scoped and ready per the
   approved plan. Also carried forward from this patch specifically: whiteboard and embed slide
   types (see FIX above for why they're deferred, not dropped).
+
+## PATCH X-LIVE v0.15 — GO LIVE, Host Run Controls, Player Experience & Real Reward Wiring (Phase 2 of 3, Native Live Sessions) (Sept 5, Ennis)
+
+- CONTEXT: Phase 1a/1b (v0.13/v0.14) built the merge-safe session data layer and native host
+  authoring UI in X-Live, but a built session could not actually be run — no GO LIVE, no host
+  controls, no player-facing screen, and (as documented since v0.13) session/slide rewards were
+  captured in the authoring form but never granted anywhere. Phase 2 (C3 in the original plan)
+  closes all of that.
+
+- FIX: `x-live-check/index.html` — new `L.liveRunningSessionId` field (host: which active
+  session's RUN PANEL is open, distinct from `L.liveEditingSession`). `rLive()` now checks it
+  first and renders the new `rLiveRun(s)` run panel before falling back to the Phase 1b builder/
+  list. `sessionRow()` gained a 🔴 GO LIVE button (scheduled sessions, calls `liveGoLiveSession`,
+  refuses with a toast if the session has zero slides) and a ▶ MANAGE button (active sessions,
+  calls `liveManageSession`), plus a live join count in the subtitle.
+
+  `liveGoLiveSession(id)` sets `status:'active'`, seeds `currentSlideIndex:0` and
+  `hostControls:{paused,responsesLocked,slideFrozen}`, saves, and opens the run panel.
+  `rLiveRun(s)` renders the current slide (icon/title/prompt/options with ⭐ on the correct
+  answer once graded, response count, revealed flag) plus NEXT/PREV (bounds-checked, dimmed at
+  the ends), REVEAL (graded slide types only, hidden once already revealed), PAUSE/RESUME, LOCK/
+  UNLOCK RESPONSES, FREEZE/UNFREEZE (independent `hostControls` toggles via
+  `liveToggleControl(key)`), PICK A PLAYER (→ the existing `wheelOpen()` Randomizer, unmodified),
+  MAKE GROUPS (→ the Teams tab + a toast, per the plan's own "no new code needed" call — neither
+  PICK nor GROUPS ports Mission Control's separate implementations), and END SESSION (→ a modal
+  confirm, then `liveEndSession()`).
+
+  Player side: `nativeSessionAppliesToMe()` finds the active session matching the player's
+  cohort (same scoping logic as the old `sessionAppliesToMe()`, now against `L.sessions`).
+  `nativeLiveSessionBanner()` shows a JOIN/REJOIN banner on ordinary player screens (rendered
+  alongside the existing Mission-Control-driven `liveSessionBanner()`, not replacing it — that
+  system is still Phase 3a's job to retire). `liveJoinSession(id)` adds the player to
+  `liveParticipants` (deduped by id — a rejoin never creates a duplicate entry), grants
+  attendance reward once, and navigates to a new `livenative` screen (bypasses the tab UI, same
+  pattern as the existing `liveagenda` bypass). `rLiveNative(s)` renders the current slide by
+  type: poll/MC/quiz as buttons (disabled+dimmed once responded or locked, green+⭐ on the
+  correct answer once revealed), open response as a textarea+SUBMIT, challenge/push-task as a
+  MARK DONE button, timer as a countdown display — and shows a frozen/paused overlay when the
+  host has toggled those controls. `liveSubmitChoice()`/`liveSubmitText()` refuse while
+  `responsesLocked`, and refuse to overwrite a response the player already submitted, all
+  through v0.13's merge-safe `saveSession()`.
+
+  Reward wiring, for real this time (fixes the v0.13/v0.14 no-op): `liveRevealSlide()` marks the
+  slide revealed and, for graded types with a `rewardXc`/`rewardBadgeId`, grants every response
+  matching `correctIndex` via `grantSessionReward()` (which splits XC and badge into two
+  `postAward()` calls, matching how every other award call site in this file already works).
+  `liveEndSession()` grants session-level completion XC/badge to every `liveParticipants` entry.
+  Every one of these three grant paths (attend/complete/slide) is deduped through the session's
+  shared `awardedTo[]` array (already carried since Phase 1a/1b, previously unused) with
+  composite keys (`'attend:'+sessionId+':'+playerId`, etc.) — a stale re-poll or a repeated host
+  click can never double-grant, per the `pflx-persistence-guardrail` skill's discipline.
+
+  Boot polling: replaced the fixed `setInterval(loadSessions, 60000)` with a recursive
+  `scheduleSessionsPoll()` that checks each cycle whether a session is actually live/relevant to
+  this client (host running one, or player in one) and re-schedules itself at 5s if so, else 60s
+  — exactly the cadence v0.13's own code comment had already flagged as the Phase 2 plan.
+
+- Files: `x-live-check/index.html` — `L.liveRunningSessionId`; `render()` gained the `livenative`
+  screen bypass and the `nativeLiveSessionBanner()` call; `scheduleSessionsPoll()` replacing the
+  fixed interval; `rLive()`/`sessionRow()` updates; new `grantSessionReward`, `liveGoLiveSession`,
+  `liveManageSession`, `liveExitRun`, `liveMoveCurrentSlide`, `liveToggleControl`,
+  `liveRevealSlide`, `liveEndSessionPrompt`, `liveEndSession`, `rLiveRun`,
+  `nativeSessionAppliesToMe`, `nativeLiveSessionBanner`, `liveJoinSession`, `liveSubmitChoice`,
+  `liveSubmitText`, `rLiveNative` — all inserted right before the TEAMS view section, same spot
+  Phase 1b's block ends. Pre-patch backup at `index.html.pre-v015-backup`.
+
+- Verified: `node scripts/syntax_gate.js index.html` — both inline `<script>` blocks clean.
+  28-case Node test suite against the REAL shipped functions (extracted via brace-counting, never
+  reimplemented): GO LIVE seeds state and opens the run panel, and refuses with zero slides;
+  NEXT/PREV bounds-check correctly; host-control toggles are independent of each other; REVEAL
+  rewards only the correct responses and — calling it twice — never re-grants (dedupe holds);
+  `nativeSessionAppliesToMe()` correctly scopes by cohort; JOIN adds the participant and grants
+  attendance once even across a rejoin; END grants completion once per participant even across a
+  repeated END call; response submission respects LOCK and never overwrites an existing response
+  — 28/28 PASS. Re-ran the full v0.10–v0.14 regression suites against the patched file — still
+  14/14, 35/35, 11/11, 41/41, 24/24 PASS (153 total across all six suites, including this one).
+  Applied directly to the live device file and re-verified there: syntax gate clean, and the
+  patched file's MD5 matches the sandbox-tested version byte for byte.
+
+- HOST ACTIONS: open X-Live as host and go to the 🔴 LIVE tab. A scheduled session (built in
+  Phase 1b) now shows a 🔴 GO LIVE button — tapping it starts the session and opens the run
+  panel with NEXT/PREV/REVEAL, PAUSE, LOCK RESPONSES, FREEZE, PICK A PLAYER, MAKE GROUPS, and END
+  SESSION. Players see a JOIN banner appear automatically on their own screens the moment a
+  session matching their cohort goes live — no join code needed. Rewards (attendance, per-slide
+  correct-answer, completion) are now granted for real; a session built with a `rewardXc`/badge
+  on a slide or in its session-level rewards will actually pay out.
+
+- BACKLOG: Phase 3a (retire Mission Control's three old Live Session systems — Console Remote,
+  Agenda broadcaster, and the same-browser-only PIP remote — now that X-Live's native version
+  covers all of it) and Phase 3b (the "Post Link + QR" broadcast tool) remain scoped and ready
+  per the approved plan. Also carried forward: whiteboard and embed slide types (Phase 1b's
+  Handoff entry has the reasoning).
+
+  Separately, two new feature requests from Ennis (neither part of the Native Live Sessions
+  plan — logging both here so they aren't lost, not scoped or started):
+
+  1. The Mission Control player dashboard's Projects/Programs views (`preview.html`, Player
+     Management → Projects) currently show a fully-expanded card per project/program. Ennis
+     wants a Netflix-style compact card grid instead, with a detail preview that pops up when a
+     player selects a card — similar in spirit to how Core Pathways renders its nodes. Flagged
+     via an annotated screenshot circling the three "NOT STARTED" project cards.
+
+  2. Core Pathway Development's pathway-icon map (`preview.html`, the "CHOOSE YOUR PATHWAY"
+     orbit screen — Content Creator/3D Modeler/Sound Designer/etc. node icons) should get
+     scroll-triggered animated movement as the player scrolls/pans on a trackpad, using "some of
+     the recent plugins we used with the Tomorrow Teacher site." Flagged via an annotated
+     screenshot of that screen. Needs a follow-up with Ennis to pin down which specific
+     TheTomorrowTeacher.org animation plugin/library he means before scoping.
