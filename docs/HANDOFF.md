@@ -9617,3 +9617,52 @@ scoping decision before starting — see chat):
 
 - HOST ACTIONS: none required — this only changes what photo-less players see; anyone who already
   has an uploaded profile image is unaffected everywhere.
+
+## PATCH XCOIN v1.5 — Master Leaderboard + Host Dashboard Avatars Were Rendering Completely Blank (Sep 5, Ennis-reported via 6 screenshots)
+
+- SYMPTOM: Ennis, screenshots of the Host Dashboard's "Top Players" widget and the Master
+  Leaderboard's top-3 podium + full players list: nearly every player (PASSIONSTUDIOS, RonAxis,
+  CIR3, VYATECH, VividStudios, Kamath Indu…, TharaJewel, Nova, Wanova, TheTikoVerse, CODECRAFTER,
+  AETHERTECH…) showed a completely EMPTY circle where the avatar should be — no image, no
+  initials, nothing. Only NEUROFLUX (who has a real uploaded photo) rendered correctly. "X-Coin
+  Leaderboard isnt showing initials without the Profile picture. They are blank."
+
+- ROOT CAUSE: `app/admin/page.tsx` (Host Dashboard "Top Players"), `app/admin/leaderboard/page.tsx`
+  (the Master Leaderboard's podium, full list, and startup-studio "top member"/member-chip rows),
+  and two of the same studio rows in `app/player/leaderboard/page.tsx` all rendered avatars as
+  `player.image ? <img .../> : player.avatar` — but real player records synced from Mission
+  Control/X-Live never populate a legacy `avatar` initials field (only two hand-written mock users
+  in `app/lib/data.ts` ever had one, e.g. `avatar: "PF"`). So every real player without an uploaded
+  `image` fell through to `undefined`, rendering nothing. This is the same bug class already fixed
+  platform-wide in PATCH PLATFORM v1.130 — but worse here, since there was no fallback content at
+  all (not even a stale logo). Notably, the player-facing leaderboard's OWN top-3 podium and main
+  player list (`app/player/leaderboard/page.tsx`, separate code paths from the two studio-row
+  spots above) had already been fixed with a computed-initials fallback in an earlier, undocumented
+  pass — it just was never propagated to the admin/host-facing pages Ennis actually screenshotted,
+  or to the studio rows in either leaderboard file.
+
+- FIX: added a small shared helper, `playerInitials(entity)` in new file
+  `app/lib/avatarUtils.ts` — honors a legacy `avatar` field if present (mock users), otherwise
+  computes initials from `brandName` → `name` → `"?"` (1-2 letters, one per significant word,
+  uppercased) — same convention as the already-correct player-leaderboard code, just extracted so
+  every surface uses one real, tested implementation instead of re-deriving it per file. Replaced
+  every bare `: x.avatar}` fallback with `: playerInitials(x)` in: `app/admin/page.tsx` (Top
+  Players widget), `app/admin/leaderboard/page.tsx` (podium, full list, studio top-member + member
+  chips), and `app/player/leaderboard/page.tsx` (studio top-member + member chips — the only two
+  spots in that file that hadn't already been fixed).
+
+- Files: `pflx-xcoin-check/app/lib/avatarUtils.ts` (new), `app/admin/page.tsx`,
+  `app/admin/leaderboard/page.tsx`, `app/player/leaderboard/page.tsx`.
+
+- Verified: `tsc --noEmit` clean on every touched file (one pre-existing, unrelated syntax error
+  in `app/admin/task-management/page.tsx` confirmed identical to HEAD via `git show` — not
+  introduced by this patch). 21-case Node test against the REAL `playerInitials()` (transpiled via
+  `tsc`, never reimplemented) plus structural checks on all three page files — covers: initials
+  from brandName/name for every real player name in Ennis's screenshots (PASSIONSTUDIOS, RonAxis,
+  CIR3, etc. — all resolve non-blank); the legacy `avatar` field still wins when present (mock
+  users unaffected); `null`/empty brandName+name never throws and never renders blank ("?"
+  fallback); every page imports `playerInitials`; zero bare `.avatar` fallbacks remain in any of
+  the three files — all 21/21 PASS.
+
+- HOST ACTIONS: none required — this only changes what photo-less players' avatar circles show;
+  anyone with an uploaded profile image is unaffected everywhere.
