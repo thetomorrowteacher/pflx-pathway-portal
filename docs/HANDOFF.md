@@ -9213,3 +9213,82 @@ scoping decision before starting — see chat):
   than the plan's originally-scoped tombstone-only patch, since a
   tombstone-only fix would have been safe but functionally inert without
   this merge-by-id wiring.
+
+## PATCH LITE v0.7 — Real PFLX X LIVE Brand Lockup Replaces Placeholder Ring+Text (Sep 5, Ennis-provided)
+
+- SYMPTOM: none — Ennis provided the actual PFLX X LIVE brand lockup (a
+  horizontal wordmark and a stacked variant) and, via annotated screenshots
+  of the live app, circled the 3 spots that still showed the placeholder
+  `PFLX_LOGO_MARK` ring icon + plain "PFLX LIVE" text instead of the real
+  logo: the header lockup (Host Dashboard / player tabs), the `L.cfg`-null
+  loading splash, and the floating bottom-left watermark shown on the
+  TEAMS/BOARDS/projector screens.
+
+- FIX: added two new base64-embedded logo constants,
+  `PFLX_LIVE_LOGO_HORIZONTAL` and `PFLX_LIVE_LOGO_STACKED` (trimmed to
+  content bounds, pngquant-compressed to ~23KB/~40KB), matching this
+  file's existing "no external asset, single self-contained file"
+  convention documented next to `PFLX_LOGO_MARK`. Swapped them into the 3
+  circled spots: header lockup now renders `<img>` + the horizontal logo
+  (keeping the live-pulse dot), the loading splash now shows the stacked
+  logo above a "LOADING…" caption, and both floating-watermark occurrences
+  now show the horizontal logo. `PFLX_LOGO_MARK` itself is left intact and
+  simply unused rather than removed, to minimize risk. Added a `.logo-img`
+  CSS rule (30px height, drop-shadow) as the sized replacement for the old
+  icon+text lockup. Also backfilled this file's top version-comment header,
+  which had never been updated for the v0.6 profile-photo patch either.
+
+- Files: `pflx-lite-check/index.html` — new `PFLX_LIVE_LOGO_HORIZONTAL`/
+  `PFLX_LIVE_LOGO_STACKED` constants, loading-screen branch, header `.logo`
+  block, both floating-watermark occurrences, new `.logo-img` CSS rule, top
+  version-comment header.
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 15-case Node
+  test against the real shipped markup: both logo constants decode to real
+  PNGs (magic-byte check); the loading screen embeds the stacked logo and
+  still shows a LOADING caption; the header embeds the horizontal logo and
+  keeps the live-pulse indicator; both watermark occurrences use the
+  horizontal logo; `PFLX_LOGO_MARK` and the new `.logo-img` CSS rule are
+  both present — 15/15 PASS.
+
+- HOST ACTIONS: none required — purely visual, no config change.
+
+## PATCH PLATFORM v1.128 — PFLX Live Had No Logo in the Global App-Switch Loading Splash (Sep 5, Ennis-reported via annotated screenshot)
+
+- SYMPTOM: the platform's shared "PFLX Loading Screen Engine"
+  (`PFLX_LOADING`) shows a per-app icon + name while switching between
+  sub-apps (Mission Control, X-Bot, X-Coin, Battle Arena, Darkcampus, PFLX
+  Live). Ennis circled this exact screen in a screenshot while navigating
+  into PFLX Live: it correctly said "LIVE" (fixed in v1.122) but showed
+  the generic PFLX ring/core mark instead of a PFLX Live–specific logo.
+
+- ROOT CAUSE: `PFLX_LOADING.logos` maps each `viewName` to its own icon
+  file in `public/` (`'mission-control': 'public/Mission Control Icon.png'`,
+  `'arena': 'public/PFLX Battle Arena Icon.png'`, etc.) — every app except
+  `'lite'` had an entry. `show()`/`showUntilReady()` resolve the image via
+  `this.logos[viewName] || 'public/PFLX Core Flat 6.png'`, so the missing
+  `'lite'` key silently fell through to the generic fallback icon used for
+  truly-unknown views. (This is the same class of gap `v1.122` already
+  fixed for the adjacent `labels` map, which just never got a matching fix
+  for `logos`.)
+
+- FIX: added `public/PFLX Live Icon.png` (the stacked PFLX X LIVE lockup
+  Ennis provided this session, pngquant-compressed) and a `'lite': 'public/PFLX Live Icon.png'`
+  entry to `PFLX_LOADING.logos`, following this repo's existing real-file
+  convention for logo assets (unlike `pflx-lite-check`, this file does use
+  external `public/*.png` assets).
+
+- Files: `pflx-platform-check/preview.html` — `PFLX_LOADING.logos` map.
+  `pflx-platform-check/public/PFLX Live Icon.png` — new asset file.
+
+- Verified: syntax gate clean (13/13 inline `<script>` blocks). 9-case Node
+  test evaluating the REAL `logos` object literal from the shipped file:
+  `logos.lite` now resolves to the new icon; every other app's entry is
+  untouched; the real `this.logos[viewName] || 'public/PFLX Core Flat 6.png'`
+  fallback expression now picks the PFLX Live icon for `'lite'` while an
+  unknown view still falls back to the generic mark; `labels.lite` ("LIVE")
+  from v1.122 is undisturbed — 9/9 PASS.
+
+- Bumped `PFLX_PATCH` 127 → 128 (`PFLX_BUILD` already current at `2026.09`).
+
+- HOST ACTIONS: none required — purely visual, no config change.
