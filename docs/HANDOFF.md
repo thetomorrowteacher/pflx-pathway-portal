@@ -9138,3 +9138,78 @@ scoping decision before starting — see chat):
   mode). If a class prefers everyone's EXO mascot shown instead, Ennis can
   switch that class's "Avatar style" to EXO Mascots from PFLX Live's SETUP
   tab.
+
+## PATCH PLATFORM v1.127 — Seasons/Programs/Jobs Could Be Silently Wiped or Resurrected on Cloud Sync (Sep 5, drive-by fix confirmed by Ennis)
+
+- SYMPTOM: none reported yet by name — this was caught proactively while
+  scoping a smaller "add missing tombstone calls" drive-by fix from the
+  Google Suite/Approvals plan. The underlying exposure: deleting a Season or
+  Job could be silently undone by a later cloud sync (a stale copy from
+  another device/tab resurrecting it), and ANY edit to a Season, Program, or
+  Job made on one device could be wholesale-overwritten by a concurrent
+  sync from another device/host, with no merge protection at all.
+
+- ROOT CAUSE: `checkpoints`/`projects`/`tasks`/`players` have followed the
+  `pflx-persistence-guardrail` merge-by-id + tombstone discipline for a
+  while, but `seasons`/`programs`/`jobs` never got the same treatment on
+  either side of sync:
+  - Pull side: `_mcApplyCollection` did a wholesale `mcSeasons = items` /
+    `mcPrograms = items` / `mcJobs = items` instead of `_mcMergeById(...)`
+    — any cloud pull fully replaced the in-memory array, including for the
+    postMessage relay handler used by embedded sub-apps.
+  - Push side: `_mcMergeQueueWithCloud`'s `mergeable` map only listed
+    `tasks`/`checkpoints`/`projects`/`players` — seasons/programs/jobs were
+    filtered out of the read-merge-write step entirely, so pushing a local
+    change also blindly overwrote the current cloud row instead of merging
+    into it.
+  - Also confirmed the plan's assumption that "Program has no delete
+    function at all" was wrong: `window.mcSeasonDeleteProgram(id)` already
+    exists and is wired to two UI delete buttons — it was just missing its
+    `_mcTombstone` call, same as `mcDeleteSeason`/`mcDeleteJob`.
+
+- FIX: wired `seasons`, `programs`, and `jobs` into the exact same
+  `_mcMergeById`-based path `checkpoints`/`projects` already use:
+  - `_mcMergeQueueWithCloud`'s `mergeable` map and write-back switch now
+    include all three (read-merge-write on push).
+  - `_mcApplyCollection`'s pull-side switch now does
+    `mcSeasons = _mcMergeById(mcSeasons, items, 'seasons')` (and the
+    Programs/Jobs equivalents) instead of a wholesale replace.
+  - The postMessage relay handler (used by embedded sub-apps posting
+    updates into MC) now merges seasons/jobs the same way instead of
+    `mcSeasons = msg.data` / `mcJobs = msg.data`.
+  - Added `_mcTombstone('seasons', season.id)` to `mcDeleteSeason`,
+    `_mcTombstone('jobs', job.id)` to `mcDeleteJob`, and
+    `_mcTombstone('programs', id)` to the existing
+  `mcSeasonDeleteProgram` (capturing the object/id before mutating the
+  array in all three, mirroring `mcDeleteCheckpoint`/`mcDeleteProject`).
+
+- Files: `pflx-platform-check/preview.html` — `_mcMergeQueueWithCloud`
+  (mergeable map + write-back switch), `_mcApplyCollection` (pull-side
+  switch), postMessage relay handler (seasons/jobs branches),
+  `mcDeleteSeason`, `mcDeleteJob`, `mcSeasonDeleteProgram`. No schema
+  changes — reuses the existing `_mcMergeById`/`_mcTombstone`/
+  `_mcDropTombstoned`/`_mcTs` helpers already used by checkpoints/projects.
+
+- Verified: syntax gate clean (13/13 inline `<script>` blocks, `node
+  --check`). 15-case Node unit test against the real extracted
+  `_mcMergeById`, `mcDeleteSeason`, `mcDeleteJob`, and
+  `mcSeasonDeleteProgram` bodies: union merge keeps local-only + cloud-only
+  items; a newer inbound item is applied; a stale inbound item does NOT
+  overwrite a newer local one; a tombstoned Season/Job/Program is NOT
+  resurrected by a stale pull; a re-created item (newer than the tombstone)
+  IS kept; `mcSeasonDeleteProgram` detaches (not deletes) linked
+  checkpoints and leaves unrelated programs/checkpoints untouched; tombstone
+  kinds (`seasons`/`programs`/`jobs`) don't cross-contaminate — 15/15 PASS.
+
+- Bumped `PFLX_PATCH` 125 → 127 (`PFLX_BUILD` already current at
+  `2026.09`) — noting `PATCH PLATFORM v1.126` shipped without its own
+  `PFLX_PATCH` bump, so this patch also closes that one-version gap rather
+  than leaving the in-app version permanently behind the Handoff log.
+
+- HOST ACTIONS: none required — this is a pure sync-safety fix, no UI or
+  workflow change. BACKLOG: this was scoped out of the combined Google
+  Suite + Approvals Dashboard plan (`radiant-puzzling-feather.md`) as a
+  "drive-by fix, but do the real fix" per Ennis's explicit choice, rather
+  than the plan's originally-scoped tombstone-only patch, since a
+  tombstone-only fix would have been safe but functionally inert without
+  this merge-by-id wiring.
