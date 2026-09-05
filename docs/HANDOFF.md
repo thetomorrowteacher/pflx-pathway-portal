@@ -9362,3 +9362,79 @@ scoping decision before starting — see chat):
   local, per-device UI preference (not synced to the cloud config), so each
   device remembers its own last-picked sort only until the page reloads,
   defaulting back to XC High→Low.
+
+## PATCH X-LIVE v0.10 + PATCH PLATFORM v1.129 — Full Rebrand: PFLX Live → X-Live (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: Ennis, after uploading `XLIVE.zip` (new "X Live Horizontal.png"
+  / "X Live Square.png" brand artwork): "Lets change PFLX Live into X-Live. Change
+  this everywhere." Follow-up decision via AskUserQuestion: also rename the
+  underlying GitHub repo/Pages URL to `x-live`, not just the visible branding.
+  Mid-patch, Ennis sent 2 corrected logo files ("Use these instead because the
+  others glow was cut off") — the original zip artwork clipped the glow effect
+  at the canvas edge; the replacements have the full, un-clipped glow.
+
+- FIX — GitHub repo/URL rename: renamed the GitHub repo `thetomorrowteacher/pflx-lite`
+  → `thetomorrowteacher/x-live` via the REST API (confirmed no custom domain/CNAME
+  on Pages first, confirmed `x-live` was available). GitHub Pages auto-rebuilt at
+  the new URL `https://thetomorrowteacher.github.io/x-live/`. Updated the local
+  git remote and renamed the local folder `pflx-lite-check` → `x-live-check` to
+  match. Internal app key/URL slug/cloud keys were deliberately left as `'lite'`
+  (pflx_lite_* Supabase keys, `data-app="lite"` Console contract, `lite_activity`
+  table) to avoid a data migration — this was already the file's own documented
+  policy from the original PFLX Live rebrand, and it still applies to the X-Live
+  rebrand.
+
+- FIX — `x-live-check/index.html` (formerly `pflx-lite-check/index.html`): full
+  text/branding pass — `<title>`, top version-history comment (rewritten for
+  v0.10), the "Cloud keys owned by..." comment, all 4 `alt="PFLX Live"` →
+  `alt="X-Live"` image tags, the demo-mode banner, and 3 code comments (Live
+  Sessions bridge, agenda-advancing, noise meter). Renamed the logo constants
+  `PFLX_LIVE_LOGO_HORIZONTAL`/`PFLX_LIVE_LOGO_STACKED` → `XLIVE_LOGO_HORIZONTAL`/
+  `XLIVE_LOGO_STACKED` (4 + 2 call sites respectively) and swapped in the new
+  Ennis-provided artwork as their base64-embedded PNG bytes — first the v1 zip
+  assets, then re-swapped to the v2 (full-glow, un-clipped) assets once Ennis
+  flagged the clipping. Image pipeline: ImageMagick trim+resize, pngquant lossy
+  compression, verified by compositing onto the app's actual dark UI background
+  (#0a0e1a) rather than trusting a white-background preview, which had made the
+  glow look washed out even though it wasn't.
+
+- FIX — `pflx-platform-check/preview.html` (Mission Control), 16 changes:
+  bumped `PFLX_PATCH` 128→129; the nav button title, YouTube-broadcast-title
+  placeholder, 3 Agenda/Guide labels, the refresh-button title, the iframe
+  loader text, 2 ticker fallback strings, and 4 code comments all updated
+  PFLX Live → X-Live; the `labels['lite']` map entry updated `'LIVE'` →
+  `'X-LIVE'` for full consistency. Most importantly: the iframe `src` map
+  entry for view `'lite'` — `'https://thetomorrowteacher.github.io/pflx-lite'`
+  → `'https://thetomorrowteacher.github.io/x-live'` — this is what actually
+  makes Mission Control load the renamed app instead of 404ing. Also replaced
+  the standalone `public/PFLX Live Icon.png` reference/file with a new
+  `public/X-Live Icon.png` (v2, full-glow square asset) used by the loading
+  splash's per-view icon map.
+
+- Files: `x-live-check/index.html` (renamed from `pflx-lite-check/index.html`,
+  logo consts + all user-facing text), `pflx-platform-check/preview.html`
+  (16-line patch + `PFLX_PATCH` bump), `pflx-platform-check/public/X-Live Icon.png`
+  (new file, replaces `public/PFLX Live Icon.png` which is left in place unused).
+
+- Verified: `x-live-check/index.html` — syntax gate clean (2/2 inline `<script>`
+  blocks); 24-case Node test against the real shipped file (title, const renames,
+  PNG magic-byte/size validity for both logos, exact call-site counts, alt text,
+  prose strings, AND confirms internal plumbing — `pflx_lite_config`,
+  `pflx_lite_qsets`, `data-app="lite"`, `lite_activity` — is untouched) — 24/24
+  PASS. `pflx-platform-check/preview.html` — syntax gate clean (13/13 inline
+  `<script>` blocks); 30-case Node test against the real shipped file (version
+  bump, the critical iframe-src-map URL, the loading-splash logo path, the
+  labels map, all 9 user-facing strings, all 4 comments, and an explicit check
+  that none of the 10 old "PFLX Live"-branded strings remain) — 30/30 PASS.
+
+- HOST ACTIONS: none required for testers — the GitHub Pages URL changed
+  automatically on rename and Mission Control's iframe now points at the new
+  URL, so nothing breaks for anyone already using Mission Control. Bookmarks
+  or direct links anyone has to the old `https://thetomorrowteacher.github.io/pflx-lite/`
+  URL will need updating to `.../x-live/` (GitHub does not auto-redirect a
+  renamed repo's Pages site).
+
+- BACKLOG: `public/PFLX Live Icon.png` (old, now-unused icon file) and the old
+  `pflx-lite`-slug references inside `x-live-check/index.html`'s internal
+  Supabase keys / Console contract were intentionally left as-is (see FIX
+  above) — not a bug, a deliberate scope boundary to avoid a data migration.
