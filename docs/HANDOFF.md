@@ -9325,3 +9325,40 @@ scoping decision before starting — see chat):
   11/11 PASS.
 
 - HOST ACTIONS: none required — purely visual.
+
+## PATCH LITE v0.9 — Players Roster Now Sorted by XC + Sort Dropdown (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: the CLASS tab's "Players (N)" roster grid (also used as the
+  bulk SELECT ALL player-picker) rendered players in whatever order the cloud
+  roster synced in — no consistent ordering. Ennis: "The players should
+  always be in order by XC Total. Should read from left to right. Also add a
+  filter for alphabet and whatever else makes sense."
+
+- FIX: added `sortedRoster(list)`, which sorts a roster array by
+  `L.rosterSort` (`'xc_desc'` default, plus `'xc_asc'`, `'name_asc'`,
+  `'name_desc'`), and `setRosterSort(mode)` to change it and re-render.
+  `rClass()` now reads `sortedRoster(classRoster())` instead of
+  `classRoster()` directly, so the grid always renders XC-highest-first by
+  default, left-to-right/top-to-bottom in DOM order (the grid's CSS is an
+  auto-flow grid, so array order IS visual reading order). Added a host-facing
+  `<select>` dropdown in the Players toolbar (next to SELECT ALL/CLEAR) with
+  4 options: XC High→Low (default), XC Low→High, Name A→Z, Name Z→A.
+
+- Files: `pflx-lite-check/index.html` — `L` state object (new `rosterSort`
+  field), `classRoster()`'s neighboring new `sortedRoster()`/
+  `setRosterSort()` helpers, `rClass()`.
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 20-case Node
+  test against the real shipped code (extracts and runs the actual
+  `sortedRoster()` function body, not a reimplementation): XC-desc sorts
+  highest-first and puts a 0-XC player last; XC-asc is the reverse; Name A→Z
+  and Z→A are correct given a tie on XC; missing/unset `rosterSort` falls
+  back to XC-desc; `sortedRoster()` does not mutate its input; `rClass()`
+  now routes through `sortedRoster()`; the toolbar's `<select>` is wired to
+  `setRosterSort(this.value)` and offers all 4 modes; SELECT ALL/CLEAR
+  buttons are unchanged — 20/20 PASS.
+
+- HOST ACTIONS: none required — purely visual/UX. The sort choice is a
+  local, per-device UI preference (not synced to the cloud config), so each
+  device remembers its own last-picked sort only until the page reloads,
+  defaulting back to XC High→Low.
