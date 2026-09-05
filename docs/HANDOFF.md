@@ -9473,3 +9473,86 @@ scoping decision before starting — see chat):
   anything in that area).
 
 - HOST ACTIONS: none — purely visual, no data or config migration involved.
+
+## PATCH X-LIVE v0.12 — Real Primary/Premium Digital Badges + Upgrades/Taxes/Fines from X-Coin (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: Ennis, same annotated-screenshot review as PATCH X-LIVE v0.11: "Also I should
+  be able to award all primary and premium badges along with Upgrades/Taxes & Fines that are
+  relevant during X-Live. Also, these should also use the images from X-Coin." X-Live's own
+  Awards/Fines/Tax tray buttons and the 🎖️ BADGE modal were a small hard-coded local list
+  (6 awards, 2 fines, 1 tax, 4 synthetic badge names with no real XC value or artwork) —
+  completely disconnected from the real Digital Badge and Modifier catalogs Ennis manages in
+  X-Coin. This is patch 2 of the approved 4-patch plan (PATCH X-LIVE v0.11-v0.14).
+
+- FIX: Added `loadCoinCategories()`/`loadModifiers()` (mirroring the existing `loadCfg()`/
+  `loadRoster()` boot-loader pattern) that `kvLoad('coinCategories')`/`kvLoad('modifiers')` from
+  the SAME Supabase `app_data` keys X-Coin's own admin pages write to — no new/parallel data
+  path. `loadCoinCategories()` flattens `coinCategories` down to just the "Primary Badges
+  (Behavior)" and "Premium Badges (Achievement)" categories (Executive/Signature are job/cert-
+  scoped and out of scope for an in-class award, matching "primary and premium badges"
+  verbatim), tagging each with its real `xc` and `image`. `loadModifiers()` keeps only
+  `!autoApply` modifiers (equivalently `triggerEvent === 'manual'`) — verified against the real
+  seed data in `pflx-xcoin-check/app/lib/data.ts` that this is EXACTLY the set X-Coin's own
+  admin stats bar already counts (16 taxes total, 7 auto-apply across upgrades+taxes, 11 of the
+  16 taxes manual — plus 3 manual upgrades = 14 host-applicable modifiers). NOTE: the approved
+  plan's draft filter also required `scope === 'all'`, which real data showed would have
+  incorrectly dropped 3 legitimately host-triggerable manual items (`upg-1` "72-Hour Extension",
+  `upg-2` "Late-Entry Pass", `tax-1` "Task Deviation" — all `scope:"task"`) — dropped that extra
+  condition once the real catalog was inspected, since "manual" alone is X-Coin's own definition
+  of "host can trigger this," matching Ennis's "relevant during X-Live" more faithfully than the
+  plan's initial guess.
+
+- FIX: Rewrote `grantBadge(players, badgeOrName)` — now accepts either a real badge object
+  (from `L.badges`, carrying real `xc`/`image`) or a plain string (the pre-existing "custom
+  badge name" flow keeps working unchanged, still 0 XC). Granting a real badge now sends its
+  real `xc` and `image` through `postAward()`'s existing `pflx_award_proposed` →
+  `PflxDataBus.award()` path (no new write mechanism) AND applies the XC to the local optimistic
+  balance — previously badges carried zero XC and no artwork by construction.
+
+- FIX: Added `applyModifier(players, modifier)` — the new host-apply path for real Upgrades/
+  Taxes/Fines, using the exact same `postAward()`+`liteLog()`+`burst()` discipline
+  `applyAction()` already established. Per Ennis's confirmed answer, a host-applied Upgrade
+  deducts its full listed `costXcoin`, identical to a Tax/Fine. `applyDefaultUpgrade()` routes
+  the DEFAULT_CFG fallback upgrades through the same `applyModifier()` function (single source
+  of truth for the deduct-cost behavior, not a second copy of it).
+
+- FIX: Replaced `badgeModal()`'s 4 hard-coded synthetic names with the real, live Primary +
+  Premium badge catalog (grouped, each button showing the real X-Coin artwork via `coin.image`
+  and real `xc`) — falls back to the old 4-name list only if `L.badges` hasn't loaded/is empty
+  (mirrors the roster's own X-Coin-unreachable fallback; never a hard dependency). Added a new
+  `modifierModal()` (same pattern) for the real Upgrades/Taxes/Fines, falling back to X-Live's
+  own `DEFAULT_CFG.fines`/`.tax`/`.upgrades` if the real modifier catalog is empty.
+
+- FIX (deviation from the literal plan text, documented here): the plan described the tray
+  itself growing a flat button per award/modifier, same as the old design. With the real
+  catalogs (8 real badges, 14 real modifiers today, and growing as Ennis adds more in X-Coin),
+  that many always-visible tray buttons would overflow/clutter the host's selection tray on
+  every screen size. Instead, `renderTray()` now shows two buttons — "🎖️ AWARD BADGE" and
+  "⚡ UPGRADE / TAX / FINE" — that open `badgeModal()`/`modifierModal()`, which scale to any
+  catalog size and group items (Primary/Premium; Upgrades/Taxes) instead of a single flat row.
+  This keeps every real badge and every relevant modifier reachable (the literal requirement)
+  without a layout regression as X-Coin's catalogs grow.
+
+- Files: `x-live-check/index.html` — `L` state object, `loadCoinCategories()`, `loadModifiers()`
+  (new), boot line, `grantBadge()`, `applyModifier()` (new), `applyDefaultUpgrade()` (new),
+  `renderTray()`, `badgeModal()`, `modifierModal()` (new).
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 41-case Node test against the real
+  shipped file — static checks confirm every new/changed function exists and wires to the right
+  data source (brace-counted from the real source, never reimplemented); behavioral cases run
+  the REAL extracted `loadCoinCategories()`/`loadModifiers()`/`grantBadge()`/`applyModifier()`
+  bodies against fixtures shaped exactly like the live X-Coin seed data
+  (`pflx-xcoin-check/app/lib/data.ts`), confirming: Executive/Signature badges excluded, real
+  xc/image carried through and category-tagged correctly; auto-apply modifiers excluded while
+  manual upgrades AND manual taxes with non-"all" scope are correctly kept; `grantBadge()` with
+  a real badge object applies its real xc to every selected player and increments badge counts,
+  while the legacy custom-name (string) path still works with 0 xc; `applyModifier()` deducts
+  the full listed cost for both a host-applied Upgrade and a Tax/Fine, flooring the local
+  balance at 0 — all 41/41 PASS. Also re-ran the existing 24-case v0.10 rebrand and 11-case
+  v0.11 Tools-cleanup regression tests against the patched file — still 24/24 and 11/11 PASS.
+
+- HOST ACTIONS: none required — this reads X-Coin's EXISTING `coinCategories`/`modifiers` data
+  live, so any badge/modifier Ennis has already set up in X-Coin (with real uploaded artwork)
+  appears in X-Live automatically. If a session ever shows the 4-name/DEFAULT_CFG fallback
+  instead of real badges, that means X-Live couldn't reach Supabase at boot — a refresh should
+  fix it, and is the intended safe fallback rather than a broken Tools tab.
