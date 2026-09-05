@@ -9985,3 +9985,76 @@ scoping decision before starting — see chat):
 - BACKLOG: Phase 1b (host authoring UI), Phase 2 (GO LIVE/run controls/player experience/real
   reward wiring), and Phase 3 (retire Mission Control's old Live Session systems + the link+QR
   broadcast tool) remain scoped and ready per the approved plan, to ship as their own patches.
+
+## PATCH X-LIVE v0.14 — Native Host Session-Building UI (Phase 1b of 3, Native Live Sessions, Sep 5)
+
+- CONTEXT: continuing the approved "X-Live: Tool Cleanup, Native Live Sessions, and Real X-Coin
+  Badges/Modifiers" plan, re-sequenced into 3 phases at Ennis's request. Phase 1a (PATCH X-LIVE
+  v0.13) shipped the merge-safe `sessions` data layer with no UI. This patch is Phase 1b: the
+  native host session-building UI itself — the piece that lets a host actually author a full
+  Live Session end-to-end inside X-Live, with nothing live-running yet (that's Phase 2).
+
+- FIX: new 8th host tab `🔴 LIVE` (added to the tab array + render() dispatch map, same pattern
+  every other tab already uses). `rLive()` shows either the session list (`rLiveList()`, grouped
+  into 🟢 Active / Scheduled / Ended) or the full builder (`rLiveBuilder()`) depending on whether
+  `L.liveEditingSession` is set.
+
+- FIX — session builder (`rLiveBuilder`): title, an "All players" toggle or per-cohort checkboxes
+  (reuses the existing `cohortList()`, same source SETUP already uses), session-level rewards
+  (attendance XC granted on join, completion XC granted on End — both wired for real reward
+  granting in Phase 2, not yet in this patch), and the slide list. `liveEditSession(id)` always
+  deep-copies into `L.liveEditingSession` (`JSON.parse(JSON.stringify(...))`) so in-progress edits
+  never mutate `L.sessions` until the host taps SAVE — Cancel is a true no-op.
+
+- FIX — slide builder (`renderSlideModal`): a modal-based editor for a v1 set of 10 slide types
+  (text, media, poll, multiple choice, quiz, open response, discussion, timer, challenge, push
+  task) via `SLIDE_TYPES`/`slideTypeMeta()`. Each type conditionally shows options (with a ⭐/☆
+  correct-answer marker for the two graded types, mc/quiz), a time limit, and a per-slide reward
+  (XC + a real badge picker via `badgeSelectHtml()`, reusing v0.12's `L.badges` Primary/Premium
+  catalog — no new badge system). Deferred to backlog, not silently dropped: whiteboard (needs
+  the doodle-canvas widget ported from `preview.html`) and embed (needs a CSP/security pass
+  first); grouping/partnership are covered by this phase's session-level cohort scoping plus the
+  existing Randomizer/Teams tabs, so they're intentionally not separate slide types.
+
+- FIX: all session writes go through Phase 1a's merge-safe `saveSession()` — no new persistence
+  path. `liveDeleteSessionConfirm()` is a SOFT delete (`status: 'archived'`), not a splice out of
+  `L.sessions` — this matters because `mergeSession()` already treats `archived` as a protected
+  terminal status a stale poll can never undo, so the delete gets tombstone protection for free
+  from code that already shipped, per the `pflx-persistence-guardrail` skill's discipline.
+
+- Files: `x-live-check/index.html` — `L.liveEditingSession`/`L.liveEditingSlide` state; the 🔴
+  LIVE tab + dispatch entry; new `SLIDE_TYPES`/`slideTypeMeta`, `newLiveSession`/`liveNewSession`/
+  `liveEditSession`/`liveCancelEdit`/`liveSaveSessionForm`/`liveDeleteSessionPrompt`/
+  `liveDeleteSessionConfirm`/`liveToggleCohort`/`badgeSelectHtml`, `liveNewSlide`/`liveAddSlide`/
+  `liveEditSlide`/`liveSlideTypeChange`/`liveSlideOptionAdd`/`liveSlideOptionRemove`/
+  `liveSlideSetCorrect`/`liveSaveSlideForm`/`liveDeleteSlide`/`liveMoveSlide`/`renderSlideModal`/
+  `slideRowHtml`, `rLive`/`rLiveList`/`rLiveBuilder` — inserted right before the TEAMS view
+  section. Pre-patch backup at `index.html.pre-v014-backup`.
+
+- Verified: `node scripts/syntax_gate.js index.html` — both inline `<script>` blocks clean.
+  35-case Node test suite against the REAL shipped functions (extracted via brace-counting, never
+  reimplemented): `slideTypeMeta()` returns correct hasOptions/hasTimer/graded/timerOnly per type
+  and falls back safely for an unknown key; `newLiveSession()`/`liveNewSlide()` produce the
+  expected default shape; the add-slide flow pushes exactly one new slide and rejects a blank
+  title; the edit-slide flow replaces in place at the right index without duplicating or
+  disturbing other slides; `liveMoveSlide()` reorders correctly and no-ops at both array
+  boundaries; `liveDeleteSlide()` removes only the targeted slide; `liveToggleCohort()` adds/
+  removes without duplicating; `liveDeleteSessionConfirm()` soft-deletes (status:'archived')
+  rather than splicing the session out of the list; and the plan's own required check — a session
+  built via `newLiveSession()`+`liveNewSlide()`, with a quiz slide (options/correctIndex/rewardXc)
+  and a discussion slide, round-trips through the REAL `saveSession()`→`loadSessions()` and comes
+  back with both slides and every field intact — 35/35 PASS. Re-ran the full v0.10/v0.11/v0.12/
+  v0.13 regression suites against the patched file — still 24/24, 11/11, 41/41, 14/14 PASS (125
+  total across all five suites). Re-staged the LIVE post-deploy file from the device and re-ran
+  the syntax gate + all five suites against it a second time — identical results, and its MD5
+  (`cff87d576ff8ae17557aa97a7e31226c`) matches the sandbox-tested file byte for byte.
+
+- HOST ACTIONS: open X-Live as host — a new 🔴 LIVE tab now appears. Building a session there
+  (title, cohort scope, rewards, slides) and tapping SAVE SESSION persists it to the cloud, but
+  there is still no way to actually GO LIVE or run it yet — that's Phase 2, next.
+
+- BACKLOG: Phase 2 (GO LIVE, host run controls, player-side live experience, real reward wiring
+  for quiz/attendance/completion), Phase 3a (retire Mission Control's three old Live Session
+  systems), and Phase 3b (the "Post Link + QR" broadcast tool) remain scoped and ready per the
+  approved plan. Also carried forward from this patch specifically: whiteboard and embed slide
+  types (see FIX above for why they're deferred, not dropped).
