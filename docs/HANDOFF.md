@@ -9084,3 +9084,57 @@ scoping decision before starting — see chat):
   treatment there. Also unchanged from v1.125: the multi-row schedule
   editor and the "Jamie already started this — join their submission"
   team-completion card differentiation remain open backlog items.
+
+## PATCH LITE v0.6 — Real Profile Photos on Player Cards + Avatar Style Setting (Sep 5, Ennis-reported)
+
+- SYMPTOM: every player card in PFLX Live (CLASS roster grid, TEAMS columns,
+  BOARDS leaderboard, the "ME" screen, and the projector views) rendered as a
+  plain colored circle with a single-letter initial — never the player's real
+  uploaded profile photo, even though that photo shows correctly everywhere
+  else in the suite (Mission Control's Home Base hero avatar, Portfolio, and
+  the generic roster picker all already branch on `player.image`).
+
+- ROOT CAUSE: `exoAvatarHTML(pid, size, fallbackName)` (`pflx-lite-check/index.html`)
+  is the single avatar renderer used by every PFLX Live screen. It was
+  written purely for the "EXO" gamified mascot feature — its only two
+  branches were "render the player's built EXO mascot" or "render initials."
+  It never referenced the real photo field (`player.image`) at all, so a
+  player's uploaded photo was silently discarded the moment it reached this
+  renderer, regardless of whether one existed. Confirmed via a full-file
+  search: zero `<img>` tags existed anywhere in `pflx-lite-check/index.html`
+  before this patch.
+
+- FIX: `exoAvatarHTML` now takes a 4th argument, `image`, and gained a real
+  photo branch plus a new per-class **Avatar style** setting
+  (`L.cfg.avatarMode`, default `'photo'`) so hosts can choose which type
+  takes priority when a player has both a photo and a built EXO mascot:
+  - `'photo'` (default): real photo → EXO mascot (if no photo) → initials
+    (if neither).
+  - `'exo'`: EXO mascot → real photo (if no mascot built) → initials.
+  All 6 call sites (`rClass`'s roster grid, `rTeams`'s two team-column
+  renders, `rBoards`'s leaderboard row, the projector leaderboard, and
+  `rMe`'s big hero avatar) now pass the player's `p.image`/`r.p.image`
+  through. A new "Avatar style" dropdown was added to the SETUP tab, wired
+  through the existing `L.cfg` → `saveCfg()` pattern (same as the existing
+  Leaderboards checkboxes) — no new persistence mechanism, no new Supabase
+  table, just the field already flowing through `mapRosterUser()` at
+  `image: u.image || null` finally being read.
+
+- Files: `pflx-lite-check/index.html` — `DEFAULT_CFG` (new `avatarMode`
+  field), `exoAvatarHTML` (new photo branch + mode logic), `rClass`,
+  `rTeams` (×2), `projTeams`, `rBoards`, `projOpen`, `rMe` (pass `.image`
+  through), `rSetup` (new Avatar style `<select>`). No backend/schema
+  changes — `image` was already present on every roster object.
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks, `node --check`).
+  7-case Node unit test against the real extracted `exoAvatarHTML`: photo
+  wins over EXO in photo mode; EXO falls back to photo when no mascot built;
+  initials as the final fallback in both modes; EXO wins over photo in exo
+  mode; and the photo URL is HTML-escaped (no injection via a malicious
+  image value) — 7/7 PASS.
+
+- HOST ACTIONS: none required for existing players — real photos will now
+  show automatically wherever one is already on file (default `photo`
+  mode). If a class prefers everyone's EXO mascot shown instead, Ennis can
+  switch that class's "Avatar style" to EXO Mascots from PFLX Live's SETUP
+  tab.
