@@ -9707,3 +9707,43 @@ scoping decision before starting — see chat):
   picturing being the target (likely Mission Control's X-Bot). Needs Ennis's input on where the
   canonical X-Bot should live and how the submission-review analysis capability should be
   exposed there before this is safe to implement — not done yet, asked Ennis directly.
+
+## PATCH XCOIN v1.7 — Removed Redundant Floating AI Chat Widget (Was Operating on Fake Mock Data) (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: Ennis, same screenshot: "Also the AI chat bar is not needed. Its functions
+  should be integrated in X-Bot." Follow-up question confirmed: this is X-Coin's own floating
+  chat bubble (self-labeled "PFLX X-Bot" when opened), and Ennis wants it removed with its
+  submission-review functionality ported into Mission Control's real X-Bot instead.
+
+- ROOT CAUSE / FINDING: `app/components/AIAssistant.tsx` (601 lines, mounted admin-wide via
+  `app/admin/layout.tsx`) duplicated Mission Control's real X-Bot (a much larger, real system —
+  `xbot-side-panel` in `preview.html`, with knowledge-base retrieval, voice, per-cohort abilities,
+  and `XBOT_AI.respond()`). Worse than simple duplication: this widget's ENTIRE command engine —
+  `buildTextResponse()` (stats/overview, "approve all", player lookups, at-risk detection,
+  leaderboard, checkpoints, etc.) and its heuristic scoring fallback — read and mutated the
+  hardcoded seed arrays (`mockUsers`, `mockTasks`, `mockTransactions` from `app/lib/data.ts`)
+  directly, NOT real Supabase-backed player/task data. A host typing "approve all" into this
+  widget would have appeared to approve submissions and credit XC, while touching nothing real.
+  Confirmed the actual, working submission-analysis feature this partially duplicated already
+  exists for real in `app/admin/approvals/page.tsx` (`analyzeTask()`, same `/api/analyze-submission`
+  endpoint, wired to live tasks with a working Analyze/Analyze-All UI) — that page is untouched
+  and unaffected by this patch.
+
+- FIX: removed the `<AIAssistant />` mount from `app/admin/layout.tsx`. Left
+  `app/components/AIAssistant.tsx` on disk, now completely unreferenced — kept rather than
+  deleted outright until the X-Bot port (below) ships and fully supersedes it.
+
+- Files: `pflx-xcoin-check/app/admin/layout.tsx`.
+
+- Verified: `tsc --noEmit` clean (same one pre-existing, unrelated error in
+  `app/admin/task-management/page.tsx`, confirmed identical to HEAD). 3-case Node test on the
+  real shipped `layout.tsx` — confirms no `AIAssistant` reference remains, `RoleGuard` and
+  `{children}` still render — all 3/3 PASS.
+
+- HOST ACTIONS: none required.
+
+- BACKLOG: port the submission-review analysis (heuristic scoring logic is generic and reusable;
+  the mock-data wiring is not) into Mission Control's X-Bot as a new host-only ability chip,
+  operating on REAL `mcTasks`/submissions data — not yet built, needs its own scoped patch given
+  it touches XC-granting logic. `app/components/AIAssistant.tsx` can be deleted outright once that
+  ships.
