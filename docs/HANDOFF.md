@@ -9747,3 +9747,84 @@ scoping decision before starting — see chat):
   operating on REAL `mcTasks`/submissions data — not yet built, needs its own scoped patch given
   it touches XC-granting logic. `app/components/AIAssistant.tsx` can be deleted outright once that
   ships.
+
+## PATCH PLATFORM v1.131 — Organization Logos + Season Rate Card Plan Tiers/Features (Sep 5, Ennis-requested)
+
+- REQUEST: Ennis, on Mission Control's Organizations panel (Settings → Organizations),
+  screenshot circling the three org cards (American School of Dubai, Prototype FLX, PFLX):
+  "I also want to add a organization logo image in 300x300 format. It can go to the left of
+  each row as shown in a square like image. I also want more organizational settings based on
+  my new cohort rules." — with the Fall 2026 Season Rate Card (PDF) attached as the source for
+  the new settings. Clarified via AskUserQuestion: (1) the Subscription Tier dropdown should
+  switch to the Rate Card's exact org plan names (Org Essential/Plus/Campus/Enterprise) and
+  auto-fill seat/cohort caps, and (2) all four groups of Rate-Card org features should become
+  editable per-org settings — Ennis chose every option offered.
+
+- ADDED:
+  - `ORG_TIER_META` — a new lookup (`preview.html`, right after the `ORGANIZATIONS` literal)
+    encoding the Rate Card's Organisation tiers exactly: Essential (3 cohorts/90 seats,
+    cross-cohort leaderboard + Friday Showdown), Plus (6/180, + season theming + host
+    certification), Campus (12/360, + termly impact report + sponsor integration), Enterprise
+    (uncapped/quoted, everything on), plus a `free`/"Independent" tier for STANDALONE with no
+    caps or features. `window.hmcOrgTierAutofill(tier)` applies a tier's defaults into the
+    currently-open org editor's inputs — fires only on a manual Subscription Tier change, never
+    silently on load, so existing org data is never overwritten just by opening the editor.
+  - Org logo: `org.logo` (a PNG data URI, resized client-side to fit inside 300×300 preserving
+    aspect ratio — no crop, so a non-square crest doesn't get mangled — via the same
+    FileReader→canvas→toDataURL pattern the Loading Gallery upload already uses). Renders as a
+    56px rounded-square avatar to the left of the org name in `hmcRenderOrgs()`'s cards; orgs
+    without a logo fall back to an initials avatar in the tier's color (same
+    house convention established this session for X-Coin's `playerInitials()`). Upload/preview/
+    remove controls added to the top of `hmcOpenOrgEditor()`'s modal
+    (`hmcOrgLogoPicked`/`hmcOrgLogoRemove`).
+  - New per-org fields, editable in the org editor and persisted by `hmcSaveOrgEditor()`:
+    `maxCohorts` (a hard cap alongside the existing `maxPlayers`, shown as "count / cap" on the
+    Cohorts stat), `crossCohortLeaderboard`, `fridayShowdown`, `seasonTheming`,
+    `termlyImpactReport`, `sponsorIntegration` (checkboxes in a new "Organization Plan Features"
+    box), `hostCertifiedStaff` (number), `namedPointOfContact` (text). Cards render a pill row
+    for whichever of these are ON, under the cohort-tag row (nothing renders if an org has none
+    set — no empty section).
+  - `hmcAddOrg()` (the inline "+ Add Organization" mini-form) updated to the same 5-tier
+    dropdown and seeds `maxPlayers`/`maxCohorts`/all plan-feature flags from `ORG_TIER_META` on
+    creation, via `Object.assign`.
+  - Backward-compat: the Subscription Tier `<select>` keeps rendering an org's existing raw
+    value as a "(legacy)" option if it's not one of the 5 new tier keys (old `standard`/
+    `premium` values, if any exist elsewhere, won't silently reset on open — none of the 3
+    current orgs use those values, confirmed by reading `ORGANIZATIONS` directly).
+  - Added `scripts/syntax_gate.js` (previously referenced by house discipline but missing from
+    this repo) — extracts every inline `<script>` block and `node --check`s each; temp files now
+    write to `os.tmpdir()` instead of next to the source (the Cowork device bridge can't unlink
+    files inside a mounted/connected folder without an explicit one-time grant).
+
+- Files: `pflx-platform-check/preview.html` (`ORGANIZATIONS`/`ORG_TIER_META`, `hmcRenderOrgs`,
+  `hmcOpenOrgEditor`, `hmcSaveOrgEditor`, `hmcAddOrg`), new
+  `pflx-platform-check/scripts/syntax_gate.js`, new
+  `pflx-platform-check/scripts/patches/2026-09-05_org_settings_v131.py` (the exact patch script,
+  kept as a migration record).
+
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after. 41-case Node test suite against the REAL shipped functions (extracted via
+  brace-counting, never reimplemented — `ORG_TIER_META` values checked against the Rate Card
+  page-by-page; `hmcOrgTierAutofill` against a fake-DOM modal for campus→essential→enterprise
+  transitions, confirming stale flags/caps from a higher tier clear correctly when switching
+  down, and caps blank correctly for the uncapped Enterprise tier; `hmcRenderOrgs` against
+  fixture orgs with/without a logo, with/without plan features, confirming no leaked
+  `undefined`/`NaN` and no empty pill-row section; `hmcSaveOrgEditor` against a fake modal DOM,
+  confirming every new field persists, the cohort single-belong-org rule and existing app-access/
+  feature-flag checkbox logic are untouched, and a removed logo saves as `null` not `''`) — all
+  41/41 PASS. Pre-patch backup at `preview.html.pre-v131-backup` (md5 matched the live file
+  before patching).
+
+- HOST ACTIONS: Upload each org's 300×300 logo via Settings → Organizations → EDIT — none are
+  set yet (all 3 existing orgs currently show initials-avatar fallback). Review/adjust each
+  org's Subscription Tier now that it maps to the Rate Card names — ASD and Prototype FLX both
+  currently read `enterprise`, which stays a valid legacy-compatible value but doesn't
+  auto-reflect their actual seat/cohort counts (ASD: 9 cohorts/69 players — fits "Org Enterprise"
+  as-is; Prototype FLX: 3 cohorts/68 players — closer to "Org Essential" by cohort count, though
+  the internal Prototype FLX/PFLX org isn't a real customer contract so this is cosmetic only).
+
+- BACKLOG / IN PROGRESS: Ennis separately requested, mid-session: full roster visibility inside
+  an Organization → Cohort drill-down, the ability to assign an "Instructor"/host role to a
+  player from within that roster view, and auto-granting that role based on Evo Rank thresholds.
+  Not yet scoped or built — needs a look at the existing `role` field on player records and any
+  prior host/instructor-role precedent before implementing; will ship as its own patch.
