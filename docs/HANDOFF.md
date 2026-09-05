@@ -9908,3 +9908,80 @@ scoping decision before starting — see chat):
 - BACKLOG: none carried forward from this request — fully scoped and shipped in one patch. The
   separate, earlier-started X-Live "native Live Sessions" plan (Patch C1-C4 of the approved
   X-Live plan) remains its own unrelated backlog item, unaffected by this patch.
+
+## PATCH X-LIVE v0.13 — Merge-Safe Session Data Layer (Phase 1a of 3, Native Live Sessions, Sep 5)
+
+- CONTEXT: continuing the approved "X-Live: Tool Cleanup, Native Live Sessions, and Real X-Coin
+  Badges/Modifiers" plan (Patches A/B shipped as v0.11/v0.12). Ennis asked mid-session for the
+  remaining "native Live Sessions" work to be split into 3 phases rather than shipped as one big
+  patch: **Phase 1 — Build** (data layer + host authoring UI), **Phase 2 — Run** (GO LIVE, host
+  controls, player experience, real reward wiring), **Phase 3 — Cutover** (retire Mission
+  Control's old Live Session systems + ship the separately-requested link+QR broadcast tool).
+  This patch is Phase 1a: the merge-safe data layer only, no UI yet.
+
+- WHY THIS FIRST: Mission Control's `mcSessions` collection (`app_data` key `sessions`) syncs
+  today as a wholesale array (`msg.data && msg.data.length → mcSessions = msg.data`) with no
+  per-field merge — safe enough for a single host authoring sessions alone, but not once players
+  are concurrently submitting live responses to the same session. Per the
+  `pflx-persistence-guardrail` skill's core rule (merge, never replace, on any inbound cloud
+  data), X-Live's own read/write path for this same key had to be merge-safe from day one, before
+  any host-facing UI is built on top of it — building the UI first and retrofitting the merge
+  logic later would have risked exactly the class of bug that skill exists to prevent.
+
+- FIX: reuses the EXISTING Supabase `app_data` key `sessions` (same key Mission Control's
+  `mcSessions` already writes) — no forked/parallel data key, and any sessions Ennis has already
+  built in Mission Control carry over with zero migration. New `L.sessions` state +
+  `L.loaded.sessions` flag in `x-live-check/index.html`, mirroring the existing
+  `loadCoinCategories()`/`loadModifiers()` boot-load pattern.
+
+- FIX — `mergeSession(local, incoming)` (new): merges ONE session, matched by id — never a
+  wholesale overwrite. Plain fields (title, mode, currentSlideIndex, hostControls, rewards, ...)
+  take the value from whichever side has the newer `updatedAt`, but four things are explicitly
+  protected beyond simple last-write-wins: `liveParticipants` unions by player id (keeping the
+  later `joinedAt` per id) so two students joining at once both survive; each slide's `responses`
+  unions by player id so two students answering the same slide at once never clobber each other;
+  `awardedTo` (the reward-dedupe list) only ever unions and never shrinks, so a stale poll can
+  never let a player re-collect an attendance/completion award; and a terminal (`ended`/
+  `archived`) status from EITHER side always wins over a non-terminal one, so a stale poll can
+  never resurrect a session another client already ended. `lastRandomPickId`/`lastGroupPick`
+  follow their own timestamps independent of the session's overall `updatedAt`, since a PICK can
+  happen between saves.
+
+- FIX — `mergeSessionList(localList, incomingList)` (new): unions two session arrays by id,
+  running `mergeSession` on any id present in both, so a local-only or cloud-only session is
+  never dropped. `loadSessions()` (new): `kvLoad('sessions')` on boot/poll, merges into `L.sessions`
+  via `mergeSessionList`. `saveSession(sess)` (new): read-merge-write — fetches the CURRENT cloud
+  `sessions` array, merges this one session's local mutation into it (never overwrites the whole
+  array with a possibly-stale local copy), writes the merged array back, and reflects the merged
+  result into `L.sessions`.
+
+- FIX: wired `loadSessions()` into the boot sequence alongside the other loaders, polling every
+  60s in this phase (no live-running UI exists yet to need a faster cadence — Phase 2 drops this
+  to 5s while a session is actually live, matching the plan's original design).
+
+- Files: `x-live-check/index.html` — `L` state (`sessions`, `loaded.sessions`), new
+  `mergeSession()`, `mergeSessionList()`, `loadSessions()`, `saveSession()` (inserted just before
+  `loadActivity()`), boot-sequence wiring. New `x-live-check/scripts/syntax_gate.js` (same
+  temp-dir-based checker already used in `pflx-platform-check`, added here so this repo has the
+  same syntax-gate discipline going forward). Pre-patch backup at `index.html.pre-v013-backup`.
+
+- Verified: `node scripts/syntax_gate.js index.html` — both inline `<script>` blocks clean.
+  14-case Node test suite against the REAL shipped `mergeSession`/`mergeSessionList` (extracted
+  via brace-counting, never reimplemented), covering exactly the persistence-guardrail's required
+  cases: two students' concurrent responses to the same slide both survive; `liveParticipants`
+  unions across two concurrent joins; a stale inbound "active" status can NOT resurrect a
+  locally-ended session, and a terminal status from either side wins even over a newer
+  non-terminal one; `awardedTo` unions and never shrinks even from a stale inbound copy; plain
+  fields follow the newer `updatedAt`; `lastRandomPickId` follows its own independent timestamp;
+  `mergeSessionList` unions by id without dropping a local-only or cloud-only session; a session
+  extended with a new slide keeps all slides after merge, with per-slide responses still unioning
+  correctly when the two sides' slide counts differ; boot wiring and the 60s poll interval are
+  present — 14/14 PASS. Re-ran the existing v0.10/v0.11/v0.12 regression suites (rebrand, Tools
+  cleanup, real badges/modifiers) against the patched file — still 24/24, 11/11, 41/41 PASS.
+
+- HOST ACTIONS: none — this phase ships no visible UI. Nothing changes for testers yet; Phase 1b
+  (native host session-building UI in a new LIVE tab) is next.
+
+- BACKLOG: Phase 1b (host authoring UI), Phase 2 (GO LIVE/run controls/player experience/real
+  reward wiring), and Phase 3 (retire Mission Control's old Live Session systems + the link+QR
+  broadcast tool) remain scoped and ready per the approved plan, to ship as their own patches.
