@@ -10209,3 +10209,61 @@ Not yet scoped: how the roster/PIN lookup should work against the existing `pflx
 - Ennis uploaded `PFLX_Season_Rate_Card.pdf` (Fall Season 2026, Rev 1.0 — 22 Aug 2026) and asked to "find a way to add all information somewhere from the attachment."
 - Transcribed the full rate card (Player/free tier, Season Pass tiers + early-bird/sibling/annual variants, Cohort 15/30/60 + additional-seat pricing, Organisation Essential/Plus/Campus/Enterprise, the "choosing" guidance, and the X-Coin economy explainer) into `docs/PRICING_SEASON_RATE_CARD_FALL2026.md` in this repo, so the pricing/programme structure lives in the project's own reference docs alongside the Handoff rather than only as a PDF in chat history.
 - This is documentation only — nothing in the live app reads or enforces these numbers, and no subscription/tier code was changed. If Ennis wants the platform's own `subscription` tiers (enterprise/standard/org-sponsored/free on `ORGANIZATIONS`/`COHORTS`) reconciled against this card, or wants pricing surfaced anywhere in-app, that needs its own explicit scoping pass — not assumed here.
+
+## BACKLOG — X-Live Native Live Sessions, Phase 3 of 3 (cutover + broadcast tool) — scoped, not yet shipped (Sept 5, Ennis)
+
+Phases 1 and 2 of the "X-Live: Tool Cleanup, Native Live Sessions, and Real X-Coin
+Badges/Modifiers" plan are fully shipped and live-confirmed:
+- PATCH X-LIVE v0.10-v0.12: rebrand, Tools tab cleanup, real Primary/Premium badges +
+  Upgrades/Taxes/Fines from X-Coin.
+- PATCH X-LIVE v0.13 (Phase 1a): merge-safe `sessions` data layer.
+- PATCH X-LIVE v0.14 (Phase 1b): native host session-building UI (🔴 LIVE tab).
+- PATCH X-LIVE v0.15 (Phase 2): GO LIVE, host run controls, player experience, real
+  reward wiring (quiz/attendance/completion XC + badges actually granted).
+- Live-confirmed Sept 5 (this entry): `https://thetomorrowteacher.github.io/x-live/`
+  serves v0.15; `https://www.prototypeflx.com/` serves PFLX_PATCH 133.
+
+Phase 3 (cutover + new broadcast tool) is scoped but deliberately NOT executed this
+session — it touches Mission Control's live navigation for active testers, and no one
+was available to verify nothing broke overnight. Exact current-file anchors so the
+next session can move fast (all in `pflx-platform-check/preview.html`, current HEAD
+`6b10808`, PFLX_PATCH 133 — re-grep before editing, line numbers drift patch to patch):
+
+- Nav item to remove: `<button class="mc-nav-btn mc-host-only" data-mc="livesession"
+  onclick="mcNav('livesession')">` — around L7565-7568, in the TOOLS section of the
+  Mission Control sidebar.
+- Panel to leave in place but now-unreachable once the nav item is gone:
+  `<div class="mc-panel" id="mc-panel-livesession">` — around L11723, containing the
+  legacy "LIVE SESSION ENGINE" (`LS_STATE` idle/lobby/live, join code, Freeze,
+  Broadcast, Player Picker, Random Groups) at ~L11724-11850 (HTML) and its IIFE logic
+  at ~L64190-64580 (`window.lsGoLive`/`lsStartSession`/`lsFreeze`/`lsBroadcastSend`/
+  `lsPlayerPicker`/`lsRandomGroups`, all confirmed same-browser-only — `BroadcastChannel`
+  + `localStorage` + iframe `postMessage`, no Supabase write).
+- "Console Remote" auto-launch to remove: inside `mcStartLiveSession` (~L48205), the
+  line `if (typeof pflxCRShow === 'function') pflxCRShow(index);` around L48246 — stops
+  the old floating remote widget from popping when a host goes live via the
+  Agenda/Slides broadcaster. `pflxCRShow` itself (~L49626) and the rest of the Console
+  Remote widget (~L48897-49760, reveal/freeze/pause/lock/random-pick/breakout
+  rooms/co-host slots/kick) stay defined but become unreachable once this one call site
+  is cut — same "hide, don't delete" call as the rest of this plan; a later cleanup
+  patch can remove the dead code once X-Live's native version has run a few real
+  classes with nothing regressing.
+- Bump `PFLX_PATCH` to 134 and add the usual `PATCH PLATFORM v1.134` Handoff entry when
+  this ships, with the 3-case removal verified (nav item gone, panel unreachable via
+  UI, Console Remote no longer auto-launches) plus a regression check that the
+  Agenda/Slides broadcaster (`mcAgendaNext`/`mcAgendaPrev`, X-Live's `liveagenda`
+  screen) still works — that piece is NOT being retired, only its Console Remote
+  side-effect.
+- Separately, Patch D (new, additive, ships in `x-live-check`, its own `PATCH X-LIVE
+  v0.16`): "Post a Link + QR" broadcast tool on X-Live's Tools tab, reusing Mission
+  Control's already-proven `pflx_broadcasts` app_data key (`pflxPostBroadcast` pattern
+  — read-merge-write, append `{id, message, url, from, at}`, cap at 100) and the
+  `qrcode-generator` CDN library MC already uses successfully. Full design in
+  `PLAN_org_cohort_management_upgrades... ` — see the plan doc `radiant-puzzling-
+  feather` captured this session for the complete Patch D spec (host posts a URL +
+  optional message; every X-Live instance polls `pflx_broadcasts` and shows a
+  dismissible full-screen overlay with a clickable link + QR code on new items).
+
+HOST ACTIONS: none required — this is a "ready to execute" backlog item, not a
+decision point. Recommend shipping it in a session where you're available to spot-check
+Mission Control immediately after, since it touches live nav for active testers.
