@@ -8995,3 +8995,92 @@ scoping decision before starting — see chat):
   editor (data model already supports it — array of `{at, to}` entries —
   only the UI is single-row this patch); Start-vs-Join visual
   differentiation on team-completion task cards.
+
+## PATCH PLATFORM v1.126 — Start/Join/Apply CTAs, Locked→Hidden Rename, Lock-Message Presets (Sep 5, Ennis)
+
+- SYMPTOM / REQUEST: Ennis clarified how the v1.125 access-states model
+  should read to players. "Locked" in his mental model isn't the true
+  host-only-hide state v1.125 introduced — it's the existing
+  cohort-required-but-visible state (the "advertising ploy": everyone can
+  see the Program/Project exists, only the assigned cohort can enter it,
+  and a message tells the rest how to gain access, e.g. "You need a
+  SeasonPass" or "reach out to your Organization"). That ambiguity meant
+  the v1.125 dropdown option literally labeled the wrong state "locked."
+  He also asked for explicit player-facing buttons: **Start** for a
+  cohort member on a restricted item, **Join** for an Open item (anyone),
+  **Apply** when the item's application process is turned on.
+
+- CLARIFIED (confirmed with Ennis via 3 questions before touching code):
+  keep both states as separate concepts, just fix the naming; the
+  Start/Join/Apply → cohort-restricted/Open/applyEnabled mapping is
+  exactly right; lock-message should stay free text with a few preset
+  templates layered on top, not replace it.
+
+- FIX — naming: the v1.125 "Active" bucket (cohort enters directly,
+  everyone else sees a lock badge + optional custom message) was ALREADY
+  the exact "advertising" behavior Ennis described — no logic changed
+  here, it was already correct, just mislabeled elsewhere. The actual
+  fix is renaming the absolute host-only-hide dropdown option (status
+  value `inactive`, still unchanged — no data migration) from "locked
+  (hidden — host only)" to "hidden (host only — nobody else can see
+  this)" across all 4 forms (Program/Checkpoint/Project/Season), so
+  "Locked" in the UI is freed up to mean what Ennis actually uses it for.
+
+- FIX — Start/Join CTA buttons: new `pflxEntryCtaLabel(item)` (sibling of
+  `pflxEffectiveAccessState`, reuses the same cascade so it can never
+  disagree with real access) returns `'Join'` when the item's effective
+  bucket is `open`, else `'Start'` — it is ONLY ever consulted after
+  `pflxPlayerCanEnterItem` has already confirmed the player can enter, so
+  it can only ever pick a button word, never grant access. Wired into the
+  3 places players actually decide whether to click into a Program or
+  Project: `ppRenderPrograms` (Program card grid) gets a green "▶ Start"/
+  "▶ Join" button alongside its existing "✓ OPEN" status badge;
+  `renderProjects` (dashboard Project widget) gets the same as a small
+  badge under the project name; `ppRenderCheckpointDetail`'s embedded
+  project cards get an inline "▶ START"/"▶ JOIN" tag next to the task
+  count. The existing "Apply to Join — $X / Free" button (already built
+  in v1.71, confirmed already correct by Ennis) is unchanged — it already
+  covers the Apply case for both Programs and Projects wherever
+  `applyEnabled` is on.
+
+- FIX — lock-message presets: added a small `<select>` beneath each of
+  the 3 existing free-text lock-message fields (Program/Checkpoint/
+  Project — Season has no lock-message field, unchanged from v1.125)
+  with 3 starter templates ("Needs a SeasonPass" → "You need a SeasonPass
+  to access this.", "Contact your Organization" → "Reach out to your
+  Organization to gain Cohort access.", and a generic cohort-only
+  fallback). Picking one fills the SAME textarea the host can still hand-
+  edit afterward — free text remains the source of truth, presets are
+  pure convenience, nothing new is persisted.
+
+- Files: `preview.html` — new function `pflxEntryCtaLabel`; edited
+  `ppRenderPrograms`, `renderProjects`, `ppRenderCheckpointDetail` (CTA
+  button/badge/tag insertion only — no entry-permission logic touched);
+  4 status dropdowns (Program/CP/Project/Season — copy-only rename); 3
+  lock-message textareas (Program/CP/Project — added sibling preset
+  `<select>`). `PFLX_PATCH` 124 → 125, `PFLX_BUILD` stays `2026.09`.
+
+- Verified: syntax gate clean, 13/13 inline `<script>` blocks. 6-case
+  Node unit test against the real extracted `pflxEntryCtaLabel` (status
+  `open` → Join; legacy/unset/`completed` → Start, never Join for a
+  closed item; a Project inherits Join from a parent Checkpoint's Open
+  status; null-safe/never-throws) — all 6/6 PASS. Re-ran the full 29-case
+  v1.125 regression suite against this file to confirm the rename/CTA
+  additions didn't disturb the underlying access cascade — all 29/29
+  still PASS. Total 35/35 PASS.
+
+- HOST ACTIONS: none required — every existing item keeps behaving
+  exactly as before; the only visible change for hosts is the renamed
+  dropdown option text (same underlying value) and the new preset
+  dropdown next to lock-message fields. Players will now see an explicit
+  "▶ Start"/"▶ Join" button/tag on Program and Project cards they can
+  already enter, where before they just had to know the card was
+  clickable.
+
+- BACKLOG / fast-follow: Checkpoint cards don't get a Start/Join CTA in
+  this patch (Ennis's request named Programs and Projects specifically;
+  Checkpoints also don't have an `applyEnabled` application-process
+  option today) — flagged as a natural next step if he wants the same
+  treatment there. Also unchanged from v1.125: the multi-row schedule
+  editor and the "Jamie already started this — join their submission"
+  team-completion card differentiation remain open backlog items.
