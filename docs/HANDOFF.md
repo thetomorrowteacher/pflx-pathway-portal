@@ -9666,3 +9666,44 @@ scoping decision before starting — see chat):
 
 - HOST ACTIONS: none required — this only changes what photo-less players' avatar circles show;
   anyone with an uploaded profile image is unaffected everywhere.
+
+## PATCH XCOIN v1.6 — Removed Duplicate Floating "PFLX BETA" Badge (Sep 5, Ennis-reported via screenshot)
+
+- SYMPTOM: Ennis, screenshot of the Host Dashboard with a hand-drawn circle around a small
+  gradient "PFLX" wordmark + amber "BETA" pill floating in the top-right of the content area:
+  "Remove the PFLX Beta branding as it is not needed in this area/all the way. Its already in
+  the toolbar."
+
+- ROOT CAUSE: `app/components/SideNav.tsx` defined a `PflxBadge()` component — a `position:
+  fixed; top:14px; right:20px` logo+BETA pill — and rendered it via `<PflxBadge />` at the top
+  of BOTH of SideNav's return paths (the collapsed-sidebar toggle view and the normal expanded
+  sidebar view). Since `SideNav` is mounted on every X-Coin admin and player page, this
+  duplicate badge appeared everywhere alongside the real PFLX Platform toolbar branding
+  (injected separately, above X-Coin's own chrome) — pure redundant UI, exactly as reported.
+
+- FIX: removed the `PflxBadge` component definition and both `<PflxBadge />` call sites from
+  `app/components/SideNav.tsx`. No functional behavior changes — this was decorative-only, with
+  `pointerEvents: "none"`.
+
+- Files: `pflx-xcoin-check/app/components/SideNav.tsx`.
+
+- Verified: `tsc --noEmit` clean on the touched file (same one pre-existing, unrelated error in
+  `app/admin/task-management/page.tsx` confirmed via `git show` to be identical to HEAD). 7-case
+  Node structural test on the real shipped file — confirms `PflxBadge` and the logo image
+  reference are gone everywhere, JSX fragment tags stay balanced, and both edited return blocks
+  (collapsed toggle button, expanded `<nav>`) still open correctly right after the removed call
+  sites — all 7/7 PASS.
+
+- HOST ACTIONS: none required — purely decorative removal, every page keeps its real toolbar
+  branding untouched.
+
+- BACKLOG / IN PROGRESS: Ennis also flagged that X-Coin's own floating AI chat widget
+  (`app/components/AIAssistant.tsx`, mounted admin-wide via `app/admin/layout.tsx` — internally
+  already self-labels as "PFLX X-Bot" with submission-review approve/reject scoring via
+  `/api/analyze-submission`) is redundant and its functions should be folded into "X-Bot"
+  instead of living as a separate widget here. Confirmed X-Coin has its own local X-Bot
+  implementation (this widget, plus `app/components/PlayerAssistant.tsx` on the player side,
+  plus `app/lib/xbotBriefing.ts`) distinct from whatever canonical X-Bot surface Ennis is
+  picturing being the target (likely Mission Control's X-Bot). Needs Ennis's input on where the
+  canonical X-Bot should live and how the submission-review analysis capability should be
+  exposed there before this is safe to implement — not done yet, asked Ennis directly.
