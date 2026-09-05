@@ -10166,3 +10166,32 @@ scoping decision before starting — see chat):
      the recent plugins we used with the Tomorrow Teacher site." Flagged via an annotated
      screenshot of that screen. Needs a follow-up with Ennis to pin down which specific
      TheTomorrowTeacher.org animation plugin/library he means before scoping.
+
+## DATA SURGERY — Cohort Cleanup: DD Core 1/2/3/5, DD Studio 2/3/7 → PlayerPool, cohorts deleted (Sept 5, Ennis)
+- CONTEXT: Ennis asked to remove all players from 7 legacy cohorts (DD Core 1, DD Core 2, DD Core 3, DD Core 5, DD Studio 2, DD Studio 3, DD Studio 7), move them into PlayerPool, then delete the cohorts — confirmed "Proceed as originally scoped" via AskUserQuestion (same 7 cohorts, no changes).
+- ROOT CAUSE: n/a — data cleanup, not a bug fix. Note for future surgery on cohorts: `pflxCohortHub`'s `playerCohortsOf(p)` (preview.html ~L16744-16990) gives absolute priority to a player's `cohorts[]` array over their free-text `cohort` string whenever that array is non-empty — a naive string-match on `cohort` alone will wrongly "fix" records whose real membership (the array) already points elsewhere.
+- FIX: Read the real `pflxCohortHub.remove()`/`playerCohortsOf()` logic straight from `preview.html` and replicated it faithfully in a Python transform, run against the actual current Supabase data (not synthetic fixtures), with every affected record's before/after values reviewed before any write.
+- DATA (Supabase project `hyxiagexyptzvetqjmnj`, table `app_data`, three keys, each in its own BEGIN/COMMIT transaction):
+  1. **51 of 52 candidate `pflx_player_<id>` rows** updated — `cohort`/`cohorts` set to `"PlayerPool"`/`["PlayerPool"]` wherever any of the 7 target cohorts was a hit. 1 candidate (`player-import-1774891628716-25`) correctly left unchanged: its `cohorts` array is `["Global Digital Intern"]`, which wins over stale `cohort` text that happened to mention "DD Studio 7" — intentional fidelity to the array-priority rule, not a miss.
+  2. **`pflx_mc_players` cache (141-item array) — 54 of 141 items updated in place**, touching only each item's `cohort`/`cohorts` fields via per-index `jsonb_set` (every other field of every item, and all 87 untouched items, left byte-identical); `updatedAt` bumped. Includes 4 cache-only orphan ids (`-16`, `-35`, `-55`, `-70`) with no canonical `pflx_player_<id>` row at all — pre-existing cache/canonical drift, not caused by this cleanup, but correctly updated here since the real `mcPlayers.forEach(fix)` loop runs independently of the canonical roster loop. 2 more candidates left unchanged for the same array-priority reason (`player-25` and `player-import-1774891628716-31`, whose `cohorts` arrays are `["Global Digital Intern"]` and `["Falcon Studios"]`).
+  3. **`pflx_organizations`** — removed all 7 names from `orgs.ASD.cohorts` (leaving `Falcon Studios`, `Falcon Studios (MS Division)`); appended all 7 names to `cohortPatch.removed` (read by `pflxCohortPatchApply()` on every boot to `delete COHORTS[name]`), so the 7 cohorts vanish from the registry without touching any other org/cohort; `updatedAt` bumped.
+- Verified: post-write SELECT across all three keys confirms **zero** remaining rows/items whose effective cohort membership (array-priority-then-string, same rule as the transform) references any of the 7 names, and `cohortPatch.removed` now contains all 7. No code changed, no commit needed for the data itself — this entry is the record.
+- HOST ACTIONS: none — transparent to affected players; their next login resolves them into PlayerPool via normal cohort lookup.
+- BACKLOG: the 4 orphaned `pflx_mc_players` cache ids (`-16`/`-35`/`-55`/`-70`) with no canonical player row are a pre-existing data-consistency issue, unrelated to this cleanup — worth a future audit pass, not fixed here.
+
+## BACKLOG — Organization & Cohort Management Upgrades (scope confirmed Sept 5, not yet started)
+Ennis moved this to the top of the queue and confirmed scope via AskUserQuestion (multiSelect):
+- Bulk player operations (multi-select players, bulk move/cohort-assign/org-assign, etc. — not yet designed).
+- Cohort/org structure & UI improvements (beyond the plain list currently in Mission Control's org admin).
+- Permissions & roles (who can do what across orgs/cohorts — not yet designed, ties into Master Host vs. regular host access levels).
+- Image insert into Organization (referenced as "mentioned before" — an org-level image/logo upload, previously discussed but never implemented; needs to be traced back to that earlier conversation before scoping).
+Not yet scoped in implementation detail — needs its own planning pass given the breadth (4 sub-areas confirmed, no architecture decided yet).
+
+## BACKLOG — "X-Live Mode (only)" standalone login for free players/cohorts/orgs (Sept 5, Ennis — put at top of queue)
+Ennis wants a Master-Host-controlled mode where a chosen cohort/org can be flagged "X-Live Mode (only)," and players under that flag:
+- Skip the entire onboarding/diagnostic flow entirely — they log in directly against their pre-built roster entry (no account creation, no diagnostic).
+- Only ever experience X-Live: live sessions (Classcraft/ClassDojo-style) plus any Battle Arena challenges connected inside X-Live.
+- Cannot see or access Mission Control, X-Coin, Core Pathways, or DarkCampus unless those are separately turned on for them.
+- Log in via a dedicated URL, proposed as `www.prototypeflx.com/xlive`: pick their name off the roster, enter their PIN, land straight in X-Live. Page should carry the "The Tomorrow Teacher | production" footer credit (matching the branding convention already used elsewhere in the app).
+- This login path is gated per-org/per-cohort by a new "X-Live Mode (only)" flag, settable only by Master Host.
+Not yet scoped: how the roster/PIN lookup should work against the existing `pflxCohortHub`/roster and X-Live's own `cohortList()`/SSO-identity pattern (X-Live currently assumes cohort-match via the parent app's identity, not a standalone PIN login of its own — this is new surface, not a reuse of an existing path); where the "X-Live Mode (only)" flag lives (likely a new field on the org/cohort record, alongside `apps.arena/xcoin/pathways/darkcampus`); whether `/xlive` is a new route in `x-live-check` itself or a thin new gate in front of it. Needs its own planning pass before implementation — logged here per Ennis's explicit "put this at the top of your list."
