@@ -9292,3 +9292,36 @@ scoping decision before starting — see chat):
 - Bumped `PFLX_PATCH` 127 → 128 (`PFLX_BUILD` already current at `2026.09`).
 
 - HOST ACTIONS: none required — purely visual, no config change.
+
+## PATCH LITE v0.8 — Remove Team Pill from Players Roster + Reposition/Enlarge Projector Watermark (Sep 5, Ennis-requested)
+
+- SYMPTOM/REQUEST: (1) the CLASS tab's "Players (N)" roster grid showed each
+  player's team name as a small colored pill above their avatar (Ennis:
+  "remove the team names in this view" — screenshot of the SELECT ALL
+  player-picker grid). (2) the PFLX Live watermark shown on the projector
+  screens (Team Battle / weekly leaderboard / Class Reward Party views) sat
+  small in the bottom-left corner; Ennis asked for it in the top-left corner
+  and a bit larger.
+
+- FIX: `rClass()`'s roster-card template no longer computes or renders the
+  `.tm` team-name pill (`const team = L.cfg.teams.assign[p.id]` and its
+  conditional `<div class="tm">` badge removed) — cards now show only the
+  avatar, name, and XC balance, matching the SELECT ALL picker use case
+  where the team affiliation isn't needed. `projTeams()` and `projOpen()`'s
+  `draw()` (the two places rendering the projector-screen watermark) both
+  moved the `<img>` from `position:fixed;bottom:20px;left:22px` to
+  `top:20px;left:22px` and grew it from 20px to 34px tall. The bottom-right
+  NEXT/CLOSE projector controls are untouched.
+
+- Files: `pflx-lite-check/index.html` — `rClass()` roster-card template,
+  `projTeams()`, `projOpen()`'s `draw()`.
+
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 11-case Node
+  test against the real shipped markup: no `.tm` class or `teamColor(team)`
+  call remains anywhere in the file; the roster card still renders avatar,
+  name, and XC (only the team badge is gone); both projector watermark
+  occurrences are now top-left at 34px tall and no bottom-left/20px
+  occurrence remains; the CLOSE/NEXT projector controls are unchanged —
+  11/11 PASS.
+
+- HOST ACTIONS: none required — purely visual.
