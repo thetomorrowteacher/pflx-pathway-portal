@@ -9556,3 +9556,64 @@ scoping decision before starting — see chat):
   appears in X-Live automatically. If a session ever shows the 4-name/DEFAULT_CFG fallback
   instead of real badges, that means X-Live couldn't reach Supabase at boot — a refresh should
   fix it, and is the intended safe fallback rather than a broken Tools tab.
+
+## PATCH PLATFORM v1.130 — Brand Initials Everywhere, "ADD LOGO" Prompt on Home Base + Portfolio (Sep 5, Ennis-requested, annotated screenshots)
+
+- SYMPTOM/REQUEST: Ennis, annotated screenshots of Home Base (player "Kenex") with a hand-drawn
+  arrow at the avatar circle labeled "ADD LOGO": "When a player logs in they should see Add Logo
+  in the Profile Picture area if there is none added. Behind it...they should just see there
+  brandnames initials. We should see Brandname initials in every app. However, here on Homebase
+  and in Portfolio...they should see Add Logo." Home Base's hero avatar (`initPlatform()`,
+  `.player-avatar-lg`) and two read-only avatars inside Mission Control's embedded Player Portal
+  preview (`ppRenderHome()`, `ppRenderPortfolio()`) still fell back to the static PFLX Core logo
+  file (`public/PFLX Core Flat 6.png`) whenever a player had no uploaded image — making every
+  photo-less player look like the platform brand itself, exactly the "we should see Brandname
+  initials in every app" problem Ennis flagged.
+
+- ROOT CAUSE: this fallback pattern had ALREADY been fixed correctly in two other places —
+  the toolbar avatar (`updateToolbarStatus()`) and the top-level Portfolio avatar
+  (`portfolioRender()`) — both with an explicit code comment: "We never fall back to the PFLX
+  Core logo: that made photo-less players look like the platform brand itself." Home Base's hero
+  avatar and the two Mission Control Player Portal preview cards were simply never brought in
+  line with that established pattern, so the bug was narrower than the screenshots alone
+  suggested — a leftover inconsistency, not a platform-wide gap.
+
+- FIX (Home Base — `initPlatform()`, `.player-avatar-lg`): replaced the PFLX-logo fallback
+  computation with `heroHasImg` (boolean) / `heroAvatarSrc` (empty string when no image) /
+  `heroInitial` (brand → display name → "P", first letter, uppercased) — same source-of-truth
+  chain the toolbar/Portfolio already use. The hero markup now branches: an uploaded image renders
+  as before, and the no-image case renders the brand initial on the same cyan/violet gradient
+  used everywhere else, with an "ADD LOGO" prompt overlaid on top (`position:absolute;inset:0`,
+  a dark scrim, small monospace text) — Home Base is one of the two surfaces Ennis named that
+  gets this prompt. The existing camera-icon badge and click-to-upload file input are unchanged.
+
+- FIX (Portfolio — `portfolioRender()`): the initial fallback here was already correct; added the
+  same "ADD LOGO" prompt overlay on top of the initial (the second of the two named surfaces).
+  Required one supporting change to the static markup: `#portfolio-avatar` gained
+  `position:relative` so the overlay's `position:absolute;inset:0` anchors to the avatar box
+  instead of the page.
+
+- FIX (Mission Control's embedded Player Portal preview — `ppRenderHome()` and
+  `ppRenderPortfolio()`): these are read-only achievement/summary cards inside Mission Control's
+  "Player Portal" sub-view (`ppNav`/`mcRenderPlayerDashPreview`) — distinct from the top-level
+  Home Base and Portfolio apps, and with no click-to-upload affordance of their own. Per Ennis's
+  literal scoping ("Homebase and Portfolio" get the prompt; "every app" gets the initials), these
+  two got the plain brand-initial fallback ONLY, with no ADD LOGO prompt — adding a non-functional
+  CTA to a display-only element would have been misleading UI.
+
+- Files: `pflx-platform-check/preview.html` — `initPlatform()` (hero avatar compute + markup),
+  `#portfolio-avatar` static style, `portfolioRender()` (avatar render), `ppRenderHome()` and
+  `ppRenderPortfolio()` (avatar fragments). `PFLX_PATCH` bumped 129 → 130.
+
+- Verified: syntax gate clean (13/13 inline `<script>` blocks). 30-case Node test extracting the
+  real changed code (exact-substring extraction from the shipped file, never reimplemented) —
+  covers: the hero-avatar compute block (image present → cover fit + real src; no image → empty
+  src, never the PFLX logo, initial from brand → displayName → "P"); the hero markup ternary
+  (image branch renders `<img>` with no prompt; no-image branch renders the initial AND the ADD
+  LOGO prompt, never references the PFLX logo file); the Portfolio avatar render (same coverage,
+  plus the static `position:relative` markup fix); `ppRenderHome`/`ppRenderPortfolio` (image
+  branch renders `<img>`; no-image branch renders the plain initial with NO ADD LOGO prompt and
+  no PFLX logo reference) — all 30/30 PASS.
+
+- HOST ACTIONS: none required — this only changes what photo-less players see; anyone who already
+  has an uploaded profile image is unaffected everywhere.
