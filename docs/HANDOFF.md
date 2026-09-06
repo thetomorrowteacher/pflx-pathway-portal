@@ -10697,3 +10697,79 @@ Mission Control immediately after, since it touches live nav for active testers.
   entirely; every other settings tab (host, xbot, general) is completely unaffected by the new
   special case. Pre-patch backup at `preview.html.pre-v140-backup`.
 - HOST ACTIONS: none required — refresh and the Cohort Manager tab now opens directly.
+
+## PATCH X-LIVE v0.18 — Live Streaming Suite, Phase 1a: LiveKit token Edge Function (Sept 6, Ennis)
+
+- CONTEXT: kicks off the new "Live Streaming Suite" plan (X-Live's "Home
+  Theater" tab becomes a real hybrid-classroom video system: host cam/mic or
+  screen-share broadcast, live to the class, with recording/backgrounds/
+  noise-reduction/co-host/multiview as later phases). This plan supersedes
+  the now-fully-shipped "Native Live Sessions" plan in the same plan-mode
+  file. PFLX has no media server anywhere today (static GitHub Pages/Vercel
+  + Supabase used purely as a KV store) -- real multi-party video needs a
+  WebRTC SFU, so building one from scratch was ruled out. Ennis chose
+  self-hosted LiveKit (open-source WebRTC SFU) as the backend; the media
+  server itself needs a persistent host with UDP ports open (can't run on
+  Vercel/GitHub Pages/a Supabase Edge Function) -- Ennis is provisioning
+  that VPS as a host action (SETUP.md + docker-compose handed to him).
+- SECURITY FINDING (documented, not glossed over): while designing the
+  token function, confirmed X-Live's (and every PFLX sub-app's) "am I the
+  host" check is entirely client-declared -- URL params or an
+  unauthenticated `postMessage` accepted from ANY origin
+  (`window.addEventListener('message', ...)` in x-live-check/index.html has
+  no `event.origin` check; the Platform's own `pflxBroadcastIdentity()`/
+  `broadcastIdentity()` send with targetOrigin `'*'`, and this is the
+  DOCUMENTED house convention in `docs/SUB_APP_SSO_CONTRACT.md`, not a
+  one-off bug). Also confirmed PFLX has no real server-verified login
+  anywhere: `/xlive`'s own PIN check (`pflxXLivePinMatches`, v1.138) runs
+  client-side against a `PLAYERS` roster already loaded into the page, and
+  `pflxXLiveBuildRedirectURL` even puts the PIN in the redirect URL's query
+  string -- so a "PIN check" gate inside the token function would only be
+  checking a secret the client already possesses, not real security.
+  Presented this honestly to Ennis (initially under-scoped the needed fix
+  as "modest," corrected once the real picture was clear). DECISION: ship
+  the video feature at today's platform-wide trust level rather than fake
+  extra security in one function; add REAL, cheap safeguards instead: the
+  host must manually tap "Start Broadcasting" every time (Phase 1b, never
+  automatic) and every viewer gets an always-visible one-tap Leave button
+  (Phase 1c). BACKLOG: real server-verified login across the whole platform
+  is tracked as its own, separate, larger project, worth doing regardless
+  of video.
+- FIX: deployed a new Supabase Edge Function `livekit-token` on project
+  `hyxiagexyptzvetqjmnj` (function id `f92590ff-7c7a-432d-ba00-10949f382249`).
+  Takes `{roomName, identity, role}`, mints a LiveKit `AccessToken` via
+  `livekit-server-sdk@2` (Deno `npm:` import) with `canPublish`/
+  `canPublishData` true only when `role === 'host'`, `canSubscribe` always
+  true, 6h TTL. Validates `roomName`/`identity` are present and charset-safe
+  before minting (fails closed on malformed input). The LiveKit API key/
+  secret live ONLY inside this function's source (no secrets-management
+  tool was available via the Supabase MCP this session, so they're inline
+  constants rather than env vars -- still never shipped to any client file,
+  which was the actual requirement; revisit as an env var if/when Ennis
+  sets one via the Supabase dashboard or CLI). `LIVEKIT_URL` is a
+  placeholder constant (`PLACEHOLDER_UPDATE_ONCE_VPS_IS_LIVE`) -- update it
+  (one line, no redeploy of logic needed) once Ennis's VPS is live.
+- Verified: curled the deployed function directly with the project's anon
+  key. A `role: 'host'` request returns a token whose decoded JWT grants
+  are `canPublish: true, canPublishData: true, canSubscribe: true`; a
+  `role: 'player'` request returns `canPublish: false, canPublishData:
+  false, canSubscribe: true`; a request missing `roomName` is rejected
+  (400); a request with invalid characters in `identity` is rejected (400).
+  No client-side file changed yet, so no `PFLX_PATCH`/version bump this
+  patch -- x-live-check/index.html changes start at the second half of
+  Phase 1a (LiveKit JS SDK + room-connect plumbing) once the VPS URL is in
+  hand.
+- NEW SKILL: `explain-plainly` (proposed to Ennis this same session) --
+  Ennis asked for technical/programming explanations to lean more practical
+  and less jargon-heavy going forward; applies to all technical
+  conversation with him, not just PFLX.
+- HOST ACTIONS: provision the self-hosted LiveKit VPS (SETUP.md + docker-
+  compose.yml + livekit.yaml already handed over) and send back the server
+  URL to unblock the rest of Phase 1a.
+- BACKLOG: real server-verified login/auth across all of PFLX (see Security
+  Finding above); Phase 1b (host camera/mic/screen-share publish UI +
+  device picker) and Phase 1c (player-side viewer, pulsing-avatar speaking
+  indicator) once the VPS URL lands; recording, virtual backgrounds, noise
+  reduction, co-host control, multiview player-screen dashboard, and native
+  Loom/Flip/CapCut-style tools, all documented in the plan file's Backlog
+  section, not built yet. Lockdown mode explicitly descoped by Ennis.
