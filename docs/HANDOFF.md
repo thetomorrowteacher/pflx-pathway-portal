@@ -10911,3 +10911,96 @@ Mission Control immediately after, since it touches live nav for active testers.
   "remove entry points only" scope. If any other entry points into either
   panel turn up later (this pass covered the two found on the Dashboard),
   handle the same way: redirect, don't delete.
+
+## PATCH X-LIVE v0.21 — critical YouTube-embed hotfix + Phase 2 embed slide types: Google Slides, Google Doc, HTML embed (Sept 6, Ennis)
+
+- SYMPTOM/CONTEXT: while scoping Ennis's Phase 2 request ("I want to add
+  embeds as a feature... a canva or google slide or google doc slide... an
+  html embed slide") by reading `rLiveNative()` closely, found that the
+  YouTube/OBS embed feature shipped in PATCH X-LIVE v0.19 had a live
+  ReferenceError bug: `esc(sleubeEmbedId)` instead of
+  `esc(s.youtubeEmbedId)`. `sleubeEmbedId` is not defined anywhere. This
+  throws the instant a session has `youtubeEmbedId` set — i.e. the moment a
+  host actually turns on YouTube broadcast mode — which crashes the ENTIRE
+  native live-session view (`rLiveNative()`) for every player in that
+  session, not just the video tile. No tester had hit it yet because the
+  feature is brand new and apparently hadn't been toggled on in the wild.
+  Confirmed via grep this was the only reference to the undefined name in
+  the file.
+- ROOT CAUSE: a typo introduced while writing v0.19 (a stray/garbled
+  variable name in the template-string concatenation), missed by the syntax
+  gate because it's valid JS syntax (a ReferenceError is a runtime error,
+  not a parse error) and missed by v0.19's own unit tests because those
+  tested `pflxYouTubeExtractId` in isolation, not the `rLiveNative()`
+  render path that actually uses the stored id.
+- FIX 1 (hotfix), `x-live-check/index.html`: `esc(sleubeEmbedId)` →
+  `esc(s.youtubeEmbedId)`. One-character-class fix, verified against the
+  actual player-facing YouTube embed markup.
+- FIX 2 (feature), `x-live-check/index.html`: three new slide types added
+  to `SLIDE_TYPES` — `google_slides`, `google_doc`, `html_embed` — all
+  iframe-based, all independent of the host's LiveKit VPS (still pending —
+  see Phase 1a/1b/1c backlog below), all reusing the existing `sl.prompt`
+  field to hold whatever the host pastes in (no slide-schema change, same
+  pattern as the `youtubeEmbedId` session field from v0.19). A shared
+  `meta.isEmbed` flag on those three types drives:
+  - `renderSlideModal()`: the existing "Content" textarea gets an
+    embed-aware label and a helpful placeholder per type (via new
+    `liveSlideContentLabel`/`liveSlideContentPlaceholder`), so hosts aren't
+    guessing what to paste.
+  - `rLiveNative()` (player view) and `rLiveRun()` (host's own current-slide
+    preview, so the host sees exactly what players see): both now render an
+    iframe (via new `pflxSlideEmbedHtml`) instead of showing the raw
+    URL/embed-code as plain text.
+  - Google Slides/Doc: a host can paste either a normal "Share" link or an
+    already-correct embed/publish link — new `pflxGoogleEmbedUrl` extracts
+    the file id and rewrites it to the canonical embed form
+    (`/presentation/d/ID/embed?...` or `/document/d/ID/preview`) either way,
+    so re-normalizing an already-embed link is a harmless no-op rather than
+    a special case to get wrong. Mirrors the pflxYouTubeExtractId precedent
+    of forgiving whatever URL shape a host actually copies.
+  - HTML embed: accepts a pasted `<iframe>` snippet (src extracted) or a
+    bare URL, rendered as a normal unrestricted iframe. If the host pastes
+    something else entirely — arbitrary markup with no iframe/URL in it,
+    e.g. a raw `<script>` snippet — it is deliberately NOT injected into
+    this page's own DOM (that would let host-authored markup read/touch
+    player session state); instead it renders inside a sandboxed `srcdoc`
+    iframe with `sandbox="allow-scripts allow-popups allow-forms
+    allow-presentation"` and NO `allow-same-origin`, which forces the
+    embedded content into its own opaque origin — its scripts still run,
+    but they can't read this page's DOM, cookies, or localStorage. This
+    resolves the "needs a light sanitization pass" note that had deferred
+    `embed` as a slide type since it was first scoped.
+- NOT included in this patch (documented, not silently dropped): the
+  "Play tab" embed (embedding X-Live's own Vault Rush game as a slide) —
+  clarified with Ennis what it means, but still needs a design decision on
+  how Vault Rush's own room-code/scoring system should relate to the
+  Nearpod slide deck's session/participant model before it can be built. A
+  Canva embed slide (Canva's own public "present" embed URL format hasn't
+  been checked yet). A screen-share slide (depends on Phase 1b — host
+  screen-share publish — which is blocked on Ennis's LiveKit VPS, still not
+  provisioned).
+- Verified: `node scripts/syntax_gate.js index.html` clean (2/2 blocks).
+  Extracted `liveSlideContentLabel`, `liveSlideContentPlaceholder`,
+  `pflxGoogleEmbedUrl`, `pflxSlideEmbedHtml`, and the real `esc()` helper
+  from the shipped file via brace-counting (not reimplemented) and unit
+  tested, 19 cases, all PASS: content labels for each embed type and the
+  null fallback for non-embed types; Slides/Doc URL rewriting for a plain
+  share/edit link, an already-embed link (idempotent), a `<iframe>`
+  snippet, non-URL garbage, empty input, and an unrelated https URL passed
+  through unchanged; the built iframe HTML for a Slides slide (rewritten
+  src, no sandbox attribute); an HTML-embed slide with a bare URL (plain
+  iframe, no sandbox); an HTML-embed slide with a pasted `<iframe>` (src
+  extracted); an HTML-embed slide with raw markup and no src/URL (sandboxed
+  `srcdoc` iframe, confirmed `allow-same-origin` is absent); no-prompt-yet
+  and null-slide edge cases (empty string, not a broken iframe).
+- BACKLOG (unchanged from the plan, restated for continuity): Phase
+  1a/1b/1c (LiveKit video room: token issuance, host camera/mic/screen
+  publish, player-side video tile) remain blocked on Ennis provisioning the
+  Oracle Cloud VPS. Phase 1e (Audience mode — open the video, not the
+  slide/agenda controls, to every logged-in member as a "game show"
+  audience) not started. Phase 1f (camera as a corner overlay + Host/Player
+  toggle wired into a running live session) not started. The
+  persistent-on-screen UI during a live session (Tools popup, Leaderboard,
+  Feed, View Team, session Code staying visible rather than the live view
+  taking over the whole screen) not started. Canva embed slide,
+  screen-share slide, and the Play-tab/Vault-Rush embed as noted above.
