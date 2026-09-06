@@ -11004,3 +11004,116 @@ Mission Control immediately after, since it touches live nav for active testers.
   Feed, View Team, session Code staying visible rather than the live view
   taking over the whole screen) not started. Canva embed slide,
   screen-share slide, and the Play-tab/Vault-Rush embed as noted above.
+
+## PATCH PLATFORM v1.142 — Profile Widget Dropdown: glass/blur redesign + customizable widget grid (Sept 6, Ennis)
+
+- CONTEXT: Ennis sent a detailed redesign request (3 screenshots) for the
+  Console's toolbar profile dropdown — "glass transparent... blur out the
+  entire screen when selected... resizable widgets... customizable by the
+  player or host... save for each user... futuristic animation... widgets
+  should have a glow/edge matching the Reality Warp setting... X-Coin,
+  Badges, Rank now absent and selectable as a widget... swappable pages if
+  widgets exceed the screen... profile picture/brandname panel should be
+  larger." Given the scope, used `AskUserQuestion` (3 questions) before
+  building: (1) sequencing — Ennis chose "phase it": ship the glass/blur
+  shell + widget engine + per-user save now, X-Live session integration as a
+  follow-up patch; (2) widget pool — "same, but Sign Out stays pinned":
+  X-Coin/Badges/Rank/Wallet/Tasks/Leaderboard/Sound become widgets; Profile
+  info, Portfolio shortcut, Settings, and Sign Out stay fixed; (3) save
+  scope — "this device only (recommended to start)": layout saves to
+  localStorage keyed by user id, cross-device cloud sync explicitly deferred
+  (no per-user cloud-sync mechanism exists yet in PFLX today — would be new
+  infra).
+- FIX, `pflx-platform-check/preview.html`, 7 changes:
+  1. Version bump `PFLX_PATCH` 140 → 142 (this also corrects a gap: the
+     v1.141 patch shipped earlier without bumping `PFLX_PATCH` at all — the
+     live app was still reporting patch 140 despite v1.141 being live).
+  2. New CSS block after `:root` — `.pflx-dd-backdrop` (fixed full-screen
+     blur overlay, 0→14px `backdrop-filter` transition), `.pflx-dd-open`
+     (opacity/transform transition for the dropdown panel itself),
+     `.pflx-widget-grid` (`display:grid; grid-auto-flow:dense` so mixed
+     1x1/2x1/2x2 widget sizes auto-pack with no gaps, no custom bin-packing
+     needed), `.pflx-widget` + hover/dragging states, `.pflx-widget-resize-
+     handle`, page-dot/arrow styles. Every widget/panel color is drawn from
+     the SAME `--cyan`/`--gold`/`--border-glow`/`--dark-panel` variables
+     every one of the 25 Reality Warp skins already redefines (confirmed by
+     reading the skin CSS blocks before building) — so each skin gets a
+     visually distinct widget design for free, no per-skin widget CSS
+     needed anywhere.
+  3. Replaced `#pflx-profile-dropdown`'s inner markup: panel widened
+     280px→320px with a max-height + scroll, glass background
+     (`var(--dark-panel)` + `blur(18px)`), opacity/transform entrance
+     transition; avatar enlarged 48px→72px with a glow ring; name font
+     13px→17px; the old fixed 3-stat row (X-Coin/Badges/Rank) and 4 fixed
+     action buttons (Wallet/Tasks/Leaderboard/Sound) were removed and
+     replaced with `#pflx-widget-grid` + `#pflx-widget-page-dots`
+     containers, populated at render time; Portfolio shortcut and Settings
+     stay as fixed buttons above the grid; Sign Out stays fixed at the
+     bottom, unchanged, per Ennis's confirmed scope.
+  4. Homebase: added a "🗂 MY PORTFOLIO" quick-access button directly under
+     the `.player-subtitle` line (the "role · cohort" brandname area) on the
+     Home Base player-identity card, per Ennis's explicit ask for a
+     portfolio shortcut there too.
+  5. New widget engine (inserted before `pflxRenderProfileDropdown`):
+     `PFLX_WIDGET_CATALOG` (the 7-widget pool with icon/label/kind/default
+     size/action), `pflxWidgetCatalogMeta`, `pflxDefaultWidgetLayout`,
+     `pflxMergeWidgetLayout` (reconciles a saved layout against the current
+     catalog — keeps saved order/sizes for known ids, appends new catalog
+     ids, drops removed ones — this is what protects a saved layout from a
+     future catalog change), `pflxLoadWidgetLayout`/`pflxSaveWidgetLayout`
+     (localStorage, keyed `pflx_widget_layout_<userId>`),
+     `pflxComputeWidgetPages` (greedy pack by running cell total, a widget
+     never splits across a page — this is the "swappable pages" behavior),
+     `pflxRenderWidgetGrid` (renders the current page + page dots/arrows),
+     drag-to-reorder and drag-to-resize via Pointer Events (not HTML5
+     drag-and-drop, so the same code path covers mouse and touch) —
+     dragging a widget onto another immediately swaps their positions
+     (chosen over a floating-clone drag as a simpler, more robust
+     implementation given this patch's scope — noted here plainly, not
+     hidden), dragging a widget's corner handle resizes it between 1x1 and
+     2x2 grid cells. Real page navigation is via explicit ‹›  arrows/dots
+     only (not a swipe gesture on the grid) so it can't conflict with the
+     reorder-drag gesture on the same surface.
+  6. `pflxRenderProfileDropdown`: no longer writes to the removed
+     `pd-xc`/`pd-badges`/`pd-rank` elements; stashes the computed stats onto
+     `window._pflxProfileStats` and calls `pflxRenderWidgetGrid()` so the
+     X-Coin/Badges/Rank widgets (if present in the user's layout) redraw
+     with current values.
+  7. `pflxToggleProfileDropdown`/`pflxCloseProfileDropdown`/the click-outside
+     listener: rewritten from an instant `style.display` flip to a
+     class-driven animation (`.pflx-dd-open` on the panel, `.pflx-dd-
+     backdrop-on` on a lazily-created full-screen backdrop div), with a
+     forced reflow (`void dd.offsetWidth`) before adding the open class so
+     the transition isn't skipped on first open. Clicking the backdrop
+     itself also closes the dropdown now (previously only clicking outside
+     the anchor did).
+- NOT included in this patch (explicitly deferred per Ennis's own phasing
+  answer): X-Live session-stream integration of the widget system (widgets
+  "working within X-Live Sessions streams") — follow-up patch. Cross-device
+  cloud sync of the saved layout — would need a new per-user cloud-sync
+  mechanism PFLX doesn't have today; deferred per Ennis's save-scope answer.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13 blocks).
+  Extracted `PFLX_WIDGET_CATALOG`, `PFLX_WIDGET_PAGE_CELLS`,
+  `pflxWidgetCatalogMeta`, `pflxDefaultWidgetLayout`,
+  `pflxMergeWidgetLayout`, and `pflxComputeWidgetPages` from the shipped
+  file via brace-counting (never reimplemented) and unit tested, 17 cases,
+  all PASS: the widget pool matches Ennis's confirmed 7-widget scope in
+  order; catalog-meta lookup for a known/unknown id; default layout sizes
+  (stat widgets 1x1, action widgets 2x1); merge with no saved data returns
+  the full default layout; merge preserves saved order/sizes for known ids
+  and appends any missing catalog ids; merge clamps an out-of-range saved
+  size into [1,2]; merge drops a saved id no longer in the catalog (a
+  removed widget doesn't linger forever); merge appends a hypothetical new
+  catalog id not yet in a saved layout; merge collapses duplicate saved
+  entries for the same id to one; page-packing keeps the real 7-widget
+  default layout (11 cells) on a single page of 12; page-packing splits an
+  all-2x2 layout (28 cells) across 3 pages of ≤12 each; no widget ever
+  splits across a page boundary; an empty layout still produces one (empty)
+  page rather than zero pages.
+- HOST ACTIONS / BACKLOG: none required from Ennis to use this patch — it's
+  purely client-side and backward compatible (a first-time user with no
+  saved layout gets the full default layout automatically via
+  `pflxMergeWidgetLayout(null, catalog)`). Backlog, in priority order per
+  Ennis's own phasing: (1) X-Live session-stream widget integration; (2)
+  cross-device cloud sync of the saved widget layout, once a per-user
+  cloud-sync mechanism exists for PFLX generally.
