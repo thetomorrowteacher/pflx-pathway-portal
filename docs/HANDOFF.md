@@ -10669,3 +10669,31 @@ Mission Control immediately after, since it touches live nav for active testers.
   flags a cohort/org, its players stop appearing in the normal roster and instead only reach
   Mission Control via `/xlive`, log in there with their existing PIN on a touch-friendly keypad,
   and land in X-Live with Battle Arena hidden and Vault Rush as their one available game.
+
+## PATCH PLATFORM v1.140 — Cohort Manager tab now opens directly, no more "MOVED" bypass card (Sept 6, Ennis-reported via annotated screenshot)
+- SYMPTOM: Ennis circled it directly — clicking the "Cohort Manager" tab in Settings landed on an
+  intermediate "MOVED — ONE PAGE NOW" pointer card explaining that Organizations/Cohort Manager/
+  permissions had merged into Host Controls → Organizations, requiring a second click on "OPEN
+  ORGANIZATION & COHORT MANAGER →" to actually get there. "When I click on the Cohort manager tab
+  it should directly open and not give me this bypass."
+- ROOT CAUSE: that pointer card (`#settings-cohorts`, dating to a July 10 merge) was a deliberate
+  design choice at the time — "so old muscle memory still lands somewhere useful" — but it's just
+  an extra click today, not a helpful landing spot.
+- FIX: `switchSettingsTab(tab)` (~L16897) now special-cases `tab === 'cohorts'` right at the top —
+  instead of activating the `#settings-cohorts` pointer panel, it immediately calls
+  `switchSettingsTab('host')` followed by `switchHostTab('orgs')` (the exact same two-step
+  navigation the pointer card's own button already performed manually) and returns before ever
+  touching the cohorts panel. The pointer panel's HTML is left in the file (unreachable, same
+  "leave dead markup rather than surgically delete" convention used elsewhere this project) since
+  nothing else references `#settings-cohorts` and removing it added no value over just making it
+  unreachable.
+- Bumped `window.PFLX_PATCH` 139 → 140.
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after. 11-case Node test suite against the REAL shipped `switchSettingsTab()`
+  (extracted via brace-counting, never reimplemented, against a mocked DOM) — all 11/11 PASS:
+  clicking Cohort Manager never activates the cohorts tab or panel, activates Host Controls +
+  Organizations instead, fires the same `hmcRefreshDashboard()`/`switchHostTab('orgs')` side
+  effects the manual two-click path used to, and skips the now-dead `populateCohortSelect()` call
+  entirely; every other settings tab (host, xbot, general) is completely unaffected by the new
+  special case. Pre-patch backup at `preview.html.pre-v140-backup`.
+- HOST ACTIONS: none required — refresh and the Cohort Manager tab now opens directly.
