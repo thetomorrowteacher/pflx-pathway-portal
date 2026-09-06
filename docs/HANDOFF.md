@@ -10841,3 +10841,73 @@ Mission Control immediately after, since it touches live nav for active testers.
   reduction, co-host control, multiview dashboard, native Loom/Flip/CapCut-
   style tools, real server-verified login platform-wide, lockdown mode
   explicitly descoped).
+
+## PATCH PLATFORM v1.141 + PATCH X-LIVE v0.20 — retire the Console's native Live Session entry points in favor of X-Live (Sept 6, Ennis)
+
+- CONTEXT: revisited the earlier "retire mc-panel-sessions" task, which had
+  stalled mid-session because the panel turned out not to be orphaned (a
+  dashboard card still led into it). Investigated properly this time and
+  found the fuller picture: the Console's Dashboard tab is literally
+  branded "Home Theater" in the sidebar (`data-mc="dashboard"`), and it
+  carries TWO separate paths into Mission Control's own native live-session
+  tooling — (1) the "Active Sessions" card (`pflxRenderPlayerSessionCard`),
+  which opens `mc-panel-sessions` (the Nearpod-style `mcSessions`/
+  `mcStartLiveSession` system) for hosts and ran a Console-native join+
+  overlay flow for players; (2) a floating PiP "Open Live Session Panel"
+  button, which opened `mc-panel-livesession` (a separate, older,
+  localStorage-only `ls*` quick-lobby tool, confirmed NOT wired into
+  anything X-Live currently reads). Presented both findings to Ennis
+  directly rather than guessing scope again after getting it wrong earlier
+  this session — he confirmed redirecting BOTH to X-Live, which lines up
+  with his very first ask in this whole project ("this is where Home
+  Theater should now live").
+  Also confirmed via source comments and direct reading that `mcSessions`
+  and X-Live's own `L.sessions` already read/write the SAME Supabase
+  `app_data` key (`'sessions'`) — a prior, undocumented-until-now patch had
+  already unified the storage. That meant this was purely a NAVIGATION
+  change, not a data migration: nothing about `mcSessions`,
+  `mcStartLiveSession`, `mc-panel-sessions`, or `mc-panel-livesession`/`ls*`
+  was touched or deleted — only these two entry points stop pointing at
+  them.
+- FIX, `pflx-platform-check/preview.html` (v1.141):
+  - New `pflxOpenXLiveSessionByCode(code)`: calls `navigateTo('lite')` to
+    switch to the X-Live iframe, then retries `mcBroadcastToApps
+    ('open_session', {code})` every 400ms for up to 10 tries (~4s) — covers
+    the case where the first sends land before X-Live's iframe has even
+    mounted its message listener on a fresh navigation.
+  - Dashboard "Active Sessions" card's click handler: both host and player
+    clicks now call `pflxOpenXLiveSessionByCode(code)` instead of
+    `mcNav('sessions')` (host) or `pflxJoinSessionByCode(code)` +
+    `pflxShowLiveSessionOverlay` (player).
+  - PiP "Open Live Session Panel" button: now just `navigateTo('lite')`
+    instead of `navigateTo('mission-control')` + `mcNav('livesession')`.
+- FIX, `x-live-check/index.html` (v0.20):
+  - New `pflxTryOpenPendingSession()`: looks up `L.pendingOpenSessionCode`
+    against the already-loaded `L.sessions` by `code` (no new fetch needed
+    — same underlying record as the Console). Guards on both
+    `L.loaded.sessions` and `L.me` (identity) being ready, since either can
+    lose the race against the Console's postMessage. Lands a host on
+    `liveManageSession(id)` — deliberately NOT `liveGoLiveSession`, which
+    re-runs go-live setup and would refuse a session with no slides —
+    and a player on `liveJoinSession(id)`.
+  - New message handler for `pflx_mc_pflx_open_session` (the
+    `mcBroadcastToApps('open_session', ...)` call, auto-prefixed
+    `pflx_mc_`): records the code and attempts immediately.
+  - Identity handler also retries the pending open once identity lands, in
+    case `open_session` arrived first.
+- Verified: `node scripts/syntax_gate.js` clean on both files (13/13 blocks
+  on preview.html, 2/2 on index.html). Extracted both new functions from the
+  shipped files via brace-counting (not reimplemented) and unit tested, 9
+  cases total, all PASS: `pflxTryOpenPendingSession` — sessions not loaded
+  yet, identity not arrived yet, code not found (stays pending for a
+  retry), host match (`liveManageSession` called + code cleared), player
+  match (`liveJoinSession` called + code cleared), no pending code at all;
+  `pflxOpenXLiveSessionByCode` — navigates immediately, broadcasts the code
+  on every tick, stops itself after exactly 10 ticks.
+- BACKLOG: `mc-panel-livesession`/`ls*` (the standalone lobby tool) and
+  `mc-panel-sessions`/`mcSessions` (the Nearpod system) themselves are still
+  present in the codebase, just no longer reachable from the Dashboard —
+  full removal was NOT requested, matching Ennis's earlier-confirmed
+  "remove entry points only" scope. If any other entry points into either
+  panel turn up later (this pass covered the two found on the Dashboard),
+  handle the same way: redirect, don't delete.
