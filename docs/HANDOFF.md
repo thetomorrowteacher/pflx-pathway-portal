@@ -11784,3 +11784,138 @@ Mission Control immediately after, since it touches live nav for active testers.
   patch. Evolution Ranking icons surfaced elsewhere and the MC Calendar
   panel's own yearly/monthly/weekly/daily view toggle remain queued,
   unchanged from the v1.145 entry.
+
+## PATCH PLATFORM v1.149 — Retired escape_room/flash_challenge ("live challenges") from System Events (Sept 6, Ennis)
+
+- ASK: the second half of Ennis's Sept 6 System Events scoping decision
+  (the first half, Virtual Theater retirement, shipped as v1.148): "Just
+  the live challenges/escape rooms" should move to X-Live; Reality Warp
+  skins and XC taxes/boosts stay in the Console.
+- TRACE (full report on file, see session transcript): the "Reality Warp +
+  System Events" engine is one IIFE at (pre-patch) lines 54818–55603 in
+  `preview.html`, plus a separate small "PiP Remote" companion IIFE
+  (~lines 49948–50097). Inside it, `SYSTEM_EVENT_TYPES` listed 10 event
+  types; only `escape_room` is an actually-implemented "live challenge" —
+  `flash_challenge` is a dropdown option with **zero implementation
+  anywhere** (no case in `activateEvent`'s switch, no completion
+  mechanic). `badge_rush`/`xc_boost`/`golden_hour`/`studio_surge` boost
+  multipliers are likewise dead/unwired in places, but those are
+  Console-side (stay) concerns, not part of this move, and are left alone.
+- WHY ESCAPE ROOM WAS SAFE TO JUST DELETE (not "port"): it was already
+  broken in ways that make porting the code verbatim worse than useless —
+  `saveEvents()` is `localStorage`-only (no Supabase call anywhere near
+  escape rooms, unlike `realityWarp()` a few dozen lines above it, which
+  correctly publishes to `app_data` key `pflx_active_skin_global`), so a
+  player on a different device than the host never saw an escape room at
+  all. `escapeRoomComplete()` awards XC by mutating the stale `PLAYERS`
+  array directly and **never calls `mcSaveData`/`mcCloudPush`** — it
+  bypasses the Console's own persistence guardrails entirely (the file
+  holds two separate player rosters, `PLAYERS` and `mcPlayers`, a known
+  footgun; escape-room XC landed only on the wrong one). It also never
+  reopens the modal on a page reload despite the state existing. X-Live,
+  by contrast, already has direct Supabase access (`kvLoad`/`kvSave`),
+  a merge-safe session data layer (`mergeSession` unions per-player state
+  properly), and the correct cross-frame reward path
+  (`postAward`/`pflx_award_proposed` → `PflxDataBus.award`) — a genuine
+  rebuild there will be both correct and safer than anything ported.
+- WHAT CHANGED, `pflx-platform-check/preview.html`:
+  - Removed `launchEscapeRoom`/`showEscapeRoomOverlay`/
+    `escapeRoomComplete`/`escapeRoomEscape` in full, their `window.*`
+    exports, the `case 'escape_room':` branch in `activateEvent`, the
+    `escapeChallenge` field in `createEvent`, both `escape_room` and
+    `flash_challenge` entries from `SYSTEM_EVENT_TYPES` (which also drops
+    them from the "CREATE SYSTEM EVENT" dropdown automatically), the
+    `.pflx-escape-room-overlay`/`.pflx-escape-room-card` CSS, the PiP
+    remote's Flash Challenge quick-launch button + its icon branch, and
+    reworded the System Events panel description (no longer promises
+    escape rooms/live challenges).
+  - Left completely untouched: `PFLX_SKINS`, `realityWarp` (+ its
+    cross-device Supabase sync/subscriber), `SYSTEM_EVENT_TYPES`'s other 8
+    entries, `applySystemTax`, `startXCRain`, `getTargetPlayers`,
+    `getActiveBoostMultiplier`/`getActiveEvents`, `renderSystemEventsPanel`,
+    `createEventFromForm`, the PiP remote's other 5 quick-launch buttons.
+  - `activateEvent`'s `switch` has no `default` case, so any escape_room
+    event object still sitting in a host's `localStorage` from before
+    this patch safely no-ops instead of throwing when the auto-expire
+    timer or a stale re-render tries to activate/deactivate it.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). 38-case Node unit test (`test_v1149.js`, functions/array
+  extracted via brace/bracket-counting from the real shipped file) —
+  confirms the type registry drops from 10 to 8 entries, `createEvent` no
+  longer sets `escapeChallenge`, `activateEvent`'s remaining cases
+  (`reality_warp`/`system_tax`/`xc_rain`) still dispatch correctly, a
+  leftover legacy `escape_room` event activates as a safe no-op, every
+  escape-room symbol/CSS/export is confirmed gone, and every untouched
+  event type/function/PiP button is confirmed still present. Live-deploy
+  confirmed via curl against `https://www.prototypeflx.com/`:
+  `PFLX_PATCH = 149`, zero hits for `escapeRoomComplete`/
+  `escapeRoomEscape`/`launchEscapeRoom`, rebranded panel description
+  present. Committed `cc3ce91` (pflx-platform), pushed, live.
+- HOST ACTIONS / BACKLOG — a real decision is needed before any X-Live
+  code gets written for this: does a "live challenge" become a new
+  X-Live session **slide type** (richer than the existing `challenge`/
+  `push_task` types, which today render as a single "mark done" button —
+  not the old multi-task/XC-per-task/lockout experience), or a
+  **standalone concept** parallel to sessions (closer to how X-Live's own
+  backlog already flags Vault Rush as not fitting the slide model)? This
+  is a product call, not an engineering one — flagging it rather than
+  guessing. Once decided, the shape of the work is: (1) a merge-safe
+  per-player task-progress structure added to `mergeSession` (or a new
+  `pflx_lite_challenges` Supabase key, parallel to X-Live's existing
+  `pflx_lite_config`/`pflx_lite_qsets`/`pflx_lite_room_*` keys), (2) host
+  authoring UI for defining tasks + XC values, (3) the actual player-side
+  challenge UI + `grantSessionReward`/`postAward`-based XC awarding. Each
+  would ship as its own small, independently-verified X-Live patch,
+  matching how the Live Sessions feature itself was built in v0.13→v0.17.
+  Also flagged, found during this trace, independent of this patch:
+  `pflxOpenXLiveSessionByCode()` broadcasts message type
+  `pflx_mc_open_session`, but X-Live's listener checks for
+  `pflx_mc_pflx_open_session` — the strings don't match, so this
+  Console→X-Live session-code handoff (shipped as "PATCH PLATFORM v1.141 /
+  PATCH X-LIVE v0.20") has silently never worked. Worth a real fix
+  independent of this work, and worth double-checking before building any
+  new Console→X-Live message type on the assumption the existing contract
+  is solid. Evolution Ranking icons and the MC Calendar panel's own
+  yearly/monthly/weekly/daily view toggle remain queued, unchanged from
+  the v1.145/v1.148 entries.
+
+## iCloud backup mirror now also targets a second folder (Sept 6, Ennis)
+
+- Ennis connected a new device folder this session,
+  `~/Library/Mobile Documents/com~apple~CloudDocs/MY APPS/PFLX Apps`, and
+  asked that it always be kept updated so both his Mac Mini and MacBook
+  Pro have current PFLX files, alongside the existing Handoff-update
+  practice.
+- IMPORTANT — did not just start writing/editing files into that folder.
+  It's a *different* iCloud path than the already-established backup
+  mirror this project has used since 2026-07-24
+  (`~/Library/Mobile Documents/com~apple~CloudDocs/PFLX APP CLOUD BACKUP`,
+  documented in `BACKUP_RULE.md`), and `BACKUP_RULE.md` is explicit that
+  the working copy is `~/My Apps/PFLX Apps` ONLY — iCloud fileproviderd
+  breaks git internals, so cloud copies must stay passive rsync snapshots,
+  never edited or git-committed directly. Confirmed this is still true
+  directly: `git log` inside the new `MY APPS/PFLX Apps` folder failed
+  with "not a git repository" even though a `.git` folder physically
+  exists there — live proof of the exact corruption the rule warns about.
+  Surfaced this conflict to Ennis via a clarifying question rather than
+  guessing; he chose to redirect/add the new folder to the existing safe
+  mirror mechanism rather than treat it as a live working copy.
+- WHAT CHANGED: `REFRESH_ICLOUD_BACKUP.command` (v3) and `BACKUP_RULE.md`
+  now cover **two** passive rsync mirror destinations — the original
+  `PFLX APP CLOUD BACKUP` and the new `MY APPS/PFLX Apps` — both refreshed
+  from the same `~/My Apps/PFLX Apps` source, same excludes, same safety
+  guards (aborts if source looks missing/empty). Kept the original
+  destination running rather than dropping it, since doing so cost
+  nothing and the ask read as "add cross-device access," not
+  "decommission the existing backup." The **rule itself is unchanged**:
+  never edit or run git in either cloud copy; `~/My Apps/PFLX Apps` is
+  still the only place that happens.
+  Ran the updated script once directly (backgrounded via `nohup` since a
+  full rsync of the repo history over iCloud is slow — 15+ minutes for
+  the first destination alone — likely the exact fileproviderd overhead
+  `BACKUP_RULE.md` already flags) to bring the new folder's stale content
+  (it had been sitting around v1.144) up to the current patch.
+- Proposed a `pflx-cloud-backup-sync` skill (matching the name
+  `BACKUP_RULE.md` already referenced but that had never actually been
+  saved) so future sessions run this refresh automatically as a closing
+  step, per the rule's own "For Claude / Fable sessions" section.
