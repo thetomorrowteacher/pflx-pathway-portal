@@ -10515,3 +10515,74 @@ Mission Control immediately after, since it touches live nav for active testers.
   map, fixing the "Portfolio not found" collision Ennis hit, and builds the roster-picker + PIN-pad
   login screen with the `.ttt-credit` footer + remember-me persistence), v1.139 (defense-in-depth
   login gate for X-Live-only players), and PATCH X-LIVE v0.17 (extend `adoptFromParams()`).
+
+## PATCH PLATFORM v1.138 — X-Live Mode Login, Phase 3: the /xlive route itself (Sept 6, Ennis)
+- CONTEXT: third patch of the `/xlive` X-Live Mode Login sequence (see v1.136/v1.137 above). This
+  is the one that fixes the exact bug Ennis hit mid-session: visiting `https://www.prototypeflx.com/
+  xlive` showed "Portfolio not found" because `/xlive` fell through Vercel's catch-all rewrite into
+  Mission Control's Public Portfolio Mode, which treats any unreserved path segment as a share-
+  portfolio brand slug (see `PLAN_xlive_mode_login.md` §1.7, written up before this patch existed).
+- FIXED: added `'xlive': 1` to the Public Portfolio Mode `reserved` map (the IIFE at the top of
+  `preview.html`, "██ PUBLIC PORTFOLIO MODE"). `/xlive` no longer gets treated as a portfolio brand.
+- ADDED: a brand-new, self-contained IIFE immediately after the Public Portfolio Mode block —
+  "██ X-LIVE MODE (ONLY) LOGIN (URL: /xlive)". Modeled directly on Public Portfolio Mode's own
+  pattern (detect the path early, inject a style tag that hides `body > *` except a dedicated
+  container, stub the same noisy init functions — `initLogin`/`initVideoBackground`/
+  `initBackgroundCanvas`/`initLoginParticles`/`seInit`/`sePlayLoginMusic`/`pdInitSliders`/
+  `initPlayerSettingsListeners` — then render into the container on `DOMContentLoaded`, by which
+  point the rest of this script block has finished executing so `PLAYERS`/`COHORTS`/
+  `ORGANIZATIONS`/`hmcCohortIsXLiveOnly` are all safely populated). Per `SUB_APP_SSO_CONTRACT.md`'s
+  house rule ("the Platform handles identity — do not maintain your own login/signup form
+  elsewhere"), this whole UI lives in `preview.html`, not inside `x-live-check`.
+- The screen itself: a roster-picker grid showing ONLY players whose cohort/org is flagged X-Live
+  Mode (only) (`window.pflxXLiveFilterRoster`, reusing v1.137's `hmcCohortIsXLiveOnly` cascade — no
+  new eligibility logic invented), then a touch-friendly numeric PIN pad (not a keyboard text field
+  — this door is meant for classroom tablets) that checks the SAME `PLAYERS[].pin` value every
+  other PFLX login already uses (`window.pflxXLivePinMatches`) — no new auth primitive, no new PIN
+  data model, exactly per the plan's confirmed scope.
+- Session persistence: **remembers the last player on this device** (Ennis's explicit choice,
+  `localStorage` key `pflx_xlive_remember_v1`, `{id, ts}`) — NOT the PIN, and NOT "always re-select"
+  (which I had recommended and Ennis correctly overrode, since this is meant for a device assigned
+  to one particular kid, not a shared kiosk). A remembered player skips straight to the PIN pad with
+  their name pre-selected; the PIN itself is still required every time. A "Not you? Pick someone
+  else" link clears it and returns to the roster grid.
+- Footer: reuses the existing `.ttt-credit` component verbatim (same markup, image, and
+  `data-pflx-version="login"` element as the normal login screen) — Ennis's explicit choice over a
+  plain-text credit line.
+- On successful PIN match: hands off to X-Live (`APP_BASE_URLS.lite`) via a NEW, purpose-built
+  `window.pflxXLiveBuildRedirectURL()` — deliberately NOT routed through the shared `buildAppURL()`
+  (which reads `window.activeSession`, a normal Mission Control login this door never creates).
+  Sends `sso=pflx`, the player's `brand`/`pin`/`role`/`cohort`, `tier=novice`, `allowedApps=''`
+  (zero Mission-Control-level app access via this door — it isn't a normal MC session), `autoselect
+  =true`, and a brand-new `xliveOnly=true` flag. That flag is inert on the platform side today —
+  the plan's Battle Arena scope answer ("just the bundled Vault Rush mini-game") gets enforced on
+  the X-Live side, which is PATCH X-LIVE v0.17 (extending `adoptFromParams()` to read it and hide
+  the Battle Arena dead-end card). Shipping the flag now, even before anything consumes it, avoids
+  a second platform-side patch later just to add one query param.
+- Bumped `window.PFLX_PATCH` 137 → 138.
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after (block 4 grew by exactly the size of the new IIFE — nothing else shifted).
+  Structural div/button/span/a/p/h1 open-close balance check on the rendered login template — all
+  balanced. 16-case Node test suite against the REAL shipped `pflxXLiveFilterRoster`,
+  `pflxXLivePinMatches`, `pflxXLiveBuildRedirectURL` (extracted verbatim via brace-counting from
+  their `window.X = function (...) {` assignments, never reimplemented) — all 16/16 PASS: the
+  roster filter correctly excludes non-flagged cohorts, PIN-less accounts, host-tier accounts, and
+  godTier system accounts, while including a flagged player via either the single-cohort string or
+  multi-cohort array field shape; a throwing cascade fails closed to an empty roster rather than
+  crashing the login screen; PIN matching handles exact match, mismatch, numeric-vs-string
+  coercion, a null player, and an empty buffer; the redirect URL always carries `xliveOnly=true`,
+  an empty `allowedApps`, `autoselect=true`, and round-trips brand/pin/sso correctly, falling back
+  to "Player" rather than a blank identity when brand/name are both missing. Pre-patch backup at
+  `preview.html.pre-v138-backup`.
+- HOST ACTIONS: none required to ship this. Once Ennis actually flags a cohort/org as X-Live Mode
+  (only) via v1.136/v1.137's toggles, its players' names will start appearing at `/xlive` — before
+  that, the roster grid correctly shows "No X-Live classes are set up yet. Ask your teacher."
+- KNOWN LIMITATION (documented, not silently dropped): `xliveOnly=true` does nothing on the X-Live
+  side yet — Battle Arena's dead-end card and the Vault Rush launch still behave exactly as today
+  until PATCH X-LIVE v0.17 ships. A player logging in via `/xlive` right now reaches a fully-normal
+  X-Live session; the restriction is enforced by WHO can reach `/xlive` (only flagged cohorts) but
+  not yet by WHAT they see once inside. v1.139 (defense-in-depth: block the normal MC login for
+  X-Live-only players so they can't bypass `/xlive` via the front door) is also still pending.
+- NEXT: v1.139 (block normal MC login + `pflx_remember_v1` auto-restore for X-Live-only players,
+  redirecting them to `/xlive` instead), then PATCH X-LIVE v0.17 (consume `xliveOnly=true` in
+  `adoptFromParams()`, gate the Battle Arena card and restrict to the bundled Vault Rush game).
