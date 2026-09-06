@@ -10349,3 +10349,47 @@ Mission Control immediately after, since it touches live nav for active testers.
   remaining trigger, or deleting the dead code), worth confirming with Ennis whether this was
   intentionally orphaned already or whether he still reaches it some other way not found in this
   pass (a bookmark, a different build, etc.) — flagging rather than guessing.
+
+## PATCH X-LIVE v0.16 — Post a Link + QR broadcast tool (Phase 3b of 3, Native Live Sessions) (Sept 6, Ennis)
+
+- CONTEXT: completes the "X-Live: Tool Cleanup, Native Live Sessions" plan's Phase 3. Ships
+  independently of Phase 3a (PATCH PLATFORM v1.135, already shipped) — purely additive, zero
+  regression risk, no dependency between the two.
+- ADDED: a new "🔗 Post a Link" card on X-Live's Tools tab (host-only). Host pastes a URL +
+  optional message and taps SEND TO EVERYONE. Reuses Mission Control's own `pflx_broadcasts`
+  `app_data` key with the exact same read-merge-write discipline `pflxPostBroadcast` already
+  uses (fetch current `items[]`, append `{id, message, url, from, at}`, cap at 100, write back)
+  — via X-Live's own `kvLoad`/`kvSave` REST helpers rather than a Supabase JS client, since
+  X-Live doesn't load one. This means a link posted from X-Live shows up the same way a plain
+  text broadcast posted from Mission Control does, and vice versa — one shared feed, not a
+  second parallel mechanism.
+- Every X-Live instance (host AND player) polls `pflx_broadcasts` every 20s
+  (`setInterval(loadBroadcasts, 20000)`, alongside the existing `loadActivity`/session polls) and
+  shows a full-screen dismissible overlay with the message, a real clickable `<a target="_blank"
+  rel="noopener">` link, and a scannable QR code on any new item. QR rendering reuses the
+  `qrcode-generator` CDN library and the exact multi-CDN fallback chain (cdnjs → jsdelivr →
+  unpkg) the Console already uses successfully — no new dependency risk.
+- A per-browser "last seen" timestamp (`localStorage` key `pflx_lite_bc_last_at`) baselines to
+  "now" the first time a browser ever loads X-Live, so the 100-item shared broadcast history
+  never replays on a fresh device — only genuinely new broadcasts posted after that point ever
+  pop the overlay.
+- Files: `x-live-check/index.html` (`rTools()` Tools tab card; `postLinkModal`/
+  `sendLinkBroadcast`/`loadBroadcasts`/`showBroadcastOverlay`/`bcGetLastSeenAt`/
+  `bcSetLastSeenAt`/`generateBroadcastQRCanvas`/`_loadQRLib`, inserted after `rTools()`; boot
+  wire-up alongside the existing `loadActivity`/`scheduleSessionsPoll` calls).
+- Verified: `node scripts/syntax_gate.js index.html` — both inline `<script>` blocks clean,
+  before and after. 18-case Node test suite against the REAL shipped functions (extracted via
+  brace-counting, never reimplemented) — all 18/18 PASS: `bcGetLastSeenAt` baselines to "now" on
+  a fresh browser and returns the stored value afterward; `loadBroadcasts` shows nothing for an
+  empty list or for items older than last-seen, shows exactly the newest of several new items
+  (not a stack of overlays) and advances last-seen to that item's timestamp; `sendLinkBroadcast`
+  rejects an empty URL without ever calling `kvSave`, auto-prepends `https://` to a bare domain,
+  is genuinely read-merge-write (a concurrent pre-existing broadcast item survives, the new one
+  is appended, `from` carries the posting host's brand), and correctly caps the list at 100
+  (oldest dropped, newest + the just-sent item survive); `generateBroadcastQRCanvas` fails
+  gracefully (returns `null`, never throws) when the CDN hasn't loaded yet. Pre-patch backup at
+  `index.html.pre-v016-backup` (sha1 matched the live file before patching).
+- HOST ACTIONS: none required.
+- This closes out Phase 3 of the Native Live Sessions plan (3a shipped as PATCH PLATFORM v1.135,
+  3b here). Remaining backlog from that plan: fully retiring `mc-panel-sessions` (see the v1.135
+  entry above) once confirmed safe to do so.
