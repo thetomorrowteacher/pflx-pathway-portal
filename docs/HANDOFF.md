@@ -10299,3 +10299,53 @@ Mission Control immediately after, since it touches live nav for active testers.
   backup at `preview.html.pre-v134-backup` (sha1 matched the live file before patching).
 - HOST ACTIONS: none required. The panel is purely informational — update it by hand here (and
   bump the patch) whenever the real Rate Card changes; it does not read from any settings.
+
+## PATCH PLATFORM v1.135 — X-Live Native Live Sessions, Phase 3a: retire LS_STATE + Console Remote auto-launch (Sept 6, Ennis)
+
+- CONTEXT: continuing the "X-Live: Tool Cleanup, Native Live Sessions" plan (Phases 1-2 shipped
+  as PATCH X-LIVE v0.10-v0.15). Phase 3 (cutover) was deliberately deferred overnight since it
+  touches live Mission Control navigation and no one was available to verify — see the prior
+  BACKLOG entry. Picked back up now that Ennis is available.
+- INVESTIGATION FIRST (before touching anything): re-mapped every real entry point into the two
+  systems flagged for retirement, since the original plan's own line-number references had
+  drifted and slightly conflated two different things. Findings:
+  - The `data-mc="livesession"` nav button opens `mc-panel-livesession`, which houses the
+    "LIVE SESSION ENGINE" (`LS_STATE` idle/lobby/live, join code, Freeze, Broadcast, Player
+    Picker, Random Groups) — confirmed same-browser-only (`BroadcastChannel`/`localStorage`/
+    iframe `postMessage`, no Supabase write) and its own floating PIP remote is only ever
+    created *after* a host reaches this panel and clicks GO LIVE. This nav button is the ONLY
+    entry point into this entire system (grepped every `data-mc="..."` value in the file, and
+    every `mcNav('livesession')`/escaped-quote variant) — removing it makes the whole system
+    unreachable with a single, clean, one-block edit.
+  - `mc-panel-sessions` ("Live & Async Sessions" — the Nearpod-style 12-slide-type authoring
+    form + Console Remote, launched via `mcStartLiveSession`) has **no sidebar nav button at
+    all** (`data-mc="sessions"` does not exist anywhere) — its only live entry point is a
+    "join an active session" card that calls `mcNav('sessions')` when a host clicks it while a
+    session happens to already be live. This panel was therefore already effectively orphaned
+    from normal navigation before this patch. Left untouched this patch (see BACKLOG below) —
+    retiring it fully needs its own confirmed pass, not a same-night bundle with the
+    LS_STATE removal.
+- FIX:
+  - Removed the `data-mc="livesession"` nav button from the TOOLS section of the sidebar.
+    `mc-panel-livesession` and its `ls*` functions are left fully defined in the file
+    (unreachable, not deleted — same "hide, don't delete" call as the rest of this plan; the
+    dead code can be removed later once nothing regresses).
+  - Removed the "Launch Console Remote for host" block inside `mcStartLiveSession` (the
+    `pflxCRShow(index)` call). The Agenda/Slides broadcast this function still does
+    (`mcBroadcastToApps('pflx_session_started'/'pflx_session_live_broadcast', ...)`, the
+    DarkCampus post) is **unchanged** — only the Console Remote side-effect is cut, per the
+    plan's explicit scope. `pflxCRShow` itself stays defined; it just has no remaining caller
+    (confirmed via grep after the patch).
+- Files: `pflx-platform-check/preview.html` (nav button ~L7565; `mcStartLiveSession` ~L48334).
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 blocks clean, before and after.
+  Post-patch structural checks: `data-mc="livesession"` count 0 (removed), `mc-panel-livesession`
+  count 1 (panel intact, unreachable), `pflxCRShow` still defined (1), zero remaining call sites
+  to `pflxCRShow(index)`. Pre-patch backup at `preview.html.pre-v135-backup` (sha1 matched the
+  live file before patching).
+- HOST ACTIONS: none required.
+- BACKLOG — `mc-panel-sessions` (Nearpod-style sessions/Console Remote authoring panel) is
+  real, working code but already unreachable via any sidebar nav button today — only reachable
+  by clicking an already-active session's card. Before fully retiring it (removing that one
+  remaining trigger, or deleting the dead code), worth confirming with Ennis whether this was
+  intentionally orphaned already or whether he still reaches it some other way not found in this
+  pass (a bookmark, a different build, etc.) — flagging rather than guessing.
