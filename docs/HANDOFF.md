@@ -10632,3 +10632,40 @@ Mission Control immediately after, since it touches live nav for active testers.
   Arena dead-end card so a player who came in through `/xlive` only ever sees the bundled Vault
   Rush mini-game (per Ennis's confirmed scope answer) — Battle Arena itself stays fully out of
   scope for now, per that same answer.
+
+## PATCH X-LIVE v0.17 — consume xliveOnly=true, gate Battle Arena (Sept 6, Ennis)
+- CONTEXT: the final patch of the X-Live Mode Login feature (see PATCH PLATFORM v1.136-v1.139
+  above for the full sequence). The Platform side is finished — v1.138's `/xlive` login door
+  already sends every successful login to X-Live with `xliveOnly=true` on the SSO URL
+  (`pflxXLiveBuildRedirectURL`), but X-Live itself has been ignoring that flag until now.
+- ADDED: `L.xliveOnly` (defaults `false`) to the app's central state object. `adoptFromParams()`
+  now reads `xliveOnly=true` off the SSO query string (exact string match — `xliveOnly=1` or any
+  other truthy-looking value does NOT count, only the literal `'true'` the Platform actually
+  sends) and sets `L.xliveOnly` accordingly.
+- FIXED (the actual restriction, per Ennis's confirmed scope answer — "just the bundled mini-game
+  (Vault Rush)", full Battle Arena explicitly out of scope): `rPlay()`'s Battle Arena card ("🤖
+  Battle Arena … OPEN IN PLATFORM") is now hidden entirely when `L.xliveOnly` is true. The Vault
+  Rush card is untouched and still fully playable — it's the one thing an `/xlive` player is meant
+  to reach. The host-only Question Sets card is also untouched (unrelated to this restriction; it
+  only ever shows for `L.isHost`, and `/xlive` is a player-only door per v1.139's login gate, which
+  exempts host/admin/master roles from the xliveOnly restriction entirely).
+- Added a version-history comment block at the top of `index.html` documenting v0.17, ahead of the
+  existing v0.16 entry (matching house convention — newest entry first).
+- Verified: `node scripts/syntax_gate.js index.html` — both inline `<script>` blocks clean, before
+  and after. 11-case Node test suite against the REAL shipped `adoptFromParams()` and `rPlay()`
+  (extracted via brace-counting, never reimplemented) — all 11/11 PASS: a valid `sso=pflx` URL with
+  `xliveOnly=true` sets the flag and returns true; no param, an explicit `xliveOnly=false`, and a
+  near-miss value (`xliveOnly=1`) all correctly leave the flag `false`; a non-`sso=pflx` URL never
+  sets it true; a normal (non-restricted) render shows the Battle Arena card, a restricted one
+  hides it while still showing Vault Rush; the flag hides Battle Arena regardless of host/player
+  role (authoritative), and doesn't touch the unrelated host-only Question Sets card. Pre-patch
+  backup at `index.html.pre-v017-backup`.
+- HOST ACTIONS: none required. This is inert until a real player actually logs in through `/xlive`
+  (which requires Ennis to have flagged a cohort/org X-Live Mode (only) via v1.136/v1.137 first).
+- THIS CLOSES OUT THE FULL X-LIVE MODE LOGIN FEATURE: PATCH PLATFORM v1.136 (flag + data model),
+  v1.137 (host roster/PIN visibility), v1.138 (the `/xlive` route — roster-picker + PIN-pad login,
+  `.ttt-credit` footer, remember-last-player-on-device persistence), v1.139 (defense-in-depth login
+  gate), and this X-LIVE v0.17 (consumes the restriction on the receiving end). End-to-end: Ennis
+  flags a cohort/org, its players stop appearing in the normal roster and instead only reach
+  Mission Control via `/xlive`, log in there with their existing PIN on a touch-friendly keypad,
+  and land in X-Live with Battle Arena hidden and Vault Rush as their one available game.
