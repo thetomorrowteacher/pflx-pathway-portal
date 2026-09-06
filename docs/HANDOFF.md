@@ -11420,3 +11420,126 @@ Mission Control immediately after, since it touches live nav for active testers.
   been rendering broken/blank (or throwing silently, depending on call
   path) for some time before this was caught — worth a quick manual look
   next time either is opened, though the fix here should have resolved it.
+
+## PATCH PLATFORM v1.145 — Player Management + Evolution Rankings fully relocated to Settings (Sept 6, Ennis)
+
+- ASK: the first two, safest pieces of Ennis's larger MC/X-Live/Settings
+  restructuring request (screenshots + "Home Theater/Virtual Theater should
+  now be a part of X-Live. System Events should be a part of X-Live. Player
+  Management is now in Settings and should be removed from MC. Evo Ranking
+  Tiers effect the entire PFLX console and sub-apps, therefore it should be
+  housed in settings along near with Player Management. Keep the same UI
+  and format..."). Shipped first since neither touches X-Live: (1) fully
+  remove Player Management's shortcut out of MC's own sidebar (it already
+  redirected to Settings; the ask was to remove the MC-side entry point
+  entirely, not just redirect it), and (2) physically relocate the
+  Evolution Rankings tier editor out of Mission Control into Platform
+  Settings (it previously only *redirected back into MC* — this patch
+  actually moves the UI, per "keep the same UI and format"). Virtual
+  Theater → X-Live, System Events → X-Live, Evolution Ranking icons on the
+  dashboard/toolbar/Portfolio, and the Calendar's week/day view toggle are
+  all deferred to follow-up patches — see BACKLOG below.
+- PLAYER MANAGEMENT REMOVED FROM MC SIDEBAR: deleted the "PLAYER
+  MANAGEMENT" section label and its `players-shortcut` button (formerly
+  `onclick="pflxOpenPlayerManager()"`) from MC's `.mc-nav`. Player
+  Management's only home is now Platform Settings → Host Controls →
+  Players (`host-players` panel, unchanged). The sidebar's own badge
+  counter (`#mc-player-count`) is gone with the button; every writer to
+  that id (`mcRenderDashboard`, `mcUpdateBadges`) already guards with
+  `if (pc) pc.textContent = ...`, so this is a clean removal with no
+  dangling references.
+- EVOLUTION RANKINGS PHYSICALLY MOVED INTO SETTINGS: the entire
+  `mc-panel-gamemgmt` block (tier cards, the full Rank Editor form —
+  name/level/icon/color/group/image upload, XC & progression
+  requirements, badge requirements, auto-apply logic, the per-cohort host
+  control matrix — everything) was cut out of Mission Control's panel
+  section and re-inserted into `#host-settings-container`, right after the
+  `host-players` panel closes, as a new `host-evos` panel. The ONLY change
+  made to the moved HTML is the outer wrapper: `mc-panel`/
+  `mc-panel-gamemgmt` → `host-panel`/`host-evos`. Every inner id
+  (`#mc-rankings-list`, `#mc-rank-form`, `#mc-rank-name`, etc.) and every
+  JS function that targets them (`mcRenderRankings`, `mcShowRankForm`,
+  `mcSaveRankForm`, `mcCancelRankForm`, `mcRankToggleAllCohorts`,
+  `mcRankAddSpecificBadge`, `mcRankImageUpload`/`mcRankImageClear`) is the
+  exact code already shipped — zero JS was reimplemented, satisfying
+  "keep the same UI and format" literally. `mcRenderGameMgmt()` (just
+  `mcLoadData()` + `mcRenderRankings()`) still works unmodified since
+  `mcRenderRankings()` looks its target up by id (`#mc-rankings-list`),
+  not by which panel contains it.
+  - MC's own sidebar "Evolution Rankings" button (with the "↗ SETTINGS"
+    hint label) is removed — that hint is now literally true everywhere,
+    so the extra arrow affordance is gone too.
+  - Settings' own `.host-subtabs` bar button now calls
+    `switchHostTab('evos')` directly instead of `pflxOpenEvoRankings()`
+    (which used to bounce back into MC before this patch — see below).
+    `switchHostTab()` gained `if (tab === 'evos') mcRenderGameMgmt();`
+    alongside the existing per-tab render calls.
+  - `pflxOpenEvoRankings()` (the global entry point other code/host
+    permission checks call) was rewritten to mirror
+    `pflxOpenPlayerManager()`'s exact pattern: `navigateTo('settings')`
+    then, 80ms later, `switchHostTab('evos')` (falling back to a direct
+    `.click()` on the subtab button if `switchHostTab` isn't defined yet)
+    — instead of its old `navigateTo('mission-control')` +
+    `mcNav('gamemgmt')`, which would now land on nothing since
+    `mc-panel-gamemgmt` no longer exists in MC. Host-only gating
+    (`pflxIsHost()`/`pflxIsHostRole()`) is unchanged.
+  - Found and fixed a second, previously-undiscovered caller of the same
+    dead route while grepping for every `gamemgmt` reference: MC's OWN
+    in-sidebar Settings mirror (`mc-set-evolution` panel →
+    `mcRenderEvolutionConfig()`) had an "Open Evolution Rankings" button
+    hardcoded to `mcNav('gamemgmt');mcGameTab('rankings');` — both calls
+    would have silently no-op'd (their target DOM/ids lived only inside
+    the just-removed panel, and each call site already null-guards, so no
+    crash, just a dead button). Retargeted it to `pflxOpenEvoRankings()`,
+    the same entry point everything else now uses, and updated its label
+    text from "Game Management" to "Platform Settings".
+- COMMAND PALETTE RETARGETED off the now-orphaned `mcNav('players')`:
+  - "Go to Player Management" (⌥-menu NAVIGATE action) now calls
+    `pflxOpenPlayerManager()` instead of `mcNav('players')`, which used to
+    land on MC's own dead `mc-panel-players`/`mcRenderPlayers()` panel
+    (left in place, unreachable, per the deliberate decision below).
+  - Per-player "Jump to `<name>`" actions (PLAYERS group) now call a new
+    `pflxJumpToPlayerSettings(name)` helper instead of `mcNav('players')`.
+    It mirrors `pflxOpenPlayerManager()`'s navigate/switch pattern, then
+    seeds the real, already-shipped `#hmc-player-search` box with the
+    player's name and calls the real `hmcFilterPlayers()` — reusing both
+    verbatim rather than inventing a new filter mechanism — so jumping to
+    a specific player from the command palette still actually surfaces
+    that player, just inside Settings' player table instead of MC's old
+    one.
+- DELIBERATELY NOT DONE, flagged for awareness: MC's own `mc-panel-players`
+  HTML panel and its `mcRenderPlayers()` function are untouched and now
+  fully unreachable from any UI (both nav entry points into it are gone).
+  Left in place rather than deleted — `mcRenderPlayers()` is called
+  alongside `hmcRenderPlayers()` in several sync-related code paths, so
+  deleting it is a separate, more careful pass, not bundled into this
+  patch.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). 27-case Node unit test (extracted via brace-counting from the
+  real shipped `switchHostTab`, `pflxOpenEvoRankings`,
+  `pflxJumpToPlayerSettings`, and `mcNav` functions) — confirms the
+  sidebar buttons/panel are really gone from the HTML source, the
+  relocated `host-evos` panel contains the real rankings list + rank form
+  + Save/Cancel wiring and is well-formed HTML, `switchHostTab('evos')`
+  activates the right subtab/panel and calls `mcRenderGameMgmt()` exactly
+  once (with a `switchHostTab('players')` regression check alongside it),
+  `pflxOpenEvoRankings()` now navigates to Settings + switches to `evos`
+  for a host and still correctly blocks a non-host (regression),
+  `pflxJumpToPlayerSettings()` navigates/switches/seeds the search
+  box/calls the real filter function (plus a no-name defensive case), and
+  `mcNav('gamemgmt')`/`mcNav('players')` no longer throw now that their
+  DOM is gone (both already null-guard). Live-browser verified against
+  the deployed site post-push: MC sidebar no longer shows Player
+  Management or Evolution Rankings entries; Platform Settings → Host
+  Controls now has a working Evolution Rankings tab with the full tier
+  editor (New Rank, tier cards, Save/Cancel) rendering and functioning
+  identically to its old MC location; command palette "Go to Player
+  Management" and a "Jump to `<player>`" both land correctly in Settings.
+- HOST ACTIONS / BACKLOG: none new for this patch. Still deferred from the
+  larger restructuring request (unchanged scope, tracked for follow-up
+  patches): Virtual Theater → X-Live (largest/riskiest, cross-app),
+  System Events → X-Live (needs a Supabase-client story for X-Live),
+  Evolution Ranking icons surfaced on the toolbar RANK indicator/Portfolio
+  page/MC Dashboard player cards/profile dropdown widget (all 4 locations
+  Ennis selected), and the Calendar's yearly/monthly/weekly/daily view
+  toggle (same items, finer time grain, per Ennis's answer).
