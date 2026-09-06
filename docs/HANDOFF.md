@@ -10586,3 +10586,49 @@ Mission Control immediately after, since it touches live nav for active testers.
 - NEXT: v1.139 (block normal MC login + `pflx_remember_v1` auto-restore for X-Live-only players,
   redirecting them to `/xlive` instead), then PATCH X-LIVE v0.17 (consume `xliveOnly=true` in
   `adoptFromParams()`, gate the Battle Arena card and restrict to the bundled Vault Rush game).
+
+## PATCH PLATFORM v1.139 — X-Live Mode Login, Phase 4: defense-in-depth login gate (Sept 6, Ennis)
+- CONTEXT: fourth and final platform-side patch of the `/xlive` sequence (v1.136-v1.138 above).
+  Until now, being flagged X-Live Mode (only) only controlled who APPEARS on the `/xlive` roster
+  (v1.138) — it did nothing to stop that same player from just using the normal Mission Control
+  login instead. This patch closes that gap.
+- ADDED: `window.pflxPlayerRecordIsXLiveOnly(player)` — a third member of the xliveOnly-resolver
+  family alongside v1.136's session-based `pflxPlayerIsXLiveOnly()` and v1.137's cohort-name-based
+  `hmcCohortIsXLiveOnly()`. This one takes a raw PLAYER RECORD directly, for the one moment none of
+  the other two fit: the login gate itself, which runs BEFORE any session exists. Host/admin/master
+  role records are never gated, same exemption as the other two resolvers.
+- FIXED (the actual gap): gated `loginUser(brandName)` itself — the single choke point every login
+  path funnels through (the manual LOGIN button, the remember-me click-through, AND the separate
+  identity-based `tryAutoLogin()` silent auto-login all call `loginUser()`). If the resolved player
+  record is X-Live Mode (only), `loginUser()` now shows a warning toast and redirects to `/xlive`
+  instead of ever setting `activeSession` — gating here, once, covers all three call sites without
+  needing to patch each one separately.
+- ADDED (extra, for UX — not strictly required since `loginUser()`'s gate already covers it): the
+  `pflx_remember_v1` restore block inside `initLogin()` now checks the remembered brand BEFORE
+  prefilling the login form. An X-Live-only account's remembered credentials redirect straight to
+  `/xlive` rather than briefly showing the normal login screen prefilled with their name, which the
+  player would then have to click through only to be redirected anyway.
+- Bumped `window.PFLX_PATCH` 138 → 139.
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after. 15-case Node test suite against the REAL shipped `pflxPlayerRecordIsXLiveOnly`
+  function and the exact `loginUser()`/remember-me gate code blocks (extracted verbatim by slicing
+  between the precise comment/line anchors this patch inserted, never reimplemented) — all 15/15
+  PASS: the record resolver correctly flags a player in a flagged cohort (string or array field),
+  never gates admin/master roles even in a flagged cohort, fails closed to `false` on a null player
+  or a throwing cascade; the `loginUser()` gate returns early (never reaches the rest of the login
+  flow) with a warning toast and a redirect to `/xlive` for a flagged player, passes straight
+  through unmodified for a normal player, and fails open (never blocks) for a brand that resolves
+  to no player record at all; the remember-me restore gate redirects immediately for a remembered
+  X-Live-only account and never touches the DOM prefill, while a normal remembered account reaches
+  the prefill exactly as before. Pre-patch backup at `preview.html.pre-v139-backup`.
+- HOST ACTIONS: none required. This only takes effect for accounts Ennis actually flags via
+  v1.136/v1.137's toggles — until then, `pflxPlayerRecordIsXLiveOnly()` returns `false` for
+  everyone and the normal login flow is completely unchanged.
+- This closes out the platform-side (`pflx-platform`) portion of the X-Live Mode Login feature —
+  v1.136 (flag + data model), v1.137 (host roster/PIN visibility), v1.138 (the `/xlive` route),
+  v1.139 (this defense-in-depth gate). Remaining work is entirely on the X-Live side: PATCH
+  X-LIVE v0.17, which needs to extend `adoptFromParams()` (`x-live-check/index.html` ~L328-336) to
+  consume the `xliveOnly=true` flag v1.138's redirect URL already carries, and gate the Battle
+  Arena dead-end card so a player who came in through `/xlive` only ever sees the bundled Vault
+  Rush mini-game (per Ennis's confirmed scope answer) — Battle Arena itself stays fully out of
+  scope for now, per that same answer.
