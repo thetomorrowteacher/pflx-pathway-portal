@@ -11233,3 +11233,58 @@ Mission Control immediately after, since it touches live nav for active testers.
   (LiveKit VPS, still not provisioned), Phase 1e (Audience mode), Phase 1f
   (camera corner overlay), Canva embed slide, screen-share slide,
   Play-tab/Vault-Rush embed.
+
+## PATCH PLATFORM v1.143 — hotfix: profile dropdown invisible behind the blur backdrop (Sept 6, Ennis)
+
+- SYMPTOM: Ennis reported that opening the new glass/blur profile dropdown
+  (shipped in v1.142) blurred the screen as designed, but the dropdown
+  panel itself never appeared — screenshot showed a fully blurred page
+  with nothing on top except a couple of stray unrelated floating buttons
+  (e.g. the X-Bot launcher), and the old page content faintly visible
+  through the blur.
+- ROOT CAUSE: `.toolbar` (`preview.html` CSS) has both `z-index: 100` and
+  a `backdrop-filter` — either one alone creates a new CSS stacking
+  context, so having both definitely does. That traps everything INSIDE
+  `.toolbar`, including `#pflx-profile-dropdown` (nested in
+  `.toolbar-profile` inside `.toolbar`), at stacking rank 100 among the
+  page's top-level layers — the dropdown's own inline `z-index:100000`
+  only matters *within* the toolbar's local stacking context, not
+  globally, no matter how large the number looks. Meanwhile v1.142's new
+  `#pflx-dd-backdrop` is appended directly onto `<body>` with
+  `z-index:99998`. Compared at the body level, 99998 beats the toolbar's
+  100, so the backdrop painted OVER the entire toolbar stacking context —
+  dropdown included — even though the dropdown's own declared z-index
+  looked six orders of magnitude higher. This is the classic CSS "trapped
+  in a low-ranked parent stacking context" bug; it's why portal/teleport
+  patterns exist for exactly this kind of full-screen overlay.
+- FIX, `pflx-platform-check/preview.html`, 3 changes:
+  1. `#pflx-profile-dropdown`'s inline style: `position:absolute` (which
+     was anchored to `.toolbar-profile`, its previous parent) →
+     `position:fixed`, with placeholder `top`/`right` values that get
+     overwritten on every open.
+  2. `pflxToggleProfileDropdown()`: on open, if the dropdown isn't already
+     a direct child of `<body>`, `document.body.appendChild(dd)` — the
+     exact same "portal it onto body" pattern v1.142 already used for the
+     blur backdrop (`pflxEnsureWidgetBackdrop`). Once it's a body-level
+     sibling of the backdrop instead of nested inside `.toolbar`, its
+     `z-index:100000` is compared apples-to-apples against the backdrop's
+     `99998` and correctly wins.
+  3. Since the dropdown is no longer positioned relative to
+     `.toolbar-profile`, `pflxToggleProfileDropdown()` now reads the
+     profile pill's live `getBoundingClientRect()` on every open and sets
+     `dd.style.top`/`dd.style.right` explicitly, so it still visually
+     anchors right under the avatar exactly as before — the fix is
+     invisible to the user except that the panel now actually appears.
+- NOT changed: the backdrop itself, the widget grid, the animation
+  timing/classes, or anything from v1.142's actual feature scope — this
+  is a pure positioning/stacking-context fix, nothing else moved.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). This bug is a real-browser layout/stacking-context issue, not
+  pure computable logic — there's no meaningful Node unit test for
+  "does this DOM node visually render above that one," so verification
+  was a live browser check against the deployed site post-push (see
+  below) rather than an extracted-function test, and is called out here
+  explicitly rather than silently skipped.
+- HOST ACTIONS / BACKLOG: none. This only affects the brand-new v1.142
+  dropdown; no other UI uses the same absolute-positioned-inside-toolbar
+  pattern that this bug depended on.
