@@ -11117,3 +11117,119 @@ Mission Control immediately after, since it touches live nav for active testers.
   Ennis's own phasing: (1) X-Live session-stream widget integration; (2)
   cross-device cloud sync of the saved widget layout, once a per-user
   cloud-sync mechanism exists for PFLX generally.
+
+## PATCH X-LIVE v0.22 — new slide types from the Daily Lesson Guide reference: Mindful Moment, Social Sprint, Project Work, Exit Ticket (Sept 6, Ennis)
+
+- CONTEXT: Ennis shared a separate "Daily Lesson Guide" single-file app
+  (American School of Bangkok) and asked for X-Live's Live Session Stream
+  to be based on it, offering to let it be fully merged in. Given the
+  scale, scoped via `AskUserQuestion` (3 questions): (1) merge depth —
+  Ennis chose "adopt UI/UX patterns only": X-Live keeps its own Supabase-
+  synced, merge-safe session/slide data model (per the persistence
+  guardrail skill) rather than importing DLG's single-writer
+  save-to-Claude-Artifact mechanism, which has no multi-host/multi-player
+  sync story at all; (2) new slide types — Ennis chose "yes, add all of
+  them": Mindful Moment, Social Sprint, Project Work, and Exit Ticket (with
+  its share/quickwrite/3-2-1/poll/rating/yes-no sub-types) become real
+  X-Live `SLIDE_TYPES` entries, same pattern as the Google Slides/Doc/HTML
+  embeds shipped in v0.21; (3) sequencing — Ennis chose "phase it": this
+  patch ships the new slide types on X-Live's EXISTING modal-based slide
+  editor; the DLG-style always-visible agenda-rail + inspector-panel visual
+  redesign of the host builder screen (replacing the current modal) is a
+  separate follow-up patch, not bundled in here.
+- FIX, `x-live-check/index.html`, 8 changes:
+  1. `SLIDE_TYPES`: added `mindful` (🧘, hasTimer), `social` (🤝, hasTimer,
+     new `hasGroupSize` flag), `project` (🛠️, hasTimer), `exit` (🎫,
+     hasTimer, new `hasExitType` flag). None are `hasOptions` at the type
+     level — Exit Ticket's Poll behavior comes from its sub-type, not the
+     slide type itself, so a plain Exit Ticket doesn't force an options
+     editor onto Share Out/Quick Write/Rating/Yes-No hosts who don't need
+     one.
+  2. New `PFLX_EXIT_TYPES` catalog (share/quickwrite/reflect321/poll/
+     rating/yesno with display labels) + `pflxExitTypeLabel(key)` helper +
+     `PFLX_GROUP_SIZES` (Pairs/Small Groups/Whole Class/Trios, DLG's own
+     enum) — both reused everywhere the sub-type/grouping needs a display
+     label or a `<select>`'s option list, so there's one source of truth
+     instead of duplicated string literals.
+  3. `liveSlideContentLabel`/`liveSlideContentPlaceholder`: friendlier
+     content-field copy for the 4 new types (e.g. Exit Ticket's textarea
+     says "Prompt" with a "What is one thing you learned today?"
+     placeholder instead of the generic fallback).
+  4. `liveNewSlide(type)`: every freshly created slide now defaults
+     `groupSize: 'Pairs', exitType: 'quickwrite'` — harmless on slide types
+     that don't use them (same convention as every slide already carrying
+     unused fields like `correctIndex`). A slide saved *before* this patch
+     lacks both fields entirely; every place that reads them uses
+     `sl.groupSize || 'Pairs'` / `sl.exitType || 'quickwrite'`, so an old
+     slide still renders correctly with the same sane defaults rather than
+     showing `undefined`.
+  5. New `liveSlideExitTypeChange(v)` (mirrors the existing
+     `liveSlideTypeChange`): updates `sl.exitType` and re-renders the slide
+     modal, so switching to "Poll" makes the Options editor appear live
+     without closing/reopening the modal.
+  6. `renderSlideModal()`: added a `showOptions` flag (`meta.hasOptions ||
+     exit+poll`) driving the existing Options editor — an Exit Ticket set
+     to Poll gets the exact same add/remove-option UI a native Poll slide
+     has. Added a Group Size `<select>` (shown only for Social Sprint) and
+     an Exit Ticket Type `<select>` (shown only for Exit Ticket), inserted
+     between the prompt textarea and the options/timer/reward fields.
+  7. `rLiveRun()` (host's own live-run preview): now shows "Grouping: ‹X›"
+     under a Social Sprint slide and "Exit type: ‹X›" under an Exit Ticket
+     slide, and the options preview line now also fires for an Exit
+     Ticket set to Poll (previously only `meta.hasOptions` types showed
+     it).
+  8. `rLiveNative()` (player view): the interactive-body `if/else` chain
+     gained exit-ticket handling — Poll rides the pre-existing
+     `hasOptions` button renderer (now widened to also match exit+poll);
+     Quick Write and 3-2-1 Reflection reuse the exact same textarea+SUBMIT
+     flow as Open Response; Rating renders five ⭐ buttons 1-5 via
+     `liveSubmitChoice(n)`; Yes/No renders two buttons via
+     `liveSubmitChoice(1)`/`liveSubmitChoice(0)` — all reusing the
+     existing `sl.responses[playerId] = {value, at}` storage and
+     `saveSession()` merge-safe write path, no new persistence mechanism.
+     Share Out falls through with an empty body (prompt-only, verbal
+     share-out — same behavior Discussion Prompt already has). Mindful
+     Moment, Social Sprint, and Project Work also fall through to
+     prompt-only for the same reason — none of them collect a digital
+     response, matching what a "moment"/"sprint"/"work time" slide
+     actually needs.
+- NOT included in this patch (explicitly phased, per Ennis's own answer):
+  the DLG-style persistent agenda-rail + always-visible inspector-panel
+  redesign of the host builder screen (currently still `rLiveBuilder()`'s
+  flat slide list + `renderSlideModal()`'s modal popup) — that's a
+  follow-up sub-patch. Also not pulled from DLG: its drag-to-place/
+  drag-to-resize free-floating image/embed canvas, its letterboxed
+  fullscreen Present mode, and its "Class Behavior Expectations" sidecar
+  card — all deferred to later sub-patches per the same phasing answer.
+  DLG's own save mechanism (Claude Artifact publish, single-writer,
+  reload-on-conflict) was deliberately NOT adopted — X-Live's existing
+  Supabase `app_data` merge-safe sync already handles concurrent host/
+  player writes, which DLG's model doesn't need to since it's single-user.
+- Verified: `node scripts/syntax_gate.js index.html` clean (2/2 blocks).
+  Extracted `SLIDE_TYPES`, `PFLX_EXIT_TYPES`, `PFLX_GROUP_SIZES`,
+  `pflxExitTypeLabel`, `slideTypeMeta`, `liveSlideContentLabel`,
+  `liveSlideContentPlaceholder`, and `liveNewSlide` from the shipped file
+  via brace-counting (never reimplemented) and unit tested, 21 cases, all
+  PASS: each of the 4 new SLIDE_TYPES entries has the right shape/flags
+  (mindful hasTimer/not hasOptions, social hasGroupSize, project exists,
+  exit hasExitType and is NOT hasOptions at the type level); the 6 exit
+  sub-types and their labels, including the undefined/garbage-key fallback
+  to "Quick Write"; the 4 group-size options in DLG's exact order; the new
+  content label/placeholder copy for all 4 types, confirming an untouched
+  existing type (`text`) still falls back to `null` as before; a freshly
+  created Social slide defaults to `groupSize: 'Pairs'` and a freshly
+  created Exit slide to `exitType: 'quickwrite'`; a regression check that
+  extracting an unrelated pre-existing function (`pflxYouTubeExtractId`,
+  from v0.19) still works cleanly post-patch, confirming the patch didn't
+  corrupt surrounding code structure.
+- HOST ACTIONS / BACKLOG: none required from Ennis — fully backward
+  compatible (old slides render with safe defaults, no schema migration
+  needed). Backlog, in the order Ennis's own phasing implies: (1) the
+  agenda-rail + inspector visual redesign of the host builder screen; (2)
+  drag-to-place/drag-to-resize free image/embed elements on a slide; (3)
+  fullscreen letterboxed Present mode; (4) the Class Behavior Expectations
+  sidecar card, shown on the first slide of a day. Unrelated, still
+  outstanding from the broader Live Streaming Suite plan: Phase 1a/1b/1c
+  (LiveKit VPS, still not provisioned), Phase 1e (Audience mode), Phase 1f
+  (camera corner overlay), Canva embed slide, screen-share slide,
+  Play-tab/Vault-Rush embed.
