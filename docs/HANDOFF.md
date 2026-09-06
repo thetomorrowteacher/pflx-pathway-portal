@@ -11623,3 +11623,89 @@ Mission Control immediately after, since it touches live nav for active testers.
   3x3 and holds after closing/reopening the dropdown.
 - HOST ACTIONS / BACKLOG: none new. My Tasks multi-view (calendar/task/
   daily) queued as its own follow-up patch, per above.
+
+## PATCH PLATFORM v1.147 — My Tasks widget: multi-view calendar/task/today (Sept 6, Ennis)
+
+- ASK: mid-session follow-up to the v1.146 widget trim/resize fix — "My
+  Tasks should actually show the tasks in different views....calender
+  view, task view, daily view, etc." Confirmed to proceed via Ennis's
+  one-word "continue" reply to my scoping question.
+- WIDGET CATALOG, `pflx-platform-check/preview.html`: `tasks` changed from
+  a plain `kind: 'action'` deep-link button to a `kind: 'rich', render:
+  'tasks'` widget, same category as Leaderboard/Wallet/Sound from v1.144.
+  `defaultH` bumped 1 → 3 (same reasoning as Leaderboard's v1.146 bump — a
+  tab bar plus a scrollable list/calendar needs real room; the v1.146
+  `overflow:hidden` safety net covers any legacy-saved smaller size that
+  doesn't get force-migrated, see below). `defaultW` and the widget's
+  `action` (`pflxOpenTasksShortcut`, unchanged) are untouched.
+- THREE TABS inside the widget, reusing the exact tab-bar CSS/pattern
+  Leaderboard already established (`pflx-widget-lb-tabs`/`-tab`/`-tab.on`):
+  - **TASKS** — the flat prioritized list.
+  - **TODAY** — the same list filtered to items due today.
+  - **CAL** — a compact month calendar with a dot marker under any day
+    that has a due item; clicking a day filters the list shown beneath the
+    grid to just that day's items.
+- DATA SOURCE — reused, not reimplemented: `pflxWidgetMyTasksItems()` is a
+  NEW function that mirrors `pflxRenderMyWork()`'s exact host-queue vs.
+  player-assigned filter+sort logic (same fields, same order: for a host,
+  awaiting-approval submissions, then overdue tasks, then overdue
+  projects; for a player, their own open assigned tasks sorted by priority
+  weight then due-date urgency) but returns a plain array instead of
+  writing into `mc-my-work-body` — the "new wrapper, not a refactor"
+  pattern already used for Sound's `pflxWidgetVolUpdate` in v1.144.
+  `pflxRenderMyWork()` itself is completely untouched, so the already-
+  shipped MC Dashboard "My Work" panel has zero regression risk.
+- CALENDAR — new rendering code, not a reuse of `mcRenderMasterCalendar()`:
+  that function is a full whole-platform month grid (100px-tall day cells,
+  5 aggregated item types) that is architecturally the wrong scale for a
+  ~144-220px profile-dropdown widget. Only its underlying date-math is
+  reused (`new Date(y,m,1).getDay()` for the first-day offset, `new
+  Date(y,m+1,0).getDate()` for days-in-month) alongside the same
+  `_mcUrgencyForDueDate`/`escapeHtml` helpers every other widget already
+  uses. New small CSS block (`.pflx-widget-cal-*`) added for the compact
+  grid/cell/dot-marker look, matching the existing widget visual language.
+- NEW GLOBAL STATE/HANDLERS: `window._pflxWidgetTasksView` (tasks/today/
+  cal), `window._pflxWidgetTasksCalMonth` ({y,m}, defaults to the current
+  month), `window._pflxWidgetTasksCalSelectedDay`. `pflxWidgetSetTasksView`/
+  `pflxWidgetCalMoveMonth`/`pflxWidgetCalSelectDay` each `stopPropagation()`
+  (same belt-and-suspenders pattern as every other widget-interactive
+  control), update state, then re-render both the docked grid and the
+  free-floating layer.
+- NOT force-migrated: a device with a pre-v1.147 saved 2x1 "tasks" widget
+  keeps that size on load — same "don't silently override a host's
+  intentional resize" decision already made for Leaderboard in v1.146. The
+  already-shipped `overflow:hidden` clip (v1.146) is what keeps an
+  undersized legacy widget failing safe (clipped) instead of the old
+  "hanging off the card" bug. A brand-new install picks up the new 2x3
+  default like any other new user.
+- KNOWN CONSEQUENCE, documented not hidden: a fresh default widget layout
+  is now 18 cells (wallet 2 + tasks 6 + leaderboard 6 + sound 4) against
+  the 12-cell `PFLX_WIDGET_PAGE_CELLS` page budget, so a brand-new
+  install's profile dropdown now paginates onto 2 pages by default instead
+  of 1. This is expected — the page-dot/arrow navigation already exists
+  and was built for exactly this — not a bug.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). 40-case Node unit test (`test_v1147.js`, functions extracted
+  via brace-counting from the real shipped file) — confirms the catalog
+  entry shape, host-branch filtering/ordering (awaiting → overdue-task →
+  overdue-project, excluding approved/not-yet-overdue/completed items),
+  player-branch filtering/sorting (excludes approved and not-assigned-to-
+  me, includes assigned-to-"all", sorts by priority then due-date), row/
+  list rendering (escaping, urgency badges, a 20-row render cap, empty-
+  state), the calendar's day-bucketing and month header for a real month,
+  a real 2028 February leap-year day count (29), day-selection filtering
+  (including a day with 2 items, a day with 1, and a day with 0 showing
+  the empty state, not a crash), and the merge-layout regression (a legacy
+  2x1 saved size is preserved unchanged; a brand-new layout gets the new
+  2x3 default) alongside a Leaderboard/catalog-count regression check.
+  Live-browser-verified: clicked through all three tabs (TASKS/TODAY/CAL)
+  in the real deployed widget, confirmed TASKS lists real assigned items,
+  TODAY correctly narrows to today's due date, CAL renders the current
+  month with dot markers on the right days and clicking a day filters the
+  list beneath the grid to that day's items.
+- HOST ACTIONS / BACKLOG: none new from this patch. Everything else from
+  the broader MC/X-Live/Settings restructuring ask (Virtual Theater →
+  X-Live, System Events → X-Live, Evolution Ranking icons on the toolbar/
+  Portfolio/MC Dashboard/profile widget, MC Calendar panel's own yearly/
+  monthly/weekly/daily toggle) remains queued, unchanged from the v1.145
+  entry.
