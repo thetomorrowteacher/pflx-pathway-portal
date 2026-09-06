@@ -10393,3 +10393,72 @@ Mission Control immediately after, since it touches live nav for active testers.
 - This closes out Phase 3 of the Native Live Sessions plan (3a shipped as PATCH PLATFORM v1.135,
   3b here). Remaining backlog from that plan: fully retiring `mc-panel-sessions` (see the v1.135
   entry above) once confirmed safe to do so.
+
+## PATCH PLATFORM v1.136 — X-Live Mode Login, Phase 1: Master-only "X-Live Mode (only)" flag (Sept 6, Ennis)
+- CONTEXT: first shippable patch of the `/xlive` X-Live Mode Login feature (see
+  `PLAN_xlive_mode_login.md`, delivered earlier this project). The plan's proposed patch numbers
+  (v1.134-v1.137, X-LIVE v0.16) were all consumed by unrelated same-day work (Pricing panel,
+  LS_STATE retirement, Post-a-Link) shipped earlier today — renumbered to v1.136-v1.139 +
+  X-LIVE v0.17 to avoid collision. This entry covers v1.136 only: the data model + toggle UI for
+  a new org/cohort-level restriction flag. No `/xlive` route yet — that's v1.138.
+- ADDED: `'manage.xliveOnly': ['master']` to the `CAP` capability map (~L71098) — a brand-new
+  Master-tier-only capability, separate from `manage.cohorts`/`manage.players` (which Admin/
+  Cohost/Instructor also hold), because this flag controls something much bigger than a normal
+  cohort setting: whether a player can log into Mission Control at all.
+- ADDED: `org.xliveOnly` (boolean) on the Organization editor (`hmcOpenOrgEditor`) — a new
+  "🔗 X-Live Mode (only) — Master Only" card, rendered ONLY when `pflxCan('manage.xliveOnly')`
+  is true (the checkbox literally isn't in the DOM for a non-master host, not just disabled).
+  Saved in `hmcSaveOrgEditor` via a new `org-edit-xliveonly` checkbox lookup — guarded so a
+  missing element (non-master host) leaves `org.xliveOnly` untouched rather than clearing it.
+- ADDED: `COHORTS[key].xliveOnly` (boolean) — a new cohort-level override row ("🔗 X-LIVE MODE
+  (ONLY)") in the Cohort Manager's App Access panel, styled as its own red-bordered card (not
+  folded into the generic app-toggle grid, since this isn't "another app" — it's a login-mode
+  restriction). New setter `updateCohortXLiveOnly(val)` (NOT the generic `updateCohortFeature`)
+  checks `pflxCan('manage.xliveOnly')` itself: a non-master host somehow triggering this (stale
+  cached UI, dev console) gets the checkbox reverted + a warning toast, and the change never
+  reaches `COHORTS`/localStorage/cloud. `loadCohortSettings()` also hides the whole row
+  (`display:none`) for non-master hosts opening a cohort's settings, so the control is invisible
+  end-to-end, not just blocked on submit.
+- FIXED (pre-emptively, per the plan's own explicit warning): `pflxSaveCohortOverrides()`'s
+  save whitelist (~L20296) only persists `apps`/`pathwayFull`/`arenaFull`/`seasons`/`projects`/
+  `internships` per cohort — any field not in that object literal silently vanishes on the next
+  save+reload cycle even though it lives fine in memory. Added `xliveOnly: !!c.xliveOnly` to
+  that whitelist. Skipping this step (the plan flagged it as a must-not-miss item) would have
+  meant the cohort toggle *looked* like it worked in the same session but reset itself the next
+  time a host saved any other cohort setting.
+- ADDED: `window.pflxPlayerIsXLiveOnly()` — the resolver a player-facing surface will call
+  (starting with v1.138/v1.139) to decide whether someone is restricted to X-Live-only mode.
+  Deliberately modeled on the existing `pflxPlayerCanAccessApp`/`resolveCohortApp` org→cohort
+  cascade (~L20480) for consistency, but with INVERTED polarity: that function is "deny wins"
+  (an app is blocked if ANY of a player's cohorts denies it); this one is "xliveOnly wins" (a
+  player IS restricted if ANY of their cohorts — or that cohort's parent org, with no cohort
+  override — says xliveOnly=true), because restriction here is the opt-in exception, not the
+  default-open case app-gating is. Hosts/admins/masters are always exempt regardless of cohort.
+  Checks the raw `pflxOverrideByName` map first (registry-drift precedence, same as
+  `resolveCohortApp`), then the in-memory `COHORTS` object, then the parent `ORGANIZATIONS`
+  entry. Fails open (returns `false` = not restricted) on any error, matching every other
+  `pflxPlayerCanAccessApp`-adjacent gate in this file.
+- Bumped `window.PFLX_PATCH` 135 → 136.
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after. 12-case Node test suite against the REAL shipped `pflxPlayerIsXLiveOnly` and
+  `updateCohortXLiveOnly` functions (extracted via brace-counting, never reimplemented) — all
+  12/12 PASS: host/admin/master roles are never restricted even with a nonsensical cohort
+  setting; a cohort-level `xliveOnly=true` restricts a plain player; an org-level `xliveOnly=true`
+  cascades down to a cohort with no override; a multi-cohort player IS restricted if even one of
+  their cohorts says `xliveOnly=true` (confirming the inverted "xliveOnly wins" polarity vs.
+  `pflxPlayerCanAccessApp`'s "deny wins"); no setting anywhere defaults to not-restricted
+  (fail-open); the raw override map wins over a stale in-memory `COHORTS` entry (registry-drift
+  precedence); a master host's toggle calls `updateCohortFeature` and fires no warning; a
+  non-master host's toggle is blocked, the checkbox is reverted, and a warning toast fires;
+  `pflxCan` being entirely absent (engine not loaded) fails open rather than blocking everyone.
+  Pre-patch backup at `preview.html.pre-v136-backup` (sha1 confirmed byte-identical to the live
+  file before patching).
+- HOST ACTIONS: none required — the new "X-Live Mode (only)" toggles exist in the Org Editor and
+  Cohort Manager now but do nothing yet (no player-facing surface reads
+  `pflxPlayerIsXLiveOnly()` until v1.138/v1.139 ship). Safe to leave untouched until then.
+- NEXT: v1.137 (X-Live roster & PIN visibility for flagged cohorts, host-facing), v1.138 (the
+  actual `/xlive` route — fixes the "Portfolio not found" collision Ennis hit, adds the
+  roster-picker + PIN-pad login UI with the `.ttt-credit` footer and remember-me persistence),
+  v1.139 (defense-in-depth: block normal MC login + auto-restore for X-Live-only players), and
+  PATCH X-LIVE v0.17 (extend `adoptFromParams()` to consume the full SSO contract). Each ships,
+  verifies, and deploys independently per house style before the next one starts.
