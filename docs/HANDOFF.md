@@ -11709,3 +11709,78 @@ Mission Control immediately after, since it touches live nav for active testers.
   Portfolio/MC Dashboard/profile widget, MC Calendar panel's own yearly/
   monthly/weekly/daily toggle) remains queued, unchanged from the v1.145
   entry.
+
+## PATCH PLATFORM v1.148 — Retired the stub Virtual Theater production suite (Sept 6, Ennis)
+
+- ASK: next piece of the larger MC/X-Live/Settings restructuring request —
+  "Virtual Theater → X-Live." Scoped via AskUserQuestion after tracing the
+  actual code: MC Dashboard's "Virtual Theater" is a big embedded section
+  (55 `vt*` functions — mixer, DJ, lighting, prompter, crew, media,
+  YouTube tab, a CapCut editor mockup) behind a "Launch Theater" button.
+  Traced every one of those functions before touching anything and found
+  they're ALL local-only mockup UI with zero backend wiring — `vtSendChat`/
+  `vtSendQAMessage` only append to a DOM list (no cloud write, unlike the
+  real PFLX chat system), `vtDeckPlay`/`vtMasterFaderChange`/`vtHotCue`/etc.
+  are `pflxToast(...'stub')` placeholders with no audio/video engine
+  behind them. Ennis's answer: retire it outright — its real successor is
+  the already-planned X-Live Live Streaming Suite (LiveKit-based, still
+  blocked on the Oracle VPS), so there's no point relocating placeholder
+  code into that app ahead of the real thing.
+- IMPORTANT — NOT everything under "Virtual Theater" was stub. The same
+  trace found the *collapsed* state of the widget is a real, working,
+  cloud-synced feature: a host configures a YouTube/Twitch URL (or a
+  looping playlist) via "Configure" (`pflxEditLiveStream`), it's mirrored
+  through Supabase `app_data` key `pflx_live_stream` (`pflxSetLiveStream`/
+  `pflxApplyCloudStream`) so every device follows the same broadcast, and
+  it Picture-in-Picture pops out (`vtHandleMCNav`/`vtHandlePlayerNav`) when
+  a host or player navigates to another tab while it's live. This is
+  genuinely in use and was NOT removed — only the non-functional "Launch
+  Theater" full production-suite panel was.
+- WHAT CHANGED, `pflx-platform-check/preview.html`:
+  - Removed the "Launch Theater" button and the entire 848-line
+    "EXPANDED STATE (full theater)" HTML panel (Stage/Mixer/DJ/FX/
+    Lighting/Media/Prompter/Crew/YouTube tab/CapCut editor) — the whole
+    confirmed-stub production suite.
+  - Removed the one call site that auto-opened it whenever a host went
+    live (`if (window.pflxRole === 'host') vtLaunchTheater();` inside
+    `pflxRenderLiveStream()`) since there's nothing left for it to open.
+  - Rebranded the KEPT collapsed widget away from "production suite"
+    framing: "VIRTUAL THEATER" → "LIVE STREAM" (host widget, player-side
+    mirror, and the Configure modal's header), "THEATER OFFLINE" →
+    "STREAM OFFLINE", and the description text now says what it actually
+    does ("Configure a YouTube or Twitch link to broadcast live to your
+    class.") instead of advertising mixing/DJ/lighting that no longer
+    exists.
+  - The 55 `vt*` stub functions (mixer, DJ, lighting, prompter, crew,
+    media, CapCut) are deliberately left in place as unreachable dead
+    code, same precedent as `mc-panel-players` from v1.145 — auditing and
+    deleting 55 individual functions one-by-one is separate, lower-value
+    work with more risk than this patch's actual point (removing the
+    entry point). `vtLaunchTheater`/`vtCollapseTheater`/`vtSwitchTab`
+    already null-guard on `document.getElementById(...)`, so they stay
+    completely harmless with their target HTML gone.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). 29-case Node unit test (`test_v1148.js`, functions extracted
+  via brace-counting from the real shipped file, against a mock DOM shaped
+  exactly like the real post-patch page — i.e. `mc-theater-launch-btn` and
+  `mc-theater-expanded` genuinely absent) — confirms the stub HTML
+  (Launch Theater button, Mixer/DJ panels, CapCut editor) and the
+  "VIRTUAL THEATER" user-facing label are gone, the rebranded copy is in
+  place, the Configure button/iframe/player-side section are still
+  present, all 55 original `vt*` functions remain defined (dead code, not
+  deleted), and — the part that actually mattered — `pflxRenderLiveStream()`
+  still correctly sets a live broadcast's iframe/status/player-mirror with
+  the removed launch button in place, still correctly shows the offline
+  state, and `vtHandleMCNav()` still correctly pops the stream into
+  Picture-in-Picture on nav-away and restores it on nav-back. Live-browser
+  verification of the actual broadcast/PiP behavior deferred to the live
+  deploy check below (no active class stream was running during this
+  patch to click through end-to-end against, but the same code path is
+  covered by the DOM-shaped unit test above).
+- HOST ACTIONS / BACKLOG: System Events → X-Live (the live-challenges/
+  escape-room piece only, per Ennis's separate scoping answer — Reality
+  Warp skins and XC taxes/boosts stay in the Console since they're
+  platform-wide, not live-session-specific) is queued as its own follow-up
+  patch. Evolution Ranking icons surfaced elsewhere and the MC Calendar
+  panel's own yearly/monthly/weekly/daily view toggle remain queued,
+  unchanged from the v1.145 entry.
