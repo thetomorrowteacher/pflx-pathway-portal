@@ -10462,3 +10462,56 @@ Mission Control immediately after, since it touches live nav for active testers.
   v1.139 (defense-in-depth: block normal MC login + auto-restore for X-Live-only players), and
   PATCH X-LIVE v0.17 (extend `adoptFromParams()` to consume the full SSO contract). Each ships,
   verifies, and deploys independently per house style before the next one starts.
+
+## PATCH PLATFORM v1.137 — X-Live Mode Login, Phase 2: roster & PIN visibility for flagged cohorts (Sept 6, Ennis)
+- CONTEXT: second patch of the `/xlive` X-Live Mode Login feature sequence (see v1.136 above for
+  the full renumbering note). Reuses the existing, already-built PIN infrastructure end to end —
+  no new auth primitive, no new data field beyond what v1.136 already added. This patch is purely
+  a host-facing convenience: give a Master/Admin a fast way to see (and hand out) the PINs an
+  X-Live-only cohort's players will need at `/xlive`, once that route exists (v1.138).
+- FOUND (before touching anything): `hmcRenderPlayers()` (the function defined near L19397) is
+  fully shadowed at runtime — a later block (~L71867) does `var origRender = window.hmcRenderPlayers;
+  ... window.hmcRenderPlayers = rebuildPlayerTable;`, keeping the old one reachable only as
+  `window.hmcRenderPlayersOriginal`. All patching below targets `rebuildPlayerTable`, the function
+  that's ACTUALLY live in Platform Settings → Player Management today — confirmed by grepping every
+  reference to `hmc-player-tbody` before editing, exactly the kind of "don't trust stale line
+  numbers or names, verify what's live" check this project's discipline calls for.
+- ADDED: a `PIN` column to the Player Management table (`host-players` panel), between `Status`
+  and `Actions`. Each row shows the player's PIN masked (`••••`) by default with a small inline
+  `Show`/`Hide` button (`hmcTogglePinCell(id)`) — masked-by-default matches the existing single-
+  player Edit modal's own PIN field convention, just now available without opening that modal for
+  every player one at a time.
+- ADDED: a red-bordered banner (`#hmc-player-xlive-banner`, hidden by default) above the table that
+  appears ONLY when the active cohort filter resolves to an X-Live Mode (only) cohort (v1.136's
+  flag) — "🔗 &lt;cohort&gt; is X-Live Mode (only) — these players log in at /xlive with their PIN,
+  not email/password", plus **Reveal All PINs** / **Hide All** buttons so a host prepping for a
+  live class can see every PIN in that cohort's roster at once instead of clicking Show N times.
+- ADDED: `window.hmcCohortIsXLiveOnly(cohortName)` — a host-admin-panel counterpart to v1.136's
+  player-session-based `pflxPlayerIsXLiveOnly()`. Same org→cohort cascade (raw override map →
+  in-memory `COHORTS` → parent `ORGANIZATIONS`, "xliveOnly wins"), but takes a cohort name directly
+  since this runs from the host's Player Management filter dropdown, not from inside a player's
+  session — there's no `activeSession`/role to read here.
+- ADDED: `window._hmcLastRenderedIds` (set at the end of every `rebuildPlayerTable()` render) plus
+  `hmcRevealAllPinsInView()`/`hmcHidePinsInView()`, which only ever touch the ids that were actually
+  in the CURRENT filtered/searched view — not every player in the roster — so a host revealing PINs
+  for one cohort's roster never accidentally reveals (or leaves revealed) unrelated players who
+  happen to be scrolled out of view.
+- Bumped `window.PFLX_PATCH` 136 → 137.
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean,
+  before and after. 13-case Node test suite against the REAL shipped `hmcCohortIsXLiveOnly`,
+  `hmcTogglePinCell`, `hmcRevealAllPinsInView`, `hmcHidePinsInView` (extracted via brace-counting,
+  never reimplemented) — all 13/13 PASS: `'all'`/falsy cohort names are never xliveOnly; cohort-
+  level and org-level (cascading) `xliveOnly=true` both resolve correctly; the raw override map
+  wins over a stale in-memory cohort record (registry-drift precedence, same as v1.136); a thrown
+  lookup fails closed to `false` rather than propagating; toggling one player's PIN cell flips only
+  that player and triggers exactly one re-render; toggling twice returns to hidden; Reveal All/Hide
+  All only ever touch ids from `_hmcLastRenderedIds` (the current filtered view), never an arbitrary
+  or previously-viewed id. Pre-patch backup at `preview.html.pre-v137-backup`.
+- HOST ACTIONS: none required. The PIN column and banner are visible to every host in Player
+  Management today (viewing a PIN was already possible per-player via Edit; this just surfaces it
+  faster) — the X-Live-only banner itself only appears once a cohort/org is actually flagged via
+  v1.136's toggles, which nothing is yet.
+- NEXT: v1.138 (the `/xlive` route itself — adds `'xlive'` to the Public Portfolio Mode `reserved`
+  map, fixing the "Portfolio not found" collision Ennis hit, and builds the roster-picker + PIN-pad
+  login screen with the `.ttt-credit` footer + remember-me persistence), v1.139 (defense-in-depth
+  login gate for X-Live-only players), and PATCH X-LIVE v0.17 (extend `adoptFromParams()`).
