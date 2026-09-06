@@ -11543,3 +11543,83 @@ Mission Control immediately after, since it touches live nav for active testers.
   page/MC Dashboard player cards/profile dropdown widget (all 4 locations
   Ennis selected), and the Calendar's yearly/monthly/weekly/daily view
   toggle (same items, finer time grain, per Ennis's answer).
+
+## PATCH PLATFORM v1.146 — Widget picker trim + fixed resize cap/overflow (Sept 6, Ennis)
+
+- ASK: annotated screenshot of the v1.144 free-widget dropdown with three
+  widgets crossed out (X-Coin, Rank, Badges — "some widgets are
+  unnecessary"), the Leaderboard and Sound widgets circled ("some of the
+  functions are hanging off of the widget"), and "the widget should be
+  able to be bigger." Scoped via 2 AskUserQuestion answers: remove just
+  the 3 X'd widgets, keep My Tasks ("Just the 3 X'd (Recommended)"); and
+  raise the resize cap AND fix default sizes so nothing overflows out of
+  the box by default ("Raise the cap + fix default sizes (Recommended)").
+- DIAGNOSED LIVE before touching code: opened the real dropdown in a
+  browser and measured each widget's actual rendered content against its
+  box with `getBoundingClientRect()`. Confirmed the Leaderboard widget's
+  content (tier tabs + 5 rows + "View All →") was 43px taller than its
+  2x2 (144x144px) box — that's the exact "hanging off" Ennis saw: content
+  painting past the card's border/background with nothing behind it,
+  because `.pflx-widget` never clipped overflow. The Sound widget's 3
+  sliders + "Full Mixer →" button, by contrast, measured 4px UNDER its
+  box height — it was already fitting, so it was left alone rather than
+  resized on a hunch.
+- WIDGET CATALOG TRIMMED, `pflx-platform-check/preview.html`: removed the
+  `xcoin`, `badges`, and `rank` plain stat widgets from
+  `PFLX_WIDGET_CATALOG` entirely. X-Coin duplicated the Wallet widget's
+  already-real balance display, Rank duplicated the RANK chip that's
+  always visible in the top toolbar, and Badges just showed a bare "0"
+  with nothing else useful. `My Tasks` was kept per Ennis's answer.
+  `pflxMergeWidgetLayout` already drops any saved-layout entry whose id
+  isn't in the current catalog (by design, from v1.142), so removing the
+  three catalog lines was the entire fix — anyone with those 3 widgets
+  still saved in their layout will simply lose them on next load, no
+  migration code needed. `pflxWidgetStatValue()` (the function that read
+  their values) is now unreachable dead code; left in place rather than
+  deleted since a future stat widget could reuse it.
+- RESIZE CAP RAISED from 2x2 to 3x3 cells (144px → 220px), so a widget CAN
+  actually be made bigger now, per Ennis. Two call sites clamped the same
+  way and both needed the new ceiling: the live pointer-drag resize
+  handler, and `pflxMergeWidgetLayout`'s own sanitizer (which runs on
+  every load) — raising only the drag handler would have let you resize a
+  widget bigger, then silently snap it back to 2x2 on the very next
+  dropdown open. 3x3 was chosen over a larger cap like 4x4 because
+  `PFLX_WIDGET_PAGE_CELLS` (the per-page budget) is 12 — a 3x3 widget (9
+  cells) still leaves room for a second widget on its page, while a 4x4
+  widget (16 cells) would always consume an entire page by itself.
+- LEADERBOARD'S DEFAULT SIZE bumped from 2x2 to 2x3 (144x220px) so it
+  fits its real content without anyone needing to manually resize it —
+  directly fixes the measured 43px overflow. Sound's default (2x2) was
+  left unchanged since it was already measured fitting.
+- DEFENSIVE FIX: added `overflow: hidden` to `.pflx-widget-rich` (the rich
+  widgets' own CSS class). This doesn't change any of today's sizes — the
+  content now fits within them — but it means if a future content change
+  ever makes a rich widget's content taller than its box again, it fails
+  safe (clipped at the edge) instead of repeating today's exact bug
+  (content painting past the card with no background behind it).
+- NOT DONE, tracked as a follow-up: Ennis separately asked mid-session for
+  My Tasks to grow into a richer widget with calendar/task/daily view
+  toggles, similar in scope to the Leaderboard/Wallet/Sound rich-content
+  work from v1.144. That's a real feature addition (needs its own design
+  pass on what each view actually shows and whether it reuses MC's
+  existing calendar/task rendering) rather than a same-day fix, so it's
+  queued as its own patch rather than bundled in here.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13
+  blocks). 20-case Node unit test (extracted via brace-counting from the
+  real shipped `PFLX_WIDGET_CATALOG`, `pflxMergeWidgetLayout`, and
+  `pflxComputeWidgetPages`) — confirms xcoin/badges/rank are gone from the
+  catalog while tasks/wallet/leaderboard/sound remain, Leaderboard's
+  defaultH is 3 and Sound's stayed 2x2, `pflxMergeWidgetLayout` drops
+  those 3 removed ids from an old saved layout (including the edge case
+  of a saved layout containing ONLY removed widgets, which now falls back
+  cleanly to the 4 remaining catalog defaults in catalog order), the
+  raised 3-cell cap lets a previously-saved 3x3 widget through while a
+  legacy 2x2 size is preserved unchanged (not force-upgraded), the cap
+  still clamps an out-of-range/tampered value, and a 3x3 (9-cell) widget
+  doesn't break pagination. Live-browser verified against the deployed
+  site post-push: X-Coin/Rank/Badges are gone from the widget picker,
+  Leaderboard now renders its tabs/rows/View-All button fully inside its
+  card with no overflow, dragging a widget's resize handle now goes up to
+  3x3 and holds after closing/reopening the dropdown.
+- HOST ACTIONS / BACKLOG: none new. My Tasks multi-view (calendar/task/
+  daily) queued as its own follow-up patch, per above.
