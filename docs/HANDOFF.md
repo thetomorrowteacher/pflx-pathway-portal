@@ -10773,3 +10773,71 @@ Mission Control immediately after, since it touches live nav for active testers.
   reduction, co-host control, multiview player-screen dashboard, and native
   Loom/Flip/CapCut-style tools, all documented in the plan file's Backlog
   section, not built yet. Lockdown mode explicitly descoped by Ennis.
+
+## PATCH X-LIVE v0.19 — Live Streaming Suite, Phase 1d: YouTube/OBS embed broadcast mode (Sept 6, Ennis)
+
+- CONTEXT: after PATCH X-LIVE v0.18 shipped the LiveKit token function (Phase
+  1a), Ennis chose **Oracle Cloud's "Always Free" tier** for the LiveKit VPS
+  itself (over paid DigitalOcean) and is provisioning it as his own action
+  item — that part is still pending and still blocks Phase 1a's client-side
+  half (LiveKit SDK wiring) plus Phase 1b/1c. Separately Ennis asked to keep
+  a second, independent broadcast option alongside the LiveKit room, not
+  instead of it: host streams via OBS to an unlisted YouTube Live broadcast,
+  and X-Live embeds it. This needs no server, no LiveKit dependency, and
+  nothing from Phase 1a, so it ships now as its own patch rather than waiting
+  on the VPS.
+- FIX: in `x-live-check/index.html`:
+  - New "📺 YouTube/OBS Stream" control panel inside the host's run panel
+    (`rLiveRun(s)`): shows a URL/ID input + SET STREAM button when no stream
+    is set, or the current stream id + a STOP button when one is. Saves onto
+    the session as `sess.youtubeEmbedId` via the existing merge-safe
+    `saveSession()` path — no new sync mechanism.
+  - New `pflxYouTubeExtractId(input)` — accepts a raw 11-char video ID or a
+    `watch?v=`, `youtu.be/`, `youtube.com/live/`, or `youtube.com/embed/`
+    URL and extracts the id; returns `null` on anything unparseable so a
+    bad paste can't set a broken embed. Exposed on `window` for testability,
+    same convention as `pflxXLivePinMatches`.
+  - New `liveSetYouTubeEmbedFromInput()` / `liveClearYouTubeEmbed()` wired to
+    the new panel's buttons.
+  - `rLiveNative()` (the player's Nearpod-style live screen): computes a
+    `ytEmbed` iframe string once (`<iframe src="https://www.youtube.com/embed/<id>?autoplay=1">`)
+    right after `hc` is derived, and prepends it to all four of that
+    function's render paths (frozen, paused, no-slides-yet, main slide) when
+    `sess.youtubeEmbedId` is set — so the stream stays visible across every
+    state the session UI can be in, sitting above the slide/agenda content it
+    already renders.
+  - Known, documented trade-offs (told to Ennis plainly): one-way only (no
+    player mic/camera back through this path), typically 10-30s of delay
+    since it rides YouTube's own live pipeline, and the host still has to
+    separately run OBS and start the YouTube broadcast — X-Live has no
+    control over OBS itself.
+- Verified: `node scripts/syntax_gate.js index.html` — both blocks OK. Unit
+  test extracted the real `pflxYouTubeExtractId` from the shipped file via
+  brace-counting (not reimplemented) and ran 9 cases, all PASS: raw 11-char
+  ID, `watch?v=` (with and without trailing params), `youtu.be/` short link,
+  `youtube.com/live/`, `youtube.com/embed/`, plus garbage/empty/null inputs
+  all correctly returning `null`.
+- AUDIENCE MODEL NOTE (Sept 6, Ennis): separately, Ennis described wanting a
+  "game show" viewing model — the live session's actual roster (host/
+  production crew + enrolled players) are the only "contestants" who get the
+  full Nearpod-style agenda/slide experience; every OTHER logged-in PFLX
+  member becomes "the audience," able to watch the video but interact only
+  via chat (the existing floating X-Bot Live Chat widget, surfaced whenever
+  X-Live is active). Two things about this already hold with zero new code:
+  LiveKit's `host` (publish) vs `player` (subscribe-only) grant split from
+  v0.18 already means only contestants can ever broadcast, no matter how many
+  viewers join; and this YouTube/OBS path is link-based/watch-only by nature,
+  so it's already "anyone can tune in." What's NOT built yet: opening the
+  video (not the slide UI) to logged-in members outside a session's roster
+  needs its own lightweight "audience" entry point plus an `audience` role on
+  the token function. Documented as Phase 1e in the plan file's backlog;
+  not started.
+- HOST ACTIONS: none for this patch — usable immediately (run OBS → start an
+  unlisted YouTube Live broadcast → paste the URL into the new panel). Oracle
+  VPS provisioning for the LiveKit path (Phase 1a's other half, Phase 1b,
+  Phase 1c) is still the outstanding host action from PATCH X-LIVE v0.18.
+- BACKLOG: Phase 1e (audience mode, see above); everything else unchanged
+  from PATCH X-LIVE v0.18's backlog (recording, virtual backgrounds, noise
+  reduction, co-host control, multiview dashboard, native Loom/Flip/CapCut-
+  style tools, real server-verified login platform-wide, lockdown mode
+  explicitly descoped).
