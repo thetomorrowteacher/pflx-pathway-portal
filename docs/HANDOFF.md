@@ -11288,3 +11288,95 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: none. This only affects the brand-new v1.142
   dropdown; no other UI uses the same absolute-positioned-inside-toolbar
   pattern that this bug depended on.
+
+## PATCH PLATFORM v1.144 — Free-floating widgets + rich Leaderboard/Wallet/Sound content (Sept 6, Ennis)
+
+- ASK: two requests bundled into one patch. (1) "I want widgets to be free
+  and detachable on the blurred interface as a glass like transparent" —
+  scoped via 3 AskUserQuestion answers: a detached widget hides along with
+  the blur and reappears at the same free position on reopen ("hides with
+  the blur"); you detach one by dragging it past the grid's edge onto the
+  blurred background, and reattach by dragging it back over the grid ("drag
+  it out"); a floating widget looks exactly like its docked form, only the
+  positioning mechanism changes ("same design, just freed"). (2) A direct
+  follow-up: "These widgets should have a widget versions of its functions.
+  A leaderboard widget should show top 10 with a filterable catagories. The
+  Wallet should show the actual wallet. Sound widget should have sliders."
+- FREE/DETACHABLE MECHANIC, `pflx-platform-check/preview.html`:
+  - Layout entries (`window._pflxWidgetLayout`) gained optional `free`/`x`/
+    `y` fields. `pflxMergeWidgetLayout` now carries these through from a
+    saved layout (only when `x`/`y` are finite numbers, so a corrupted save
+    can never resurrect a broken free state).
+  - A new `#pflx-free-widgets-layer` portals onto `<body>` (same portal
+    pattern already used for the blur backdrop and the dropdown itself,
+    v1.143), `z-index:99999` — between the backdrop (99998) and the
+    dropdown panel (100000). `pflxRenderFreeWidgets()` renders every
+    `entry.free === true` widget there at its saved `x`/`y`, using the same
+    `pflxBuildWidgetCardHtml()` the docked grid uses — this is what keeps a
+    free widget visually identical to its docked form.
+  - `pflxRenderWidgetGrid()` now filters `!entry.free` before paginating, so
+    a detached widget stops consuming grid/page space.
+  - Drag mechanics extended (`_pflxWidgetDrag` gained a `location:
+    'grid'|'free'` field): dragging a docked widget whose pointer exits the
+    grid's bounding rect (24px margin, for hysteresis so ordinary reordering
+    near the edge doesn't misfire) flips `entry.free = true`, computes
+    `x`/`y` from the live pointer position, and re-renders both layers.
+    Dragging a free widget whose pointer re-enters the grid's rect (no
+    margin, so reattach requires an actual drop over the grid) flips
+    `entry.free = false` and re-renders. Resize-by-corner-handle works
+    identically whether a widget is docked or free.
+  - `pflxToggleProfileDropdown()`/`pflxCloseProfileDropdown()` now also
+    show/hide `#pflx-free-widgets-layer` in step with the backdrop — per
+    "hides with the blur," a free widget's position is saved layout state
+    (survives close/reopen and reload) but the widget itself isn't visible
+    outside an open dropdown.
+- RICH WIDGET CONTENT, same file. Every data source reused as-is, nothing
+  reimplemented:
+  - **Leaderboard** (now 2x2 by default): embeds `window.pflxLeaderboardByTier(10)`
+    — the exact function already shipped for the host's tier-aware
+    leaderboard modal — behind three small in-widget tabs (Starter/Novice/
+    Pro), satisfying "top 10 with filterable categories" with the tiers the
+    rest of the platform already uses for this. A "VIEW ALL →" footer button
+    opens the full `pflxOpenTierLeaderboard()` modal.
+  - **Wallet**: shows `window._pflxProfileStats.xc` (the same balance the
+    plain X-Coin stat widget reads) large and prominent, plus an "OPEN
+    WALLET →" button to `pflxOpenWalletShortcut()`. NOTE for Ennis: the
+    Console has no local wallet ledger of its own — `pflxOpenWalletShortcut`
+    has always been a pure deep-link to the separate X-Coin app, confirmed
+    by re-reading it during this patch. "Show the actual wallet" is
+    implemented here as "show the real balance inline, stay one tap from
+    the full app," not a duplicated transaction ledger — flagging this
+    explicitly since it's a real interpretation choice, not a literal
+    reading of the request.
+  - **Sound** (now 2x2 by default): three real sliders (Master/Music/SFX)
+    seeded from `SE.playerPrefs.volume/musicVolume/sfxVolume`. A new
+    `pflxWidgetVolUpdate(kind, val)` wrapper writes to those same
+    `SE.playerPrefs` fields and calls the existing `sePlayerPrefSave()` —
+    reusing all its side effects (music pause/resume, legacy `pflxMusic`
+    oscillator sync, live-stream auto-mute, `PFLX_AUDIO.refresh()`) — rather
+    than reimplementing them. A wrapper was needed because the full Sound
+    Settings panel's own `sePlayerVolUpdate`/etc. hardcode THAT panel's
+    element ids and can't be reused verbatim for a second, simultaneous set
+    of sliders. A "FULL MIXER →" footer button still opens the full panel
+    for the settings this compact widget doesn't surface (mute toggles,
+    live-stream volume, etc).
+  - Widget-internal interactive elements (tier tabs, the wallet/leaderboard/
+    sound footer buttons, the sliders) all call `event.stopPropagation()` on
+    `pointerdown` so clicking/dragging them doesn't fight with the widget's
+    own drag-to-reorder/drag-to-detach handling.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13 blocks).
+  26-case Node unit test (`test_v1144_v2.js`, extracted via brace-counting
+  from the real shipped functions) — catalog shape for all 3 rich widgets,
+  `pflxMergeWidgetLayout` free/x/y carry-through (including dropping a
+  corrupted free state with missing/non-finite x/y), `pflxComputeWidgetPages`
+  correctly excludes free widgets from page-budget math, `pflxWidgetFreeSize`
+  pixel footprints for 1x1/2x1/2x2, `pflxPointInRect` hit-testing including
+  the intentional detach-vs-reattach margin asymmetry, and a regression
+  check that the untouched `pflxTierMeta` still extracts cleanly. The
+  drag-to-detach/drag-to-reattach interaction itself is real-browser pointer
+  behavior, not pure computable logic — verified with a live browser pass
+  against the deployed site post-push (see below), same as v1.143's
+  precedent for this class of bug/feature.
+- HOST ACTIONS / BACKLOG: none new. Cross-device sync of the widget layout
+  (including free position) remains out of scope, per the original v1.142
+  Handoff entry — this device only, same as before.
