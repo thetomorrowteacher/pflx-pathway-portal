@@ -10267,3 +10267,35 @@ next session can move fast (all in `pflx-platform-check/preview.html`, current H
 HOST ACTIONS: none required — this is a "ready to execute" backlog item, not a
 decision point. Recommend shipping it in a session where you're available to spot-check
 Mission Control immediately after, since it touches live nav for active testers.
+
+## PATCH PLATFORM v1.134 — Pricing & Plans reference panel inside Mission Control (Sept 6, Ennis-requested)
+
+- REQUEST: Ennis had asked for the Fall 2026 Season Rate Card PDF's information to be added
+  "somewhere" (prior entry shipped it as a standalone doc in this repo's `docs/` folder). He
+  followed up: "I dont want the pdf in the Projects. I want the information from the PDF inside
+  of PFLX." Clarified via AskUserQuestion: host-facing reference panel inside Mission Control
+  (not the public landing page).
+- REMOVED: `docs/PRICING_SEASON_RATE_CARD_FALL2026.md` — moved out of the repo (git history
+  still has it in commit `773a24b` if ever needed) since the content now lives in the app itself.
+- ADDED: a new "&#x1F4B0; Pricing & Plans" nav item in Mission Control's TOOLS section
+  (`data-mc="pricing"`, next to Settings), any host tier can view it (no CAP gate — it's pure
+  reference material, no editing). Opens `mc-panel-pricing`: a static, styled reference panel
+  covering the full Fall 2026 Rate Card verbatim — Player (free tier), Season Pass (+ Early
+  Bird/Sibling/Annual variants), Cohort (15/30/60 + additional seat), Organisation
+  (Essential/Plus/Campus/Enterprise), the "Choosing" 4-question guide, and the X-Coin economy
+  explainer — styled with the existing `.mc-card`/`.mc-page-title` conventions and the same
+  tier accent colors already used by `ORG_TIER_META` (green/gold/purple/cyan) so it reads as
+  part of the same design language as the Organizations editor from PATCH PLATFORM v1.131. Pure
+  static content, no new data model or logic — nothing here is read/enforced by the app itself
+  (matches the same "reference, not source of truth for billing logic" framing as the doc it
+  replaces).
+- Files: `pflx-platform-check/preview.html` (nav button + `mc-panel-pricing`, inserted just
+  before the existing Settings nav button/panel).
+- Verified: `node scripts/syntax_gate.js preview.html` — all 13 inline `<script>` blocks clean
+  (unchanged count, confirming the insertion is pure HTML with no script-block interference); a
+  small Node/Python structural check confirmed the inserted panel's HTML tags are correctly
+  balanced (81 open/81 close `<div>` once tag-boundary artifacts in the check itself were
+  accounted for) and that both the nav button and the panel id appear exactly once. Pre-patch
+  backup at `preview.html.pre-v134-backup` (sha1 matched the live file before patching).
+- HOST ACTIONS: none required. The panel is purely informational — update it by hand here (and
+  bump the patch) whenever the real Rate Card changes; it does not read from any settings.
