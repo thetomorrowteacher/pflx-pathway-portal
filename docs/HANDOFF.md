@@ -11380,3 +11380,43 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: none new. Cross-device sync of the widget layout
   (including free position) remains out of scope, per the original v1.142
   Handoff entry — this device only, same as before.
+
+## PATCH PLATFORM v1.144 hotfix — pflxTierMeta naming collision crash (Sept 6, Ennis)
+
+- SYMPTOM: caught during this patch's own live-browser verification (not by
+  Ennis) — clicking a tier tab on the new Leaderboard widget threw
+  `Uncaught TypeError: Cannot read properties of null (reading 'label')`.
+- ROOT CAUSE: `window.pflxTierMeta` was defined TWICE under the same global
+  name for two unrelated concepts. The original (line ~62020) maps the
+  PLAYER evolution tier (`starter`/`novice`/`pro`) to a label+color, used by
+  the new Leaderboard widget, the pre-existing tier-aware leaderboard modal
+  (`pflxOpenTierLeaderboard`), the Player Management tier pill, and the tier
+  history modal. A second, unrelated HOST-permission-tier module (further
+  down the file, `master`/`admin`/`cohost`/`instructor`/`guest`) also did
+  `window.pflxTierMeta = tierMeta` — since script blocks execute top to
+  bottom at page load, this second assignment silently won, so by the time
+  ANY of those 5 callers actually ran (at user-interaction time, long after
+  page load), `pflxTierMeta('starter')` returned `null` instead of the
+  expected `{label, rgb}` — the host-tier map has no `starter`/`novice`/
+  `pro` keys. This means the tier-aware leaderboard modal, the tier history
+  modal, and the Player Management tier pill were ALREADY silently broken
+  in production before this patch — this patch's new widget just happened
+  to be the first thing to actually exercise the crash path live.
+- FIX: renamed the intruding host-tier export to `window.pflxHostTierMeta`.
+  Confirmed via grep that nothing else in the codebase referenced
+  `window.pflxTierMeta`/`pflxHostTierMeta` expecting the host-tier shape —
+  every real caller of the bare `pflxTierMeta` identifier wants the player
+  evo-tier meaning — so this is a pure, non-breaking rename with no other
+  call sites to update.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (13/13 blocks)
+  after the hotfix. Re-ran the live browser check against the deployed
+  site: opened the profile dropdown, switched the Leaderboard widget's tier
+  tabs (no crash), confirmed the pre-existing tier-aware leaderboard modal
+  and Player Management tier pill are also implicitly fixed by this rename
+  (not independently re-tested in the UI this pass, but the same root cause
+  applies to all 5 callers).
+- HOST ACTIONS / BACKLOG: none. Flagging for awareness: this collision
+  means the tier-aware leaderboard modal and tier history modal have likely
+  been rendering broken/blank (or throwing silently, depending on call
+  path) for some time before this was caught — worth a quick manual look
+  next time either is opened, though the fix here should have resolved it.
