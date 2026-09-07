@@ -12183,3 +12183,41 @@ Mission Control immediately after, since it touches live nav for active testers.
   immediate neighbors despite the `z-index: 5` bump (the toolbar row has
   very little gap between buttons); an easy follow-up value tweak if it
   reads as too aggressive in practice.
+
+## PATCH PLATFORM v1.155 — MC Calendar's YEAR view gets real, clickable days (Sept 7, Ennis)
+
+- ASK: "Add the days as well into the calendar and make them clickable." —
+  a follow-up on the v1.151 Year/Month/Week/Day toggle. The YEAR view
+  (`_mcRenderCalYear`) showed 12 month tiles with only a scheduled-item
+  COUNT per month; clicking a tile jumped to Month view, but there was no
+  way to see or jump to an individual day from the year overview.
+- WHAT CHANGED:
+  - New `_mcMiniMonthDaysHtml(year, m, byDate, todayIso)` — renders one
+    month's mini day-grid (a real Sun-Sat 7-column layout, blank leading
+    cells so day 1 lands under its actual weekday, like a desktop
+    calendar's year view). A day with any scheduled item (pulled from the
+    same `_mcCollectCalendarItems` data the count already used) gets a
+    small dot marker; today gets a solid highlight.
+  - New `_mcJumpToCalDay(iso)` — sets the shared `_mcMasterCalDay` anchor
+    and switches to Day view, reusing the exact same `mcSetCalendarView`
+    path the toolbar buttons use.
+  - `_mcRenderCalYear` now calls `_mcMiniMonthDaysHtml(...)` for every
+    month tile, appending the day grid under the existing month name/count.
+    Each day cell has its own `onclick` (with `event.stopPropagation()`) so
+    clicking a day jumps straight to that Day view without also firing the
+    month tile's own click-to-Month-view handler.
+  - Month tiles widened from `minmax(140px, 1fr)` to `minmax(230px, 1fr)`
+    to give the new 7-column day grid room to stay legible.
+- Verified: syntax gate clean (13/13 blocks). 20-case Node unit test — the
+  real `_mcJumpToCalDay`, `_mcMiniMonthDaysHtml`, and `_mcRenderCalYear`
+  extracted from the shipped file via brace-counting and run against a
+  real September 2026 fixture (30 days, starts on a Tuesday) — confirms
+  the day-of-week padding is exactly right, all 30 days render as
+  independently clickable, a day with scheduled items gets a dot and one
+  without doesn't, today is visually distinct, propagation is correctly
+  stopped so a day click doesn't also jump to Month view, and v1.150-1.154's
+  work (rank icons, month-view jump, toolbar hover, Launch Apps grid) is
+  untouched.
+- HOST ACTIONS / BACKLOG: none new. Worth a quick live click-through —
+  click a day with a dot on it and confirm the Day view lands on that
+  exact date with its scheduled items visible.
