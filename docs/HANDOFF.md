@@ -12745,3 +12745,58 @@ Mission Control immediately after, since it touches live nav for active testers.
   line is present in the real extracted function source.
 - HOST ACTIONS / BACKLOG: none required from Ennis for this patch — his
   current "SeasonPass" selection carries over automatically on next load.
+
+## PATCH X-LIVE v0.27 — Fixed the silent-discard trap on Edit Session (Sept 7, Ennis)
+
+- ASK: Ennis, terse: "Now I still dont ee the theater" (i.e. "see the
+  theater" — the X-Live Live Streaming Suite / broadcast feature). Not
+  self-explanatory, so investigated live in-browser rather than guessing.
+  First traced whether he meant the OLD Mission Control "Home Theater" nav
+  button — confirmed via grep across `preview.html` that it was
+  deliberately, fully retired in PATCH PLATFORM v1.148/v1.157 (100% stub
+  mixer/DJ/lighting UI, zero real backend; the button is now labeled
+  "Dashboard") — asked Ennis directly via AskUserQuestion, he confirmed he
+  meant the NEW X-Live broadcast feature instead, not the old retired one.
+- ROOT CAUSE, found by reproducing the flow live in the browser: X-Live's
+  LIVE tab had zero sessions built ("No sessions yet"). Built one to
+  demonstrate where the shipped YouTube/OBS Stream panel (PATCH X-LIVE
+  v0.19/Phase 1d) actually lives — it only renders inside a session's RUN
+  panel, reached via GO LIVE. First attempt: added a slide via the
+  categorized picker (v0.24), saw it listed as "Slides (1)" in the Edit
+  Session screen, then clicked the top-right "← BACK" button expecting
+  plain navigation (exactly how "← BACK" behaves everywhere else in this
+  app — the RUN panel, the ended-session screen). GO LIVE then failed:
+  "Add at least one slide before going live" — the slide was silently
+  gone. Traced `rLiveBuilder()` (the New/Edit Session screen): that
+  top-right "← BACK" button was wired to `liveCancelEdit()` — the SAME
+  discard-the-working-copy function as the screen's own, honestly-labeled
+  "CANCEL" button next to SAVE SESSION at the bottom. Two buttons, same
+  destructive action, one mislabeled to look harmless. This is almost
+  certainly the exact trap Ennis hit himself — add a slide, click what
+  looks like "just go back," silently lose it, GO LIVE stays blocked, no
+  broadcast panel ever becomes reachable. Confirmed exactly once relabeled
+  and re-run: build session → add slide → SAVE SESSION (not the old
+  BACK) → GO LIVE → the YouTube/OBS Stream panel renders immediately.
+- FIX: relabeled the top-right button from "← BACK" to "✕ CANCEL" —
+  matching its own already-honest twin at the bottom of the same screen.
+  Zero behavior change; both buttons already called `liveCancelEdit()`
+  before and after this patch. The RUN panel's and ended-session screen's
+  real pure-navigation "← BACK" buttons (no data to lose there) are
+  untouched.
+- Verified: syntax gate clean (2/2 blocks). 6-case Node unit test on code
+  extracted from the shipped file via brace-counting, confirming the
+  mislabeled button text is gone, the honest "✕ CANCEL" label is in place,
+  `liveCancelEdit()` is still wired to exactly the same 2 buttons
+  (behavior-unchanged), SAVE SESSION is untouched, and the RUN panel's
+  genuinely-harmless "← BACK" is left exactly as it was. Also
+  live-browser-verified end to end: built a real "Theater Demo" session,
+  added a slide, saved, went live, confirmed the YouTube/OBS Stream panel
+  renders in the host run view — then ended and deleted the demo session
+  so nothing was left behind in Ennis's real session list.
+- HOST ACTIONS / BACKLOG: none required. To reach the actual broadcast
+  panel today: LIVE tab → + NEW SESSION → add at least one slide →
+  **SAVE SESSION** (the gold button, not the top-right one) → GO LIVE —
+  the "📺 YouTube/OBS Stream (optional)" panel appears at the top of the
+  run view. Real camera/mic video (Phase 1b/1c of the Live Streaming
+  Suite plan) still needs the Oracle VPS to be provisioned before it can
+  be built.
