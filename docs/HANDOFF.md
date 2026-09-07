@@ -12346,3 +12346,63 @@ Mission Control immediately after, since it touches live nav for active testers.
     overall, and named/saveable custom widget layouts (detached, per-user
     sets). (3) An X-Live Avatar widget with stats, deeply connected to
     Battle Arena.
+
+## PATCH X-LIVE v0.23 — Bold sizing pass + agenda rail on the LIVE run view (Sept 7, Ennis)
+
+- ASK: with Home Theater/Live Stream fully retired from the Console (PATCH
+  PLATFORM v1.157) and everything now living in X-Live's own 🔴 LIVE tab,
+  Ennis asked (1) where to access it, (2) to make X-Live's assets larger/
+  Bold, (3) where the live agenda feature stands, (4) whether X-Live's UI
+  should take on a side-panel layout combined with the uploaded "Daily
+  Lesson Guide" reference app, and (5) to enlarge the X-Live logo. Scoped
+  via AskUserQuestion: ship the sizing/Bold pass immediately (independent,
+  low risk); put an agenda rail on the RUN view only, not the builder or
+  player view; do this ahead of the two other queued builds (Home
+  dashboard widget-editor, X-Live Avatar + Battle Arena widget).
+- ANSWERED (no code, informational): the retired Home Theater/Live Stream
+  functionality's permanent home is X-Live's existing native "Live
+  Sessions" system (🔴 LIVE tab — PATCH X-LIVE v0.13-v0.22), not a new
+  build. The live agenda feature IS that system: session builder
+  (rLiveBuilder), GO LIVE + run controls (rLiveRun), player view
+  (rLiveNative). v0.22 already pulled slide types (mindful/social/project/
+  exit + exit-ticket sub-types) from the Daily Lesson Guide reference file
+  onto X-Live's existing merge-safe data model; this patch is the first
+  visual-layout borrowing from that same reference (a rail, not DLG's
+  literal styling — X-Live keeps its own cyan/gold HUD look).
+- WHAT CHANGED — Bold sizing pass (site-wide CSS, every tab): `.hd .logo`
+  wordmark 18px→23px; `.logo-img` (the X-Live lockup) 30px→46px tall;
+  `.logo-pulse` live-dot 6px→8px; `.tab` (top nav) padding 10px 16px→13px
+  20px, font-size 10.5px→12.5px; `.cardT` (card titles) 10px→11.5px;
+  `.bigbtn` (every button platform-wide) padding 12px 18px→14px 22px,
+  font-size 11px→12.5px.
+- WHAT CHANGED — agenda rail on the host RUN view (`rLiveRun`): a new
+  196px-wide left rail lists every slide in the running session (icon +
+  title + response count), current slide highlighted gold; clicking a row
+  jumps straight to that slide via new `liveJumpToSlide(i)` (bounds-
+  checked absolute-index sibling of the existing `liveMoveCurrentSlide`
+  relative step — same saveSession()+render() shape). The right side
+  ("stage") is the pre-existing YouTube/OBS card, current-slide card, and
+  every control row (PREV/NEXT/REVEAL, PAUSE/LOCK/FREEZE, PICK A PLAYER/
+  MAKE GROUPS, END SESSION) — moved, not rewritten; every onclick/behavior
+  is byte-for-byte what shipped in v0.22.
+- NOT changed this patch (explicitly out of scope per Ennis's answer):
+  the session builder (`rLiveBuilder`, still a flat "+ ADD SLIDE" list)
+  and the player-side native view (`rLiveNative`, still full-screen) keep
+  their current layout. No data/schema change — this is render-layer only
+  on top of the existing `L.sessions`/`s.slides` model.
+- Verified: syntax gate clean (2/2 inline `<script>` blocks). 33-case Node
+  unit test — real code extracted from the shipped file via brace-counting
+  — confirms every CSS bump landed (and the old value is gone), confirms
+  `liveJumpToSlide` bounds-checks and mutates/saves/renders correctly,
+  confirms `liveMoveCurrentSlide` is untouched, and confirms `rLiveRun`'s
+  real source still wires up every pre-existing control call site
+  unchanged. Additionally ran the real extracted `rLiveRun` against a
+  fake 3-slide session (not just source-matched — actually invoked): 3
+  rail rows render, the flex wrapper is present, the current slide (index
+  1) is highlighted, and END SESSION still renders.
+- HOST ACTIONS / BACKLOG: the fuller "rail everywhere" option (also
+  redesigning the builder and the native player view into a DLG-style
+  rail/stage/inspector layout) was declined for now — logged as backlog
+  if Ennis wants it later. Next up per this session's priority answer:
+  the Home dashboard widget-editor pass, then the X-Live Avatar + Battle
+  Arena widget.
