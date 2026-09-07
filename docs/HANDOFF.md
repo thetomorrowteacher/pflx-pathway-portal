@@ -12558,3 +12558,82 @@ Mission Control immediately after, since it touches live nav for active testers.
   separate after-the-fact transcription pass. Not yet decided which path
   Ennis wants — flagged as an open decision alongside the still-open Oracle
   VPS blocker.
+
+## PATCH X-LIVE v0.24 — Categorized visual Add Slide type picker (Sept 7, Ennis)
+
+- ASK: Ennis sent 12 reference screenshots (Nearpod, Peardeck, Wayground/
+  Quizizz, Blooket, Classcraft, Socrative, Quizlet Live) plus X-Live's own
+  Add Slide screen and said: "I don't see a lot of variation between slide
+  activity types...this needs to be more intuitive, a better UI. There
+  should be more options as well," followed by a long list of specific
+  feature asks (combined-percentage results reveal, a quiz-race mode, and
+  matching the UI/feature set of a dozen named ed-tech apps "all in one
+  with PFLX in the backend"). Scoped via AskUserQuestion into a phased plan
+  (documented below) — build order confirmed: (1) this picker redesign,
+  then (2) the universal results-reveal visualization, then (3) Quiz Race
+  mode, with everything else logged as backlog.
+- WHAT CHANGED: the ADD/EDIT SLIDE modal's Type field was a single flat
+  `<select>` listing all 17 slide types alphabetically-by-insertion-order
+  (the exact screenshot Ennis circled). Replaced with a categorized visual
+  card grid (`pflxSlideTypePickerHtml`, new `PFLX_SLIDE_CATEGORIES` map),
+  matching the pattern in the reference screenshots (Nearpod's "Add
+  Content"/"Add Activity" tiles, Peardeck's categorized "Add" grid): 4
+  categories — Content (Text, Media, Google Slides/Doc, HTML Embed),
+  Questions & Polls (Poll, Multiple Choice, Quiz Question, Open Response,
+  Discussion Prompt), Timed Activities (Timer, Challenge, Mindful Moment,
+  Social Sprint, Project Work), Tasks & Wrap-Up (Push Task, Exit Ticket) —
+  each a 2-column grid of icon+label cards, the current selection
+  highlighted gold with a checkmark. Clicking a card calls the exact same
+  `liveSlideTypeChange(type)` the old `<select>`'s `onchange` called —
+  behavior is unchanged, only the picker UI is new.
+- NOT changed this patch (explicitly phased for later, per the priority
+  answer): no new slide types were added, no results-percentage
+  visualization, no Quiz Race scoring mode. Confirmed while researching
+  this patch: X-Live's 17 existing slide types today only show a player's
+  OWN correct/incorrect on reveal (`rLiveNative`'s `showCorrect`/`myResp`
+  logic) — there is no class-wide percentage breakdown anywhere yet. That
+  gap is the confirmed starting point for the next X-Live patch.
+- PLAN — remaining phases from this ask, in build order Ennis chose:
+  1. **(this patch)** Categorized visual slide-type picker.
+  2. **Universal results reveal** — a real percentage-breakdown
+     visualization (bar chart per choice + correct-answer highlight) shown
+     on reveal for every slide type with options (poll/mc/quiz/rating/
+     yes-no), on both the host's `rLiveRun` projector view and players'
+     `rLiveNative` screens. Per Ennis's answer, this always recomputes live
+     from every response ever recorded on that slide (live + self-directed
+     mixed) rather than freezing a snapshot at the live moment — matters
+     once self-directed sessions (a separate, still-queued ask) exist.
+  3. **Quiz Race mode** — a new Kahoot/Blooket/Wayground/Quizlet-Live-style
+     slide type: countdown timer, speed-weighted scoring, live leaderboard
+     between questions.
+  4. **Backlog, not yet scoped**: broader feature-parity items from the
+     named apps (Mentimeter-style word-cloud slide, Blooket-style
+     game-board/avatar-collecting modes — likely overlaps with the
+     already-queued X-Live Avatar epic below, Classcraft-style points/
+     character overlay, richer media/embed slide types).
+- HAYPI DRAGON CLARIFICATION (X-Live Avatar epic, still queued, not built
+  this patch): Ennis corrected "Haypi Monster" to "Haypi Dragon" and sent 4
+  real screenshots of it. Confirms the actual mechanic much more precisely
+  than the earlier general research: a dragon has a COMBAT action (active,
+  immediate) and a REST state; while resting it sits in a "Dragon Eyrie"
+  (nest) accumulating EXP toward a level-up threshold (e.g. 4081/18500) on
+  a real-world countdown timer (e.g. 00:04:56) shown alongside it; a
+  separate "Magic Matrix" screen lets the player socket stat-boosting
+  stones (Mana/Attack/Damage/Crit) once leveled. This validates the earlier
+  AskUserQuestion answer (a new lightweight action checklist feeds the
+  avatar's leveling meter, not existing MC Tasks) and sharpens the design
+  target for that still-queued epic: Combat = the timed action set;
+  Eyrie-style rest/incubation = the ~5-hour timeout period Ennis described;
+  Magic Matrix = the post-level-up stat/upgrade screen.
+- Verified: syntax gate clean (2/2 blocks). 14-case Node unit test — real
+  code extracted from the shipped file via brace-counting — confirms the
+  old `<select>` is gone from `renderSlideModal`, confirms every one of the
+  17 `SLIDE_TYPES` keys appears in `PFLX_SLIDE_CATEGORIES` exactly once (no
+  type silently dropped or duplicated), and actually invokes the real
+  extracted `pflxSlideTypePickerHtml` (not just source-matched) against the
+  real `SLIDE_TYPES`/`slideTypeMeta` from this same file — confirms all 4
+  category labels render, the selected type is highlighted and an
+  unselected one is not, and all 17 types render as clickable cards.
+- HOST ACTIONS / BACKLOG: none required from Ennis for this patch. Next up
+  per the confirmed build order: the universal results-reveal
+  visualization (Phase 2 above).
