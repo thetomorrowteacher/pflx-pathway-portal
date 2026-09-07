@@ -12637,3 +12637,61 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: none required from Ennis for this patch. Next up
   per the confirmed build order: the universal results-reveal
   visualization (Phase 2 above).
+
+## PATCH X-LIVE v0.25 — Universal results-reveal visualization (Sept 7, Ennis)
+
+- ASK: continuation of the Sept 7 slide-type epic (PATCH X-LIVE v0.24
+  shipped the categorized visual Add Slide picker as phase 1). Phase 2, per
+  Ennis's confirmed build order: "I want results after each question to
+  show a combined percentage, this will also be for regular polls, and
+  questions as well. Create a beautiful visual of results after questions
+  are answered for show in the projector presentation slides. The reveal
+  should show the percentage of choice chosen by current players combined
+  with any self directed data upon reveal. It should also show the correct
+  answer percentage." Build-order and reveal-data-merge semantics were both
+  confirmed via AskUserQuestion: this patch next, and "Always live,
+  recomputes forever" (never a frozen snapshot).
+- WHAT CHANGED: a new shared `pflxSlideResultsHtml(sl)` renders a
+  percentage bar chart — one bar per choice, gold gradient by default,
+  green + glow for the correct choice on graded types — shown on REVEAL,
+  on BOTH the host's projector view (`rLiveRun`'s stage) and every
+  player's own screen (`rLiveNative`). Covers every slide type that has
+  choosable options: Poll, Multiple Choice, Quiz Question (via
+  `meta.hasOptions`), and Exit Ticket's Poll/Rating(1-5, with a computed
+  average)/Yes-No sub-types (`sl.exitType`) — confirmed via `SLIDE_TYPES`/
+  `PFLX_EXIT_TYPES` these are the only types with anything option-shaped to
+  chart; text/media/timer/discussion/etc. correctly render nothing. Graded
+  types (mc/quiz) also get a "✅ NN% answered correctly (X of Y)" summary
+  line, computed the same live way.
+- REVEAL, ALWAYS RECOMPUTED LIVE (Ennis's confirmed semantics): the new
+  `pflxSlideResultsHtml(sl)` reads `sl.responses` fresh on every call —
+  never a cached snapshot taken at reveal time — so it already reflects
+  every response ever recorded on that slide. Confirmed with a real
+  invocation test that mutates the responses object between two calls and
+  asserts the second call's output changes (`1 response` → `2 responses`).
+  This means once the separate, still-queued self-directed-sessions ask
+  ships (self-directed responses landing in the same `sl.responses` object
+  on the same slide), the chart automatically becomes "live + self-directed
+  combined" with ZERO further code changes here — the live-recompute design
+  was chosen specifically for that forward compatibility.
+- ROOT-CAUSE FIX ALONG THE WAY: found while researching this patch —
+  `rLiveRun`'s REVEAL button was gated on `meta.graded` alone, so an
+  UNGRADED Poll could never be revealed to anyone; `sl.revealed` would
+  simply never become true for a Poll slide. Broadened the gate to a new
+  `pflxSlideHasResults(sl, meta)` helper (any options-bearing type, graded
+  or not, plus Exit Ticket's Poll/Rating/Yes-No), so Polls now get a
+  REVEAL button and a results chart same as MC/Quiz. `liveRevealSlide()`'s
+  reward-granting logic is UNCHANGED — still `meta.graded`-only, since an
+  ungraded poll has no "correct" answer to reward XC/badges for.
+- Verified: syntax gate clean (2/2 blocks). 32-case Node unit test on code
+  extracted from the shipped file via brace-counting, including real
+  invocations of the extracted `pflxSlideHasResults`/`pflxSlideResultsHtml`
+  against fixtures covering: graded MC (percentage + correct-answer
+  summary math), ungraded poll (no summary line), Exit→Rating (average
+  computation), Exit→Yes/No (bucket counts), a zero-response slide (no
+  NaN/divide-by-zero), and the live-recompute behavior itself.
+- NOT changed this patch (still phased next, per Ennis's build order):
+  Quiz Race mode (Kahoot/Blooket/Wayground/Quizlet-Live-style countdown
+  timer + speed-weighted scoring + live leaderboard) is next.
+- HOST ACTIONS / BACKLOG: none required from Ennis for this patch. Next up
+  per the confirmed build order: Quiz Race mode.
