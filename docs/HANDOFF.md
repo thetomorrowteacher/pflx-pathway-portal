@@ -11975,3 +11975,71 @@ Mission Control immediately after, since it touches live nav for active testers.
   function with month-only rendering today, no view-toggle UI at all; the
   Tasks tab's own List/Board/Calendar/Table segmented-control pattern
   (`mcSetTasksView`) is the reuse candidate for the new toggle's look.
+
+## PATCH PLATFORM v1.151 — MC Calendar panel gets a Year/Month/Week/Day view toggle (Sept 6, Ennis)
+
+- ASK: part 2 of "Old v1.145 backlog" (part 1, Evolution Rank icons, shipped
+  as v1.150): "the Calendar's yearly/monthly/weekly/daily view toggle,"
+  deferred since v1.145, reconfirmed still open through v1.149.
+- TRACE (full report on file, see session transcript): the MC Calendar
+  panel is a distinct, separate feature from the two OTHER calendars in
+  this codebase — the "MY TASKS" widget's own small CAL tab (v1.147) and
+  the Tasks tab's per-status Calendar sub-view — neither of those was
+  touched. The MC Calendar panel (`mc-panel-calendar` → `mcNav('calendar')`
+  → `mcRenderMasterCalendar()`) was a single ~104-line function rendering
+  ONLY a month grid, with no view-switching UI at all. Its 5 data sources
+  (Seasons/Programs/Checkpoints/Projects/Tasks) were bucketed by an inline
+  `addToDay()` closure hardcoded to the current year/month — not reusable
+  for any other zoom level as-is.
+- WHAT CHANGED: refactored the bucketing into a shared, range-based
+  `_mcCollectCalendarItems(rangeStartISO, rangeEndISO)` (same 5 source
+  loops, unchanged item shapes/labels/colors — only the date-range check
+  changed from "== this year/month" to "between start and end ISO dates,"
+  which also correctly handles a week spanning a month boundary). Added a
+  Year/Month/Week/Day segmented-control toggle (`mcSetCalendarView`,
+  persisted to `localStorage['pflx_mc_calendar_view']`), styled after the
+  Tasks tab's own List/Board/Calendar/Table toggle but given its own
+  `.mc-cal-view-btn` class specifically to avoid the two toggles'
+  `document.querySelectorAll` highlight logic cross-contaminating each
+  other (both would otherwise match a shared `.mc-view-btn` class).
+  `mcRenderMasterCalendar()` is now a small dispatcher calling one of 4 new
+  sub-renderers:
+  - `_mcRenderCalMonth` — the original month grid, functionally identical,
+    now fed by the shared collector instead of its own closure.
+  - `_mcRenderCalWeek` — a 7-day row (Sun–Sat) around the current anchor
+    date, no per-day chip cap (more vertical room than the month grid).
+  - `_mcRenderCalDay` — a single-day list view with a "Nothing scheduled"
+    empty state.
+  - `_mcRenderCalYear` — 12 month tiles with a scheduled-item count each;
+    clicking a tile jumps into Month view on that month
+    (`_mcJumpToCalMonth`). Deliberately simplified vs. 12 full mini
+    month-grids (which the trace flagged as the heaviest option) — a
+    count-per-month overview reads faster for a full-year timeline and
+    avoids a very tall, cramped page; flagging this scope choice plainly
+    rather than silently deciding it.
+  Filters (`mcCalFilters`/`mcToggleCalFilter`) and the existing month
+  prev/next nav (`_mcMasterCalMonth`/`_mcMasterCalMoveMonth`) are
+  untouched and apply identically across all 4 views.
+- Verified: syntax gate clean (13/13 blocks). 38-case Node unit test
+  (every new/changed function extracted via brace-counting from the real
+  shipped file) — confirms `_mcISODate` padding, the collector's date-range
+  filtering (in-range, single-day, month-boundary-spanning, and per-type
+  filter gating, all against real Season/Program/Checkpoint/Project/Task
+  fixtures using the actual `_mcAddDaysISO` program-end-date math), the
+  view-toggle buttons exist on distinct markup/class from the Tasks tab's
+  toggle, `mcSetCalendarView`'s validation/persistence/re-render, the
+  dispatcher's routing for all 4 modes, all 4 sub-renderers are present
+  and well-formed, the month view's per-day ISO-keyed lookup and its
+  existing 4-chip-cap/overflow behavior are preserved, the old int-keyed
+  bucket object and inline `addToDay` closure are both fully gone, and
+  every "must not touch" function (month nav, filters, legend, the Tasks
+  tab's own toggle, v1.150's `pflxRankIconHtml`) is still present
+  unmodified.
+- HOST ACTIONS / BACKLOG: none new. This closes out both halves of the
+  "Old v1.145 backlog" item Ennis selected this session (Evolution Rank
+  icons in v1.150, this Calendar toggle in v1.151). Everything else from
+  the original Sept 6 MC/X-Live/Settings restructuring ask remains as
+  already tracked: the System Events → X-Live live-challenge rebuild
+  (needs its own product/design decision, see the v1.149 entry) and the
+  `pflx_mc_open_session`/`pflx_mc_pflx_open_session` message-type mismatch
+  bug flagged during the v1.149 trace.
