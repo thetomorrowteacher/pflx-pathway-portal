@@ -12241,3 +12241,108 @@ Mission Control immediately after, since it touches live nav for active testers.
   Calendar year-view day grid) is untouched.
 - HOST ACTIONS / BACKLOG: none new. If 1.4x still feels off in either
   direction, it's a one-line value tweak in the same two rules.
+
+## PATCH PLATFORM v1.157 — Home Theater / Live Stream retired, moved to X-Live (Sept 7, Ennis)
+
+- ASK: "Home Theater/Live Stream should be moved to X-Live completely" (two
+  annotated screenshots of the MC "Home Theater" nav item and its embedded
+  LIVE STREAM panel). Scoped over three AskUserQuestion rounds: (1) removal
+  depth → "Full teardown" (delete the underlying dead JS too, not just entry
+  points/UI); (2) nav label → Ennis gave a full landing-page product vision
+  instead of picking a label (see BACKLOG below); (3) X-Live is YouTube-only
+  today, the old widget supported Twitch too → "Proceed, log as X-Live
+  backlog." A fourth round followed a research pass that surfaced a real
+  dependency: Settings → YouTube API (a separate, large, working OAuth/chat/
+  stats broadcast tab) calls `pflxToggleLiveStream()`/`pflxGetLiveStream()`
+  directly → "Keep 2 functions as internal plumbing."
+- WHAT CHANGED — removed (host widget, player stage view, PIP overlay, Q&A
+  panel, ticker indicator, Home banner, Settings sound card, and their
+  backing JS):
+  - Core JS: `pflxSetLiveStream`, `pflxApplyCloudStream`, `pflxToYouTubeEmbed`,
+    `pflxStreamCurrentSource`, `pflxPlaylistAdvance` (+ its YT-event listener
+    IIFE), `pflxYTListen`, `pflxEditLiveStream` (Configure modal),
+    `pflxTickerLiveClick`, `pflxRenderLiveStream`, the startup render-gate IIFE.
+  - `vtHandleMCNav`/`vtHandlePlayerNav`/`vtPatchPipClose` (Theater↔PiP nav
+    hooks) and the Live Q&A side panel (`vtQAPanelOpen`/`vtToggleQAPanel`/
+    `vtCloseQAPanel`/`vtSendQAMessage`), plus their unguarded call sites
+    inside `mcNav()`/`ppNav()`.
+  - The entire floating PIP overlay subsystem — `#pip-container` HTML+CSS,
+    the `pip` state object, drag/resize/preset handlers, `pipShow`/`pipHide`/
+    `pipInit`/`pipOnClose`/`pipCheckAutoActivate`, `pflxToYouTubeEmbedPip`.
+    Confirmed via direct grep that nothing else in the file calls
+    `pipShow`/`pipHide` — this turned out to be single-purpose Live Stream
+    infra, not shared infra as the initial research pass assumed.
+  - "FEATURE: Live Stream Audio Priority" (`window.pflxLiveStreamDuck`/
+    `Restore` + a global postMessage listener), "FEATURE C: Live Stream PIP
+    Rework", "FEATURE D: Live Stream Audio Rules" — all three fully
+    Live-Stream-specific IIFEs. Removing Feature: Live Stream Audio Priority
+    also incidentally fixes a pre-existing bug found during this pass:
+    `window.PFLX_AUDIO.setDuck` was never a real method, so that IIFE's
+    message listener threw uncaught on every YouTube postMessage anywhere
+    on the platform.
+  - HTML: the MC Home collapsed widget + Configure button, the player-side
+    stage view, the PIP overlay markup, the Q&A side panel, the Home page
+    live-stream banner, the ticker LIVE indicator, the player-toolbar Live
+    Stream mute/volume controls, and the Settings "4. LIVE STREAM" card
+    (+ its 3 switch cases and the dedicated `sePlayerLiveStreamMuteToggle`/
+    `sePlayerLiveStreamVolUpdate`/`seApplyLiveStreamAutoMute` functions).
+  - CSS: `.mc-theater-section`/`-collapsed`/`-expanded` container rules,
+    `.ticker-live` rules, and the whole "LIVE STREAM PIP STYLES" block.
+  - MC sidebar nav button relabeled "Home Theater" → "Dashboard" (interim —
+    see BACKLOG).
+- WHAT CHANGED — deliberately kept (matches the v1.148 "leave dead/shared
+  code in place" precedent; avoids high-risk surgery on unrelated features
+  for no functional benefit):
+  - `pflxGetLiveStream()` unmodified; `pflxToggleLiveStream()` rewritten to
+    a minimal try/catch flag-flip with no render/cloud-sync/PIP side
+    effects — kept ONLY because Settings → YouTube API's `ytSetActiveLive()`
+    still calls both directly.
+  - `window.PFLX_AUDIO` — its `apply()` only ever targeted the now-gone
+    `#mc-live-stream-iframe`; it silently no-ops now rather than being
+    chased down through a dozen guarded call sites in X-Bot Briefing /
+    Loading Screen music.
+  - `SE.config.loadingMusic.muteLiveStreamWhilePlaying` /
+    `SE.playerPrefs.liveStreamMuted`/`.muteLiveStreamOutsideMC`/
+    `.liveStreamVolume` — inert data fields on shared config/prefs objects;
+    the one remaining DOM lookup (`loadingMusicSettingSave`) already
+    null-checks the now-gone checkbox.
+  - All already-dead v1.148 Virtual Theater production-suite code
+    (`VT_ROLES`, crew/mixer/dj/lighting/prompter/backroom stubs,
+    `vtLaunchTheater`/`vtCollapseTheater`/`vtSwitchTab`/`vtSendPlayerChat`
+    and their CSS) — confirmed via grep that none of those three functions
+    has a live external caller.
+- Verified: syntax gate clean (13/13 blocks). 84-case Node unit test — real
+  code extracted from the shipped file via brace-counting — confirms every
+  deleted function/export/HTML id is gone with zero dangling references,
+  the 2 kept functions still satisfy the YouTube API engine's direct call,
+  `PFLX_AUDIO` and the v1.148 dead-code family are byte-for-byte untouched,
+  and the nav relabel landed. Live-deploy confirmed via GitHub raw content
+  (`PFLX_PATCH = 157` present, `"Home Theater"` string count 0, line count
+  matches the shipped patch exactly).
+- HOST ACTIONS / BACKLOG:
+  - Twitch parity: X-Live's broadcast embed is YouTube-only today (the old
+    Home Theater widget supported Twitch too). Logged as X-Live backlog per
+    Ennis's explicit "proceed" answer.
+  - "Dashboard" is an interim nav label only. Ennis's real answer to "what
+    should the button say" was a full landing-page product vision, not a
+    label: *"Should be more like a landing page for information about
+    available jobs, available programs, new jobs, new programs added, my
+    tasks. Should be able to add task to todays goal section. Should be
+    customizable, should offer suggestions for how to complete a task that
+    is current. Alerts for deadlines coming up within 72/48/24 hours.
+    Current Projects....Jobs Hired panel...."* This needs its own dedicated
+    scoping pass (a genuinely new MC Dashboard feature, not a rename) —
+    NOT started this patch.
+  - Queued next (separate features, not started): (1) a Habitica-style goal/
+    task system for MC — an overall goal + 5-10 sub-tasks, a progress meter
+    that unlocks a "loot box" (Goal Setter → Self Directed Player badges,
+    then a random chance at Focus Optimizer / Strategic Optimizer / Beacon
+    of X-cellence), a Host Controls toggle for the feature, and a "PFLX Tax"
+    penalty mechanic for tasks not completed on time — needs a badge-catalog
+    check, a PFLX Tax mechanic check, and a Host Controls settings-pattern
+    check before scoping. (2) A Home dashboard widget-editor pass: title
+    labels on widgets, a resized Player Card (name/My Portfolio/Settings
+    only), a "+" add-widget button with edit support, larger widgets
+    overall, and named/saveable custom widget layouts (detached, per-user
+    sets). (3) An X-Live Avatar widget with stats, deeply connected to
+    Battle Arena.
