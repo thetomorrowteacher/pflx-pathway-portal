@@ -12478,3 +12478,83 @@ Mission Control immediately after, since it touches live nav for active testers.
   include a Haypi Monster-style timed avatar-leveling mechanic, an Online/
   Who's-Online widget, a Job Board widget, and an MC Projects widget —
   logged as backlog/in-progress, not yet built as of this entry.
+
+## PATCH PLATFORM v1.159 — Online, Job Board, and MC Projects widgets (Sept 7, Ennis)
+
+- ASK (mid-turn follow-on to v1.158, verbatim): "Add more Widgets: Add a
+  online widget showing whose online, ... Job Board widget, MC Widget to
+  view Projects, open projects and basically the new MC home page." Scoped
+  via AskUserQuestion: build this (more widgets) before the two larger
+  queued epics (X-Live Avatar + Battle Arena; Live Sessions multi-session/
+  self-directed/AI-notes); MC Projects stays a compact list widget (same
+  shape as the others), not a bigger multi-section mini-dashboard.
+- WHAT CHANGED — three new entries in `PFLX_WIDGET_CATALOG`, using the same
+  "rich" widget shape v1.158 gave a real title bar/remove button to. Every
+  one reuses an existing data/render path rather than standing up a new
+  system:
+  - **Online** (`pflxWidgetOnlineHtml`): reads the existing `pflx-presence`
+    Supabase Realtime channel (`window._prGetOnlineList`, a new one-line
+    export added to that IIFE — the channel already tracks every logged-in
+    player's name/role/cohort/activity cross-client; the toolbar's Live
+    Roster panel has shown this to every player, not just hosts, since
+    July 15). The widget lists up to 6 online players with an activity dot;
+    its footer opens the existing full Live Roster panel
+    (`pflxPresenceTogglePanel`).
+  - **Job Board** (`pflxWidgetJobBoardHtml`): the exact same open-jobs +
+    mock-title-blocklist + cohort filter `pflxRenderHomeJobBoard` (the
+    existing Home Base card) already applies to `ppGetJobs()`, rendered as
+    a widget-card HTML string instead of appended DOM nodes. Row click and
+    the footer's "VIEW ALL" both deep-link through the same role-aware
+    `navigateTo('mission-control')` → `mcNav('jobboard')`/`ppNav('jobs')`
+    dance the Home card's row click already uses (`pflxWidgetOpenJob`).
+  - **MC Projects** (`pflxWidgetProjectsHtml`): the player's open assigned
+    projects via `ppGetProjects()` + `ppItemAssignedToActivePlayer` (same
+    filter `ppRenderHome` uses). No footer "VIEW ALL" — there is no
+    standalone "all projects" Player Portal page to send it to today, so
+    the widget's own rows (deep-linking straight to `ppNav('project-detail',
+    {id})` via new `pflxWidgetOpenProject`) are the access point, per
+    Ennis's "compact list" answer.
+- richFooter's VIEW-ALL/FULL-MIXER split in `pflxBuildWidgetCardHtml`
+  extended to include `online`/`jobboard` (previously only `leaderboard`/
+  `tasks` got "VIEW ALL →"; anything else defaulted to "FULL MIXER →",
+  which only ever made sense for Sound).
+- Verified: syntax gate clean (13/13 blocks). 35-case Node unit test — real
+  code extracted via brace-counting — confirms the new catalog entries,
+  render dispatch, and richFooter set; confirms `pflxWidgetJobBoardHtml`
+  reuses the exact same mock-title-blocklist/status/cohort filters as the
+  existing Home card; confirms `pflxWidgetProjectsHtml` reuses
+  `ppItemAssignedToActivePlayer` and excludes completed projects. Ran the
+  real extracted `pflxWidgetOnlineHtml` and `pflxWidgetJobBoardHtml` (not
+  just source-matched — actually invoked) against fake fixtures: confirms
+  the online list renders names + a correct count, and confirms the job
+  board correctly includes a matching-cohort open job while excluding a
+  wrong-cohort job and a known mock/seed title.
+- SEPARATELY LOGGED (not built this patch — surfaced mid-turn, needs its
+  own scoping pass): X-Live's SETUP → My Class → Cohort field
+  (`L.cfg.cohort`, `x-live-check/index.html` line ~2241) is a single-value
+  `<select>`; Ennis wants multi-cohort selection there. Needs a schema
+  change (`L.cfg.cohort` string → `L.cfg.cohorts` array) plus updating
+  every read site that currently does `L.cfg.cohort === c`.
+- HOST ACTIONS / BACKLOG: none required for this patch. Still queued per
+  priority: X-Live Avatar + Battle Arena (Haypi Monster-style timed
+  leveling, new lightweight action checklist per Ennis's answer — not MC
+  Tasks); Live Sessions multi-session/self-directed mode/recording embed/
+  AI notes (AI-notes backend still open — see below); the X-Live multi-
+  cohort SETUP fix just logged above.
+- RESEARCH NOTE (informational, no code): checked whether Read AI (or
+  Recall.ai/Otter/Fireflies/tl;dv-style "meeting bot" products) could
+  power AI notes on X-Live sessions. All of them only join Zoom/Google
+  Meet/Microsoft Teams (some also Webex/Slack Huddles) — none attach to a
+  custom self-hosted WebRTC room or a plain YouTube/OBS embed, which is
+  what X-Live's Live Streaming Suite plan uses. The one option that fits
+  natively, since self-hosted LiveKit is already the committed backend for
+  that plan (Phase 1a, still blocked on Ennis's Oracle VPS): LiveKit's own
+  official Agents framework can join a self-hosted LiveKit room as a silent
+  participant, run real-time speech-to-text via a provider (Deepgram/
+  AssemblyAI/Speechmatics), and pipe the transcript to an LLM for a
+  summary/action-items pass — no third-party meeting-bot subscription
+  needed. This still doesn't cover the YouTube/OBS broadcast mode (nothing
+  to "join" there — one-way outbound only); a YouTube VOD would need a
+  separate after-the-fact transcription pass. Not yet decided which path
+  Ennis wants — flagged as an open decision alongside the still-open Oracle
+  VPS blocker.
