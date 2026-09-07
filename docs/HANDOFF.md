@@ -12406,3 +12406,75 @@ Mission Control immediately after, since it touches live nav for active testers.
   if Ennis wants it later. Next up per this session's priority answer:
   the Home dashboard widget-editor pass, then the X-Live Avatar + Battle
   Arena widget.
+
+## PATCH PLATFORM v1.158 — Player Card widget editor: titles, remove/add, named presets, bold sizing (Sept 7, Ennis)
+
+- ASK (verbatim, 4 annotated screenshots): "Add a title of the widget and
+  stretch out the player card to fit the name and only My Portfolio and
+  settings. Add the plus to add new widgets and edit them. They still need to
+  get larger. Leave them detached and setup in a custom set that can be saved
+  and named." Scoped via AskUserQuestion: add a remove (✕) + a "+ ADD WIDGET"
+  picker (not a full drag-in catalog browser); simple named presets, one
+  active at a time (not multi-preset stacking/blending).
+- IDENTIFIED TARGET: "the player card" is the existing Profile Dropdown
+  widget system (`#pflx-profile-dropdown`, opened from the toolbar avatar —
+  the shipped code itself already calls it "the player card dropdown" in a
+  comment near the SOUND widget), not the separate `ppRenderHome` Player
+  Portal home screen. Extended that existing system rather than building a
+  new one.
+- ROOT-CAUSE FOUND WHILE READING `pflxBuildWidgetCardHtml`: a `showLabel`
+  variable was computed but only ever consumed by the stat/plain render
+  branches — the `kind === 'rich'` branch (wallet/tasks/leaderboard/sound,
+  every widget in the current catalog) never referenced it, so all 4
+  currently-catalogued widgets rendered with NO visible title at all. This
+  directly explains Ennis's "add a title" ask as a real, currently-true gap.
+- WHAT CHANGED — title bars + remove: `pflxBuildWidgetCardHtml` rewritten to
+  always prepend a `.pflx-widget-titlebar` (icon + label + ✕ remove button)
+  ahead of every widget's content, for every kind. Clicking ✕ calls new
+  `pflxWidgetRemove(id, ev)`, which sets `entry.hidden = true` on that
+  layout entry (not a delete — size/position is remembered) and re-renders.
+- WHAT CHANGED — add-widget picker: new `#pflx-widget-add-row` mount holds a
+  "+ ADD WIDGET" button (`pflxRenderWidgetAddRow`/`pflxWidgetToggleAddPicker`)
+  that expands to list every hidden catalog entry; clicking one calls new
+  `pflxWidgetUnhide(id)` to bring it back. `pflxMergeWidgetLayout` now carries
+  `entry.hidden` through catalog-change merges (same pattern as the existing
+  `free`/x/y carry-through), and `pflxRenderWidgetGrid`/`pflxRenderFreeWidgets`
+  both exclude hidden entries from their `docked`/`free` filters.
+- WHAT CHANGED — named presets: new subsystem (`pflxWidgetPresetsKey`/
+  `pflxWidgetActivePresetKey`/`pflxLoadWidgetPresets`/`pflxSaveWidgetPresets`/
+  `pflxLoadActivePresetId`/`pflxSaveActivePresetId`) storing a JSON array of
+  `{id, name, layout, updatedAt}` in localStorage per player. New
+  `#pflx-widget-preset-row` renders a `<select>` (Custom (unsaved) + one
+  option per saved preset) plus 💾 Save-As / ✎ Rename / 🗑 Delete buttons.
+  `pflxWidgetSaveAsPreset` prompts for a name and deep-clones
+  `window._pflxWidgetLayout` into a new preset; `pflxWidgetSwitchPreset`
+  re-merges a preset's cloned layout through the existing
+  `pflxMergeWidgetLayout(..., PFLX_WIDGET_CATALOG)` so catalog changes since
+  the preset was saved still resolve correctly, then saves it as the live
+  layout. One preset active at a time, per Ennis's answer — no blending.
+- WHAT CHANGED — bold sizing pass: `.pflx-widget-grid` rows 68px→86px, gap
+  8px→10px; `.pflx-widget-icon` 15px→19px; wallet balance 20px→24px; stat
+  widget value 18/13px→22/15px; the dropdown card itself 320px→360px wide;
+  avatar 72px→80px; name 17px→19px; the My Portfolio / Settings buttons
+  changed from a stacked column to a side-by-side row, each `flex:1`,
+  padding 9px 10px→12px 10px, font-size 11px→12px — the literal "stretch out
+  the player card to fit the name and only My Portfolio and settings" ask.
+- Verified: syntax gate clean (13/13 inline `<script>` blocks). 58-case Node
+  unit test — real code extracted from the shipped file via brace-counting —
+  confirms every CSS/HTML bump landed, confirms `hidden` is carried through
+  `pflxMergeWidgetLayout` and respected by both render filters, confirms the
+  free-widget grid CELL size (76→92) matches the enlarged docked cell, and
+  confirms every new remove/add/preset function's real behavior (guards,
+  confirms, prompts, JSON-clone, re-merge-through-catalog). Additionally ran
+  the real extracted `pflxBuildWidgetCardHtml` (not just source-matched —
+  actually invoked, with its rich-kind render helpers stubbed) against a
+  fake wallet-widget fixture: confirms a rich-kind widget, which rendered NO
+  title at all before this patch, now renders both its title bar and a
+  working remove control.
+- HOST ACTIONS / BACKLOG: none required from Ennis for this patch. Next up
+  per this session's priority answer: X-Live Avatar + Battle Arena widget
+  (Task G) — since scoped, Ennis has significantly expanded this ask (see
+  the follow-on PATCH PLATFORM v1.159 entry / in-progress work below) to
+  include a Haypi Monster-style timed avatar-leveling mechanic, an Online/
+  Who's-Online widget, a Job Board widget, and an MC Projects widget —
+  logged as backlog/in-progress, not yet built as of this entry.
