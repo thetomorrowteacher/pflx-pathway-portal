@@ -12695,3 +12695,53 @@ Mission Control immediately after, since it touches live nav for active testers.
   timer + speed-weighted scoring + live leaderboard) is next.
 - HOST ACTIONS / BACKLOG: none required from Ennis for this patch. Next up
   per the confirmed build order: Quiz Race mode.
+
+## PATCH X-LIVE v0.26 — Multi-select Class cohorts (Sept 7, Ennis)
+
+- ASK: Ennis, with a screenshot circling the SETUP → My Class → Cohort
+  field: "I should also be able to select multiple cohorts as well."
+  Previously logged as a small carried-over item in the PATCH PLATFORM
+  v1.159 Handoff entry; built now on Ennis pointing directly at it.
+- WHAT CHANGED: `L.cfg.cohort` was a single string driving a flat
+  `<select>` — a host's class could only ever be one named cohort or "All
+  players" (`''`). Added `L.cfg.cohorts` (array) and replaced the dropdown
+  with a multi-select toggle-chip row in SETUP (`rSetup`) — click a chip to
+  add/remove that cohort from the class, any number at once, with a
+  "N selected" / "None selected — showing all players" hint line.
+  `classRoster()` (the single, central read site every other view already
+  goes through — Boards, Teams, Feed, etc. all call it rather than reading
+  `L.cfg.cohort` directly, confirmed by grep) now matches a player if ANY
+  of their (possibly comma-separated) cohorts intersects ANY of the host's
+  selected cohorts — a true union, not just an either/or single match.
+- MIGRATION: a host's existing single-cohort selection is NOT lost.
+  `loadCfg()` now seeds `cohorts[]` from the legacy `cohort` string the
+  first time it loads after this patch, if `cohorts[]` is still empty —
+  e.g. a host previously on "SeasonPass" opens X-Live post-patch and sees
+  "SeasonPass" pre-checked, not "All players". The legacy `cohort` field
+  is left in place but no longer written to (same "leave the old field
+  inert rather than delete it" convention as v0.24's `typeOptions`).
+- ALSO UPDATED (both real read sites of the old field, found by grep — no
+  others existed): the "Host Dashboard · <cohort>" header now lists every
+  selected cohort (comma-joined) instead of just one; the `lite_activity`
+  audit row's `cohort` column (written by `liteLog`, in both the Supabase
+  POST body and the local `L.activity` mirror) now carries a comma-joined
+  string of all selected cohorts via a new shared `pflxCohortsTag()`,
+  instead of the single legacy value.
+- IMPLEMENTATION NOTE: the toggle chips pass the cohort's INDEX in
+  `cohortList()` (a stable, alphabetically sorted list) to a new
+  `pflxToggleCohort(i)`, rather than passing the cohort name itself into
+  the `onclick` attribute — sidesteps any risk of a cohort name containing
+  a quote character breaking the inline handler, without needing a new
+  JS-string-escaping helper.
+- Verified: syntax gate clean (2/2 blocks). 21-case Node unit test on code
+  extracted from the shipped file via brace-counting, including real
+  invocations of the extracted `classRoster`/`pflxToggleCohort`/
+  `pflxCohortsTag`/`cohortList` against a 4-player fixture (one player
+  belongs to two cohorts) — confirms a single selected cohort still
+  matches correctly, TWO selected cohorts union correctly (Alice+Bob+Cara,
+  excluding Dan — the actual multi-select behavior asked for), toggling an
+  index adds then removes a cohort and calls `saveCfg`/`render`, the
+  audit-tag joins multiple cohorts with a comma, and `loadCfg`'s migration
+  line is present in the real extracted function source.
+- HOST ACTIONS / BACKLOG: none required from Ennis for this patch — his
+  current "SeasonPass" selection carries over automatically on next load.
