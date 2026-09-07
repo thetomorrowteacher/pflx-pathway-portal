@@ -11919,3 +11919,59 @@ Mission Control immediately after, since it touches live nav for active testers.
   `BACKUP_RULE.md` already referenced but that had never actually been
   saved) so future sessions run this refresh automatically as a closing
   step, per the rule's own "For Claude / Fable sessions" section.
+
+## PATCH PLATFORM v1.150 — Evolution Rank icons surfaced (toolbar/Portfolio/Roster) (Sept 6, Ennis)
+
+- ASK: the "Old v1.145 backlog" item Ennis picked up first: "Evolution
+  Ranking icons surfaced on the toolbar RANK indicator/Portfolio page/MC
+  Dashboard player cards/profile dropdown widget" (4 locations, deferred
+  since the v1.145 entry, reconfirmed still open in v1.148/v1.149).
+- TRACE (full report on file, see session transcript): a dedicated
+  research pass found the 4 named locations are NOT uniformly "text only,
+  no icon" — it's mixed, and 2 of the 4 don't literally exist as named:
+  - Toolbar RANK (`updateToolbarStatus()`) already prints the tier's emoji
+    `.icon` as plain text — the gap is the uploaded-tier-**image** variant
+    (`mcPflxRanks[].image`) never renders, only `.icon` ever does.
+  - Portfolio page (`ppRenderPortfolio()`) reads the raw `myPlayer.rank`
+    field directly instead of resolving through the canonical
+    `mcGetEvoRankObj()` lookup — renders **nothing** for the common case
+    of an XC-derived (non-override) tier, icon or otherwise.
+  - "MC Dashboard player cards" don't literally exist — `mcRenderDashboard()`
+    only shows aggregate stat tiles, no per-player cards. Scoped via
+    AskUserQuestion to the closest real match: the Org/Cohort Roster modal
+    (`hmcOpenRoster()`), whose rank pill was text-only ("T{level} {name}",
+    no icon).
+  - "Profile dropdown widget" is genuinely contradictory with a prior,
+    deliberate decision: v1.146 removed the Rank stat widget from that
+    dropdown specifically because it "duplicated the always-visible
+    toolbar RANK chip." Surfaced via AskUserQuestion rather than silently
+    re-adding it; Ennis chose to leave it removed and ship the other 3.
+- WHAT CHANGED: added one shared helper, `pflxRankIconHtml(rankLike,
+  sizePx)` (icon/image-aware — renders a tier's uploaded `.image` as an
+  `<img>` when present, else its emoji `.icon`, cross-referencing the live
+  `mcPflxRanks` list by name when the caller's own rank-like object has no
+  `.image` field, e.g. the toolbar's legacy XC-fallback rank), then wired
+  it into all 3 in-scope sites:
+  - Toolbar: `rankEl.innerHTML = pflxRankIconHtml(rank) + ' ' + escapeHtml(rank.name)` (was plain `textContent`).
+  - Portfolio: added `myPortfolioRank = myPlayer ? mcGetEvoRankObj(myPlayer) : null`
+    and render its icon + resolved name (was the raw, often-blank `myPlayer.rank`).
+  - Roster modal: prepended `pflxRankIconHtml(rank, 12)` to the existing
+    tier pill.
+  Deliberately untouched: `mcGetEvoRankObj`, the XC-progress-bar math
+  (`getNextRank`/`xcPct`), `mcRenderPlayers`' own already-working icon
+  render, `mcRenderRankings`' tier-editor imgBlock, and the profile
+  dropdown's widget catalog/removal.
+- Verified: syntax gate clean (13/13 blocks). 21-case Node unit test
+  (functions extracted via brace-counting from the real shipped file) —
+  confirms the helper's image/icon/fallback/escaping/size behavior, the
+  cross-reference-by-name lookup for image-less legacy rank objects, all 3
+  call sites now use it and no longer contain their old broken/plain-text
+  code, the profile dropdown catalog is untouched, and every "must not
+  touch" function/line listed above is still present unmodified.
+- HOST ACTIONS / BACKLOG: none new. The "MC Calendar panel's own
+  yearly/monthly/weekly/daily view toggle" half of this same "Old v1.145
+  backlog" selection is scoped as its own follow-up patch (v1.151) — a
+  dedicated trace found it's a single 104-line `mcRenderMasterCalendar()`
+  function with month-only rendering today, no view-toggle UI at all; the
+  Tasks tab's own List/Board/Calendar/Table segmented-control pattern
+  (`mcSetTasksView`) is the reuse candidate for the new toggle's look.
