@@ -11975,3 +11975,211 @@ Mission Control immediately after, since it touches live nav for active testers.
   function with month-only rendering today, no view-toggle UI at all; the
   Tasks tab's own List/Board/Calendar/Table segmented-control pattern
   (`mcSetTasksView`) is the reuse candidate for the new toggle's look.
+
+## PATCH PLATFORM v1.151 — MC Calendar panel gets a Year/Month/Week/Day view toggle (Sept 6, Ennis)
+
+- ASK: part 2 of "Old v1.145 backlog" (part 1, Evolution Rank icons, shipped
+  as v1.150): "the Calendar's yearly/monthly/weekly/daily view toggle,"
+  deferred since v1.145, reconfirmed still open through v1.149.
+- TRACE (full report on file, see session transcript): the MC Calendar
+  panel is a distinct, separate feature from the two OTHER calendars in
+  this codebase — the "MY TASKS" widget's own small CAL tab (v1.147) and
+  the Tasks tab's per-status Calendar sub-view — neither of those was
+  touched. The MC Calendar panel (`mc-panel-calendar` → `mcNav('calendar')`
+  → `mcRenderMasterCalendar()`) was a single ~104-line function rendering
+  ONLY a month grid, with no view-switching UI at all. Its 5 data sources
+  (Seasons/Programs/Checkpoints/Projects/Tasks) were bucketed by an inline
+  `addToDay()` closure hardcoded to the current year/month — not reusable
+  for any other zoom level as-is.
+- WHAT CHANGED: refactored the bucketing into a shared, range-based
+  `_mcCollectCalendarItems(rangeStartISO, rangeEndISO)` (same 5 source
+  loops, unchanged item shapes/labels/colors — only the date-range check
+  changed from "== this year/month" to "between start and end ISO dates,"
+  which also correctly handles a week spanning a month boundary). Added a
+  Year/Month/Week/Day segmented-control toggle (`mcSetCalendarView`,
+  persisted to `localStorage['pflx_mc_calendar_view']`), styled after the
+  Tasks tab's own List/Board/Calendar/Table toggle but given its own
+  `.mc-cal-view-btn` class specifically to avoid the two toggles'
+  `document.querySelectorAll` highlight logic cross-contaminating each
+  other (both would otherwise match a shared `.mc-view-btn` class).
+  `mcRenderMasterCalendar()` is now a small dispatcher calling one of 4 new
+  sub-renderers:
+  - `_mcRenderCalMonth` — the original month grid, functionally identical,
+    now fed by the shared collector instead of its own closure.
+  - `_mcRenderCalWeek` — a 7-day row (Sun–Sat) around the current anchor
+    date, no per-day chip cap (more vertical room than the month grid).
+  - `_mcRenderCalDay` — a single-day list view with a "Nothing scheduled"
+    empty state.
+  - `_mcRenderCalYear` — 12 month tiles with a scheduled-item count each;
+    clicking a tile jumps into Month view on that month
+    (`_mcJumpToCalMonth`). Deliberately simplified vs. 12 full mini
+    month-grids (which the trace flagged as the heaviest option) — a
+    count-per-month overview reads faster for a full-year timeline and
+    avoids a very tall, cramped page; flagging this scope choice plainly
+    rather than silently deciding it.
+  Filters (`mcCalFilters`/`mcToggleCalFilter`) and the existing month
+  prev/next nav (`_mcMasterCalMonth`/`_mcMasterCalMoveMonth`) are
+  untouched and apply identically across all 4 views.
+- Verified: syntax gate clean (13/13 blocks). 38-case Node unit test
+  (every new/changed function extracted via brace-counting from the real
+  shipped file) — confirms `_mcISODate` padding, the collector's date-range
+  filtering (in-range, single-day, month-boundary-spanning, and per-type
+  filter gating, all against real Season/Program/Checkpoint/Project/Task
+  fixtures using the actual `_mcAddDaysISO` program-end-date math), the
+  view-toggle buttons exist on distinct markup/class from the Tasks tab's
+  toggle, `mcSetCalendarView`'s validation/persistence/re-render, the
+  dispatcher's routing for all 4 modes, all 4 sub-renderers are present
+  and well-formed, the month view's per-day ISO-keyed lookup and its
+  existing 4-chip-cap/overflow behavior are preserved, the old int-keyed
+  bucket object and inline `addToDay` closure are both fully gone, and
+  every "must not touch" function (month nav, filters, legend, the Tasks
+  tab's own toggle, v1.150's `pflxRankIconHtml`) is still present
+  unmodified.
+- HOST ACTIONS / BACKLOG: none new. This closes out both halves of the
+  "Old v1.145 backlog" item Ennis selected this session (Evolution Rank
+  icons in v1.150, this Calendar toggle in v1.151). Everything else from
+  the original Sept 6 MC/X-Live/Settings restructuring ask remains as
+  already tracked: the System Events → X-Live live-challenge rebuild
+  (needs its own product/design decision, see the v1.149 entry) and the
+  `pflx_mc_open_session`/`pflx_mc_pflx_open_session` message-type mismatch
+  bug flagged during the v1.149 trace.
+
+## PATCH PLATFORM v1.152 — X-Live gets its real logo + moves up in the toolbar + gains a Launch Apps tile (Sept 6, Ennis)
+
+- ASK: annotated screenshot of the Console home page — arrows pointing at
+  the toolbar's X-Live icon (labeled "X Live") and down at the Launch Apps
+  grid. "Change the X-Live icon to the X-Live logo square image. Then Add
+  it to launch apps and also move it in the tool bar."
+- TRACE: the toolbar's X-Live button (`data-view="lite"` — the internal
+  key stays `lite` on purpose per the v1.111 naming decision; only display
+  strings say "X-Live") was rendering a plain 📡 emoji, last in the app
+  row (Home → Mission Control → X-Coin → Pathways → Arena → DarkCampus →
+  **X-Live** → Help). The Launch Apps grid (home page, `apps` array,
+  `pflxRenderHomeAppHub()`) had no X-Live entry among its 5 tiles at all.
+  Found two candidate logo assets already in `public/`: `X-Live Icon.png`
+  (500×449, the X-mark + "LIVE" text, near-square) and `PFLX Live
+  Icon.png` (560×329, a wider "PFLX...X LIVE" lockup) — confirmed the
+  first is the right one both by aspect ratio (matches "square image")
+  and because it's the one already wired into the loading-screen splash
+  map (`logos.lite`, from a prior v1.128 fix) — no new asset needed.
+- WHAT CHANGED:
+  - Toolbar: the X-Live button now renders `<img src="public/X-Live
+    Icon.png" alt="X-Live">` (was the emoji span) and moved to the 2nd
+    slot, right after Home — confirmed via AskUserQuestion rather than
+    guessing at the annotation's intent. New order: Home → **X-Live** →
+    Mission Control → X-Coin → Pathways → Arena → DarkCampus → Help.
+  - Launch Apps: added X-Live as a new 6th tile, placed first (matching
+    its new toolbar position) — `{ key: 'lite', name: 'X-Live', icon:
+    'public/X-Live Icon.png', accent: '#00f0ff', iconScale: 1.3, desc:
+    '...' }`. No new code needed beyond the array entry — the shared
+    render loop and `onclick` → `navigateTo('lite')` wiring already
+    handle it exactly like the other 5 tiles (same GitHub Pages URL via
+    `APP_BASE_URLS.lite`, unchanged).
+  - `iconScale: 1.3` is an eyeballed value (the logo's own transparent
+    canvas padding makes it read a little small at the default 1.0, same
+    reasoning as Battle Arena's existing 1.8) — worth a quick visual
+    check live and a follow-up tweak if it looks off.
+- Verified: syntax gate clean (13/13 blocks). 17-case Node unit test (the
+  toolbar's actual `<div class="toolbar-nav">` HTML block and the `apps`
+  array both extracted from the real shipped file — the array via
+  bracket-counting, same discipline as function extraction) — confirms
+  the emoji is fully gone, the exact new `<img>` markup is present, the
+  toolbar's `data-view` order is exactly `home, lite, mission-control,
+  xcoin, pathways, arena, darkcampus`, the apps array grew from 5 to 6
+  with X-Live first and every pre-existing tile (icon/accent/iconScale)
+  byte-for-byte unchanged in its original relative order, and the
+  underlying navigation plumbing (`APP_BASE_URLS.lite`, the loading-screen
+  logo map, the shared render/onclick loop) is untouched.
+- HOST ACTIONS / BACKLOG: none new. Worth a quick live look at whether
+  `iconScale: 1.3` reads right next to the other tiles — an easy one-line
+  follow-up tweak if not.
+
+## PATCH PLATFORM v1.153 — Toolbar icons magnify + pulsate on hover, Launch Apps grid balanced to 3 per row (Sept 7, Ennis)
+
+- ASK: screenshot of the live v1.152 toolbar, circled — "Each icon in the
+  toolbar should magnify and pulsate upon hover."
+- TRACE: the toolbar row (`.nav-btn` — Home, X-Live, Mission Control, X-Coin,
+  Core Pathways, Battle Arena, DarkCampus) had a hover state (background
+  gradient, border glow, brighter icon) but no size or animation change.
+  The trailing round "?" tutorial-replay button (`.pflx-tut-help-btn`,
+  `pflxTutStart()`) sits in the same row and is visible for every user post-
+  first-login (`pflxTutCheckFirstLogin()` flips it from its default
+  `display:none` to `inline-flex` either right after the first-run tutorial
+  or immediately for a returning user who's already seen it) — confirmed by
+  reading that function directly rather than trusting an earlier session's
+  claim that it stays hidden. It's circled in Ennis's screenshot alongside
+  the app icons, so it's in scope for the same treatment. Modeled the new
+  pulse on the existing always-on `pflxFabPulse`/`pflxFabBob` ring-expansion
+  pattern used by the floating X-Bot icon, but hover-gated instead of
+  looping constantly.
+- WHAT CHANGED:
+  - New shared `@keyframes pflxNavBtnHoverPulse` — a box-shadow ring that
+    expands and fades (matches the FAB's ring-pulse shape, cyan-toned to
+    match the toolbar's existing hover glow color).
+  - `.nav-btn:hover` — added `transform: scale(1.15)` (magnify),
+    `z-index: 5` (so the enlarged icon isn't clipped by its tightly-packed
+    neighbors — `gap` between buttons is only a few px), and
+    `animation: pflxNavBtnHoverPulse 1.2s ease-out infinite` (pulsate).
+    Kept the existing background/border-color hover styling as-is.
+  - `.pflx-tut-help-btn:hover` — same three additions (scale, z-index,
+    shared pulse animation), keeping its existing background-color hover
+    change.
+  - Deliberately NOT looping the scale itself (no "breathing" size
+    animation) — a static magnify plus a separate looping glow reads
+    cleaner than animating both scale and glow at once.
+  - Known, accepted minor side effect: the `::after` tooltip
+    (`content: attr(title)`) inherits the button's hover `transform`, so its
+    text appears slightly enlarged while hovered — cosmetic only, not worth
+    compensating CSS for.
+- ASK (mid-patch add-on): a follow-up screenshot of the live 6-tile Launch
+  Apps grid — 5 tiles across the top row, DarkCampus stranded alone on a
+  second row. "Try to balance out the options so that it is 3 on each row."
+  Root cause: `#home-app-hub-grid`'s inline style used
+  `grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))`, which packs
+  as many 180px+ columns as the viewport allows — 5 on a normal desktop
+  width, not a number tied to the tile count. Fixed to a hard
+  `repeat(3, 1fr)`, giving an even 3-and-3 regardless of viewport width. The
+  existing 480px mobile media query override (`#home-app-hub-grid {
+  grid-template-columns: 1fr !important; }`) still wins on phones —
+  untouched.
+- Verified: syntax gate clean (13/13 blocks). 25-case Node unit test — the
+  real `@keyframes pflxNavBtnHoverPulse`, `.nav-btn:hover`, and
+  `.pflx-tut-help-btn:hover` rules, plus the `#home-app-hub-grid` inline
+  style and its 480px media-query override, all extracted from the shipped
+  file via brace-counting (not reimplemented) — confirms the
+  magnify/z-index/pulse properties are present with the right values,
+  existing hover styling is preserved, `.nav-btn.active` was NOT given the
+  same treatment (hover-only, as intended), the grid is now a fixed 3
+  columns with the old `auto-fit` fully gone, the mobile single-column
+  override is untouched, the v1.152 toolbar order is untouched, and the
+  X-Bot FAB's own pulse animation stays a separate, untouched keyframe.
+- HOST ACTIONS / BACKLOG: none new. Worth a quick live check of both: the
+  toolbar hover (and the "?" button, once visible post-tutorial) to confirm
+  the 1.15x magnify doesn't feel too aggressive, and the Launch Apps grid at
+  a few browser widths to confirm 3-per-row still reads well on tablet-size
+  windows (the tiles are `1fr`-flexible so they should just narrow evenly,
+  but worth eyeballing).
+
+## PATCH PLATFORM v1.154 — Toolbar hover magnify bumped to 2x (Sept 7, Ennis)
+
+- ASK: follow-up to v1.153's toolbar hover effect — "The magnify should be
+  2 times larger upon hover."
+- WHAT CHANGED: `.nav-btn:hover` and `.pflx-tut-help-btn:hover` (the round
+  "?" tutorial-replay button, styled the same way since v1.153) both had
+  `transform: scale(1.15)` — bumped to `transform: scale(2)`. Everything
+  else from v1.153 (the `pflxNavBtnHoverPulse` glow-ring animation, the
+  `z-index: 5` clip-prevention, the existing background/border hover
+  styling) is unchanged.
+- Verified: syntax gate clean (13/13 blocks). 15-case Node unit test — the
+  real `.nav-btn:hover` and `.pflx-tut-help-btn:hover` rules extracted from
+  the shipped file via brace-counting — confirms both now scale to exactly
+  2, the old 1.15x value is gone, the pulse animation and z-index are
+  intact, an unrelated `scale(1.15)` elsewhere in the file
+  (`pflxBroadcastIconPing`) was correctly left alone, and v1.150-v1.153's
+  work (rank icons, calendar toggle, toolbar order, 3-column Launch Apps
+  grid) is untouched.
+- HOST ACTIONS / BACKLOG: none new. At 2x, a 42px toolbar button hovers to
+  84px — worth a live look to confirm it doesn't visually collide with its
+  immediate neighbors despite the `z-index: 5` bump (the toolbar row has
+  very little gap between buttons); an easy follow-up value tweak if it
+  reads as too aggressive in practice.
