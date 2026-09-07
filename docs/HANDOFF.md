@@ -12221,3 +12221,23 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: none new. Worth a quick live click-through —
   click a day with a dot on it and confirm the Day view lands on that
   exact date with its scheduled items visible.
+
+## PATCH PLATFORM v1.156 — Toolbar hover magnify dialed back from 2x to 1.4x (Sept 7, Ennis)
+
+- ASK: live-browser screenshot showing the Home icon magnified and visibly
+  crowding its neighbors on hover — "Icons are magnifying too large. Make
+  less 1 time." The 2x value from v1.154 (itself a bump up from v1.153's
+  original 1.15x, per Ennis's explicit "2 times larger" request) reads as
+  too aggressive in practice.
+- WHAT CHANGED: `.nav-btn:hover` and `.pflx-tut-help-btn:hover` both go
+  from `transform: scale(2)` to `transform: scale(1.4)` — a clearly
+  visible magnify, well short of doubling, but nowhere near the original
+  subtle 1.15x either. Pulse animation, z-index clip-prevention, and
+  existing background/border hover styling are all unchanged.
+- Verified: syntax gate clean (13/13 blocks). 10-case Node unit test — the
+  real `:hover` rules extracted from the shipped file via brace-counting —
+  confirms both now scale to exactly 1.4, the old 2x value is gone, the
+  pulse/z-index are intact, and v1.153/v1.155's work (Launch Apps grid,
+  Calendar year-view day grid) is untouched.
+- HOST ACTIONS / BACKLOG: none new. If 1.4x still feels off in either
+  direction, it's a one-line value tweak in the same two rules.
