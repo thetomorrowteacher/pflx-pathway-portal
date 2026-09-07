@@ -12043,3 +12043,53 @@ Mission Control immediately after, since it touches live nav for active testers.
   (needs its own product/design decision, see the v1.149 entry) and the
   `pflx_mc_open_session`/`pflx_mc_pflx_open_session` message-type mismatch
   bug flagged during the v1.149 trace.
+
+## PATCH PLATFORM v1.152 — X-Live gets its real logo + moves up in the toolbar + gains a Launch Apps tile (Sept 6, Ennis)
+
+- ASK: annotated screenshot of the Console home page — arrows pointing at
+  the toolbar's X-Live icon (labeled "X Live") and down at the Launch Apps
+  grid. "Change the X-Live icon to the X-Live logo square image. Then Add
+  it to launch apps and also move it in the tool bar."
+- TRACE: the toolbar's X-Live button (`data-view="lite"` — the internal
+  key stays `lite` on purpose per the v1.111 naming decision; only display
+  strings say "X-Live") was rendering a plain 📡 emoji, last in the app
+  row (Home → Mission Control → X-Coin → Pathways → Arena → DarkCampus →
+  **X-Live** → Help). The Launch Apps grid (home page, `apps` array,
+  `pflxRenderHomeAppHub()`) had no X-Live entry among its 5 tiles at all.
+  Found two candidate logo assets already in `public/`: `X-Live Icon.png`
+  (500×449, the X-mark + "LIVE" text, near-square) and `PFLX Live
+  Icon.png` (560×329, a wider "PFLX...X LIVE" lockup) — confirmed the
+  first is the right one both by aspect ratio (matches "square image")
+  and because it's the one already wired into the loading-screen splash
+  map (`logos.lite`, from a prior v1.128 fix) — no new asset needed.
+- WHAT CHANGED:
+  - Toolbar: the X-Live button now renders `<img src="public/X-Live
+    Icon.png" alt="X-Live">` (was the emoji span) and moved to the 2nd
+    slot, right after Home — confirmed via AskUserQuestion rather than
+    guessing at the annotation's intent. New order: Home → **X-Live** →
+    Mission Control → X-Coin → Pathways → Arena → DarkCampus → Help.
+  - Launch Apps: added X-Live as a new 6th tile, placed first (matching
+    its new toolbar position) — `{ key: 'lite', name: 'X-Live', icon:
+    'public/X-Live Icon.png', accent: '#00f0ff', iconScale: 1.3, desc:
+    '...' }`. No new code needed beyond the array entry — the shared
+    render loop and `onclick` → `navigateTo('lite')` wiring already
+    handle it exactly like the other 5 tiles (same GitHub Pages URL via
+    `APP_BASE_URLS.lite`, unchanged).
+  - `iconScale: 1.3` is an eyeballed value (the logo's own transparent
+    canvas padding makes it read a little small at the default 1.0, same
+    reasoning as Battle Arena's existing 1.8) — worth a quick visual
+    check live and a follow-up tweak if it looks off.
+- Verified: syntax gate clean (13/13 blocks). 17-case Node unit test (the
+  toolbar's actual `<div class="toolbar-nav">` HTML block and the `apps`
+  array both extracted from the real shipped file — the array via
+  bracket-counting, same discipline as function extraction) — confirms
+  the emoji is fully gone, the exact new `<img>` markup is present, the
+  toolbar's `data-view` order is exactly `home, lite, mission-control,
+  xcoin, pathways, arena, darkcampus`, the apps array grew from 5 to 6
+  with X-Live first and every pre-existing tile (icon/accent/iconScale)
+  byte-for-byte unchanged in its original relative order, and the
+  underlying navigation plumbing (`APP_BASE_URLS.lite`, the loading-screen
+  logo map, the shared render/onclick loop) is untouched.
+- HOST ACTIONS / BACKLOG: none new. Worth a quick live look at whether
+  `iconScale: 1.3` reads right next to the other tiles — an easy one-line
+  follow-up tweak if not.
