@@ -13348,3 +13348,61 @@ Mission Control immediately after, since it touches live nav for active testers.
   can watch + chat, nothing else" model), and once Recording (Backlog)
   ships, list past recordings here too so Theater becomes the one place
   to catch up on anything X-Live streamed, live or not.
+
+
+## PATCH X-LIVE — Sub-App Embed slide type (Sept 8, Ennis)
+- ASK: first slice of the "Host Interactive View" epic (plan Phase 3) —
+  run a Mission Control Project or Core Pathways Module as a session's
+  focal point. Shipped unattended overnight per Ennis's "do all of it"
+  instruction, scoped down to what's concretely buildable tonight without
+  guessing at unconfirmed design decisions (see BACKLOG below).
+- FIX: new `sub_app` slide type, isEmbed:true, filed under the Content
+  category alongside Google Slides/Doc/HTML embed (PATCH X-LIVE v0.21).
+  New `PFLX_SUBAPPS` catalog (Core Pathways, Battle Arena, DarkCampus —
+  the same three deployed URLs preview.html's own `APP_BASE_URLS` map
+  uses) — a host picks one from a dropdown (`sl.subApp`) instead of
+  pasting a URL, and `pflxSlideEmbedHtml()` embeds it via the exact same
+  unrestricted-iframe technique the other embed types already use.
+  Editor (`renderSlideModal`) swaps the usual free-text content textarea
+  for the app picker when `sl.type === 'sub_app'`, with a note that popup
+  mini-activities and live badge-awarding tied to the embedded app aren't
+  built yet.
+- NOT BUILT (deliberately, and why): Mission Control has no separate
+  deployed URL — unlike Core Pathways/Battle Arena/DarkCampus, it's
+  native to `preview.html` itself, a different repo. Embedding an MC
+  Project needs a genuinely new chrome-free "embed mode" of the Console
+  (the plan's own default-assumption note flagged this as the single
+  biggest unresolved design question in the whole epic). Building that
+  blind, unattended, in a repo this session hasn't touched tonight, is
+  too architecturally risky to guess at — it needs either a live pairing
+  session or its own dedicated scoping pass. Also not built: the popup
+  mini-activity-over-embed interaction model, live badge-awarding tied to
+  in-app progress, the freeze/annotate/screenshot/share toolkit, and any
+  Discord integration (Discord can't be live-embedded at all per the
+  plan's own research — X-Frame-Options blocks it). This patch is
+  intentionally just "Core Pathways/Battle Arena/DarkCampus as a session
+  slide" — the technically easy third of the epic, not the whole thing.
+- Verified: syntax gate clean (2/2 blocks) on the first attempt. New
+  14-case Node unit test (`test_subapp_embed.js`) covering the SLIDE_TYPES
+  entry shape, the categories invariant (every type filed exactly once —
+  same check v0.28's test used, confirming nothing was silently
+  orphaned), the PFLX_SUBAPPS catalog (and that Mission Control is
+  deliberately absent from it), the embed rendering for a valid app
+  choice, empty/invalid-choice safety (no broken embed shown), and a
+  regression check that the pre-existing google_slides/google_doc/
+  html_embed types are byte-for-byte unaffected. Also re-ran the v0.30/
+  v0.31/Theater test suites (114 cases total) for regression safety since
+  this patch touches the shared `renderSlideModal`/`pflxSlideEmbedHtml`
+  functions — all still pass. Not live-clicked in a real browser
+  (unattended overnight patch, same caveat as tonight's other two
+  patches) — worth adding a Sub-App slide to a real session next time
+  Ennis is at the console and confirming Core Pathways/Battle Arena/
+  DarkCampus actually load inside it (cross-origin iframe embedding can
+  sometimes hit a target site's own X-Frame-Options/CSP headers, which
+  wasn't checked live tonight — preview.html already embeds these same
+  three apps successfully via iframe, so this is expected to work, but
+  hasn't been directly confirmed for X-Live's own domain).
+- HOST ACTIONS / BACKLOG: confirm this "technically easy third first"
+  scoping was the right call, or redirect. The Mission Control chrome-free
+  embed mode remains the epic's real centerpiece and biggest open
+  question — worth a dedicated session to scope before attempting it.
