@@ -13232,3 +13232,71 @@ Mission Control immediately after, since it touches live nav for active testers.
   from earlier this session: the Theater tab epic and the Sub-App Screen
   Share / Host Interactive View epic are both confirmed at the decision
   level but not yet built.
+
+
+## PATCH X-LIVE v0.31 — X-Rush Powerups & Sabotage (Sept 8, Ennis)
+- ASK: from the same X-Rush follow-on request as v0.29's rebrand — Blooket-
+  Racing/Gimkit-Classic-style powerups and sabotage. Originally slotted as
+  v0.30 in the plan, renumbered to v0.31 after v0.30 was reassigned to the
+  Add Activity UX redesign (shipped earlier this session).
+- FIX: a session-scoped "Nitro" currency, earned per correct X-Rush answer
+  by directly reusing `pflxRaceScore`'s existing speed-weighted curve
+  (not forked). Six powerups, each a small pure function
+  (`pflxRaceTriggerPowerup` validates + constructs a purchase event):
+  🚀 Speed Boost (flat track/leaderboard bonus), 🛡️ Shield (blocks the
+  next incoming sabotage, then re-arms if bought again), ⭐ Double Points
+  (doubles the score of whichever X-Rush slide was live at purchase time),
+  ❄️ Freeze (locks the target's answer buttons for 8s), 🌫️ Fog
+  (deterministically reshuffles the target's option order for 10s, seeded
+  so it doesn't reshuffle again on re-render), 🪙 Steal (transfers a flat
+  15 Nitro from target to actor). Host gets two independent toggles
+  (⚡ Powerups, 💣 Sabotage) in `rLiveRun`, shown only when the session has
+  an X-Rush slide. Players get a Nitro balance + purchase bar
+  (`pflxRacePowerupBarHtml`) above the question in `rLiveNative`, with a
+  target picker for sabotage.
+  Everything derives from `s.raceEvents`, a new append-only list unioned
+  by event id in `mergeSession()` — same discipline as the existing
+  `awardedTo` union — plus the already-merge-safe `slides`/`responses`.
+  There is no separately-mutated "balance" or "shield active" field
+  anywhere: `pflxRaceNitroBalance`/`pflxRaceActiveEffects` are pure
+  functions that replay the event log, so nothing here can be clobbered
+  by a stale poll (pflx-persistence-guardrail discipline).
+  `pflxRaceLeaderboard` (and therefore the v0.29 track view, which reads
+  it) now folds in Speed Boost/Steal/Double-Points bonuses via
+  `pflxRacePowerupBonus` — proven backward compatible: with no
+  `raceEvents` on a session this is a no-op, unit-tested explicitly.
+  A sabotage against a currently-shielded target is marked `blocked` at
+  the moment it's triggered (checked against the target's own
+  `pflxRaceActiveEffects`), still costs the actor their Nitro, but has no
+  duration/economic effect and consumes the shield.
+- Verified: syntax gate clean (2/2 blocks). New 37-case Node unit test
+  (`test_v031_powerups.js`) covering the powerup catalog shape, Nitro
+  earned/spent/balance math (never goes negative), every
+  `pflxRaceTriggerPowerup` gate (toggles off, can't-afford, missing/self
+  target, unknown key), shield block-then-consume-then-rearm across three
+  events, Fog's deterministic-but-seed-varying shuffle, Steal's actor/
+  target credit-debit (and that a blocked steal has zero economic effect),
+  Double Points' per-slide doubling, and `pflxRaceLeaderboard`'s
+  backward-compatible fold-in (byte-identical output with no raceEvents,
+  correctly folds in a boost, and surfaces a player who only has a boost
+  event and no correct answers). Re-ran the earlier v0.29/v0.30 test
+  suites for regression safety: v0.30's 43 cases all still pass; v0.28/
+  v0.29's suites hit two EXPECTED stale-snapshot mismatches (v0.29's own
+  test still asserts the FROM-DECK-button-next-to-ADD-SLIDE layout v0.30
+  intentionally removed; v0.28's standalone sandbox doesn't define the
+  new `pflxRacePowerupBonus` dependency `pflxRaceLeaderboard` now calls)
+  — both are artifacts of older tests sandboxing an earlier version of
+  the code, not real regressions; the current v0.30/v0.31 tests are the
+  authoritative check on today's shipped behavior and both pass clean.
+- HOST ACTIONS / BACKLOG: none required to ship. Not yet live-verified in
+  a real two-tab browser session (this patch shipped unattended overnight
+  per Ennis's instruction) — worth a real click-through when convenient:
+  buy a Freeze on a second tab and confirm the target's buttons actually
+  lock, and confirm the Nitro balance/leaderboard numbers look right on a
+  real multi-question race. Speed Boost's "track jump" is data-only for
+  now (folded into the leaderboard/track score, no separate distance
+  animation) — matches the plan's original phasing, since the dedicated
+  avatar-track visual polish is still v0.32. Team-mode sabotage-scoping
+  ("hits the whole target team"), still-queued per the plan: v0.32
+  (avatar-track + shortcut puzzles), v0.33 (Arena Cartridge slide type),
+  v0.34 (remove live-hosting from Battle Arena).
