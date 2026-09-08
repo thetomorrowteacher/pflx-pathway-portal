@@ -13112,3 +13112,62 @@ Mission Control immediately after, since it touches live nav for active testers.
   `https://www.prototypeflx.com/`, checkmark badge text present at
   both call sites.
 - HOST ACTIONS / BACKLOG: none.
+
+
+## PATCH PLATFORM v1.163 — Loading-logo square outline + Battle Arena icon size (Sept 8, Ennis)
+- SYMPTOM: two screenshots. (1) DarkCampus loading screen: "There is a
+  square outline that should be removed around the Darkcampus logo" — a
+  thin gray rectangle visible behind the animated purple rings, tightly
+  bounding the circular logo. (2) Battle Arena loading screen: "The battle
+  arena controller icon is too small" compared to every other app's logo
+  on the same loading screen.
+- ROOT CAUSE (1): `.pflx-loading-logo` (the 220x220 `position:relative`
+  box holding the logo image plus two animated rotating rings) had no
+  border of its own anywhere in the CSS or DOM — confirmed by live-
+  inspecting the actual production page (computed styles on every element
+  inside `#pflx-loading-screen` showed border:0/none everywhere) and by
+  checking the source PNG pixel data (fully transparent at every edge, no
+  baked-in line). The square only appeared on some loads and not others
+  (confirmed live: Battle Arena's own loading screen, same rings, no
+  square) — consistent with a Chromium GPU compositing-layer seam,
+  occasionally rasterized at the container's own rectangular box edges
+  because that box holds a child with an animated `filter` + `transform:
+  scale` (`.pflx-loading-logo-img`'s `pflxLogoPulse` animation), rather
+  than anything actually authored to look like a rectangle.
+- ROOT CAUSE (2): `public/PFLX Battle Arena Icon.png` is a 3840x2160
+  canvas where the controller artwork itself only fills ~60% of the
+  canvas width (vs ~96%+ edge-to-edge for every other app's logo PNG,
+  confirmed by comparing pixel bounding boxes). Every app's loading logo
+  renders through the same shared 160x160 `object-fit: contain` box, so
+  the sparse canvas made Battle Arena's icon render visibly smaller than
+  its same-box siblings — a source-asset problem, not a CSS one.
+- FIX: (1) `.pflx-loading-logo` now clips to a circle
+  (`border-radius: 50%; overflow: hidden;`). This removes anything
+  rectangular the compositor might draw regardless of the precise
+  internal cause, and is safe: the two rings are already circles at the
+  same 220px size as the box (nothing gets cut off), and the 160px logo
+  image is smaller and centered. (2) Cropped `PFLX Battle Arena Icon.png`
+  tight to the controller artwork (small padding) and downscaled — same
+  picture, now fills the frame like every other app icon, and the file
+  dropped from 4.1MB to ~700KB (faster load too). Original kept alongside
+  as `PFLX Battle Arena Icon.pre-v1163-backup.png` for reference.
+- Verified: syntax gate clean (13/13 blocks). 7-check Node harness
+  confirms the `.pflx-loading-logo` CSS block carries both new
+  properties with the box size unchanged, `PFLX_PATCH` reads 163 (162
+  gone), and the icon file is now well under 1MB. Live-inspected the real
+  production page via the console (`PFLX_LOADING.show(...)`, computed
+  styles on every child of the loading screen) before writing the fix, to
+  confirm no authored border/outline/box-shadow existed anywhere in that
+  tree. Live-deploy confirmed: `PFLX_PATCH = 163` on
+  `https://www.prototypeflx.com/`.
+- HOST ACTIONS / BACKLOG: none required. Worth a visual spot-check next
+  time DarkCampus's loading screen comes up with a few different random
+  background images (21-image gallery, `loadingGallery`) — if the square
+  is ever seen again after this patch, that would point away from the
+  compositing-seam theory and toward one specific gallery image's own
+  content, which would need a different fix (identifying and re-cropping
+  that one image). Same pre-existing, unrelated git-index anomaly noted
+  in prior entries (`scripts/syntax_gate.js` and a Sept 5 patch script
+  staged as deleted while still present on disk) is still there, still
+  untouched — this commit was again scoped to `preview.html` and the one
+  icon file via an explicit pathspec.
