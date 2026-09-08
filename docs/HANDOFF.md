@@ -13095,3 +13095,20 @@ Mission Control immediately after, since it touches live nav for active testers.
   script staged as deleted while still present on disk) is still
   there, still untouched — this commit was again scoped to
   `preview.html` only via an explicit pathspec.
+
+
+## PATCH PLATFORM v1.162 — Completed-task badge is a checkmark, not a lock (Sept 8, Ennis)
+- SYMPTOM: Ennis, immediately after v1.161 shipped: "Shouldn't show a
+  lock if complete and approved it should show a ✅."
+- FIX: the badge v1.161 added next to an already-completed task's
+  checkbox in the Checkpoint/Project Advanced forms changed from
+  "🔒 completed — locked" to "✅ Completed — locked" — same disabled
+  checkbox and save-time safety net underneath (a completed task still
+  can't be silently un-attached), just a checkmark instead of a lock
+  icon on the badge itself.
+- Verified: syntax gate clean (13/13 blocks). `test_v1161.js` (22
+  cases) updated to assert the checkmark is present and re-ran clean.
+  Live-deploy confirmed: `PFLX_PATCH = 162` live on
+  `https://www.prototypeflx.com/`, checkmark badge text present at
+  both call sites.
+- HOST ACTIONS / BACKLOG: none.
