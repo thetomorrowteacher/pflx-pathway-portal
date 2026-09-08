@@ -12893,3 +12893,139 @@ Mission Control immediately after, since it touches live nav for active testers.
   browser click-through of Quiz Race's countdown/lockout/leaderboard, and
   the Oracle Cloud LiveKit VPS SSH-key handoff (blocking Phase 1a-1c of
   the Live Streaming Suite plan).
+
+
+## PATCH X-LIVE v0.29 — X-Rush (rebrand of Quiz Race) + avatar track view + shared Battle Arena deck import (Sept 8, Ennis)
+- ASK: right after v0.28 (Quiz Race) shipped and was live-verified, Ennis
+  asked for a substantial follow-on in the same conversation: drop the
+  generic "Quiz Race" name for something on-brand ("Keep the PFLX theme
+  going"); add Blooket-Racing/Gimkit-Classic-style powerups and sabotage;
+  connect it to Battle Arena's existing Quizlet upload/card-deck system
+  instead of building a separate one; let X-Live's existing Teams feature
+  enter as team pods; add mid-race "escape room"-style code/CryptoHack-
+  flavored shortcut challenges; and — the big structural piece — make
+  X-Live host ALL of Battle Arena's live game modes, with Battle Arena's
+  own live-hosting removed once that's true. A follow-up confirmed using
+  the platform's existing avatar system for racers, not generic icons.
+  Given the breadth, this shipped as a full plan (approved via
+  ExitPlanMode) broken into 6 independently-verified sub-patches, v0.29
+  through v0.34 (v0.34 — removing live-hosting from Battle Arena — is a
+  separate-repo change staged for its own review before it ships). This
+  entry covers v0.29 only, the first and lowest-risk sub-patch.
+- WHAT CHANGED (v0.29 only):
+  1. **Rebrand**: `SLIDE_TYPES`'s `quiz_race` entry display label/icon
+     changed `'Quiz Race'`/🏎️ → `'X-Rush'`/🏁 across the Add-Slide picker,
+     host run view, and player view. The internal key (`quiz_race`) and
+     every function name (`pflxRace*`, `isRace`, etc.) is UNCHANGED —
+     display-only, zero schema/data risk, nothing from the just-verified
+     v0.28 scoring/leaderboard path was touched.
+  2. **Avatar track view**: new `pflxRaceTrackHtml(s)` renders the top 10
+     racers as positioned `exoAvatarHTML()` bubbles along a track (progress
+     % = player's share of the revealed race slides' max possible XC),
+     with a 🏁 flag at the finish line — reuses the platform's one existing
+     shared avatar renderer (photo/EXO-mascot/initials per
+     `L.cfg.avatarMode`), no new avatar system. Rendered alongside the
+     existing `pflxRaceLeaderboardHtml()` in both `rLiveRun` (host) and
+     `rLiveNative` (player).
+  3. **Shared Battle Arena deck import**: ported Battle Arena's own
+     Quizlet/CSV parsers (`parseDelimited`/`parseCsv`/`autoParse` from
+     `pflx-arena-check/app/lib/decks.ts`) into x-live-check as
+     `pflxParseDelimited`/`pflxParseCsv`/`pflxAutoParseDeck` — same
+     algorithms, ported not reinvented — reading/writing the SAME Supabase
+     `app_data` key Battle Arena already uses (`pflx_ba_decks`), so a deck
+     uploaded in either app shows up in both automatically, nothing
+     duplicated or migrated. New host flow "🏁 FROM DECK" button (next to
+     + ADD SLIDE): pick a shared deck → pick a question count (capped at
+     the deck's size) → `pflxDeckToRaceSlides(deck, count, opts)`
+     auto-generates that many `quiz_race` slides, each card's `term` as
+     the prompt, its `definition` as the correct option, plus 2-3 other
+     cards' definitions from the same deck auto-picked as distractors.
+- Verified: syntax gate clean. 28-case Node unit test (`test_v029.js`)
+  extracting the real shipped functions via brace-counting — covers the
+  rebrand (label changed, key/internal names unchanged), all three ported
+  parsers against Quizlet-tab/CSV-with-header/malformed-row/quoted-CSV
+  fixtures, `pflxDeckToRaceSlides` (correct count generation, correct
+  seconds/rewardXc pass-through, no duplicate options, `correctIndex`
+  genuinely resolves to that card's own definition, capping at deck size,
+  graceful handling of a 1-card deck and of an empty/null deck), and
+  wiring-presence checks confirming the track view is called from both
+  live-render call sites and the FROM DECK button is actually present.
+  Live interactive browser click-through: confirmed the rebrand strings
+  ("X-Rush"/🏁) render correctly in the Add-Slide picker and both host/
+  player views against the real deployed GitHub Pages URL, and confirmed
+  the FROM DECK flow against Battle Arena's real, non-test
+  "Branding & Identity" deck (18 cards) — pulled and converted to slides
+  correctly. NOT yet pixel-verified: `pflxRaceTrackHtml`'s avatar bubbles
+  actually rendering in-position during a live race (needs a revealed
+  race slide with at least one player response, i.e. a second live
+  player tab actively answering) — code-complete and unit-tested, but
+  this specific visual was not confirmed with real pixels this session.
+  Flagged here rather than implied to be fully checked; a fast follow-up
+  live check is queued before v0.30 (powerups) ships.
+- HOST ACTIONS / BACKLOG: none required to use X-Rush today — it's the
+  same LIVE tab flow as Quiz Race, now labeled X-Rush, plus the new FROM
+  DECK button. Queued next in the approved plan: v0.30 (Nitro
+  currency + powerups/sabotage: Speed Boost, Shield, Freeze, Steal, Fog,
+  Double Points), v0.31 (team mode using X-Live's existing Teams
+  primitive), v0.32 (avatars on the track UI polish + the parameterized
+  Caesar/Base64/binary/code-riddle shortcut-puzzle library), v0.33 (Arena
+  Cartridge slide type, reusing the v0.21 sandboxed srcdoc iframe
+  technique), v0.34 (remove `quiz_duel`/`team_clash` live-hosting from
+  Battle Arena — separate repo, reviewed with Ennis before shipping;
+  `project_showdown`/`strategy_battle` stay in Arena, out of scope).
+
+## PATCH PLATFORM v1.160 — Fix ACTIVE SEASON banner showing an already-ended season (Sept 8, Ennis)
+- SYMPTOM: Ennis (via two Mission Control "Seasons" admin screenshots):
+  "Summer season is over yet I'm still seeing the banner. Im not sure if
+  this is also true for player dashboard. The banner should disappear
+  once the season has ended. Any season that is scheduled to begin should
+  then show the banner during the season time."
+- ROOT CAUSE: three independent, drifted implementations of "what's the
+  current season," found by reading all three side-by-side. The MC-wide
+  season bar (`pflxRenderSeasonBar`) and the shared Home Base "ACTIVE
+  SEASON" card (`pflxSeasonCardHtml` — its own comment confirms it's the
+  one renderer for BOTH host and player Home dashboards, directly
+  answering Ennis's "not sure if this is also true for player dashboard"
+  — yes, confirmed) each had a correct date-window check (`status active`
+  AND today inside `[startDate, endDate]`) but then silently fell back to
+  a date-agnostic "just flagged active" match, or even `mcSeasons[0]`,
+  whenever the correct check found nothing live — so an ended season kept
+  showing forever once nothing else qualified. The player-facing Season
+  Portal (`ppGetSeason`) was worse: it never checked dates or the active
+  flag at all, just always returned `mcSeasons[0]`.
+- FIX: introduced one shared, fallback-free source of truth,
+  `pflxCurrentLiveSeason()` — flagged active/enabled AND (when dates are
+  set) today falls inside `[startDate, endDate]`, `null` when nothing
+  genuinely qualifies right now, no stale-flag or array-index fallback —
+  and repointed all three call sites (`pflxRenderSeasonBar`,
+  `pflxSeasonCardHtml`, `ppGetSeason`) at it. This also directly satisfies
+  Ennis's second requirement ("any season scheduled to begin should show
+  the banner during the season time") by construction: a future-dated
+  season with `status: 'active'` now correctly shows nothing until its
+  window opens, then shows automatically the moment it does — no host
+  action needed either way.
+- Verified: syntax gate clean. 15-case Node unit test (`test_v1160.js`)
+  extracting the real shipped functions via brace-counting, fixtures
+  built relative to real `Date.now()` — covers: an ended season (even if
+  still flagged active) is NOT returned; a not-yet-started season is NOT
+  returned; a season currently inside its window IS returned; an
+  in-window-but-unflagged season is NOT returned; an ended season and a
+  live season together correctly resolve to only the live one; an ended
+  season and a future season together correctly resolve to nothing (no
+  stale fallback); no-`mcSeasons`-defined and empty-`mcSeasons` both
+  return `null` without throwing; and regression checks confirming the
+  old fallback-chain code is genuinely gone from all three call sites,
+  not just shadowed. Live-deploy confirmed: `curl`-grepped
+  `https://www.prototypeflx.com/` post-deploy — `PFLX_PATCH = 160` live,
+  `pflxCurrentLiveSeason` present at all 5 expected occurrences (the
+  function definition, its `window.` export, and its 3 call sites).
+- HOST ACTIONS / BACKLOG: none — this is a pure bugfix, takes effect
+  immediately for every already-ended/future season with no data changes
+  needed. Unrelated finding while committing this patch, NOT touched:
+  `pflx-platform-check`'s git index has pre-existing staged deletions for
+  `scripts/syntax_gate.js` and `scripts/patches/2026-09-05_org_settings_v131.py`
+  that simultaneously still exist as real files on disk (dated Sept 5,
+  not from this session). Left exactly as found — this commit was scoped
+  to `preview.html` only via an explicit pathspec — but Ennis should be
+  aware the repo's index has this anomaly next time someone runs a plain
+  `git add -A`/`git commit` there.
