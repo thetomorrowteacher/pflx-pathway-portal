@@ -13300,3 +13300,51 @@ Mission Control immediately after, since it touches live nav for active testers.
   ("hits the whole target team"), still-queued per the plan: v0.32
   (avatar-track + shortcut puzzles), v0.33 (Arena Cartridge slide type),
   v0.34 (remove live-hosting from Battle Arena).
+
+
+## PATCH X-LIVE — Theater tab (Sept 8, Ennis)
+- ASK: a new top-level 🎬 Theater nav entry, decoupled from session
+  lifecycle (confirmed earlier this session via AskUserQuestion). Shipped
+  unattended overnight per Ennis's "do all of it" instruction — this
+  entry documents the specific interpretation built, for Ennis to
+  confirm/correct: since the confirming AskUserQuestion's exact answer
+  text wasn't in this session's carried-forward context, "decoupled from
+  session lifecycle" was read as *any logged-in user (host or player) can
+  browse and watch a live stream without joining that session's roster,
+  without affecting/being affected by its hostControls (pause/freeze/
+  lock), and without touching liveJoinSession()* — a pure watch surface
+  layered on top of the already-shipped YouTube/OBS embed (PATCH X-LIVE
+  v0.19/Phase 1d), not a rebuild of the old pre-Live-Streaming-Suite
+  "Home Theater" tab and not the full LiveKit-room Audience mode (Phase
+  1e in the plan, which needs the still-not-provisioned Oracle VPS).
+- FIX: new `theater` tab added to both the host and player nav arrays
+  (`🎬 THEATER`). `pflxTheaterLiveSessions()` filters `L.sessions` to
+  `status === 'active' && youtubeEmbedId` (currently actually streaming,
+  not just "live" with no broadcast). `rTheater()` renders a list of
+  those with a WATCH button; picking one (`theaterWatch(id)`) shows just
+  the YouTube iframe (same embed pattern `rLiveNative()` already uses)
+  plus a back button (`theaterStopWatching()`) — no slide/agenda UI, no
+  roster check. If the session being watched stops streaming or ends
+  while someone's on the watch screen, `rTheater()` falls back to the
+  list automatically (the `find()` re-checks `status==='active'` on every
+  render, so a stale watch-state can't show a dead embed).
+- Verified: syntax gate clean (2/2 blocks) on the very first attempt (no
+  new anchors clashed with anything, unlike the more invasive v0.31
+  patch earlier tonight). New 18-case Node unit test (`test_theater.js`)
+  covering the active+streaming filter (excludes no-stream/scheduled/
+  ended sessions), watch/stop-watching state transitions, the list vs.
+  watch view branching, the ended-mid-watch fallback, the empty state,
+  and that the tab is wired into both nav arrays and the render dispatch
+  map. Not live-clicked in a real browser (unattended overnight patch,
+  per the same caveat as v0.31 above) — worth a real check next time
+  Ennis is at the console: start a YouTube/OBS broadcast on one session,
+  confirm it shows up in Theater and plays for a user with no roster
+  membership on that session.
+- HOST ACTIONS / BACKLOG: please confirm this interpretation matches what
+  was actually wanted for Theater — if not, the `rTheater()`/
+  `pflxTheaterLiveSessions()` functions above are the whole surface area
+  to redirect. Natural next steps once confirmed: fold in the X-Bot Live
+  Chat widget for Theater viewers (matching the plan's Phase 1e "audience
+  can watch + chat, nothing else" model), and once Recording (Backlog)
+  ships, list past recordings here too so Theater becomes the one place
+  to catch up on anything X-Live streamed, live or not.
