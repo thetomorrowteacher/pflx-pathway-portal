@@ -13029,3 +13029,69 @@ Mission Control immediately after, since it touches live nav for active testers.
   to `preview.html` only via an explicit pathspec — but Ennis should be
   aware the repo's index has this anomaly next time someone runs a plain
   `git add -A`/`git commit` there.
+
+
+## PATCH PLATFORM v1.161 — Off-season banner copy + earned-task-credit guardrail (Sept 8, Ennis)
+- SYMPTOM: two related asks in one message, with a screenshot of the
+  Mission Control Dashboard's ACTIVE SEASON widget: (1) with no season
+  currently live, the widget read "ACTIVE SEASON / NO SEASON SET" —
+  Ennis: "It should say Off-Season and not No Season Set"; (2) "if a
+  checkpoint/project/program includes a task that has been completed
+  by a player then that task should remain and be credited as complete
+  by that player."
+- ROOT CAUSE (1): the v1.160 season-bar fix (`pflxCurrentLiveSeason()`)
+  correctly returns `null` when nothing is genuinely live, but the
+  bar's fallback display text was the literal string `'No Season Set'`
+  — accurate but confusing copy, easily read as "you forgot to
+  configure a season" rather than "we're between seasons right now."
+- ROOT CAUSE (2): the Advanced Checkpoint form (`mcSaveCPForm`) and the
+  Advanced Project form (`mcSaveProjectForm`) both rebuild their
+  `taskIds` array purely from whichever `.mc-cp-task-cb`/
+  `.mc-project-task-cb` checkboxes happen to be checked in the DOM at
+  save time. Nothing protected a task with a real, already-approved
+  player submission from silently vanishing out of a checkpoint/
+  project on a routine re-save (an accidental uncheck, or any future
+  render-timing gap) — which would also erase that task's contribution
+  to the player's checkpoint/project completion percentage. Separately,
+  `mcDeleteTask`'s confirm dialog warned about how many checkpoints/
+  projects a task was attached to, but said nothing about players who
+  had already earned credit on it before letting the host delete it
+  outright.
+- FIX: (1) the season bar's fallback text is now `'OFF-SEASON'`. (2) a
+  new shared predicate, `_mcTaskHasAnyCompletion(t)` — true when the
+  task's single-track status is `'approved'`/`completed:true`, OR (for
+  everyone-mode tasks) at least one entry in `t.submissions[]` is
+  `'approved'`. Both Advanced forms now (a) lock/disable the checkbox
+  for any already-attached task with a completion, with a "🔒 completed
+  — locked" badge so the host can see why it can't be unchecked from
+  this screen, and (b) carry a save-time safety net that unions a
+  completed task back into `taskIds` even if its checkbox was somehow
+  missing/unchecked — belt-and-suspenders so earned credit can never
+  quietly disappear via this path. `mcDeleteTask` still lets a host
+  fully delete a task (that's a deliberate, already-confirmed action,
+  left unchanged), but its confirm dialog now states plainly how many
+  players have already earned credit on it before that confirmation.
+  No separate "program" task-picker exists — Programs group Checkpoints
+  (`cp.programId`), not tasks directly — so the fix's two real surfaces
+  (Checkpoint, Project) cover the full hierarchy Ennis described.
+- Verified: syntax gate clean (13/13 blocks). 22-case Node unit test
+  (`test_v1161.js`) extracting the real shipped functions via
+  brace-counting — covers `_mcTaskHasAnyCompletion` across single-track
+  approved/completed/open and everyone-mode approved/pending/rejected/
+  empty-submissions cases; confirms both forms' render functions
+  actually disable the checkbox and add the locked badge (not just
+  text-present checks); confirms both forms' save functions carry the
+  safety-net union logic, plus an isolated behavioral test proving the
+  union keeps a completed task whose checkbox went missing while NOT
+  resurrecting a genuinely-unchecked incomplete task; confirms
+  `mcDeleteTask` checks completion before its one `confirm()` call and
+  mentions "earned credit" in the warning. Live-deploy confirmed:
+  `curl`-grepped `https://www.prototypeflx.com/` — `PFLX_PATCH = 161`
+  live, `OFF-SEASON` present, `_mcTaskHasAnyCompletion` present at all
+  7 expected occurrences.
+- HOST ACTIONS / BACKLOG: none — takes effect immediately, no data
+  changes needed. Same pre-existing, unrelated git-index anomaly noted
+  in the v1.160 entry (`scripts/syntax_gate.js` and a Sept 5 patch
+  script staged as deleted while still present on disk) is still
+  there, still untouched — this commit was again scoped to
+  `preview.html` only via an explicit pathspec.
