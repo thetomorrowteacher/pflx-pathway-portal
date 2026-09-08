@@ -12800,3 +12800,96 @@ Mission Control immediately after, since it touches live nav for active testers.
   run view. Real camera/mic video (Phase 1b/1c of the Live Streaming
   Suite plan) still needs the Oracle VPS to be provisioned before it can
   be built.
+
+## PATCH X-LIVE v0.28 — Quiz Race mode, a Kahoot/Blooket/Wayground/Quizlet-Live-style timed activity (Sept 8, Ennis)
+- ASK: Ennis picked "Quiz Race mode" as the next priority (over a
+  FeedForward triage sweep and Phase 1g scheduling work), after v0.27
+  shipped. Same-session mid-turn, Ennis raised four larger, separate asks
+  (a slide-editor UX redesign with type-specific popup editors; the
+  Phase 3 Host Interactive View epic — embedding Core Pathways/Mission
+  Control as a slide with sub-app popups; a standalone Theater reachable
+  without an active session; a standalone YouTube-video Theater with
+  Edpuzzle-style timestamped popup activities) — confirmed via a second
+  AskUserQuestion to finish Quiz Race first, as originally planned. Those
+  four items are NOT built here; they remain queued for their own
+  scoping/build-order pass with Ennis. See `docs/plans/x-live-streaming-
+  suite.md`-equivalent conversation record (Phase 3 section) for the Host
+  Interactive View epic's existing architecture notes.
+- WHAT CHANGED: a new `quiz_race` slide type, filed under the existing
+  "Questions & Polls" category in the v0.24 categorized Add-Slide picker.
+  It reuses the existing quiz-slide schema 100% (options/correctIndex/
+  seconds/rewardXc/rewardBadgeId) — the only new field anywhere is
+  `sl.startedAt`, a timestamp stamped the moment a slide becomes current
+  (`liveMarkSlideStarted`, called from `liveGoLiveSession`,
+  `liveMoveCurrentSlide`, and `liveJumpToSlide`; idempotent — jumping back
+  to an already-started slide never resets the clock, so previously
+  recorded response times stay fair).
+  - Live countdown: both the host run view (`rLiveRun`) and the player
+    view (`rLiveNative`) show a ticking countdown (`pflxEnsureRaceTimer`/
+    `pflxStopRaceTimer`, same setInterval/clear pattern as the file's
+    existing legacy agenda timer) while the slide is unrevealed and has a
+    time limit. On the player side, the countdown reaching 0 disables
+    answering (`raceExpired`, folded into the same disabled/opacity
+    condition every other option-based slide type already uses — no
+    separate code path for race vs. non-race options).
+  - Speed-weighted scoring: `pflxRaceScore(sl, resp)` — a correct answer
+    at t=0 earns the full `rewardXc`; at the time limit it earns half;
+    linear in between; always at least 1 point for a correct answer, never
+    negative. Wrong/missing answers score 0. A slide with no time limit
+    (`seconds: 0`) or missing `startedAt` (fails open) pays the flat full
+    reward, matching every other graded slide type's existing behavior.
+  - Live leaderboard: `pflxRaceLeaderboard(s)`/`pflxRaceLeaderboardHtml(s)`
+    sum `pflxRaceScore` across every REVEALED `quiz_race` slide in the
+    session, live-recomputed from `sl.responses` on every render (same
+    "always live, recomputes forever" discipline as v0.25's universal
+    results-reveal visualization — nothing about the leaderboard is stored
+    or snapshotted, so it's automatically merge-safe). Rendered between
+    questions in both host and player views using the existing
+    `.pflx-results-*` CSS classes (no new CSS), showing top 10 by name
+    (via `classRoster()`) with a 🏁 header and proportional bars.
+  - Reward grant: `liveRevealSlide`'s existing `grantSessionReward` call
+    now computes `xc` as `pflxRaceScore(sl, r)` for `quiz_race` slides
+    (every other graded type is unchanged, still `sl.rewardXc` flat) — the
+    existing `s.awardedTo` dedupe list still guards against double-grants,
+    so no new anti-cheat/anti-duplicate logic was needed.
+- Verified: syntax gate clean (2/2 blocks, 148033/116645 chars). 37-case
+  Node unit test (`test_v028.js`) extracting the real shipped functions
+  via brace-counting — covers: `quiz_race`'s SLIDE_TYPES/category
+  registration (and the existing v0.24 invariant that every slide type
+  appears in the categorized picker exactly once, now 18 types);
+  `pflxRaceScore`'s full scoring curve (instant/at-limit/midway/beyond-
+  limit/no-time-limit/missing-startedAt/minimum-1-point edge cases);
+  `pflxRaceLeaderboard`'s aggregation (multi-question totals, wrong
+  answers scoring 0 not missing, non-race and unrevealed slides excluded);
+  `liveMarkSlideStarted`'s idempotency; and that all three slide-advance
+  paths plus `liveRevealSlide`/`rLiveRun`/`rLiveNative` are actually wired
+  to the new functions (not just defined and orphaned). One bug caught and
+  fixed during this pass, before it ever reached the shipped file: an
+  early guard `!sl.startedAt` treated a legitimate `startedAt: 0` as
+  "missing," misfiring the no-time-limit fallback and over-paying full
+  points instead of the speed-weighted score — changed to
+  `typeof sl.startedAt !== 'number'`.
+  Live interactive browser verification (build a real test session, go
+  live, answer as a player, confirm the countdown/lockout/leaderboard
+  render end-to-end) was attempted but the Chrome browser connection
+  dropped mid-session and did not reconnect; deferred rather than
+  reported as done. The code-level test coverage above is comprehensive,
+  but a real click-through of the countdown/leaderboard UI in the live
+  Console is still outstanding.
+- HOST ACTIONS / BACKLOG: none required to use Quiz Race today — LIVE tab
+  → + NEW SESSION → Add Slide → Questions & Polls → Quiz Race → set a
+  time limit and reward XC → SAVE SESSION → GO LIVE. Backlogged/queued
+  from this same conversation (not yet scoped or prioritized against each
+  other): (1) slide-editor UX redesign — popup, type-specific editors
+  instead of one long stacked form; (2) the Phase 3 Host Interactive View
+  epic — embedding a Mission Control Project or Core Pathways Module as a
+  session's focal point with popup mini-activities (see prior Phase 3
+  architecture notes: Core Pathways is a real iframable app, Mission
+  Control is not and would need a new chrome-free embed mode); (3) a
+  standalone Theater reachable without first building/running a live
+  session; (4) a standalone YouTube-video Theater with Edpuzzle-style
+  timestamped popup activities, usable outside an active session. Also
+  still outstanding, unrelated to this patch: a live interactive
+  browser click-through of Quiz Race's countdown/lockout/leaderboard, and
+  the Oracle Cloud LiveKit VPS SSH-key handoff (blocking Phase 1a-1c of
+  the Live Streaming Suite plan).
