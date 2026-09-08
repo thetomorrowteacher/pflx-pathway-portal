@@ -13171,3 +13171,64 @@ Mission Control immediately after, since it touches live nav for active testers.
   staged as deleted while still present on disk) is still there, still
   untouched — this commit was again scoped to `preview.html` and the one
   icon file via an explicit pathspec.
+
+
+## PATCH X-LIVE v0.30 — Add Activity UX redesign (Sept 8, Ennis)
+- SYMPTOM/ASK: three related asks in one message. (1) "The Build X-Rush
+  from deck option should happen when I select X-Rush from Add Slide" —
+  the standalone "🏁 FROM DECK" button sat next to "+ ADD SLIDE" as its
+  own separate entry point, disconnected from the type-selection flow.
+  (2) "Add slide should be add activity" — rename throughout. (3) "Each
+  activity when selected should have a popup with specific settings to
+  its activity" — the old single modal always showed the full type grid
+  PLUS every field for every possible slide type at once, rather than a
+  focused screen for just the chosen type.
+- FIX: `L.liveEditingSlide` gained a `step` field (`'type'` |
+  `'race-choice'` | `'fields'`) driving three screens instead of one
+  combined modal: `renderSlideTypeModal()` (type grid only, titled "Add
+  Activity" for a new activity / "Change Activity Type" when backing out
+  of an existing one), `renderSlideModal()` (the focused per-type fields
+  popup — all existing conditional field blocks reused unchanged, just no
+  longer sharing a screen with the type grid), and a new
+  `renderRaceChoiceModal()` for X-Rush specifically ("📚 Build from a
+  Deck" / "✍️ Create a Single Question" / back / cancel).
+  `liveSlideTypeChange(type)` branches: picking `quiz_race` goes to
+  `'race-choice'`; every other type goes straight to `'fields'`.
+  `liveAddSlide()`/`liveEditSlide(idx)` now open at step `'type'`/
+  `'fields'` respectively. New `liveSlideChangeType()` (fields → back to
+  type grid via a "CHANGE" button in the fields popup header) and
+  `liveSlideRaceManual()` (race-choice → fields, for "Create a Single
+  Question"). `liveCloseDeckPicker()` now checks whether it was opened
+  mid-X-Rush-flow (`step === 'race-choice'`) and returns to the choice
+  screen instead of calling `modalClose()` and abandoning the in-progress
+  activity; `liveBuildFromDeck()` clears `L.liveEditingSlide` on a
+  successful build so no placeholder activity is left dangling. The
+  standalone "🏁 FROM DECK" button in `rLiveBuilder()`'s section header is
+  removed entirely — reaching the deck-build flow now only happens by
+  picking X-Rush from Add Activity. Renamed throughout: "Add Slide" →
+  "Add Activity", "Edit Slide" → "Edit Activity", "SAVE SLIDE" → "SAVE
+  ACTIVITY", "Slides (N)" → "Activities (N)", "No slides yet." → "No
+  activities yet.".
+- Verified: syntax gate clean (2/2 blocks). 43-case Node unit test
+  (`test_v030_add_activity.js`, extracts the real
+  `liveAddSlide`/`liveEditSlide`/`liveSlideTypeChange`/
+  `liveSlideChangeType`/`renderRaceChoiceModal`/`liveSlideRaceManual`/
+  `renderSlideTypeModal`/`liveCloseDeckPicker`/`liveBuildFromDeck`/
+  `renderSlideModal` via brace-counting) — covers every step transition,
+  the X-Rush race-choice branch, deck-picker cancel/build interaction
+  with the in-flight draft (including the idx===-1 vs idx!==-1 title
+  distinction on the type-change screen), and text assertions on the
+  real `renderSlideModal`/`rLiveBuilder` source confirming the grid was
+  removed from the fields popup and every renamed string shipped. All 43
+  pass.
+- HOST ACTIONS / BACKLOG: none required for this patch. Still queued from
+  the same X-Rush follow-on request, unaffected by this UX patch: v0.31
+  (team mode), v0.32 (avatar-track polish + shortcut puzzles), v0.33
+  (Arena Cartridge slide type), v0.34 (remove live-hosting from Battle
+  Arena) — this patch reused v0.30's number for the Add Activity redesign
+  instead of the originally-planned powerups/sabotage patch; powerups/
+  sabotage is not yet scheduled to a specific version and should be
+  slotted in before v0.31 when picked back up. Also still outstanding
+  from earlier this session: the Theater tab epic and the Sub-App Screen
+  Share / Host Interactive View epic are both confirmed at the decision
+  level but not yet built.
