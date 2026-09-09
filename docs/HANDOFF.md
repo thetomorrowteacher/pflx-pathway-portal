@@ -13943,3 +13943,113 @@ Mission Control immediately after, since it touches live nav for active testers.
   (BOARDS/TEAMS tabs) also filtered by cohort scope for a scoped host —
   not just the session list — that's a further, not-yet-scoped
   extension, same pattern, ready to build once confirmed.
+
+
+## PATCH X-LIVE + PATCH PLATFORM v1.164 — Mission Control Embed: Auto-Login + Anti-Refresh (Sept 9, Ennis)
+- SYMPTOM: Ennis, testing the Mission Control sub-app embed (shipped
+  earlier today) inside a live session: "I shouldn't have to login. This
+  should open directly to MC when I choose Mission Control not the start
+  screen. Also, it is refreshing." Screenshot showed the embed frozen on
+  the Console's own boot/loading splash, never reaching login or MC.
+- ROOT CAUSE (two separate bugs, both real):
+  1. **Refreshing**: `render()` (x-live-check/index.html) rebuilds the
+     ENTIRE visible screen via `app.innerHTML = ...` on every state change
+     or poll (60+ call sites — roster loads every ~60s, broadcasts every
+     20s, any click). `pflxSlideEmbedHtml()`'s `sub_app` branch returned a
+     raw `<iframe>` baked into that HTML string, so every single
+     `render()` call destroyed and recreated the iframe DOM node — the
+     browser has no choice but to reload whatever's inside it from
+     scratch. With polls firing every 20-60s (and instantly on any click),
+     the embed visibly never got past its own boot splash.
+  2. **Forced re-login**: even once stable, the embed loads a FRESH
+     instance of the same Console app (`https://www.prototypeflx.com/`)
+     inside a cross-origin iframe. Its own silent `tryAutoLogin()` reads
+     `pflx_remember_v1`/the persisted identity from THIS IFRAME's own
+     localStorage — which third-party storage partitioning (Chrome
+     Storage Partitioning, Safari ITP) gives an empty, isolated copy of,
+     separate from the user's real top-level session on the same origin.
+     So a host already fully authenticated in X-Live (which itself
+     received ITS identity via the existing `pflx_identity_broadcast`
+     bridge) saw a fresh, un-prefillable login screen inside the embed
+     every time.
+- FIX (x-live-check/index.html):
+  - `pflxSlideEmbedHtml()`'s `sub_app` branch now returns a placeholder
+    `<div data-pflx-embed-slot data-pflx-embed-key="...">`, never a raw
+    `<iframe>` — applies to ALL sub-app embeds (pathways/arena/
+    darkcampus/missioncontrol), not just MC.
+  - New `pflxSyncEmbedPortal()`: keeps ONE real `<iframe>` in a
+    module-level variable and MOVES it (`appendChild`) into whichever
+    slot is present after each render — moving an already-attached DOM
+    node relocates it without destroying/reloading it, so the same
+    iframe survives every re-render. `src` (and the identity handshake
+    below) are only touched the first time a given embed key appears, or
+    when the key changes to a different sub-app. Called at all 3 of
+    `render()`'s exit points.
+  - New `pflxOnEmbedFrameLoad(key)`: on the portal iframe's real `load`
+    event, if (and only if) the embedded app is `missioncontrol`, posts
+    `{type:'pflx_xlive_embed_identity', brand: L.me.brand}` to the
+    iframe with an explicit `targetOrigin` (never `'*'`) — deliberately
+    sends ONLY the current viewer's brand (host or player, whoever's
+    looking), never a PIN, XC balance, or role.
+- FIX (pflx-platform-check/preview.html):
+  - New `pflxTryEmbedIdentityLogin(brand, attemptsLeft)`: if
+    `window.activeSession` is already set, no-ops (never clobbers a real
+    login in progress). Otherwise looks up `brand` via the existing
+    `findPlayerByBrand()` and, if found, calls the existing `loginUser()`
+    directly — reusing 100% of the real login path (session
+    construction, rank resolution, cert award, role broadcast) with ZERO
+    new session-construction code; the embedded Console re-derives XC/
+    badges/role/hostTier/managedCohorts etc. itself from its OWN roster,
+    it never trusts those fields from the parent. If the roster hasn't
+    loaded yet, retries up to 2x at 700ms before giving up (fails open to
+    the normal login screen, never silently stuck). After a successful
+    login, calls `navigateTo('mission-control')` so the embed lands
+    directly in MC instead of the platform's default landing view.
+  - The existing bottom-of-file `window.addEventListener('message', ...)`
+    (already handling `pflx_xc_changed`/`pflx_identity_request_sync`)
+    gained one more branch: `pflx_xlive_embed_identity` is only honored
+    when `window.self !== window.top` (this Console instance really is
+    embedded) AND `ev.origin` is in a new
+    `PFLX_TRUSTED_EMBED_ORIGINS = ['https://thetomorrowteacher.github.io']`
+    allowlist (X-Live's real deployed origin, confirmed via `APP_BASE_URLS.lite`
+    elsewhere in this file) — so no other embedder can trigger a PIN-free
+    login, and a normal top-level visit is never affected.
+  - `PFLX_PATCH` bumped 163 → 164, `PFLX_BUILD` = '2026.09'.
+- Verified: syntax gate clean on both files (x-live-check: 2/2 blocks;
+  pflx-platform-check: 13/13 blocks). Two new Node unit tests extracting
+  the real functions:
+  - `test_xlive_mc_embed_relogin.js` (17 cases): the portal survives a
+    same-key re-render with the identical iframe instance and an
+    untouched `src` (proves no reload); switching to a different embed
+    key does reload; no slot hides without destroying the frame; the
+    identity relay fires exactly once per load, only for
+    `missioncontrol`, with the correct brand and a real (non-`*`) target
+    origin, and safely no-ops with no `L.me.brand` yet.
+  - `test_platform_mc_embed_relogin.js` (12 cases): an already-active
+    session is never clobbered; an empty brand no-ops; a found player
+    reaches `loginUser` with the canonical roster brand and schedules
+    `navigateTo('mission-control')`; a not-yet-loaded roster retries and
+    then succeeds; exhausted retries fail closed with no login; the
+    message listener refuses a non-embedded (top-level) post, refuses an
+    untrusted origin even while embedded, and — end-to-end through the
+    REAL wired listener + real `pflxTryEmbedIdentityLogin` — a trusted,
+    embedded post reaches `loginUser` with the right brand.
+  - Updated `test_xlive_missioncontrol_subapp.js`'s 3 assertions that
+    checked for a raw `<iframe>` string (now correctly expects the
+    placeholder slot instead — this is the intended shape change from
+    this patch, confirmed the fix, not a regression).
+  - Full regression re-run: Session Scheduling 19/19, Role Toggle 10/10,
+    Host Tiers 39/39, Host Cohort Scope 18/18, Team mode 16/16,
+    Team-wide Sabotage 29/29, v0.32 Puzzles 165/165, Mission Control
+    Sub-App 11/11 (updated) — all pass.
+  - Not live-clicked in a real browser yet — needs a real X-Live session
+    with a Mission Control sub_app slide, watched over several poll
+    cycles (roster/activity/broadcast polls) to confirm the embed no
+    longer visibly reloads, and confirm it lands the viewer directly in
+    Mission Control with no login screen shown.
+- HOST ACTIONS / BACKLOG: none required to use this — it's automatic for
+  any `missioncontrol` sub_app slide once both repos deploy. If Ennis
+  ever renames/moves X-Live off `thetomorrowteacher.github.io`, the
+  `PFLX_TRUSTED_EMBED_ORIGINS` allowlist in preview.html needs updating
+  to match, or the auto-login silently stops firing (fails closed, not a
+  security hole, but worth remembering).
