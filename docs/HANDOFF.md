@@ -13641,3 +13641,70 @@ Mission Control immediately after, since it touches live nav for active testers.
   (Host Interactive View) already tracks. When that epic is actually
   scoped, this fullChrome embed is the fallback/baseline it can be upgraded
   from once a real chrome-free "just this Project" embed mode exists.
+
+
+## PATCH X-LIVE — Session Scheduling (Start/End Time) (Sept 9, Ennis)
+- ASK: mid-turn on the Mission Control patch, Ennis sent two screenshots
+  of the "NEW SESSION" form (no date/time fields today) with "I should
+  also be able to schedule it as well. Start time and End time with
+  calendar select options and clock. I should be able to save multiple
+  sessions."
+- MULTIPLE-SESSION SAVE: already worked before this patch, confirmed by
+  reading the real code — `L.sessions` is an array, "+ NEW SESSION" always
+  builds a fresh session object via `newLiveSession()` with its own id,
+  and `liveSaveSessionForm()` → `saveSession()` is the existing merge-safe
+  read-merge-write into that array (per `pflx-persistence-guardrail`),
+  never a single-session overwrite. Nothing needed fixing there — flagging
+  this explicitly so it isn't mistaken for silently-unaddressed.
+- FIX (the new part — Start/End Time): `newLiveSession()` gained
+  `scheduledStart: ''` / `scheduledEnd: ''`. The builder form (`rLiveBuilder()`)
+  gained a new "🗓️ Schedule" card with two native
+  `<input type="datetime-local">` fields — this control IS a combined
+  calendar-select + clock picker in every modern browser (desktop and
+  mobile), matching Ennis's ask in one input each rather than splitting
+  date/time into two, with zero new dependencies (same house convention as
+  every other input in this file). Per the plan's own Phase 1g framing
+  (session scheduling was already backlogged there): this is
+  **informational/plannable only** — it does not auto-start or auto-end
+  the session; the host still taps GO LIVE / END SESSION by hand, exactly
+  as before. Auto-start raises moderation questions (a session going live
+  with no host present) that haven't been discussed with Ennis, so this
+  patch deliberately does not wire either field into
+  `liveGoLiveSession`/`liveEndSession`'s control flow — the UI says so
+  plainly ("you still tap GO LIVE yourself when ready").
+- New pure helpers: `pflxFormatSessionSchedule(startVal, endVal)` (manual
+  day/month tables + 12-hour-clock math, no locale/`Intl` dependency, so
+  it's deterministic across browsers and Node) renders a single display
+  string — same-day shows one date with both times ("Fri, Sep 11 · 3:00 PM
+  – 4:00 PM"), cross-day shows both dates, either side alone renders just
+  that side, both unset renders nothing. `pflxSessionScheduleWarning(start,
+  end)` is soft validation only — returns a warning string when End is
+  at/before Start, `null` otherwise (never blocks Save, per the
+  informational framing above). The formatted schedule also now shows in
+  the session list (`rLiveList()`'s `sessionRow`) under the slide-count
+  line, so a host can see at a glance which sessions are scheduled when.
+- Verified: syntax gate clean (2/2 blocks, block 2 grew 174692 → 178378
+  chars). New 19-case Node unit test (`test_xlive_session_scheduling.js`)
+  extracting the real `pflxFormatSessionSchedule`/
+  `pflxSessionScheduleWarning`/`newLiveSession` — same-day and cross-day
+  formatting, start-only/end-only/both-unset cases, 12-hour-clock edge
+  cases (00:00 → 12:00 AM, 12:00 → 12:00 PM), minute zero-padding,
+  malformed-input fail-safe (no throw), and the full warning matrix
+  (unset/equal/before/after/garbage). Full regression suite re-run: v0.30
+  Add Activity 43/43, v0.31 Powerups 37/37, Theater 18/18, Sub-App Embed
+  14/14, Team mode 16/16, Team-wide Sabotage 29/29, v0.32 Puzzles 165/165,
+  Mission Control Sub-App 11/11, this patch 19/19 — all pass (the one
+  pre-existing v0.29 FROM-DECK-button stale failure, unrelated and already
+  documented, is unchanged). Not live-clicked in a real browser yet —
+  worth a check next time Ennis is at the console: open NEW SESSION, set a
+  Start and End Time via the native pickers, confirm both the warning (End
+  before Start) and the session-list display render correctly, and confirm
+  a second session can be created and saved alongside the first without
+  losing it.
+- HOST ACTIONS / BACKLOG: none new. This is the Start/End half of the
+  plan's Phase 1g; the remaining two Phase 1g pieces — a configurable
+  self-directed duration window (`sess.selfDirectedWindowMinutes`) and
+  downloadable Final Reports — are still backlogged, unchanged by this
+  patch. If Ennis later wants auto-start/auto-end tied to these fields,
+  that's a real, separate scoping conversation (moderation implications
+  noted above), not assumed here.
