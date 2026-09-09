@@ -14177,3 +14177,110 @@ Mission Control immediately after, since it touches live nav for active testers.
   (ProPresenter-style host controls, Guest Host temporary studio access,
   motion graphics, team-vs-team popups, gamified transitions, system
   lighting) — all logged in the plan file under "Update, Sept 9."
+
+
+## PATCH X-LIVE — Auto-start / auto-stop session lifecycle (Sept 9, Ennis)
+- CONTEXT: Ennis, in the large live-production feature message: "This
+  should auto start and auto stop." Phase 1g of the plan file had
+  deliberately left this open ("auto-starting a session with no host
+  present raises its own moderation questions Ennis hasn't spoken to") --
+  Ennis has now directly asked for it, so it ships. First item of the
+  "continue everything until done" sequence (Ennis went to sleep and asked
+  me to keep going autonomously through the rest of the live-production
+  feature list logged in the plan file's "Update, Sept 9" section).
+- ARCHITECTURE: PFLX has no server-side process anywhere (static GitHub
+  Pages/Vercel hosting + a polled Supabase KV store -- the same constraint
+  already documented for the LiveKit VPS). There is nowhere to run a real
+  cron job. The honest implementation: any HOST-TIER client that has
+  X-Live open polls `L.sessions` already (`loadSessions()`, via
+  `scheduleSessionsPoll()` -- every 5s while a session is actively
+  running, every 60s otherwise); a new `pflxLiveAutoLifecycleCheck()` runs
+  on every one of those refreshes and flips any session whose scheduled
+  time has arrived. This is a real, working feature, not a simulation --
+  but it only fires while SOME host-tier device has the app open at/after
+  the scheduled moment. That limitation is stated plainly in the Schedule
+  card's own copy now (was previously "informational only, does not
+  auto-start"), not hidden.
+- FIX (x-live-check/index.html):
+  - `liveGoLiveSession(id)` refactored (behavior unchanged, verified) to
+    extract its core "flip session to active" logic into a new
+    `pflxActivateSession(s)` -- shared with the new auto-start path so
+    there's one implementation, not two that could drift.
+  - `liveEndSession()` refactored (behavior unchanged, verified) the same
+    way, extracting `pflxGrantCompletionRewards(s)`.
+  - New `pflxLiveAutoStart(s)`: activates the session via
+    `pflxActivateSession`, sets a transparency flag `s.autoStarted = true`,
+    saves, and claims `L.liveRunningSessionId` ONLY if the host isn't
+    already actively running a different session -- an auto-start never
+    yanks a host's screen away from whatever they're currently running.
+  - New `pflxLiveAutoEnd(s)`: ends the session, sets `s.autoEnded = true`,
+    grants completion rewards via the shared helper, and only clears
+    `L.liveRunningSessionId` if it was pointed at the session actually
+    being ended (so auto-ending session A never affects a host who's
+    separately running session B).
+  - New `pflxLiveAutoLifecycleCheck()`: host-tier-only (checks
+    `L.isHost` AND `L.hostCapabilities.runSessions` -- a player client can
+    never auto-transition a session for everyone), respects the existing
+    cohort-scoping guard (`pflxSessionInCohortScope`) so a scoped Guest/
+    Instructor host only auto-manages sessions in their own scope, and is
+    naturally idempotent: once a session's `status` flips away from
+    `scheduled`/`active` it stops matching, so a transition only ever
+    fires once. A `scheduled` session with an elapsed `scheduledStart` but
+    NO slides yet is skipped (mirrors the existing manual-GO-LIVE guard --
+    an empty session never goes live, auto or not).
+  - Wired into `loadSessions()` (runs right after the cloud merge, before
+    the existing `render()` call) -- reuses the sessions-poll cadence that
+    already existed, adds no new interval/timer.
+  - Schedule card copy updated: "Informational for now -- you still tap GO
+    LIVE yourself when ready. This does not auto-start or auto-end the
+    session." -> "Auto-starts and auto-ends at these times once set -- but
+    only while a host has X-Live open (PFLX has no server-side
+    scheduler). You can still tap GO LIVE / END SESSION yourself any
+    time."
+- Verified: syntax gate clean (2/2 blocks). New 39-case Node unit test
+  (`test_xlive_autolifecycle.js`) extracting the real functions: manual
+  GO LIVE/END SESSION behave exactly as before the refactor (no-slides
+  refusal, cohort-scope refusal, correct toasts with no "auto" wording);
+  auto-start sets the transparency flag and claims the run-view only when
+  the host is idle, never steals focus from an in-progress session;
+  auto-end grants rewards once, never double-grants, and only clears
+  `L.liveRunningSessionId` when it matches; the lifecycle checker is a
+  strict no-op for non-host and under-privileged-host clients, correctly
+  skips future-scheduled/no-slides/out-of-scope sessions, and never
+  throws on already-ended or scheduling-field-less sessions. Full
+  regression re-run across every existing X-Live test file: Theater
+  18/18, v0.22 21/21, v0.30 Add Activity 43/43, v0.31 Powerups 37/37,
+  Host Cohort Scope 18/18, Host Tiers 39/39, Mission Control Embed Relogin
+  17/17, Mission Control Sub-App 11/11, Role Toggle 10/10, Session
+  Scheduling 19/19, Team mode 16/16, Team-wide Sabotage 29/29, v0.32
+  Puzzles 165/165, YouTube relay 16/16 -- all pass, no regression from
+  this patch. Three unrelated pre-existing test failures noted but NOT
+  touched by this patch (confirmed by inspecting the diff -- none of it
+  is anywhere near the failing assertions): `test_subapp_embed.js`'s
+  Arena-cartridge-iframe checks (that slide type, v0.33 in the plan, is
+  not built yet -- the test is aspirational/stale), `test_v029.js`'s
+  "FROM DECK button position" UI-layout check, and `test_v022.js`/
+  `test_v028.js`'s hard-coded `SLIDE_TYPES` extraction markers and count
+  (stale now that later patches added more slide types) -- these are
+  test-harness drift from earlier patches, not caused by this one, and
+  are left for a future cleanup pass rather than blocking this ship.
+  Not live-clicked in a real browser yet (Ennis asleep) -- next time
+  Ennis is on, worth a real check: set a session's Start Time a minute or
+  two out, leave the Host Dashboard open, and confirm it flips to LIVE on
+  its own at that time; same for End Time on a running session.
+- HOST ACTIONS / BACKLOG: none required to get this working -- any
+  session with Start/End Time set now behaves as described automatically.
+  Real limitation worth knowing: if no host-tier device has X-Live open at
+  the scheduled moment, the transition simply waits until one does (next
+  time any host opens the app and it polls sessions, a still-due
+  transition fires then, even if late) -- there's no way around this
+  without a real backend cron, which PFLX doesn't have. Next in the
+  "continue everything until done" sequence: auto-record (client-side
+  `MediaRecorder` capture), then the rest of the Sept 9 live-production
+  list (prominent Session Timer, ProPresenter-style host controls, Guest
+  Host temporary production access, soundboard/motion-graphics/lighting
+  as OBS-capture-dependent local effects, team-vs-team popup progress
+  bars, gamified transitions, blooket-style side-panel/player-initiated
+  activities) -- see the plan file's "Update, Sept 9" section for the
+  full breakdown and the still-open LiveKit-VPS blocker on anything
+  requiring real multi-party video/audio broadcast.
