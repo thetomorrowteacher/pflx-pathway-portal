@@ -13507,3 +13507,76 @@ Mission Control immediately after, since it touches live nav for active testers.
   over from v0.31/Team mode. Next items in the X-Rush plan are v0.32
   (avatar-track visual polish + shortcut puzzle challenges), then v0.33
   (Arena Cartridge slide type).
+
+
+## PATCH X-LIVE v0.32 — Shortcut Puzzle Challenges (Sept 9, Ennis)
+- ASK: next item in the X-Rush phased plan after Team-wide Sabotage —
+  "avatars on the track + shortcut puzzle challenges." The avatar half was
+  already shipped back in v0.29 (the track view has rendered each racer
+  via the shared `exoAvatarHTML()` — the one avatar renderer every roster/
+  leaderboard in this file already uses — since that patch), so this ships
+  the puzzle half only. Ennis is running a separate character-art redesign
+  pass on the EXO avatar system itself ("the setup is good but I don't
+  like the character design") — nothing in this patch touches
+  `exoCoreSVG`/`EXO_LINES`/colorways, and the track/leaderboard code reads
+  whatever avatar art `exoAvatarHTML()` returns, so a future redesign
+  needs zero code changes here.
+- FIX: no real CryptoHack/embeddable puzzle API exists (same finding as
+  the earlier Canva/CapCut/Flip research this session), so this is a
+  small, parameterized template library built natively — 4 types (Caesar
+  cipher, Base64, binary-to-text, "predict this code's output"), each a
+  pure `generate(rand)` that computes a fresh instance from REAL logic
+  (never a hand-authored answer key). Every template accepts a seeded
+  `rand()` via the new shared `pflxSeededRand(seed)` (generalized from the
+  seeding technique `pflxRaceFogOptions` already used) — so a given
+  `(type, seed)` pair always regenerates the identical puzzle, meaning
+  nothing needs to be stored on the slide itself; every player and every
+  re-render derive the same puzzle from the same slide id.
+- Shortcut stations: every Nth `quiz_race` slide (host-configurable
+  `s.puzzleInterval`, default 3, counted in document order so other slide
+  types interleaved in the deck don't throw off the count) becomes a
+  station. The puzzle TYPE for that station is itself seeded off the
+  slide id, picked from whichever categories the host has enabled
+  (`s.puzzleCategories`, all four by default). Solving grants a flat
+  `PFLX_PUZZLE_JUMP_AMOUNT` (15) track-position jump via a new
+  `puzzle_solved` raceEvent, folded into `pflxRacePowerupBonus` exactly
+  like Speed Boost/Steal/Double Points already are — reuses the proven
+  bonus-folding pattern, doesn't fork it. Missing a station costs nothing
+  — low-stakes by design, per the plan.
+- New host card ("🧩 Shortcut Puzzles") next to the X-Rush Powerups card:
+  on/off, question interval, and per-category checkboxes. New player-side
+  puzzle bar (next to the existing powerup bar) shows the prompt + an
+  answer box while a station slide is live and unsolved-by-me, and a
+  simple confirmation once solved. One solve per player per station slide
+  (checked against the existing `raceEvents` log, no separate "solved"
+  flag to drift out of sync) — a teammate/classmate can still solve the
+  same station independently.
+- Verified: syntax gate clean (2/2 blocks) on the first attempt. New
+  165-case Node unit test (`test_xlive_v032_puzzles.js`) — seeded-PRNG
+  determinism, 20 generated instances per template all independently
+  re-verified (Caesar: answer is a real wordbank word and the checker
+  round-trips; Base64: the prompt actually contains a real Base64
+  encoding of the answer, re-derived independently in the test, not
+  compared against a canned string; binary: same, re-derived; code:
+  prompt embeds real runnable-looking JS with a non-empty computed
+  answer), `pflxPuzzleGenerate` determinism per (type, seed) and null on
+  an unknown type, station-slide interval math (every Nth, interval
+  0/negative fallback/clamp, no race slides, non-race slides interleaved),
+  category restriction, and the full `pflxPuzzleSolve` gating (correct/
+  incorrect, one-solve-per-player-per-slide, a different player can still
+  solve the same station, non-station and puzzles-disabled rejection).
+  Regression: v0.31 Powerups 37/37, Team mode 16/16, Team-wide Sabotage
+  29/29, Theater 18/18, Sub-App Embed 14/14 — 279 total across everything,
+  all pass. v0.29's one pre-existing stale failure (FROM-DECK button
+  layout, intentionally removed by v0.30) is unchanged, not a new
+  regression. Not live-clicked in a real browser yet — worth a check next
+  time Ennis is at the console: build a short X-Rush deck (4+ race
+  slides), turn on Shortcut Puzzles at interval 3, confirm the station
+  actually appears on question 3, try a wrong answer then the right one,
+  and confirm the track jump is visible.
+- HOST ACTIONS / BACKLOG: none new for this patch. This closes out v0.32.
+  Next up in the X-Rush plan is v0.33 (Arena Cartridge slide type), then
+  v0.34 (removing live-hosting from Battle Arena — a separate repo,
+  staged, reviewed by Ennis before shipping). Character-art redesign for
+  the EXO avatar system is Ennis's own separate track, outside this
+  patch queue.
