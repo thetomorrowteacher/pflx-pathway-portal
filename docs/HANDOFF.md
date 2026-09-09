@@ -14284,3 +14284,80 @@ Mission Control immediately after, since it touches live nav for active testers.
   activities) -- see the plan file's "Update, Sept 9" section for the
   full breakdown and the still-open LiveKit-VPS blocker on anything
   requiring real multi-party video/audio broadcast.
+
+
+## PATCH X-LIVE — Prominent Session Timer (Sept 9, Ennis)
+- CONTEXT: from the same Sept 9 live-production message: "Session Timer
+  should be promanate." Second item of the "continue everything until
+  done" sequence (see the plan file's Sept 9 "late night" update for the
+  full phased breakdown of what's left and why the rest paused here).
+- FOUND: two separate timer systems already exist in this file, easy to
+  conflate. `agendaTimerIv`/`agendaTimerFor` belongs to the OLDER
+  Nearpod-style `liveagenda`/`L.liveSession` screen. The NEWER X-Live
+  session run view (`rLiveRun`/`L.sessions`) has per-SLIDE timers
+  (`hasTimer` slide types, `pflxEnsureRaceTimer` for X-Rush) but had no
+  single overall SESSION clock. "Promanate" reads as wanting the latter
+  made prominent -- there wasn't one to make prominent yet, so this adds
+  it.
+- FIX (x-live-check/index.html):
+  - `pflxActivateSession(s)` (shared by manual GO LIVE and auto-start, see
+    the previous patch) now stamps `s.liveStartedAt = Date.now()` --  a
+    real "this session actually went live at X" anchor that didn't exist
+    before.
+  - New pure `pflxSessionTimerText(s, nowMs)`: if `s.scheduledEnd` is set,
+    counts DOWN to it ("⏱ 12:34 left", turning red/"urgent" under 2
+    minutes, then "⏱ +3:12 over" once past it). Otherwise, if
+    `s.liveStartedAt` is set, counts UP from it ("⏱ 8:45 elapsed"). If
+    neither field exists (an old session predating this patch), returns
+    null and the timer stays hidden rather than showing something made
+    up.
+  - New `pflxEnsureSessionTimer(s)` / `pflxStopSessionTimer()`: a direct-
+    DOM `setInterval` ticker (updates one `#pflxSessionTimerVal` element's
+    textContent/color every second), same established pattern as
+    `agendaTimerIv`/`pflxRaceTimerIv` -- deliberately NOT a full `render()`
+    every second. Guarded so re-entering the same running session's view
+    doesn't stack a second interval; switching to a different session
+    (or leaving/ending the run view) correctly clears the old one first.
+  - Wired to stop cleanly: `liveExitRun()`, `liveEndSession()`, and
+    `pflxLiveAutoEnd()` (only when it's ending the session actually being
+    displayed, so auto-ending a DIFFERENT session than the one a host is
+    looking at leaves that host's own timer running).
+  - `rLiveRun(s)`'s header now shows the ticking value next to the
+    session title, large (`Audiowide`, 20px) and colored (green normal,
+    red under 2 minutes remaining, gold once in overtime) -- genuinely
+    prominent, not tucked into a corner.
+- Verified: syntax gate clean (2/2 blocks). New 18-case Node unit test
+  (`test_xlive_sessiontimer.js`): countdown/elapsed/overtime/urgent
+  label+color logic all correct at exact boundary values (90s = urgent,
+  past `scheduledEnd` = overtime with the right "+mm:ss" text);
+  `scheduledEnd` correctly takes priority over `liveStartedAt` when both
+  are present; the DOM/interval wiring starts exactly one interval per
+  session, never double-starts on repeat calls for the same session,
+  correctly tears down and restarts when switching sessions, and never
+  throws with no element present or neither timing field set. Existing
+  39-case auto-lifecycle test updated (stubbed the new
+  `pflxStopSessionTimer` call now present inside `liveEndSession`/
+  `pflxLiveAutoEnd`) and re-passes 39/39 confirming the previous patch's
+  behavior is untouched. Full existing-suite regression re-run: Theater
+  18/18, v0.22 21/21, v0.30 Add Activity 43/43, v0.31 Powerups 37/37,
+  Host Cohort Scope 18/18, Host Tiers 39/39, Mission Control Embed Relogin
+  17/17, Mission Control Sub-App 11/11, Role Toggle 10/10, Session
+  Scheduling 19/19, Team mode 16/16, Team-wide Sabotage 29/29, v0.32
+  Puzzles 165/165, YouTube relay 16/16 -- all pass. Same three unrelated
+  pre-existing failures noted in the previous patch's entry remain
+  (Arena-cartridge iframe checks for the not-yet-built v0.33 slide type,
+  a stale "FROM DECK button position" UI check, and stale `SLIDE_TYPES`
+  extraction markers/counts in two older test files) -- none touched by
+  this patch, left for a future cleanup pass.
+  Not live-clicked in a real browser yet (Ennis asleep). Worth a real
+  check next time he's on: open a running session's Host Dashboard, watch
+  the header clock tick, set a short End Time and confirm it goes red
+  then flips to "+mm:ss over" on schedule.
+- HOST ACTIONS / BACKLOG: none required. Next in the "continue everything
+  until done" sequence -- see the plan file's Sept 9 late-night update for
+  the full remaining list and why it was judged better to lay out clearly
+  and pause than to keep grinding through the rest (auto-record and the
+  camera bubble need real camera/mic hardware to verify at all; the
+  ProPresenter-style host-controls redesign is large enough to deserve
+  Ennis's reaction to a reference/mockup before a full build, matching how
+  every other open-ended UI ask in this plan has been handled).
