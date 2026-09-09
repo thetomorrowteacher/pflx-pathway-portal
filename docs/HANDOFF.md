@@ -13580,3 +13580,64 @@ Mission Control immediately after, since it touches live nav for active testers.
   staged, reviewed by Ennis before shipping). Character-art redesign for
   the EXO avatar system is Ennis's own separate track, outside this
   patch queue.
+
+
+## PATCH X-LIVE — Mission Control added to the PFLX Sub-App picker (Sept 9, Ennis)
+- ASK: Ennis sent two screenshots of the X-Live "ADD ACTIVITY" modal's
+  "WHICH PFLX APP?" dropdown (sub_app slide type), which only listed Core
+  Pathways / Battle Arena / DarkCampus, with "I need you to create the
+  Mission Control option."
+- WHY IT WASN'T THERE ALREADY: unlike the other three, Mission Control has
+  no separate deployed URL — it's native to `preview.html` (the Console)
+  itself, a different repo, not a standalone Vercel app. This is also the
+  central unresolved question flagged in the plan's Phase 3 (Host
+  Interactive View epic) — a real chrome-free "embed just one Project"
+  mode is a much bigger, still-unscoped build (popup mini-activities, live
+  badge-awarding, freeze/annotate toolkit).
+- FIX: shipped the honest v1 rather than waiting on Phase 3's full scope.
+  Verified directly this patch that the Console's real production URL
+  (`https://www.prototypeflx.com/`) serves with
+  `content-security-policy: frame-ancestors *` (confirmed both by reading
+  `pflx-platform-check/vercel.json`'s site-wide CSP/`X-Frame-Options:
+  ALLOWALL` and by a direct `curl -sI` against the live URL) — it iframes
+  cleanly today with the exact same technique already used for the other
+  three sub-apps, no CSP blocker. `PFLX_SUBAPPS` gained a fourth entry:
+  ```js
+  missioncontrol: { label: 'Mission Control', url: 'https://www.prototypeflx.com/', fullChrome: true }
+  ```
+  `PFLX_SUBAPPS` is the single source of truth both the dropdown builder
+  (`subAppHtml` in `renderSlideModal()`) and the actual iframe renderer
+  (`pflxSlideEmbedHtml()`) already read from generically — adding this one
+  entry wired both automatically, no other code path needed touching. The
+  `fullChrome: true` flag drives an extra caveat line in the editor UI only
+  when Mission Control specifically is picked: "This embeds the full
+  Console (host signs in inside the frame, same as any other browser tab)
+  — not a focused, chrome-free view of one Project yet." This is honestly
+  the FULL Console (nav/login and everything), not the dedicated
+  chrome-free "just this Project" embed from Phase 3 — that richer mode
+  (popup activities, live badge-awarding, freeze/annotate) is still
+  backlogged, unscoped, and unchanged by this patch.
+- Verified: syntax gate clean (2/2 blocks, block 2 grew 173818 → 174692
+  chars). New 11-case Node unit test (`test_xlive_missioncontrol_subapp.js`)
+  extracting the real `PFLX_SUBAPPS` object and `pflxSlideEmbedHtml()` —
+  confirms all 4 sub-apps present, the original 3 untouched (URLs/labels/no
+  fullChrome flag), Mission Control's URL/label/fullChrome are correct, a
+  real iframe renders with the correct `src` for `subApp: 'missioncontrol'`,
+  a Battle Arena regression check, and safe empty-string behavior for an
+  unknown/empty `subApp`. Full regression suite re-run: v0.30 Add Activity
+  43/43, v0.31 Powerups 37/37, Theater 18/18, Sub-App Embed 14/14, Team mode
+  16/16, Team-wide Sabotage 29/29, v0.32 Puzzles 165/165, this patch 11/11 —
+  all pass. Two pre-existing, unrelated stale failures noted (not caused by
+  this patch, which only touches `PFLX_SUBAPPS`/`subAppHtml`): `test_v029.js`
+  has the already-documented FROM-DECK button layout failure (intentionally
+  removed by v0.30); `test_v028.js` crashes on an outdated leaderboard
+  fixture that predates the v0.30/v0.31 powerup functions it doesn't
+  extract — both are stale test files from before several patches, not
+  regressions from this change. Not live-clicked in a real browser yet —
+  worth a check next time Ennis is at the console: add a Mission Control
+  activity slide, confirm the picker shows it and the iframe loads the real
+  Console (will require signing in inside the frame, per the caveat note).
+- HOST ACTIONS / BACKLOG: none new for this patch beyond what Phase 3
+  (Host Interactive View) already tracks. When that epic is actually
+  scoped, this fullChrome embed is the fallback/baseline it can be upgraded
+  from once a real chrome-free "just this Project" embed mode exists.
