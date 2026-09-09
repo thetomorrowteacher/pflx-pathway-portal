@@ -13866,3 +13866,80 @@ Mission Control immediately after, since it touches live nav for active testers.
   test account `hostTier: 'guest'` (or `'instructor'`) via the Console's
   existing Player Manager UI — no new admin surface was built here since
   one already exists.
+
+
+## PATCH X-LIVE — Tiered Host Access, Part 2: Cohort Scoping (Sept 9, Ennis)
+- CONTEXT: continues the Part 1 capability-gating patch shipped earlier
+  today. Mid-build, Ennis sent a correction: "Guest Host only has host
+  control of a Project in MC and a Cohort manager. Instructor can have
+  control of multiple Programs, and Projects and cohorts or
+  organizations."
+- CORRECTION folded in (before building anything new): Part 1 shipped
+  with `scopedToCohorts: (tier === 'instructor' || tier === 'cohost')` —
+  Guest Host was left UNSCOPED for X-Live purposes (any cohort, or even
+  an All Players session). That was wrong per this message — Guest Host
+  is scoped to ONE cohort too, alongside their one MC Project (a
+  Console-side dimension X-Live doesn't model — Projects/Programs live in
+  Mission Control/Core Pathways, not X-Live sessions). Fixed to
+  `scopedToCohorts: (tier === 'guest' || tier === 'instructor' || tier
+  === 'cohost')` — now every tier below admin/master is cohort-scoped in
+  X-Live, matching the Console's own tier model where every tier below
+  admin has scope !== 'global'. Instructor/Co-Host's "multiple cohorts"
+  needed no change — `managedCohorts[]` was already array-based, so
+  "one cohort" (guest) vs "multiple cohorts" (instructor/cohost) is
+  purely how many entries the Console's Player Manager assigns, not a
+  different mechanism.
+- FIX (the actual Part 2 build): new `pflxSessionInCohortScope(session,
+  managedCohorts)` — pure, decides whether a session is in a scoped
+  host's reach. An "All Players" session is treated as explicitly OUT of
+  scope for any scoped host (it spans every cohort, not one they could
+  own) — the one real judgment call here, not asked about directly, so
+  flagged plainly in case Ennis wants it handled differently. A scoped
+  host with an empty `managedCohorts[]` (tier assigned, no cohort yet)
+  manages nothing — strict, matching the Console's own `scopeAssigned()`
+  semantics rather than failing open. New `pflxVisibleSessions(sessions,
+  caps, managedCohorts)` filters a session list down to what a host may
+  see — unscoped tiers (admin/master) see everything unchanged; a scoped
+  tier (guest/instructor/cohost) sees only in-scope sessions.
+- Wired at every place a session is reached, not just the list — fail
+  closed like the earlier role-toggle patch: `rLiveList()` filters the
+  visible session list; `liveNewSession()` defaults a scoped host's new
+  session to their own cohort(s), never "All players"; `rLiveBuilder()`'s
+  "Who is this for?" picker is replaced with a locked notice and the
+  cohort checkboxes are restricted to the host's own `managedCohorts` (no
+  path to picking an out-of-scope cohort in the UI at all); and
+  `liveEditSession`/`liveGoLiveSession`/`liveManageSession`/
+  `liveDeleteSessionPrompt` each independently re-check scope, so a
+  scoped host can't reach an out-of-scope session through a direct-by-id
+  call (e.g. the Console's 'open_session'-by-code handoff) even though
+  the list never showed it to them.
+- Verified: syntax gate clean (2/2 blocks, block 1 grew 153596 → 155306
+  chars). New 18-case Node unit test (`test_xlive_host_cohort_scope.js`)
+  extracting the real `pflxSessionInCohortScope`/`pflxVisibleSessions` —
+  All-Players-always-out-of-scope, single/multi-cohort matching in both
+  directions, case-insensitive matching, the strict-empty-scope safe
+  default, and full filtering across a 4-session/4-tier matrix (guest,
+  instructor, cohost, admin/master). Corrected the Part 1 test's guest
+  assertion to match the fix (`guest.scopedToCohorts === true`). Full
+  regression suite re-run: v0.30 Add Activity 43/43, v0.31 Powerups
+  37/37, Theater 18/18, Sub-App Embed 14/14, Team mode 16/16, Team-wide
+  Sabotage 29/29, v0.32 Puzzles 165/165, Mission Control Sub-App 11/11,
+  Session Scheduling 19/19, Role Toggle 10/10, Host Tiers (corrected)
+  39/39, this patch 18/18 — all pass (the one pre-existing v0.29
+  FROM-DECK-button stale failure, unrelated and already documented, is
+  unchanged). Not live-clicked in a real browser yet — needs real
+  guest/instructor test accounts with `managedCohorts` assigned via the
+  Console's Player Manager to check for real: confirm a cohort-scoped
+  host only sees sessions for their own cohort(s) in the LIVE tab, can't
+  create an All Players session, and a direct-by-code join attempt on an
+  out-of-scope session is refused.
+- HOST ACTIONS / BACKLOG: this closes out the tiered-host-access epic as
+  scoped so far (capability gating + cohort scoping). The Console-side
+  Project/Program/Node scoping Ennis mentioned (Guest Host's "Project in
+  MC," Instructor's "multiple Programs and Projects") is already fully
+  handled by the Console's own existing `managedScope` engine — nothing
+  new needed in X-Live for that half, since X-Live sessions aren't
+  Project/Program-shaped. If Ennis wants leaderboard/roster views
+  (BOARDS/TEAMS tabs) also filtered by cohort scope for a scoped host —
+  not just the session list — that's a further, not-yet-scoped
+  extension, same pattern, ready to build once confirmed.
