@@ -13406,3 +13406,49 @@ Mission Control immediately after, since it touches live nav for active testers.
   scoping was the right call, or redirect. The Mission Control chrome-free
   embed mode remains the epic's real centerpiece and biggest open
   question — worth a dedicated session to scope before attempting it.
+
+
+## PATCH X-LIVE — X-Rush Team mode (Sept 9, Ennis)
+- ASK: next item in the X-Rush phased plan after Powerups & Sabotage —
+  "when `L.cfg.teams.names.length` is set, X-Rush groups racers into team
+  pods... a team's track position is the sum of its members'
+  `pflxRaceScore` progress... the leaderboard aggregates by team instead
+  of by player when teams are active."
+- FIX: new `pflxRaceTeamLeaderboard(s)` reuses the existing Teams feature
+  as-is (`L.cfg.teams`/`makeTeams()`/`teamColor()` — no new team
+  primitive) and sums each team's members' scores straight out of
+  `pflxRaceLeaderboard(s)` (which already folds in v0.31's powerup
+  bonuses — team mode is built strictly on top of that, not alongside
+  it). Returns `[]` when no teams are configured, so both
+  `pflxRaceLeaderboardHtml` and `pflxRaceTrackHtml` gained a single
+  `if (teamBoard.length)` branch at the top and are otherwise byte-
+  identical to their pre-patch selves for solo sessions — verified
+  explicitly. Team rows use `teamColor()` for their color chip and stack
+  each member's existing `exoAvatarHTML()` on the track — no new avatar
+  or color system.
+- NOT BUILT (deliberately, documented per the plan's own scoping): team-
+  wide sabotage targeting ("Freeze hits every member of the target team,
+  a host toggle, defaulting to per-player"). That touches the powerup-
+  targeting UI and `pflxRaceTriggerPowerup` and deserves its own focused
+  pass rather than being rushed in alongside the leaderboard/track work —
+  per-player sabotage targeting still works exactly as it did in v0.31
+  even when teams are active.
+- Verified: syntax gate clean (2/2 blocks) on the first attempt. New
+  16-case Node unit test (`test_xlive_team_mode.js`) covering: no-teams
+  strict no-op, basic 2-team aggregation, uneven team sizes, a non-
+  responding member contributing 0 without breaking the sum, a tie
+  between teams, an unassigned player being excluded rather than
+  crashing, both HTML renderers, and an explicit composability check
+  against v0.31's powerup-bonus folding. Re-ran the v0.31/Theater/Sub-App
+  suites for regression safety (37 + 18 + 14 = 69 cases, all pass); the
+  v0.29 suite shows its one already-documented stale failure (the
+  FROM-DECK-button-layout assertion the v0.30 redesign intentionally
+  removed — not a new regression, unchanged from before this patch). Not
+  live-clicked in a real browser yet — worth a check next time Ennis is
+  at the console: draft a 2-team roster, run a real X-Rush race across a
+  few player tabs, confirm the track/leaderboard actually aggregate by
+  team and the per-team avatar stack reads clearly at a glance.
+- HOST ACTIONS / BACKLOG: team-wide sabotage targeting (above) is the
+  next natural follow-on once this is confirmed live. After that, the
+  plan's own next items are v0.32 (avatar-track visual polish + shortcut
+  puzzle challenges) and v0.33 (Arena Cartridge slide type).
