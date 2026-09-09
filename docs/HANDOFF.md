@@ -14053,3 +14053,127 @@ Mission Control immediately after, since it touches live nav for active testers.
   `PFLX_TRUSTED_EMBED_ORIGINS` allowlist in preview.html needs updating
   to match, or the auto-login silently stops firing (fails closed, not a
   security hole, but worth remembering).
+
+
+## PATCH X-LIVE + PATCH PLATFORM v1.165 — Theater/YouTube API Relay ("Both 1 and 2", Part 1) (Sept 9, Ennis)
+- CONTEXT: "Theater is not doing anything. I should have some of the same
+  settings from the virtual theater that was setup in MC." Investigation
+  (this session, before compaction) found two things: MC's rich crew/
+  mixer/lighting/prompter "Virtual Theater" is dead/orphaned code (never
+  actually reached X-Live despite a comment claiming the migration
+  happened), and a REAL, live, but Theater-disconnected asset exists: the
+  Console's Settings → YouTube API (a real OAuth connection to Ennis's
+  YouTube channel, already authorized, `pflx_yt_config`). Asked Ennis to
+  choose: (1) connect the real YouTube API, (2) rebuild the crew/
+  production studio, or (3) something else. Answer: **"Both 1 and 2."**
+  Then asked which to start with — answer: **YouTube API relay first**.
+  This patch is that piece; the crew/production-studio rebuild (part 2)
+  is next.
+- ARCHITECTURE DECISION: `pflx_yt_config` (OAuth access/refresh tokens)
+  is confirmed localStorage-only on the Console's own origin, never
+  synced to Supabase — and it must stay that way, since `app_data` is
+  reachable by anything holding the project's anon key. Rather than
+  sync the tokens anywhere, X-Live opens a **hidden postMessage relay**:
+  a 1x1 off-screen iframe of the same live Console app
+  (`https://www.prototypeflx.com/`, X-Live's existing `missioncontrol`
+  sub-app entry). X-Live posts an action request; the Console performs
+  the real YouTube Data API call using its own already-authorized
+  `ytConfig` and posts the result back. The tokens never cross the frame
+  boundary — this reuses the exact same trust pattern (origin-locked
+  postMessage, brand-only identity, never credentials) just shipped for
+  the Mission Control embed auto-login (v1.164) two patches ago.
+- FIX (x-live-check/index.html):
+  - New `pflxYtEnsureRelayFrame()` / `pflxYtRelayTargetOrigin()` / new
+    `pflxYtRelayRequest(action, payload)` (Promise-based, 12s timeout,
+    queues the request if the relay frame hasn't finished loading yet
+    rather than dropping it). The relay frame also does the SAME
+    `pflx_xlive_embed_identity` handshake as the MC embed fix on load —
+    reused, not duplicated.
+  - New `pflxYtEnsureStatusChecked()`: fires a `status` relay request
+    once per page load, caches the result in new `L.ytRelayStatus`, and
+    re-renders when it resolves.
+  - New `liveYtCreateAndGoLive()`: relay-creates a real unlisted YouTube
+    broadcast titled after the session, sets `sess.youtubeEmbedId` (the
+    SAME field the manual-paste flow already used — every downstream
+    reader, Theater's viewer, `rLiveNative`, the STOP button, needed zero
+    changes) plus a new `sess.youtubeViaRelay` flag.
+  - `liveClearYouTubeEmbed()` (existing, host STOP button) now also ends
+    the real broadcast via the relay when `sess.youtubeViaRelay` is true
+    — a manually-pasted stream is untouched, cleared exactly as before.
+  - `rLiveRun()`'s YouTube card: when the relay reports a connected
+    account and no stream is set yet, shows "🔴 CREATE & GO LIVE ON
+    YOUTUBE" instead of the manual paste-URL fields. Not connected (or
+    status not yet known) → the EXACT original manual-paste UI, now with
+    a one-line hint pointing at Settings → YouTube API when disconnected.
+    Zero regression risk for any host who hasn't connected YouTube.
+  - Documented trade-off, unchanged from the original Phase 1d plan: this
+    automates broadcast CREATE/END and grabs the video ID — it does not
+    automate the actual video feed. OBS still needs to be pointed at that
+    YouTube channel's stream key to push video; `enableAutoStart:true` on
+    the created broadcast means it goes live automatically the moment OBS
+    starts streaming, no separate "go live" click needed in YouTube
+    Studio.
+- FIX (pflx-platform-check/preview.html):
+  - New `pflxYtRelayHandle(action, payload, cb)`: `status` is a pure
+    local read (no API call — instant connected/disconnected check).
+    `createBroadcast`/`endBroadcast` call the REAL `ytApiFetch()` (the
+    same generic, tested API helper the Settings → YouTube API page
+    itself uses) directly — not a duplicate implementation. Written as a
+    new, parameterized entry point rather than reusing
+    `ytCreateBroadcast()`/`ytStopBroadcast()` as-is, because those
+    existing functions read straight from that Settings page's own
+    `<input>` elements (title/description/privacy fields) — which don't
+    exist in a hidden background relay frame that never opens that tab.
+    `createBroadcast` mirrors the exact same request body shape
+    (`enableDvr`/`enableEmbed`/`enableAutoStart`/`enableAutoStop`,
+    `privacyStatus: 'unlisted'`) the Settings page's real-API branch
+    already sends. `endBroadcast` also calls the existing `ytEndLive()`
+    afterward so the Settings page's own live timer/chat-poll state
+    stays in sync if a host has that tab open too.
+  - Wired into the SAME message listener the Mission Control embed
+    identity relay uses, gated by the SAME guard: embedded-only
+    (`window.self !== window.top`) AND the SAME
+    `PFLX_TRUSTED_EMBED_ORIGINS` allowlist — no new trust surface opened.
+  - `PFLX_PATCH` bumped 164 → 165.
+- Verified: syntax gate clean on both files (x-live-check 2/2 blocks;
+  pflx-platform-check 13/13 blocks). Two new Node unit tests:
+  - `test_xlive_yt_relay.js` (16 cases): the relay frame is created once
+    and reused across calls; a request made before the frame finishes
+    loading is queued and correctly sent once it does; the returned
+    Promise actually resolves once the (simulated) response arrives;
+    `pflxYtEnsureStatusChecked` fires exactly once and updates
+    `L.ytRelayStatus`/re-renders; `liveYtCreateAndGoLive`'s happy path
+    sets `youtubeEmbedId`+`youtubeViaRelay` and saves the session; a
+    relay error leaves the session untouched and surfaces via toast
+    instead of crashing.
+  - `test_platform_yt_relay.js` (16 cases): `status` never makes an API
+    call either way (connected or not); `createBroadcast`/`endBroadcast`
+    both fail closed with `not_connected`/`missing_videoId` rather than
+    calling the API when preconditions aren't met; the real API call
+    shape is asserted directly (POST to `/liveBroadcasts`, unlisted
+    privacy, auto-start/auto-stop, the session title carried through);
+    a YouTube API error response surfaces to the caller unmodified, not
+    swallowed; `endBroadcast` transitions the correct broadcast id and
+    calls the existing `ytEndLive()`; an unknown action is refused.
+  - Full regression re-run: Mission Control Embed Relogin 17/17, Mission
+    Control Sub-App 11/11, Session Scheduling 19/19, Role Toggle 10/10,
+    Host Tiers 39/39, Host Cohort Scope 18/18, Team mode 16/16,
+    Team-wide Sabotage 29/29, v0.32 Puzzles 165/165 — all pass.
+  - Not live-clicked in a real browser yet — needs a real host account
+    with YouTube already connected (Settings → YouTube API, already true
+    for Ennis's account) to click "CREATE & GO LIVE ON YOUTUBE" from a
+    running X-Live session and confirm: a real unlisted broadcast appears
+    in YouTube Studio, the video ID lands on the session and shows up in
+    Theater's viewer once OBS starts pushing to that channel's stream
+    key, and STOP correctly transitions the real broadcast to complete
+    (not just clears the local field).
+- HOST ACTIONS / BACKLOG: none required — this is automatic for any host
+  whose account already has YouTube connected in Settings → YouTube API;
+  everyone else keeps the exact manual-paste flow, unchanged. Part 2 of
+  "Both 1 and 2" — rebuilding the crew/production-studio system natively
+  in X-Live (roles, mixer, lighting board, soundboard, teleprompter,
+  participant grid) — is next, and now also absorbs the large Live
+  Production feature list Ennis sent right after this patch started
+  (ProPresenter-style host controls, Guest Host temporary studio access,
+  motion graphics, team-vs-team popups, gamified transitions, system
+  lighting) — all logged in the plan file under "Update, Sept 9."
