@@ -13784,3 +13784,85 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: Ennis's tiered-access ask (guest host /
   instructor host with "specified" narrower access than a full Partner
   host) needs real scoping — see my reply for the specific questions.
+
+
+## PATCH X-LIVE — Tiered Host Access, Part 1: Capability Gating (Sept 9, Ennis)
+- ASK: following the Host/Player toggle patch, Ennis added: "The player
+  who receives Host access/privilege should have the host mode toggle.
+  However, guest host or instructor host will have specified host
+  access." I asked 3 clarifying questions before building anything (this
+  is a real access-control boundary, not something to default-guess at)
+  and got concrete answers: **Guest Host** — can build AND run sessions,
+  but not touch rewards/scoring, delete a session, or reach
+  Teams/Setup. **Instructor Host** — everything except Setup, AND scoped
+  to their own cohort(s) only. **Granting** — "already exists in the
+  Console's user roles."
+- FOUND (reading `pflx-platform-check/preview.html` directly): the
+  Console already has a complete, real five-tier host permission engine —
+  `guest` / `instructor` / `cohost` / `admin` / `master` — assignable per
+  account via its Player Manager UI, stored as `session.hostTier` +
+  `session.managedCohorts[]` (cohort scope) / `session.managedScope`
+  (project/node scope for MC/Core Pathways). `hostTier()` resolves an
+  explicit `hostTier` field first, else falls back to the legacy `role`
+  string (`admin`→`master`, `host`→`admin`, `instructor`/`teacher`→
+  `instructor`). Critically: `pflxBroadcastIdentity()` already sends the
+  ENTIRE `activeSession` object (hostTier/managedCohorts included) as
+  `user` in the `pflx_identity_broadcast` message every sub-app iframe —
+  X-Live included — already receives. X-Live was discarding everything
+  but id/brand/role. So "granting" needed NO new UI anywhere — it already
+  exists in the Console's Player Manager; this patch only teaches X-Live
+  to read what's already being sent.
+- FIX: `L.me` now also carries `hostTier`/`managedCohorts` from the
+  identity payload. New `pflxResolveHostTier(role, hostTier)` mirrors the
+  Console's `hostTier()` resolution EXACTLY (same field-then-fallback
+  order, same mapping) so the two apps can never disagree about what tier
+  an account holds. New `pflxHostCapabilities(tier)` derives X-Live's own
+  capability set per Ennis's confirmed scope: `buildSessions`/
+  `runSessions` true for every tier ≥ guest; `editRewards`/
+  `deleteSessions`/`teamsTab` true for instructor/cohost/admin/master (not
+  guest); `setupTab` true only for admin/master; `scopedToCohorts` true
+  for instructor/cohost (cohort SCOPING itself — filtering which
+  sessions/roster they actually see — is Part 2, a separate patch, not
+  yet built). New `pflxHostTabAllowed(tabKey, caps)` gates the Teams and
+  Setup tabs only (every other tab was left open to every host tier per
+  Ennis's answer, since nothing else was flagged as restricted). Applied
+  at 3 sites: the Host Dashboard tab list (filtered), the DELETE SESSION
+  button in the session list (hidden without `deleteSessions`), and the
+  entire "🎁 Session Rewards" card in the session builder (hidden without
+  `editRewards`). Existing admin/master accounts (i.e., every host
+  account today, since the Console's Player Manager hasn't assigned any
+  guest/instructor tiers to X-Live-facing accounts yet) get every
+  capability, unrestricted — this patch changes nothing observable for
+  them.
+- NOT BUILT YET (flagged, not silently assumed): cohort SCOPING for
+  Instructor Host — actually filtering which sessions and roster/
+  leaderboard views a cohort-scoped instructor can see, using the
+  `managedCohorts[]` this patch now reads. Also not extended to
+  everywhere cohort filtering could apply (BOARDS leaderboard, TEAMS) —
+  scoping the session list + the "who is this for" cohort picker in the
+  builder is the planned next patch; leaderboard/roster scoping beyond
+  that is a further, not-yet-scoped extension.
+- Verified: syntax gate clean (2/2 blocks, block 1 grew 150336 → 153596
+  chars). New 39-case Node unit test (`test_xlive_host_tiers.js`)
+  extracting the real `pflxResolveHostTier`/`pflxHostCapabilities`/
+  `pflxHostTabAllowed` — full resolution-order matrix (explicit tier wins,
+  unknown tier value falls back to role, all 4 role mappings,
+  case-insensitivity, non-host), the full capability matrix for all 5
+  tiers against every one of Ennis's confirmed boundaries, and tab-gating
+  for guest/instructor/admin. Full regression suite re-run: v0.30 Add
+  Activity 43/43, v0.31 Powerups 37/37, Theater 18/18, Sub-App Embed
+  14/14, Team mode 16/16, Team-wide Sabotage 29/29, v0.32 Puzzles
+  165/165, Mission Control Sub-App 11/11, Session Scheduling 19/19, Role
+  Toggle 10/10, this patch 39/39 — all pass (the one pre-existing v0.29
+  FROM-DECK-button stale failure, unrelated and already documented, is
+  unchanged). Not live-clicked in a real browser yet — needs a real
+  guest-tier and instructor-tier account assigned via the Console's
+  Player Manager to check for real: confirm a Guest Host sees no
+  Teams/Setup tabs, no DELETE button, no Rewards card, but CAN build and
+  run a session end-to-end; confirm an Instructor Host sees everything
+  except Setup.
+- HOST ACTIONS / BACKLOG: Part 2 (cohort scoping for Instructor/Co-Host)
+  is next. To actually test this patch for real, Ennis needs to assign a
+  test account `hostTier: 'guest'` (or `'instructor'`) via the Console's
+  existing Player Manager UI — no new admin surface was built here since
+  one already exists.
