@@ -13452,3 +13452,58 @@ Mission Control immediately after, since it touches live nav for active testers.
   next natural follow-on once this is confirmed live. After that, the
   plan's own next items are v0.32 (avatar-track visual polish + shortcut
   puzzle challenges) and v0.33 (Arena Cartridge slide type).
+
+
+## PATCH X-LIVE — X-Rush Team-wide Sabotage Targeting (Sept 9, Ennis)
+- ASK: deferred twice already — first out of v0.31 (Powerups & Sabotage:
+  "Freeze hits every member of the target team, a host toggle, defaulting
+  to per-player") and again out of tonight's Team mode patch — both times
+  documented as deserving its own focused pass since it touches the
+  powerup-targeting UI and `pflxRaceTriggerPowerup` directly. This patch is
+  that pass.
+- FIX: new host toggle `s.sabotageTeamWide` (checkbox next to Sabotage in
+  the X-Rush Powerups card, only shown once sabotage is on AND teams are
+  configured). When on, ❄️ Freeze and 🌫️ Fog (marked `teamCapable: true` on
+  `PFLX_POWERUPS`) target a whole team instead of one player: a new pure
+  `pflxRaceTeamMembers(assign, teamName)` resolves the team roster off the
+  existing `L.cfg.teams.assign` (no new team primitive), and
+  `pflxRaceTriggerPowerup` builds one event carrying `targetPids`/
+  `targetTeam` instead of a single `targetPid`. `pflxRaceActiveEffects`
+  (the one function both the host and player views already read Freeze/Fog
+  state from) was extended to match either shape — a legacy single-target
+  event and a new team event both resolve correctly, verified explicitly.
+  🥊 Steal deliberately stays single-player, unconditionally, even with the
+  toggle on — "steal from a whole team" has no clean economic meaning and
+  was never asked for, so it keeps its own player-target select in the
+  power-up bar while Freeze/Fog get a separate team-target select.
+- Shield interacts correctly at the team level: a shielded member of the
+  target team is recorded in the event's `blockedPids[]` and is NOT
+  affected (their shield is consumed absorbing the hit), while unshielded
+  teammates still get frozen/fogged normally — `event.blocked` (fully
+  blocked) only sets true if EVERY targeted member was shielded.
+- Verified: syntax gate clean (2/2 blocks) on the first attempt. New
+  29-case Node unit test (`test_xlive_team_sabotage.js`) covering:
+  `pflxRaceTeamMembers` lookups, the toggle being a strict no-op with no
+  teams configured or with the toggle off, a team-wide Freeze correctly
+  hitting every other team member and sparing the actor's own team, your
+  own team being rejected as a target, Steal staying single-target
+  regardless of the toggle, effect expiry after `durationMs`, partial-team
+  shielding (one member blocked, the rest still hit), a single-member enemy
+  team resolving correctly, and explicit backward-compatibility checks that
+  a pre-patch single-`targetPid` event still resolves through the updated
+  `pflxRaceActiveEffects` exactly as before. Re-ran the full regression
+  suite: v0.31 Powerups (37/37 — its sandbox needed a one-line `L.cfg.teams`
+  stand-in added since `pflxRaceTriggerPowerup` now reads that global, a
+  test-harness update only, no product code touched), Team mode (16/16),
+  Theater (18/18), Sub-App Embed (14/14) — 85/85 plus this patch's own 29,
+  114 total, all pass. v0.29's one pre-existing stale failure (FROM-DECK
+  button layout, removed intentionally by the v0.30 redesign) is unchanged
+  and not a new regression. Not live-clicked in a real browser yet — worth
+  a check next time Ennis is at the console: draft a 2-team roster, turn on
+  Sabotage + Team-wide Sabotage, fire Freeze from one team at the other,
+  confirm every targeted player's answer buttons actually lock, and that a
+  shielded teammate visibly shrugs it off while the rest freeze.
+- HOST ACTIONS / BACKLOG: none new. This closes out the last item carried
+  over from v0.31/Team mode. Next items in the X-Rush plan are v0.32
+  (avatar-track visual polish + shortcut puzzle challenges), then v0.33
+  (Arena Cartridge slide type).
