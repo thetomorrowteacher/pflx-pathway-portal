@@ -13708,3 +13708,79 @@ Mission Control immediately after, since it touches live nav for active testers.
   patch. If Ennis later wants auto-start/auto-end tied to these fields,
   that's a real, separate scoping conversation (moderation implications
   noted above), not assumed here.
+
+
+## PATCH X-LIVE — Host/Player View Toggle wired up (Sept 9, Ennis)
+- ASK: two screenshots of X-Live's Host Dashboard with the top toolbar
+  (near "RANK Partner") circled: "I should be able to switch to player
+  mode. I should then have a player dashboard with player functions. This
+  should be the way that all of Host Dashboard works." Also: "The player
+  who receives Host access/privilege should have the host mode toggle.
+  However, guest host or instructor host will have specified host
+  access."
+- FOUND (reading the real code, both repos): the Console
+  (`pflx-platform-check/preview.html`) already has a genuine, working
+  Host View / Player View toggle in its persistent top toolbar
+  (`#toolbar-role-toggle`, `pflxToggleRole()`/`pflxSetRole()`, gated
+  visible to admin/host/teacher/instructor roles by
+  `pflxInjectRolePill()`'s `isAdmin` check) — this is exactly the control
+  Ennis circled. On every click it already broadcasts a
+  `pflx_role_changed` `postMessage` to every sub-app iframe
+  (`mcBroadcastToApps`). X-Live never listened for that message — it only
+  ever computed `L.isHost` ONCE, at identity load
+  (`adoptFromParams`/the `pflx_identity_broadcast` handler), and never
+  again. Meanwhile X-Live already has a COMPLETE real player dashboard
+  (`rMe`/`rTheater`/`rBoards`/`rShop`/`rPlay`) — literally every tab and
+  screen in the whole Host Dashboard already branches off that single
+  `L.isHost` boolean (the `const tabs = L.isHost ? [...] : [...]` split,
+  the header text, session controls, leaderboard visibility, Vault Rush
+  host controls, etc.). So making the toggle actually work here needed no
+  new player UI at all — this is the exact gap the plan's Phase 1f already
+  flagged for the live-session view specifically ("needs checking whether
+  the existing mimic/role-toggle machinery... needs live-session-specific
+  wiring"); turns out the gap was file-wide, and the fix is identical
+  either way.
+- FIX: `L.isHost` is now the live-toggleable DISPLAY state; a new
+  `L.realIsHost` (computed the same way `L.isHost` always was, from the
+  signed identity's role) tracks the actual underlying permission. A new
+  pure `pflxApplyRoleChange(realIsHost, role)` decides what to do with an
+  incoming `pflx_role_changed` message — fails closed: a genuine player
+  account (`realIsHost === false`) can never be switched INTO host view by
+  this message, even a spoofed one, since only a real host's own client
+  can ever hold `realIsHost === true` in the first place. The message
+  listener calls it, updates `L.isHost`, bounces off a tab that doesn't
+  exist in the new view (e.g. was on SETUP, toggled to player — lands on
+  MY EXO instead of a blank screen), and re-renders. No other function in
+  the file needed touching — this is the payoff of the existing
+  architecture already centralizing everything on one boolean.
+- NOT BUILT (needs Ennis's input, flagged in my reply rather than
+  guessed): the tiered permission model — "guest host" / "instructor
+  host" getting "specified" (narrower) host access than full Partner/
+  Owner access. Confirmed by reading `pflxInjectRolePill`'s `isAdmin`
+  check: today admin/host/teacher/instructor are ALL treated identically
+  everywhere in the real code — there is no existing tiered-access concept
+  anywhere to extend. Which specific tabs/actions a guest host or
+  instructor host should lose is a real access-control decision, not
+  something to default-guess at.
+- Verified: syntax gate clean (2/2 blocks, block 1 grew 148557 → 150336
+  chars from this patch; block 2 unchanged, confirming the edit stayed
+  scoped to the identity/message-handling section near the top of the
+  file). New 10-case Node unit test (`test_xlive_role_toggle.js`)
+  extracting the real `pflxApplyRoleChange` — both toggle directions for a
+  real host, an unknown/undefined role ignored safely, and the full
+  fail-closed matrix for a non-host (including falsy-but-not-`false`
+  edge values 0/null/undefined, all correctly refused). Full regression
+  suite re-run: v0.30 Add Activity 43/43, v0.31 Powerups 37/37, Theater
+  18/18, Sub-App Embed 14/14, Team mode 16/16, Team-wide Sabotage 29/29,
+  v0.32 Puzzles 165/165, Mission Control Sub-App 11/11, Session Scheduling
+  19/19, this patch 10/10 — all pass (the one pre-existing v0.29
+  FROM-DECK-button stale failure, unrelated and already documented, is
+  unchanged). Not live-clicked in a real browser yet — worth a check next
+  time Ennis is at the console: open X-Live as a real host account inside
+  the Console, click the toolbar Host View/Player View toggle, confirm
+  the WHOLE Host Dashboard (not just one tab) flips to the real player
+  experience and back, including mid-way through a running live session
+  (the original Phase 1f ask).
+- HOST ACTIONS / BACKLOG: Ennis's tiered-access ask (guest host /
+  instructor host with "specified" narrower access than a full Partner
+  host) needs real scoping — see my reply for the specific questions.
