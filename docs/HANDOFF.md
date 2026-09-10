@@ -14589,3 +14589,86 @@ Mission Control immediately after, since it touches live nav for active testers.
   deployed app/repo. Recommend confirming with Ennis whether the same
   "parallel + host preview" principle should be extended there next,
   and in what priority.
+
+
+## PATCH PLATFORM v1.166 — Cyberpunk X-Bot Timer (Sept 10, Ennis)
+- ASK: Ennis attached two screenshots of the X-Bot floating widget's HOST
+  tab and asked for "a cyberpunk styled timer with large digitals," preset
+  buttons for 1/3/5/7/10/15/20/30/45/60/70/80 minutes, a sound on/off
+  toggle, a chime every minute, a cyberpunk alarm when the timer runs out
+  (flashing red digits — cyan normally, yellow inside the last minute), a
+  visual 10-9-8… countdown in the last 10 seconds, and a voice counting
+  down from 10 — "This should work within the X-Bot floating icon."
+- INVESTIGATION: read the X-Bot dock's existing HOST-tab layout (Quick
+  Actions → Sound Equalizer, `preview.html` ~lines 13572-13596),
+  `pflxPlaySfx(event)` (~line 61959, the platform's synthesized-SFX engine
+  — reused its existing `'alarm'` siren case as-is for the time's-up
+  sound rather than building a second one), and `window.pflxSpeak(text)`
+  (~line 73899, the free offline Web Speech API TTS wrapper already used
+  elsewhere in the platform) so the countdown voice reuses real,
+  already-working infrastructure instead of a new one. X-Live's own
+  `timerStart(mins)` (a LOCAL-only host projector countdown, not
+  broadcast to players) was the precedent for scoping this the same way:
+  the Cyber Timer lives only in the host's own X-Bot widget, not synced
+  or visible to players — worth confirming with Ennis if a shared/
+  broadcast version is wanted later.
+- FIX (`pflx-platform-check/preview.html`): new "CYBER TIMER" panel
+  inserted between the existing Quick Actions and Sound Equalizer blocks
+  in the X-Bot dock's HOST tab:
+  - `pflxTimerDisplayState(remainingSeconds, totalSeconds)` — pure
+    function returning `{state, color, countdownNum, display,
+    remainingSeconds}`. States: `normal` (>60s left, cyan), `warning`
+    (≤60s, yellow — "within the last min"), `critical` (≤10s, yellow with
+    a big single countdown digit — the 10-9-8… phase), `alarm` (≤0s, red
+    flashing). Negative input is clamped to the alarm state, never a
+    negative display.
+  - `pflxTimerShouldChime(remainingSeconds, totalSeconds)` — pure
+    function: fires exactly on 60-second boundaries, never at the timer's
+    own start and never once it's hit zero.
+  - `xbotTimer` state object (total/remaining seconds, running/paused,
+    interval id, last-spoken countdown number, sound-on preference
+    persisted to `localStorage['pflx_xbot_timer_sound']`), plus
+    `xbotTimerDraw` (renders the display + color/flash/pulse classes),
+    `xbotTimerSpeakIfCritical` (speaks each countdown number exactly
+    once via `pflxSpeak`, last-10-seconds only), `xbotTimerTick` (the
+    1-second driver: decrements, redraws, fires the per-minute chime via
+    `pflxPlaySfx('timerChime')`, fires the alarm at zero),
+    `xbotTimerFireAlarm` (stops the interval, plays the existing
+    `'alarm'` SFX, speaks "Time's up"), `xbotTimerStart(minutes)` (wired
+    to the 12 preset buttons), `xbotTimerPauseResume`, `xbotTimerStop`
+    (RESET), `xbotTimerToggleSound`.
+  - New `'timerChime'` case added to `pflxPlaySfx`'s switch — a short
+    two-tone digital blip distinct from the existing siren-style
+    `'alarm'` case, which is reused unchanged for the time's-up sound.
+  - Self-contained `<style>` block co-located with the new HTML (not
+    touching the global stylesheet): `xbotTimerFlashRed`/`xbotTimerPulse`
+    keyframes driving the alarm-flash and critical-phase pulse.
+  - `PFLX_PATCH` bumped 165 → 166 (`PFLX_BUILD` already `2026.09`, current
+    month, unchanged) per house discipline.
+- Verified: syntax gate clean (13/13 blocks). New 23-case Node unit test
+  (`test_platform_xbot_timer.js`) extracting the real
+  `pflxTimerDisplayState`/`pflxTimerShouldChime` functions: every state
+  boundary (61s/60s/11s/10s/1s/0s/-5s), correct color per state, display
+  formatting (`05:00`, `02:05`), `countdownNum` populated only in
+  `critical` and cleared in every other state, and the full chime-boundary
+  matrix (never at start, never after zero, never off-boundary, correct
+  on 1/3/5-minute timers including their specific minute marks). Full
+  regression suite re-run across every existing platform test file — all
+  pass except 3 pre-existing failures in `test_v1142.js`/`test_v1144.js`/
+  `test_v1144_v2.js` (a stale widget-catalog schema check — `xcoin`/
+  `badges`/`rank`/`leaderboard`/`tasks` catalog metadata, ~line 60521,
+  nowhere near this patch's edits at ~13604/55870-56050/62226) — confirmed
+  unrelated by subsystem and code distance, not caused by this patch.
+  NOT live-clicked in a real browser this pass (no interactive browser
+  session available this turn) — worth a real check next time Ennis is
+  on: open the X-Bot widget's HOST tab, start a short preset (1m), confirm
+  the chime, the yellow last-minute shift, the last-10-seconds countdown
+  digits + spoken numbers, and the red alarm flash all fire correctly with
+  real audio hardware.
+- HOST ACTIONS / BACKLOG: this is LOCAL-only to the host's own browser —
+  it is not synced to players or broadcast anywhere (same scope as
+  X-Live's existing `timerStart`). If Ennis wants a shared/visible-to-
+  players version later, that's a separate, larger patch (would need a
+  sync/broadcast channel this timer doesn't have). The preset list is
+  fixed (1/3/5/7/10/15/20/30/45/60/70/80 min) with no custom-duration
+  input — flag if Ennis wants an arbitrary custom time field added later.
