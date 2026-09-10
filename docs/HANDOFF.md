@@ -14468,3 +14468,124 @@ Mission Control immediately after, since it touches live nav for active testers.
   logged in the plan file. Recommend confirming with Ennis which of
   those (if any) he wants next, rather than guessing the build order on
   a system this large.
+
+
+## PATCH X-LIVE — Host/Player mode should be genuinely parallel (Sept 10, Ennis)
+- ASK: "Also, the host mode vs Player mode should be parallel. If I'm
+  on Theater in Host Mode...when I click the player mode toggle then I
+  should see the Theater in Player Mode. Even If im not a Player in
+  the selected Cohort in X-Live, the master host or anyhost should
+  still have a player mode and they should see the player mode
+  dashboard although they might not specifically be a player in the
+  X-Live or other MC Programs, projects, etc. This gives all host the
+  chance to participate like a player or to just see the players
+  point of view in Player Mode."
+- ROOT CAUSE (found by reading the actual postMessage-passing code
+  between the Console and X-Live, not guessed): `pflxBroadcastIdentity()`
+  in `pflx-platform-check/preview.html` already sends the CURRENTLY
+  active Host/Player toggle state on every identity sync
+  (`role: window.pflxRole || 'player'`) — but X-Live's own
+  `pflx_identity_broadcast`/`pflx_identity_response` handler was
+  silently ignoring `m.role` entirely and always recomputing
+  `L.isHost` fresh from the real account tier, then stamping
+  `L.realIsHost = L.isHost` on top of it. Since the Console
+  re-broadcasts identity on ANY iframe finishing load anywhere on the
+  page (`pflxBridgeInit`'s `f.addEventListener('load', ...)` is
+  attached to every iframe, not just X-Live's own), a host who had
+  deliberately toggled into Player Mode could get silently snapped
+  back to Host Mode by a completely unrelated iframe reload elsewhere
+  on the Console page — no click, no signal, nothing to explain it.
+  That is the actual mechanism behind "it's not parallel / doesn't
+  stick."
+- SECOND BUG: `nativeSessionAppliesToMe()` (the function that decides
+  whether a live session is even visible on the player-facing
+  `livenative` screen) checked the CURRENT account's own roster/cohort
+  membership. A real host (master/admin, or a scoped Guest/Instructor
+  Host) previewing Player Mode is very often not enrolled as a player
+  anywhere at all — so they'd see "This live session is no longer
+  active" even for a session that was genuinely live and fully within
+  their own scope, purely because their own account has no roster
+  entry.
+- FIX (x-live-check/index.html):
+  - New `pflxResolveDisplayHost(realIsHost, broadcastRole)`: pure.
+    Given the real (identity-derived) host status and an optional role
+    string from an identity sync, decides the display `L.isHost`.
+    Fails closed exactly like the existing `pflxApplyRoleChange` — a
+    real player account can never display as host no matter what a
+    message claims. Falls back to the real tier when no role is given
+    at all (keeps every other caller's behavior unchanged).
+  - New `pflxSyncScreenForRoleChange(nextIsHost, currentScreen,
+    hasRunningSession)`: pure. A screen key valid in BOTH modes' tab
+    bars (Theater, Boards, Play) carries straight over — this is what
+    makes "Theater in Host Mode → Theater in Player Mode" actually
+    parallel, rather than an accident of two arrays happening to share
+    a spelling. The host's LIVE run-control tab, when a session is
+    actually running, lands a host switching to Player Mode on
+    `'livenative'` — the real player's-eye view of what's happening
+    right now — instead of the generic MY EXO home screen, directly
+    serving "or to just see the players point of view." Anything else
+    host-only falls back to each mode's natural home screen.
+  - The identity broadcast/response handler now splits `L.realIsHost`
+    (the real tier, computed once and never touched by a toggle) from
+    `L.isHost` (computed via `pflxResolveDisplayHost(L.realIsHost,
+    m.role)`, respecting whatever the Console's toggle currently says)
+    — and re-syncs `L.screen` via the shared helper above whenever
+    `L.isHost` actually changes as a result.
+  - The explicit `pflx_role_changed` toggle-click handler now calls
+    the SAME shared `pflxSyncScreenForRoleChange` helper instead of
+    its own separate inline copy of the same logic — one source of
+    truth for both paths.
+  - `nativeSessionAppliesToMe()`: a previewing host
+    (`L.realIsHost && !L.isHost`) now sees whatever their own REAL
+    host scope already covers — an unscoped tier (admin/master, or a
+    non-cohort-scoped guest) sees any active session; a cohort-scoped
+    tier (guest/instructor/cohost) sees only sessions inside their own
+    managed cohorts — reusing the exact same `pflxSessionInCohortScope`
+    primitive the Host Dashboard's own session list already uses, not
+    new logic. A REAL (non-previewing) player's behavior is completely
+    unchanged.
+  - Small "👁️ PREVIEWING AS PLAYER" indicator added to the header
+    whenever a real host is the one viewing Player Mode, so it's
+    honest about what's happening (a preview) rather than silently
+    showing a placeholder 0-XC/no-badges account with no explanation.
+- Verified: syntax gate clean (2/2 blocks). New 21-case Node unit test
+  (`test_xlive_role_parallel.js`) extracting the real functions:
+  `pflxResolveDisplayHost` (fails closed for a real player regardless
+  of a spoofed role, respects an explicit host/player role, defaults
+  to the real tier when no role is given); `pflxSyncScreenForRoleChange`
+  (shared-key screens carry over in both directions, a host-only
+  screen with no running session falls back to each mode's home, the
+  LIVE tab with a running session lands on `livenative` specifically
+  when switching to player but NOT when no session is running);
+  `nativeSessionAppliesToMe` (an unscoped previewing host sees a
+  cohort-restricted session despite no roster entry, a scoped
+  previewing host sees only their own managed cohorts and correctly
+  excludes others', a REAL player's own roster-cohort resolution is
+  completely unchanged in both the matching and non-matching case, a
+  host actually IN host mode — not previewing — correctly falls
+  through to the normal check and finds nothing for an unenrolled
+  account, an allCohorts session and a non-active session both behave
+  correctly regardless of preview state). Full regression re-run
+  across every existing X-Live test file — all pass except the same 3
+  pre-existing, already-documented unrelated failures
+  (`test_subapp_embed.js`, `test_v029.js`, `test_v022.js`/
+  `test_v028.js`). `test_xlive_role_toggle.js` (10/10) specifically
+  re-checked since this patch touches the same role-toggle area — its
+  existing `pflxApplyRoleChange` coverage is untouched by this patch
+  and still passes. Not yet live-clicked in a real browser (Chrome
+  automation was intermittently unavailable this pass) — worth a real
+  check next time Ennis is on: toggle to Player Mode while on Theater,
+  confirm it stays on Theater even after a few seconds/other Console
+  activity, and check a live session shows correctly in Player Mode
+  preview for a host account with no roster entry.
+- HOST ACTIONS / BACKLOG: this patch is scoped to X-Live specifically,
+  the concrete example Ennis gave. He also said "in the X-Live or
+  other MC Programs, projects, etc." — Mission Control's OWN internal
+  Programs/Projects screens (and other sub-apps: Core Pathways, Battle
+  Arena, DarkCampus) have their own separate navigation/screen state
+  and were not touched this pass — each would need its own
+  investigation of how (or whether) it currently preserves the
+  current view across the role toggle, and each lives in a different
+  deployed app/repo. Recommend confirming with Ennis whether the same
+  "parallel + host preview" principle should be extended there next,
+  and in what priority.
