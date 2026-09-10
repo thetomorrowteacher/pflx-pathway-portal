@@ -14361,3 +14361,110 @@ Mission Control immediately after, since it touches live nav for active testers.
   ProPresenter-style host-controls redesign is large enough to deserve
   Ennis's reaction to a reference/mockup before a full build, matching how
   every other open-ended UI ask in this plan has been handled).
+
+
+## PATCH X-LIVE — Virtual Theater: real Production Crew panel (Sept 10, Ennis)
+- ASK: Ennis, after the auto-start/auto-stop and Session Timer patches
+  shipped: "continue. And I still dont see the theater." Asked via
+  AskUserQuestion what happens when he clicks the 🎬 THEATER tab; he
+  picked "It's not the production studio I meant" — clarifying he wants
+  the richer crew/mixer/lighting/prompter "Virtual Theater" experience
+  he originally designed in Mission Control, not the simple
+  watch-a-livestream page the X-Live Theater tab shows today.
+- INVESTIGATION: read `pflx-platform-check/preview.html` directly. Found
+  a full ~49-function `vt*` system (`VT_ROLES` crew-role model, mixer,
+  lighting board, teleprompter, media switcher, chat, moderation,
+  participant grid — CSS ~lines 2693-2915, JS ~lines 43470-43951+) — but
+  a full-file grep for its mount-point element ids
+  (`mc-theater-collapsed`, `mc-theater-expanded`) found ZERO matching
+  HTML anywhere in the file. It was built and never wired to any
+  reachable UI path — not hidden, not broken, literally unreachable by
+  any click. That's the actual root cause of "I still dont see the
+  theater": there was never a theater to see, in MC or (until now)
+  X-Live. Many of the system's functions were non-functional stubs even
+  conceptually — `vtSaveScene` just toasts "Scene saved" with no
+  persistence, `vtMediaUpload` is literally
+  `pflxToast('Upload media file (stub)', 'info')`, the backroom
+  functions are all stubs — so porting the whole thing as-is would
+  recreate the exact "looks like it works but doesn't" problem that
+  caused this investigation in the first place.
+- FIX (x-live-check/index.html): ported the single most concrete,
+  genuinely-real-now piece — crew role assignment — for real, wired to
+  X-Live's actual session/roster data instead of MC's local-only mock
+  state:
+  - New `PFLX_CREW_ROLES`: the same 6 roles/labels/icons/colors/max
+    capacities as MC's `VT_ROLES` (Director 👑 max 3, Presenter/Speaker
+    🎙️ max 4, Sound Technician 🎵 max 2, DJ 🎧 max 1, Lighting
+    Technician 💡 max 2, Media Technician 📺 max 3).
+  - New `pflxComputeCrewAssignment(assignments, playerId, roleKey)`: a
+    pure function — given the current `{playerId: roleKey}` map, a
+    target player, and a role (falsy roleKey means "unassign"), returns
+    the new map plus an ok/error result. Never mutates the input. A
+    player holds at most one crew role at a time; a role at max
+    capacity is refused for a new assignee, but reassigning the SAME
+    player who already holds a role never trips that role's own
+    capacity check.
+  - New `pflxAssignCrewRole`/`pflxUnassignCrewRole`: side-effecting
+    wrappers — resolve the session from `L.sessions`, call the pure
+    logic above, and on success set `s.crewAssignments` and persist
+    through the existing merge-safe `saveSession(s)` path (same
+    discipline as every other synced session field); on a role-full
+    refusal, re-render (to reset the `<select>` back) and toast the
+    capacity warning without saving. Both fail closed (no throw, no
+    save) on an unknown session id or missing player id.
+  - New `pflxCrewParticipantName`/`pflxTheaterCrewPanelHtml`: name
+    lookup against `L.roster`, and the actual panel markup — one card
+    per role with an assignment `<select>` populated from
+    `sortedRoster(classRoster())`, an assigned-count/max indicator, and
+    removable chips for each currently-assigned person.
+  - `rTheater()`: for hosts, now renders the new "🎭 Virtual Theater —
+    Production Crew" card above the pre-existing watch-list card —
+    shows the live panel when a session is currently running
+    (`L.liveRunningSessionId`), otherwise a prompt to start one. Non-host
+    players see only the existing watch-list card, unchanged.
+- Verified: syntax gate clean (2/2 blocks). New 34-case Node unit test
+  (`test_xlive_vtheater_crew.js`) extracting the real functions:
+  taxonomy sanity (exactly 6 roles, correct max capacities); pure
+  assignment logic (first assignment, unknown-role rejection,
+  falsy-roleKey unassign, max-capacity refusal for a new player,
+  re-assigning the same player to a role they already hold never
+  double-counts against that role's own capacity, switching roles frees
+  the old slot and leaves other players untouched, never mutates its
+  input, unassigning a never-assigned player is a safe no-op); the
+  side-effecting wrappers (sets `crewAssignments` on the real session
+  object, calls `saveSession` with the updated session, re-renders,
+  toasts a role-naming confirmation; the role-full path does NOT mutate
+  state or save but still re-renders and toasts a capacity message;
+  unassign removes the player and toasts a distinct "Removed" message;
+  an unknown session id or empty player id fails closed with no
+  throw/save); the panel renderer (all 6 role cards present, assigned
+  players show as chips, session title shown, correct 0/N capacity
+  display, and an empty roster never crashes the renderer). Full
+  regression re-run across every existing X-Live test file — all pass
+  except the same 3 pre-existing, already-documented unrelated failures
+  (`test_subapp_embed.js`'s Arena-cartridge-iframe checks — that slide
+  type isn't built yet; `test_v029.js`'s "FROM DECK button position"
+  UI-layout check; `test_v022.js`/`test_v028.js`'s stale hard-coded
+  `SLIDE_TYPES` extraction markers) — confirmed none of this patch's
+  diff is anywhere near those failing assertions. `test_theater.js`
+  (18/18) specifically re-checked since `rTheater()` was directly
+  modified — its dispatch-wiring tests still pass, confirming the new
+  crew-panel insertion didn't break the existing render path. Not yet
+  live-clicked in a real browser with a running session — worth a real
+  check next time Ennis is on: start a Live Session, open the Theater
+  tab, assign a couple of roster members to roles, confirm the chips/
+  capacity counts update live and survive a page refresh (merge-safe
+  save).
+- HOST ACTIONS / BACKLOG: this ships the CREW panel only — the rest of
+  MC's original Virtual Theater mockup (Stage preview, audio Mixer, DJ
+  deck, Lighting board, Teleprompter, Media switcher, in-theater chat,
+  moderation tools) is a deliberately separate, still-pending follow-up
+  scope, not silently implied to be "done" by this patch. Those were
+  mostly non-functional stubs in MC even when reachable, so each one
+  needs its own honest "what can actually work" pass before being built
+  — most naturally lands as part of the still-queued "Part 2"
+  crew/production-studio rebuild and overlaps with the Sept 9 Live
+  Production feature set's soundboard/lighting-effects items already
+  logged in the plan file. Recommend confirming with Ennis which of
+  those (if any) he wants next, rather than guessing the build order on
+  a system this large.
