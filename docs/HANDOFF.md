@@ -14672,3 +14672,98 @@ Mission Control immediately after, since it touches live nav for active testers.
   sync/broadcast channel this timer doesn't have). The preset list is
   fixed (1/3/5/7/10/15/20/30/45/60/70/80 min) with no custom-duration
   input — flag if Ennis wants an arbitrary custom time field added later.
+
+
+## PATCH PLATFORM v1.167 — Cyber Timer full screen/+1 min/manual entry + un-pin Host Broadcast (Sept 10, Ennis)
+- ASK: Ennis attached two more X-Bot HOST-tab screenshots (one showing the
+  Cyber Timer's red "00:00" alarm-flash state, confirming v1.166 works) and
+  asked, verbatim: "I dont want the broadcast message pinned to the top. I
+  want to be able to project the timer in full screen inside of the X-Bot
+  popup. I should be able to resize yet have the timer fully projected
+  inside. I also want a +1 min feature and a manual time entry."
+- INVESTIGATION: read the X-Bot dock's architecture (`#pflx-dock`, the
+  unified floating X-Bot + Chat popup shipped July 9) and confirmed it is
+  ALREADY a movable, resizable floating window (`.pflx-dock-rsz` drag-corner
+  handles, `state = {x,y,w,h}` persisted to `localStorage`) — so "I should be
+  able to resize" was not a request for new resize infrastructure; the real
+  gap was that the Cyber Timer's digits are a fixed 42px font that doesn't
+  scale as the dock is resized. Worked through the CSS stacking-context
+  implications of a fullscreen timer overlay before writing any code: since
+  `#pflx-dock-body` has no explicit `z-index` (no isolated stacking context),
+  an absolutely-positioned overlay inside it can use it as its containing
+  block (escaping the intermediate `#xbot-host-section`'s `overflow-y:auto`
+  clip, since that container isn't itself positioned) while still painting
+  BELOW the dock's own resize handles (kept the overlay's z-index at 1,
+  under the handles' z-index 6) — so drag-to-resize stays usable even with
+  the timer shown full screen. This reasoning is sound per spec but was not
+  live-browser-verified this pass (no interactive Chrome session available).
+- FIX (`pflx-platform-check/preview.html`), 4 idempotent steps:
+  - **Fullscreen projection**: new `#xbot-timer-panel` wrapper (was an
+    unidentified div) with a `⛶` toggle button (`xbotTimerToggleFullscreen`)
+    that adds an `.xbot-timer-fs` class — CSS makes the panel
+    `position:absolute; inset:0` within the dock body, covering the whole
+    X-Bot popup with a larger cyberpunk-styled timer view (bigger preset
+    buttons, centered digits). A `ResizeObserver` on `#xbot-timer-box`
+    (attached only while fullscreen is active, disconnected on exit) drives
+    `xbotTimerFitDisplay()`, which calls a new pure function
+    `pflxTimerFitFontSize(containerWidth, containerHeight)` — fits the digit
+    size to the box's actual rendered dimensions (constrained by width/4.6
+    or height*0.5, whichever is smaller; clamped 28-320px) every time the
+    dock is dragged to a new size.
+  - **+1 MIN**: new button calling `xbotTimerAddMinute()`, backed by a pure
+    `pflxTimerAddMinute(remainingSeconds, totalSeconds, running)` — adds 60s
+    to both remaining/total if a timer is already running; starts a fresh
+    60s timer if none is running (rather than silently no-op'ing).
+  - **Manual time entry**: two new number inputs (MM/SS) + a SET button
+    calling `xbotTimerStartManual()`, backed by a pure
+    `pflxParseManualDuration(minutesStr, secondsStr)` validator — rejects
+    negative/fractional minutes, seconds outside 0-59, a zero total, and
+    anything over 24 hours; toasts a clear error via the existing
+    `pflxToast` on invalid input rather than silently failing.
+  - Refactored the existing `xbotTimerStart(minutes)` into a thin wrapper
+    around a new `xbotTimerStartSeconds(totalSeconds)` primitive — both the
+    12 fixed presets AND the new manual-entry path now share one "what
+    happens when a duration is set" implementation, so there's no duplicated
+    start logic to drift out of sync.
+  - **Un-pin Host Broadcast**: the composer's textarea/targets/SEND row is
+    now wrapped in a collapsible `#xbot-broadcast-body` (`display:none` by
+    default) with a `▸`/`▾` toggle button (`pflxBroadcastToggleCollapse`),
+    persisted per-device via `localStorage['pflx_xbot_broadcast_collapsed']`
+    (defaults to collapsed). `pflxBroadcastInit()` now applies the saved
+    preference every time the composer is shown, so it no longer permanently
+    eats vertical space above the mode tabs regardless of which tab is
+    active — a host can still broadcast from any tab, just collapsed until
+    they choose to expand it.
+  - `PFLX_PATCH` bumped 166 → 167 (`PFLX_BUILD` already `2026.09`, current
+    month, unchanged) per house discipline.
+- Verified: syntax gate clean (13/13 blocks, both before and after the
+  version bump). New 27-case Node unit test (`test_xbot_timer_v2.js`)
+  extracting the real `pflxParseManualDuration`/`pflxTimerAddMinute`/
+  `pflxTimerFitFontSize`/`pflxBroadcastNextCollapsedState` functions:
+  every manual-entry validation boundary (empty→0, zero-duration, negative/
+  fractional minutes, seconds 0-59 range, the 24h ceiling), +1 min on both
+  a running and an idle timer (including a NaN-state degrade case and a
+  rescue-from-zero case), font-fit clamping at both the 28px floor and
+  320px ceiling plus NaN/negative-input fallback to the 42px default and a
+  width-vs-height-constrained comparison, and the collapse-toggle's
+  force/no-force state transitions. Full regression suite re-run across
+  every existing platform test file (9 files) — all pass except the same 3
+  pre-existing failures already documented as unrelated in the v1.166 entry
+  (`test_v1142.js`/`test_v1144.js`/`test_v1144_v2.js`, a stale
+  widget-catalog schema check nowhere near this patch's edits); the
+  existing `test_platform_xbot_timer.js` (23 cases, the v1.166 timer-state
+  logic) still passes unchanged, confirming this patch didn't regress the
+  base timer behavior it built on top of. NOT live-clicked in a real
+  browser this pass (no interactive Chrome session available) — worth a
+  real check next time Ennis is on: open X-Bot's HOST tab, tap ⛶ to go
+  full screen, drag-resize the dock and confirm the digits scale smoothly
+  while the corner resize handles stay clickable, hit +1 MIN both mid-run
+  and while idle, try a manual entry with a bad value (e.g. seconds=99) and
+  confirm the toast fires, and confirm the Host Broadcast composer opens
+  collapsed and the chevron toggle/persistence works.
+- HOST ACTIONS / BACKLOG: none new. Still local-only to the host's browser,
+  same scope as v1.166 (not synced/broadcast to players). The
+  CSS-stacking-context reasoning behind the fullscreen overlay not blocking
+  the dock's resize handles is sound per spec but unverified in a real
+  browser — flag if a host reports the corner handles becoming unclickable
+  while the timer is full screen.
