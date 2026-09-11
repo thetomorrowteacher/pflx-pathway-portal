@@ -15097,3 +15097,64 @@ Mission Control immediately after, since it touches live nav for active testers.
   (`https://thetomorrowteacher.github.io/x-live/`, run through the Mac
   since the cloud sandbox's proxy blocks direct external curls):
   `PRESENT</button>` count 1, `📽️ PROJECT</button>` count 0.
+
+## PATCH PLATFORM v172 — X-Bot Controller foundation: size presets + auto-hide pinned bar (Sept 11, Ennis)
+- ASK (verbatim): "For X-Bot...remake the pinned bar. I want to be able to
+  use the X-Bot function in different sizes and the pinned bar gets in the
+  way... X-Bot should become like a PFLX controller." Confirmed via
+  AskUserQuestion: size model = "Both — presets you can also free-resize";
+  pinned-bar fix = "Auto-hide, tap/hover to reveal"; MIDI controller
+  (later phase) = "Both 1 and 2" (software button-grid AND real Web MIDI
+  API hardware support). This patch ships the load-bearing foundation
+  everything else in that message (team-arrangement layout, soundboard/
+  DJ, MIDI controller, more X-Live tools) depends on — per the plan's own
+  sequencing recommendation, the dock had no concept of a "size" to key
+  a layout off of before this patch.
+- BUILT: `#pflx-dock` gains 4 named size bands (Compact 340×440 /
+  Standard 420×560 / Wide 680×600 / Studio 920×680) via a pure,
+  threshold-based `sizeBand(w)` classifier (compact <420, standard <680,
+  wide <920, studio ≥920) — NOT an exact-match check, specifically so a
+  manually free-dragged size classifies identically to clicking the
+  matching preset, satisfying "presets you can also free-resize" with
+  one code path instead of two. Four preset buttons (▪ Compact / ◻
+  Standard / ▭ Wide / 🖥 Studio) added to `.pflx-dock-header`;
+  `window.pflxDockApplyPreset(name)` applies a preset's w/h, keeps the
+  SE corner anchored (same convention as manual corner-resize), persists,
+  and re-renders. `render()` — the single funnel every drag-resize
+  pointermove and every preset click already flows through — now also
+  syncs a live `pflx-band-<name>` class onto `#pflx-dock` and highlights
+  the active preset button on every call, so band state can never drift
+  from actual size. `window.pflxDockSizeBand()` exposed for later phases
+  to query.
+- Pinned bar (`.xbot-mode-tabs`, the CHAT/VOICE/HOST/LIVE/DEV row) now
+  auto-hides ONLY in the Compact band (`max-height:7px; opacity:0.4`),
+  expanding to full height on hover or a tap-to-peek (a 3s
+  auto-recollapse timer for touch devices, wired in `init()`) — Standard/
+  Wide/Studio bands are unaffected, so the "pinned bar gets in the way"
+  complaint is fixed exactly at the size where it was actually a problem
+  (the dock's floor, 320-419px) without touching the bar's behavior
+  anywhere else.
+- Verified: syntax gate clean (13 blocks). New 20-case unit test
+  (`test_xbot_controller_v172.js`) extracting the REAL `sizeBand`/
+  `SIZE_PRESETS`/`pflxDockApplyPreset`/`render` bodies via brace/string
+  matching (never reimplemented) — all 8 `sizeBand()` threshold-boundary
+  cases (320/419/420/679/680/919/920/2000), preset shape/self-consistency/
+  ordering, `pflxDockApplyPreset('studio')`'s dimension application/
+  SE-corner anchoring/live band-class sync/stale-class removal/
+  persistence, a manual-resize-via-`render()`-only case (proves band sync
+  works with zero preset click), and an unknown-preset-name no-op case —
+  all PASS. Full regression suite re-run clean: the 3 documented
+  pre-existing Node-crash files (`test_v1142.js`/`test_v1144.js`/
+  `test_v1144_v2.js`) are unchanged, and `test_xbot_briefing_v171.js`'s
+  one non-passing case is only its own stale "PFLX_PATCH bumped to 171"
+  literal-version assertion (expected — this patch correctly bumps the
+  constant to 172) — all 20 of that suite's real behavioral checks still
+  pass.
+- HOST ACTIONS / BACKLOG: this is xc-1 of the new "X-Bot Controller"
+  epic — per the plan's sequencing recommendation, next up is porting
+  x-live-check's `rTeams()` team-arrangement board into the Wide band
+  (xc-2), then Theater tab + saved YouTube playlist + PIP detach into
+  Studio (xc-3), then the soundboard (xc-4) and the software/hardware
+  MIDI controller (xc-5/xc-6) last, since those still need their own
+  design passes before a line of code is worth writing. xb-3 through
+  xb-11 of the earlier X-Bot companion plan are still queued behind this.
