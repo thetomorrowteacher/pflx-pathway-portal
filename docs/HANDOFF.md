@@ -14933,3 +14933,61 @@ Mission Control immediately after, since it touches live nav for active testers.
   should be natively ported into the Console (xb-10), and whether ad-hoc
   named/saved groupings are enough for "team management" or he wants
   persistent cross-session team standings (xb-4).
+
+## PATCH PLATFORM v170 — xb-2: active cohort control in X-Bot's Live tab (Sept 11, Ennis)
+- ASK: continuation of the "X-Bot becomes the PFLX companion" pivot (see
+  v169) — "I should be able to control the active cohort(s) that is setup
+  within X-Live dashboard."
+- FIX (`pflx-platform-check/preview.html`), 4 idempotent steps:
+  - New "MY CLASS (COHORT FILTER)" chip row inside `#xbot-live-section`
+    (the panel shipped in v169) — one toggle chip per cohort group.
+  - `pflxXBotLoadCfg()`/`pflxXBotSaveCfg(cfg)` read/write the SAME
+    `pflx_lite_config` app_data row X-Live's own Setup tab
+    (`pflxToggleCohort`/`L.cfg.cohorts`) already owns. Deliberately a
+    plain upsert, not a merge — this mirrors X-Live's own `saveCfg()`
+    exactly, since it's a single-row host preference (not a multi-writer
+    synced collection like `sessions`, which is why xb-1 needed a real
+    merge layer and this doesn't).
+  - `pflxXBotCohortNames()` derives the chip list from the SAME
+    `mcCohortGroups` registry the Console's own Cohort Manager already
+    populates — no new cohort registry.
+  - `xbotLiveRenderSessions()` (from v169) now filters by the selected
+    cohort(s): a session shows if it's `allCohorts`, if no cohort filter
+    is selected ("none selected = show all players", same convention
+    X-Live's own Setup tab uses), or if any of its `cohorts[]` overlaps
+    the host's selection (case-insensitive). Toggling a chip in X-Bot now
+    actually changes which sessions the host can GO LIVE / END from
+    there, not just a cosmetic filter.
+  - `PFLX_PATCH` bumped 169 → 170.
+- **Correction to the v169 research**: while reading `x-live-check/
+  index.html` for this patch, found it already has a persistent
+  `L.cfg.teams` system (`{names: [], assign: {}}`, with shuffle/reroll/
+  clear functions around line 4058–4083) — the earlier architecture
+  research (recorded in this session's plan file) only checked
+  `preview.html` for a Teams feature and concluded none existed anywhere.
+  It exists, just in the other file. This means xb-4 ("team management")
+  can surface X-Live's EXISTING teams system in X-Bot instead of building
+  a new persistent Team object from scratch — a smaller lift than
+  originally planned. Flagging here so the next session building xb-4
+  doesn't redo this research.
+- Verified: syntax gate clean (13/13). New 11-case Node unit test
+  (`test_xbot_live_cohort.js`): confirms the real cohort-filter predicate
+  is present verbatim in the shipped source (so this test breaks loudly
+  if the logic is ever edited without updating the test), an ended
+  session never shows regardless of filter, no-filter-selected shows
+  every scheduled/active session, an `allCohorts` session always shows
+  once a filter is active, cohort matching is case-insensitive, a session
+  with no cohort overlap is correctly hidden, a multi-cohort session
+  matches on ANY overlap, and the toggle add/remove/defensive-non-array
+  semantics all behave correctly. Full regression suite re-run across
+  every existing platform test file (11 files) — all pass except the same
+  3 pre-existing failures documented as unrelated since v1.166.
+  NOT live-clicked in a real browser this pass (no interactive Chrome
+  session available) — worth a real check next time Ennis is on: open
+  X-Bot's Live tab, toggle a cohort chip on/off, and confirm the session
+  list actually narrows/widens to match.
+- HOST ACTIONS / BACKLOG: xb-3 through xb-11 still ahead (X-Live Activated
+  indicator, Teams/Noise Meter/Badge/Fine tools — now smaller scope per
+  the correction above, screen share, host monitoring, X-Bot's own
+  Theater tab + PIP detach, daily briefing, player-side tools, resize/
+  fullscreen polish). Full detail in the session's plan file.
