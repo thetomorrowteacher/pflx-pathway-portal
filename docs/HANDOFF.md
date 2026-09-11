@@ -14767,3 +14767,75 @@ Mission Control immediately after, since it touches live nav for active testers.
   the dock's resize handles is sound per spec but unverified in a real
   browser — flag if a host reports the corner handles becoming unclickable
   while the timer is full screen.
+
+
+## PATCH PLATFORM v1.168 — Cyber Timer fullscreen cleanup + fix digit overlap at tiny dock sizes (Sept 11, Ennis)
+- ASK: Ennis attached two screenshots of the v1.167 fullscreen Cyber Timer
+  view — one at normal dock size showing every control still present, one
+  at a heavily minimized dock size where the giant digits visibly overlap
+  the "CYBER TIMER / X EXIT / SOUND ON" header text — and said: "The full
+  screen toggle should not show the time options...just the timer digits
+  and only the add time option while its in the full screen mode in the
+  popup. Also, when I minimize the popup into the smallest, it shows over
+  the words. Please fix."
+- ROOT CAUSE:
+  1. Fullscreen mode (v1.167) reused the exact same markup as the compact
+     panel — the 12 preset buttons, the manual MM:SS entry row, and the
+     PAUSE/RESET buttons all still rendered, just at a slightly larger
+     size. Nothing tailored the fullscreen view down to a clean projection.
+  2. The overlap: `#xbot-timer-box` (the flex-column box holding the
+     digits and controls) had no `overflow:hidden`, so whenever the fitted
+     digit size still didn't quite fit the box's available height (edge
+     cases at very small dock sizes), the oversized text simply rendered
+     outside the box's bounds. Because the box uses
+     `justify-content:center`, that overflow pushed out symmetrically
+     both above and below the box — the "above" direction landed directly
+     on top of the header row. Compounding it, the header row itself had
+     no `flex-shrink:0`, so under an extremely tight total height budget
+     the flex layout could shrink the header below its own natural size
+     instead of guaranteeing it stays fully readable. And
+     `pflxTimerFitFontSize`'s constants (a 28px floor, `width/4.6` and
+     `height*0.5`) were tuned for a normal-sized fullscreen dock, not an
+     aggressively minimized one — at very small containers the "fitted"
+     size still exceeded the real available room.
+- FIX (`pflx-platform-check/preview.html`), 6 idempotent steps:
+  - Added a reusable `.xbot-timer-fs-hide` class, scoped with
+    `#xbot-timer-panel.xbot-timer-fs .xbot-timer-fs-hide { display:none
+    !important; }` — has zero effect outside fullscreen, hides its target
+    only while `.xbot-timer-fs` is active. Applied it to the preset grid,
+    the manual-entry row, and the PAUSE and RESET buttons. Fullscreen now
+    shows only the digit display and the +1 MIN button ("just the timer
+    digits and only the add time option") — everything else (including
+    EXIT and the SOUND toggle, which aren't "time options") stays as-is.
+  - Gave the header row a stable id (`xbot-timer-header-row`, previously
+    unidentified) and pinned it with `flex-shrink:0` in fullscreen so it
+    always renders at its full natural height regardless of how little
+    vertical room is left.
+  - Added `overflow:hidden !important` and a tighter `padding:10px
+    !important` override to `#xbot-timer-box` in fullscreen — a hard
+    backstop so oversized digit text can never again visually bleed onto
+    the header, independent of how accurate the font-fit math is. Reduced
+    the digit display's fullscreen `margin-bottom` from 22px to 14px
+    (less vertical budget wasted now that fewer siblings sit below it).
+  - Tuned `pflxTimerFitFontSize`'s constants more conservatively: width
+    divisor `4.6` → `5.0`, height multiplier `0.5` → `0.4`, and — most
+    importantly — the floor `28px` → `16px`, so a genuinely tiny dock can
+    keep shrinking the digits to actually fit instead of hitting a floor
+    that guarantees overflow.
+- Verified: syntax gate clean (13/13 blocks). Extended the existing
+  `test_xbot_timer_v2.js` (now 28 cases) — updated the floor-boundary
+  assertion for the new 16px floor and added a new extremely-tiny-dock
+  case (10×10 → still clamps cleanly at 16px, no negative/zero output).
+  Full regression suite re-run across all 9 test files — same 3
+  pre-existing unrelated failures as every prior entry
+  (`test_v1142.js`/`test_v1144.js`/`test_v1144_v2.js`, the stale
+  widget-catalog schema check), everything else including
+  `test_platform_xbot_timer.js` (23 cases) unaffected. `PFLX_PATCH`
+  bumped 167 → 168 (`PFLX_BUILD` already `2026.09`, unchanged). NOT
+  live-clicked in a real browser this pass (no interactive Chrome session
+  available) — worth a real check next time Ennis is on: enter fullscreen
+  and confirm only the digits + +1 MIN show, then shrink the X-Bot popup
+  down to its smallest size and confirm the header text stays fully
+  legible with no digit overlap.
+- HOST ACTIONS / BACKLOG: none new. Same local-only scope as v1.166/
+  v1.167.
