@@ -15299,3 +15299,57 @@ Mission Control immediately after, since it touches live nav for active testers.
   worth writing, unchanged by this patch. The saved-YouTube-playlist
   picker noted above is also backlogged. xb-3 through xb-11 of the
   earlier X-Bot companion plan remain queued behind this epic.
+
+## PATCH PLATFORM v175 — xc-4: Soundboard for a Guest Host to DJ (Sept 11, Ennis)
+- ASK: continuation of the "X-Bot Controller" epic's confirmed sequencing
+  — step 4, after the size-band foundation (xc-1), Teams board (xc-2),
+  and Theater+PIP (xc-3): "soundboard for a Guest Host to DJ."
+- BUILT: a fourth SOUND sub-tab alongside SESSIONS/TEAMS/THEATER in the
+  Live tab, Studio-gated (same principle as Theater — matches v172's
+  own Studio preset copy, which literally says "soundboard"). An 8-pad
+  grid (`#xbot-sound-grid`): each pad is either an upload affordance
+  (a real `<input type="file" accept="audio/*">`) or, once a clip is
+  loaded, a click-to-play pad with a remove action. Rather than
+  reinventing audio-blob storage, this reuses the SAME IndexedDB
+  machinery the platform's own Sound Engine already proved out
+  (`pflxDBAudioSave`/`pflxDBAudioLoad`/`pflxDBAudioDelete`, database
+  `pflx_platform`, store `audio`) — only pad metadata (slot → clip
+  name) lives in `localStorage` (`pflx_xbot_soundboard_meta`), the
+  exact same metadata/blob split `SE.config.tracks` already uses. New
+  functions: `xbotSoundboardLoadMeta`/`SaveMeta`, `xbotSoundboardRender
+  Grid`, `xbotSoundboardUpload` (FileReader → dataURL →
+  `pflxDBAudioSave` → meta update → re-render), `xbotSoundboardPlay`
+  (loads via `pflxDBAudioLoad`, plays only if a clip is actually
+  stored — never a phantom `Audio()` on an empty pad), `xbotSoundboard
+  Clear` (deletes the IndexedDB blob AND the meta entry together, so a
+  cleared pad reverts cleanly to the upload affordance).
+- HONEST CAVEAT, surfaced directly in the host UI (not just documented
+  — this was explicitly flagged in the Sept 9 plan as something that
+  must not get dropped when this gets built): "🔊 Plays through YOUR
+  speakers only. To include a clip in a live OBS/YouTube broadcast,
+  enable OBS's Desktop Audio Capture separately." X-Bot has no
+  audio-mixing pipeline of its own — this is real and was checked, not
+  assumed.
+- Verified: syntax gate clean (13 blocks). New 26-case unit test
+  (`test_xbot_soundboard_v175.js`) — 5 markup-structure checks (the
+  sub-tab pill, the panel, Studio-only band gating, the caveat copy
+  itself is present) plus 21 sandboxed behavioral checks extracting
+  the real shipped block via brace/string matching against stubbed
+  `pflxDBAudioSave`/`Load`/`Delete`/`localStorage`/`Audio` — meta
+  round-trips correctly (including a corrupted-JSON fail-safe), the
+  grid always renders exactly 8 pads in the right empty/filled state,
+  upload/play/clear all route through the real IndexedDB bridge
+  functions with the right `xbot_pad_<N>` key convention, play never
+  constructs a phantom `Audio()` on an empty pad, and clear reverts a
+  pad cleanly — all 26 PASS. Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files unchanged, and
+  `test_xbot_briefing_v171.js`/`test_xbot_controller_v172.js`/
+  `test_xbot_teams_v173.js`/`test_xbot_theater_v174.js` each show their
+  own now-expected single stale-`PFLX_PATCH`-literal non-pass — every
+  real behavioral check across every suite still passes.
+- HOST ACTIONS / BACKLOG: xc-5/xc-6 (MIDI controller grid — both a
+  software performance-pad grid and real Web MIDI API hardware
+  support) is next per the sequencing recommendation, and will reuse
+  this patch's soundboard pads directly as one of its trigger actions.
+  xb-3 through xb-11 of the earlier X-Bot companion plan remain queued
+  behind this epic.
