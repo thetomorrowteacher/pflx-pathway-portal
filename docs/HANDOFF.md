@@ -15353,3 +15353,96 @@ Mission Control immediately after, since it touches live nav for active testers.
   this patch's soundboard pads directly as one of its trigger actions.
   xb-3 through xb-11 of the earlier X-Bot companion plan remain queued
   behind this epic.
+
+## PATCH PLATFORM v176 — X-BOT CONTROLLER GRID: SOUND-PAD PERFORMANCE GRID + REAL WEB MIDI HARDWARE SUPPORT (Sept 11, Ennis)
+- ASK: xc-5/xc-6, the last item in the "X-Bot Controller" epic (v172-v175)
+  before it's fully shipped. Ennis's answer to the 3-way MIDI-meaning
+  clarifying question was "Both 1 and 2" — build BOTH (1) a software
+  performance-pad grid styled after a Launchpad/APC-style button grid,
+  triggering already-real PFLX actions, AND (2) real Web MIDI API
+  hardware support (`navigator.requestMIDIAccess()`, device
+  enumeration, a mapping/config UI) so a physical MIDI controller
+  plugged into the host's computer can trigger the same actions.
+- BUILT: a fifth CONTROLLER sub-tab alongside SESSIONS/TEAMS/THEATER/
+  SOUND in X-Bot's Live tab, Studio-gated per v172's own "soundboard,
+  controller grid, monitoring" preset copy (this patch is literally the
+  "controller grid" that copy named in advance).
+  - An 8-pad grid (`#xbot-controller-grid`), each pad assignable via a
+    dropdown to one action from `window.XBOT_CONTROLLER_ACTIONS` — a
+    deliberately small, HONEST registry containing only real,
+    already-wired actions: `sound:1`-`sound:8` (dispatches to xc-4's
+    real `xbotSoundboardPlay(n)`) and `noise` (dispatches to the real,
+    already-existing global `window.mcToggleNoiseMeter()`). Nothing
+    fabricated — no player-targeted XC award action was added, since no
+    player-picker UI exists in X-Bot yet and inventing one would violate
+    the "only real, already-wired actions" principle this whole epic has
+    followed since xc-3.
+  - Mapping persists to `localStorage` key `pflx_xbot_controller_map`
+    (`{slot: action}`), fails safe to `{}` on corrupted JSON rather than
+    throwing.
+  - `xbotControllerFirePad(slot)` is the single dispatch funnel used by
+    BOTH a pad click and a MIDI note-on — clicking pad 3 and hitting the
+    physical MIDI note mapped to pad 3 run the exact same code path, not
+    two parallel trigger systems.
+  - Real Web MIDI support: `xbotControllerMidiSupported()` feature-
+    detects `navigator.requestMIDIAccess` honestly (Chrome/Edge only —
+    Safari/Firefox correctly show "MIDI hardware requires Chrome or
+    Edge" instead of silently doing nothing); `xbotControllerConnectMidi()`
+    requests access and populates a real device picker
+    (`#xbot-midi-device-select`) from the browser's actual connected
+    devices; `xbotControllerSelectMidiDevice(deviceId)` wires that
+    device's `onmidimessage` to the pure parser below.
+  - `xbotControllerHandleMidiMessage(deviceId, data)` — a PURE function
+    taking a raw 3-byte array shaped exactly like a real
+    `MIDIMessageEvent.data` (`[status, note, velocity]`). Filters to real
+    note-on events (`status & 0xF0 === 0x90 && velocity > 0`, correctly
+    ignoring note-off/velocity-0 "running status" note-offs and non-
+    note-on status bytes like control-change). In "learn" mode
+    (`xbotControllerStartLearn(slot)`), the next real note-on maps that
+    physical note to that pad, PER DEVICE (`pflx_xbot_midi_map` key,
+    shape `{deviceId: {note: slot}}`) — the same physical note number on
+    two different controllers maps to two independent pads, confirmed by
+    test, since a device-id collision would otherwise silently cross-wire
+    two hosts' hardware. Outside learn mode, a mapped note dispatches
+    straight to `xbotControllerFirePad`, same as a click.
+  - This pure-parser design is what makes the MIDI logic genuinely
+    unit-testable without real hardware — the actual hardware I/O
+    (`navigator.requestMIDIAccess` itself) is honestly acknowledged as
+    unverifiable by a Node test; only that it's feature-detected
+    correctly and the message handler it would feed is correct.
+- Verified: syntax gate clean (13 blocks). New 40-case unit test
+  (`test_xbot_controller_v176.js`) — 5 markup-structure checks (the
+  sub-tab pill, the panel, the grid mount point, Studio-only band
+  gating, the honest MIDI-unsupported message, the device picker) plus
+  35 sandboxed behavioral checks extracting the real shipped block via
+  brace/string matching — action-registry content, map load/save/set
+  round-trip (including a corrupted-JSON fail-safe), `firePad` dispatch
+  to the real Soundboard/Noise-Meter bridges (never a fabricated
+  action, never on an unassigned pad), `renderGrid`'s 8-pad count and
+  honest MIDI-supported/unsupported UI toggling, `connectMidi`'s
+  unsupported (resolves null) and supported (resolves the real
+  `MIDIAccess`, populates the device picker) cases, and the full pure
+  `xbotControllerHandleMidiMessage` parser suite (unmapped note no-op,
+  learn-mode mapping + auto-clear-after-one-learn, previously-learned
+  dispatch, note-off/non-note-on/malformed-data rejection, and
+  cross-device mapping isolation) — all 40 PASS. One test-only bug was
+  found and fixed during verification (not a shipped-code bug): the
+  "renders exactly 8 pads" assertion originally regex-matched
+  `/xbot-ctrl-pad /g` (a trailing space present only on
+  assigned/learning pads), undercounting on a grid with mostly
+  unassigned pads — fixed to count `.xbot-ctrl-pad-trigger` instead,
+  which every pad emits exactly once regardless of state. Full
+  regression suite re-run clean: the 3 documented pre-existing
+  Node-crash files unchanged, and `test_xbot_briefing_v171.js`/
+  `test_xbot_controller_v172.js`/`test_xbot_teams_v173.js`/
+  `test_xbot_theater_v174.js`/`test_xbot_soundboard_v175.js` each show
+  their own now-expected single stale-`PFLX_PATCH`-literal non-pass —
+  every real behavioral check across every suite still passes.
+- HOST ACTIONS / BACKLOG: this completes the full "X-Bot Controller"
+  epic (xc-1 through xc-6, PATCH PLATFORM v172-v176) per the Sept 11
+  sequencing recommendation. Still backlogged, untouched by this
+  epic: the saved-YouTube-playlist picker flagged in xc-3's entry, and
+  xb-3 through xb-11 of the earlier X-Bot companion plan (X-Live
+  Activated indicator, consolidated Live Tools panel, screen share via
+  OBS/YouTube relay, host monitoring, daily briefing, player-side
+  X-Tracker/Notes/Voice/Video Studio, resize/fullscreen polish).
