@@ -15158,3 +15158,65 @@ Mission Control immediately after, since it touches live nav for active testers.
   MIDI controller (xc-5/xc-6) last, since those still need their own
   design passes before a line of code is worth writing. xb-3 through
   xb-11 of the earlier X-Bot companion plan are still queued behind this.
+
+## PATCH PLATFORM v173 — xc-2: Team-arrangement board ported into X-Bot's Live tab (Sept 11, Ennis)
+- ASK: continuation of the Sept 11 "X-Bot Controller" message — "some
+  sizes like this would work well for team arrangement layouts." Per the
+  sequencing recommendation confirmed in the plan file, this is step 2:
+  port X-Live's already-live Teams board (`rTeams()`/`makeTeams()`/
+  `teamsShufflePlayers()`/`teamsRerollNames()`/`teamsMovePlayer()`/
+  `clearTeams()`, the SHUFFLE/NEW NAMES/PRESENT/REDRAFT/CLEAR tool
+  Ennis screenshotted) into X-Bot's dock, gated to the size bands (v172)
+  wide enough to actually show a multi-column grid.
+- BUILT: a new SESSIONS / TEAMS sub-tab pair inside the existing Live tab
+  (`#xbot-live-section`, from xb-1/xb-2). Teams reads/writes the SAME
+  Supabase `pflx_lite_config` row X-Live's own `saveCfg()` already owns
+  (`cfg.teams = {names, assign}`) via the xb-2 `pflxXBotLoadCfg`/
+  `pflxXBotSaveCfg` bridge already established for the cohort filter —
+  teams drafted from X-Bot show up in X-Live's own TEAMS tab immediately
+  and vice versa, nothing duplicated or migrated. New functions:
+  `pflxXBotDrawTeamNames`/`pflxXBotTeamColor` (ported verbatim from
+  X-Live's `drawTeamNames`/`teamColor`, same 30-name bank and 6-color
+  palette, for visual/brand consistency across both surfaces),
+  `window.pflxXBotTeamRoster()` (X-Bot's own `classRoster()` equivalent —
+  filters the Console's live `mcPlayers` array by the Live tab's cohort
+  chips, excludes admin accounts), `window.pflxXBotRenderTeams`,
+  `pflxXBotMakeTeams`/`TeamsShuffle`/`TeamsRerollNames`/
+  `TeamsMovePlayer`/`ClearTeams` (1:1 ports of X-Live's own team
+  functions, same clamp-to-[2,6] and cycle/wrap semantics), and
+  `window.xbotLiveSwitchSubTab` for the SESSIONS/TEAMS pill toggle.
+- Size-band gating is purely CSS, off the SAME `#pflx-dock.pflx-band-*`
+  classes v172's `render()` already maintains on every resize/preset
+  click — `.xbot-teams-grid` only shows at Wide/Studio, `.xbot-teams-
+  resize-hint` (with a "SWITCH TO WIDE" button calling v172's own
+  `pflxDockApplyPreset('wide')`) shows otherwise. No new resize-event
+  JS wiring — the same principle v172 established (one shared code
+  path, not two) extends cleanly to a second feature.
+- KNOWN SIMPLIFICATION (documented, not hidden): X-Live's team board
+  shows "weekly XC per team" via `sumActivity()`, which depends on
+  X-Live's own loaded activity log — not available in this Console
+  context. X-Bot's version shows each team's current TOTAL X-Coin
+  balance instead (`mcPlayers[].xcoin`, natively available here) — a
+  real number, just a different window than X-Live's "this week"
+  figure. Flag to Ennis if the weekly figure specifically matters here;
+  porting the activity log too is a bigger, separate scope addition.
+- Verified: syntax gate clean (13 blocks). New 43-case unit test
+  (`test_xbot_teams_v173.js`) extracting the REAL shipped block (name
+  bank/color cycling, cohort-filtered roster, all 5 team actions, the
+  render function's both empty/populated states, and the sub-tab
+  toggle) via brace/string matching, running it against stubbed
+  document/window/mcPlayers and asserting real side effects (cfg
+  actually saved via `pflxXBotSaveCfg`, grid innerHTML actually
+  rendered) — all PASS. Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files unchanged, and both
+  `test_xbot_briefing_v171.js` and `test_xbot_controller_v172.js` show
+  their own now-expected single non-pass (each patch's test asserts its
+  OWN patch's `PFLX_PATCH` literal, which this patch correctly moves
+  past to 173) — every real behavioral check in both suites still
+  passes.
+- HOST ACTIONS / BACKLOG: xc-3 (Theater tab + saved YouTube playlist +
+  PIP detach into Studio, folding in xb-8) is next per the sequencing
+  recommendation, then xc-4 (soundboard) and xc-5/xc-6 (MIDI controller
+  — software grid + real Web MIDI hardware support) last, since those
+  still need their own design passes. xb-3 through xb-11 of the earlier
+  X-Bot companion plan remain queued behind this epic.
