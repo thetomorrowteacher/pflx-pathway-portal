@@ -14839,3 +14839,97 @@ Mission Control immediately after, since it touches live nav for active testers.
   legible with no digit overlap.
 - HOST ACTIONS / BACKLOG: none new. Same local-only scope as v1.166/
   v1.167.
+
+## PATCH PLATFORM v169 — xb-1: X-Bot / X-Live session bridge, the foundation of the "X-Bot becomes the companion" pivot (Sept 11, Ennis)
+- ASK: Ennis stepped back from the feature-by-feature X-Live backlog and
+  reframed the whole product, verbatim: "X-Live should be a backend
+  dashboard for X-Live. However, lets build the tools and features within
+  the X-Bot floating icon for X-Live... X-Bot truly becomes the PFLX
+  companion to guide and control your journey as a host throughout PFLX."
+  He listed a large set of host and player tools that should live in X-Bot
+  (timer, teams, noise meter, badge/tax controls, screen share, a Theater
+  tab with a YouTube playlist and PIP detach, a daily briefing on login,
+  and player-side notes/voice/video-studio tools inspired by Flipgrid and
+  Screencastify), while session building/setup stays in X-Live's own
+  dashboard.
+- INVESTIGATION: before writing any code, read the ACTUAL live code in
+  both `preview.html` and `x-live-check/index.html` (two Explore agents,
+  then direct `grep` against the real device files to correct a stale
+  cloud-sandbox mirror one agent had read from) to separate what already
+  exists from what's genuinely new, plus web research on Flipgrid/
+  Screencastify's real feature sets. Full findings and an 11-phase build
+  plan (xb-1 through xb-11) are recorded in this session's plan file.
+  Confirmed with Ennis: screen-share stays on the existing YouTube/OBS
+  relay near-term (no new paid infra), self-hosted LiveKit stays the
+  longer-term path once he provisions a VPS; the daily briefing auto-opens
+  the dock once per calendar day.
+- FIX (`pflx-platform-check/preview.html`), the foundation patch (xb-1),
+  7 idempotent steps:
+  - New host-only `#xbot-tab-live` mode tab inside X-Bot, gated by
+    `pflxInjectRolePill()` exactly like the existing Host/Dev tabs (shown/
+    hidden alongside `#xbot-tab-host`/`#xbot-tab-eng`).
+  - New `#xbot-live-section` panel: lists every `scheduled`/`active`
+    session with a GO LIVE / END SESSION button per session.
+  - **The real substance of this patch**: `pflxXBotMergeSession`/
+    `pflxXBotMergeSessionList` are a faithful PORT of
+    `x-live-check/index.html`'s own `mergeSession`/`mergeSessionList` —
+    same field-by-field newer-updatedAt precedence, same
+    `liveParticipants`/`awardedTo`/`raceEvents` union-never-shrinks
+    discipline, same terminal-status(`ended`/`archived`)-always-wins rule,
+    same index-aligned slide/response merge. This is not a
+    reimplementation that could drift out of sync with X-Live's own merge
+    semantics — it's the same algorithm, so a session mutated from EITHER
+    app merges correctly no matter which one saves last.
+  - `pflxXBotLoadSessions()`/`pflxXBotSaveSession(sess)` do the same
+    read-merge-write X-Live's `loadSessions()`/`saveSession()` already do,
+    via the existing `window.pflxSupabase()` client (already used
+    elsewhere in this file for portfolio publish and org-config sync,
+    hitting the exact same Supabase project/`app_data` table X-Live's raw
+    `fetch`-based `kvLoad`/`kvSave` also hit) — no new connection, no new
+    transport.
+  - This is deliberately a thin first slice per house discipline ("ship
+    just enough to prove the bridge works") — the session list is NOT yet
+    cohort-scoped to the host's own class (lands in xb-2), and none of
+    teams/timer-relocation/screen-share/theater/daily-briefing/player
+    tools have been touched yet — those are xb-2 through xb-11, tracked in
+    the plan file, each its own future patch.
+  - `PFLX_PATCH` bumped 168 → 169 (`PFLX_BUILD` unchanged, `2026.09`).
+- Verified: syntax gate clean (13/13 blocks). New 14-case Node unit test
+  (`test_xbot_live_bridge.js`) extracting the REAL shipped
+  `pflxXBotMergeSession`/`pflxXBotMergeSessionList` functions: a stale
+  write never clobbers a newer concurrent edit (and vice versa — the
+  newer `updatedAt` wins either direction), `liveParticipants` unions by
+  id and keeps the later `joinedAt` regardless of which side is "newer"
+  overall, `awardedTo` never shrinks even against a stale empty list (no
+  double-award risk), `raceEvents` unions by event id (a purchase from
+  either writer is never dropped), a terminal status wins from EITHER
+  side even against a newer non-terminal write (a session can never be
+  silently resurrected), slide `responses` union by player id (two
+  students answering at once never clobber each other), and
+  `mergeSessionList` unions two arrays by id rather than ever doing a
+  wholesale overwrite. Full regression suite re-run across every existing
+  platform test file (11 files) — all pass except the same 3 pre-existing
+  failures already documented as unrelated since v1.166
+  (`test_v1142.js`/`test_v1144.js`/`test_v1144_v2.js`); the existing
+  `test_xbot_timer_v2.js` (28 cases) and `test_platform_xbot_timer.js`
+  (23 cases) still pass unchanged, confirming this patch didn't disturb
+  the Cyber Timer work it sits alongside inside X-Bot's mode tabs.
+  NOT live-clicked in a real browser this pass (no interactive Chrome
+  session available) — worth a real check next time Ennis is on: open
+  X-Bot, confirm the new "🔴 Live" tab appears for a host account, tap it,
+  confirm a session built in X-Live's own dashboard shows up in the list,
+  tap GO LIVE, and confirm X-Live's own session list reflects the status
+  change (and vice versa — end a session from X-Live, confirm X-Bot's
+  list picks it up on refresh).
+- HOST ACTIONS / BACKLOG: this is xb-1 of an 11-phase plan (xb-1 through
+  xb-11, full detail in the session's plan file) — cohort control (xb-2),
+  the X-Live Activated indicator (xb-3), Teams/Noise Meter/Badge/Fine
+  tools (xb-4), screen share via the OBS/YouTube relay (xb-5), host
+  monitoring (xb-6/xb-7), X-Bot's own Theater tab + PIP detach (xb-8),
+  daily briefing (xb-9), player-side X-Tracker/Notes/Voice/Video Studio
+  (xb-10), and a resize/fullscreen polish pass across every new tool
+  (xb-11, ships last) are all still ahead. Two open questions flagged for
+  Ennis, not blocking: whether X-Tracker is a separate deployed app or
+  should be natively ported into the Console (xb-10), and whether ad-hoc
+  named/saved groupings are enough for "team management" or he wants
+  persistent cross-session team standings (xb-4).
