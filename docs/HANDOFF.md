@@ -14991,3 +14991,82 @@ Mission Control immediately after, since it touches live nav for active testers.
   the correction above, screen share, host monitoring, X-Bot's own
   Theater tab + PIP detach, daily briefing, player-side tools, resize/
   fullscreen polish). Full detail in the session's plan file.
+
+## PATCH PLATFORM v171 — three small X-Bot fixes: briefings in chat, auto-open on login/app-load, FAB behind dock (Sept 11, Ennis)
+- ASK (verbatim, from a Sept 11 image-based message that also carried a
+  separate, much larger MC Player Dashboard redesign ask — tracked
+  separately, not part of this patch): "All X-Bot briefings should now
+  only show in X-Bot chat. Always automatically open upon login or new
+  app load. X-Bot floating icon should be behind chat box."
+- FIX 1 (briefings in chat): `window.pflxXBotBrief` (the FEATURE:
+  X-Bot Contextual Briefings block) previously built a standalone
+  `document.body`-appended floating card (bottom-left, `z-index:10000`,
+  6s auto-dismiss timer, click-to-dismiss). Rewrote it to call the SAME
+  `xbotAddMessage(msg, false, 'briefing')` bubble renderer every other
+  X-Bot chat reply already goes through — the briefing now appears as a
+  permanent bot message inside `#xbot-chat-messages`, badge-labeled
+  BRIEFING, and gets logged to Chat Monitor for free (no separate
+  logging path needed). No more auto-dismiss: it's chat history now.
+- FIX 1 continued (audio-ducking monkey-patch): a SECOND
+  `window.pflxXBotBrief` assignment ("FEATURE B: X-Bot Briefing Audio
+  Priority", a monkey-patch wrapping the first as `origBrief`) used a
+  `MutationObserver` watching for the old floating card's removal from
+  the DOM, to know when to stop `PFLX_AUDIO` ducking. Since the briefing
+  bubble is now permanent chat history and never gets removed, that
+  observer would have silently leaked forever and never fired — ducking
+  would have stayed "on" indefinitely after the first briefing of a
+  session. Replaced with the existing 10s safety-timeout alone (the
+  monkey-patch already had one as a fallback; it's now the only path).
+  Everything else in the wrapper (start ducking before showing, call
+  `origBrief.call(this, viewName)`, speak via `pflxXBotTTS`) is
+  unchanged.
+- FIX 2 (auto-open on login/app-load): traced `loginUser(brandName)` and
+  confirmed it is the ONE choke point both the manual-login-form
+  submission path AND `tryAutoLogin()`'s persisted-session auto-restore
+  path ("new app load" — a page refresh/revisit with a saved identity)
+  funnel through, since `tryAutoLogin()` calls `loginUser(u.brand)`
+  directly. Added a single hook inside `loginUser()`'s post-login
+  `setTimeout`, right after `initPlatform(displayName);`, calling
+  `window.pflxDock.open('xbot')`. Wrapped in a small self-retrying
+  helper (`pflxXBotAutoOpenOnLogin`, 250ms interval, capped at 40 tries
+  ≈ 10s) because on the auto-login path this line runs ~660ms after
+  `DOMContentLoaded`, while `#pflx-dock`'s own `init()` (which creates
+  `window.pflxDock`) doesn't run until ~1000ms after
+  `DOMContentLoaded` — without the retry, `window.pflxDock` would
+  sometimes not exist yet on a fresh page load with a persisted
+  session, and the auto-open would silently no-op.
+- FIX 3 (FAB behind dock): `#pflx-dock-fab`'s `z-index` (100001, above
+  `#pflx-dock`'s 100000) lowered to 99999. `#pflx-dock` itself stays at
+  100000, unchanged. The floating icon now renders under the open chat
+  panel instead of on top of it; its drag/corner-anchor behavior in
+  `render()` is unaffected (that's positioning logic, not stacking).
+- Verified: syntax gate clean (13 blocks). New 21-case unit test
+  (`test_xbot_briefing_v171.js`) extracting the REAL shipped code —
+  both `pflxXBotBrief` assignments (confirms the first now calls
+  `xbotAddMessage(msg, false, 'briefing')` and no longer builds a
+  floating card/dismiss timer; confirms the second no longer references
+  `[data-xbot-briefing]` or `new MutationObserver` but still ducks/calls
+  `origBrief`/speaks via TTS) and the real auto-open retry helper,
+  ACTUALLY RUN with fake synchronous timers rather than just
+  string-asserted: pflxDock-already-ready opens immediately with zero
+  retries; pflxDock-not-ready-yet retries at the documented 250ms
+  interval then opens once available; pflxDock-never-appears gives up
+  after the documented 40-try cap (39 scheduled retries); a throwing
+  `pflxDock.open()` is caught and never crashes the login flow. Full
+  regression suite re-run across every test file — all pass except the
+  same 3 pre-existing unrelated Node-crash failures documented since
+  v1.166 (test_v1142/1144/1144_v2).
+- NOT live-clicked in a real browser this pass (no interactive Chrome
+  session available) — worth a real check next time Ennis is on: log in
+  fresh (and via a persisted "remember me" reload) and confirm X-Bot
+  actually pops open both times; trigger a real briefing and confirm it
+  lands as a chat bubble, not a floating card; confirm the fab visually
+  sits behind the open dock panel at the SE corner.
+- HOST ACTIONS / BACKLOG: xb-3 through xb-11 of the X-Bot companion plan
+  are still ahead. Ennis also sent a separate, much larger ask this same
+  session (remake the X-Bot pinned tab bar for size-based layouts —
+  team arrangement, a DJ soundboard — plus a MIDI controller for PFLX,
+  folding the Virtual Theater + PIP detach in, plus renaming X-Live's
+  Teams "PROJECT" button to "PRESENT" to avoid clashing with Mission
+  Control's own Projects terminology). Investigation and plan-file update
+  for that in progress, not yet built.
