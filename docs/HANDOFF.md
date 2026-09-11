@@ -15446,3 +15446,74 @@ Mission Control immediately after, since it touches live nav for active testers.
   Activated indicator, consolidated Live Tools panel, screen share via
   OBS/YouTube relay, host monitoring, daily briefing, player-side
   X-Tracker/Notes/Voice/Video Studio, resize/fullscreen polish).
+
+## PATCH PLATFORM v177 — X-BOT THEATER: SAVED YOUTUBE PLAYLIST (Sept 11, continuing house priority)
+- ASK: the saved-YouTube-playlist picker was flagged as backlog in xc-3's
+  own entry (v174) and re-flagged again in v175/v176's entries as the
+  next natural item once the X-Bot Controller epic (xc-1 through xc-6)
+  finished shipping — a host-curated list of videos a Theater viewer can
+  watch without needing a session to currently be live.
+- BUILT: a "📺 SAVED PLAYLIST" section under X-Bot's THEATER sub-tab,
+  below the live-broadcast watch list (which is unchanged).
+  - Storage: `cfg.theaterPlaylist` (array of `{id, videoId, title}`),
+    read/written via the SAME xb-2 `pflxXBotLoadCfg`/`pflxXBotSaveCfg`
+    Supabase bridge xc-2's Teams board already established — a saved
+    item shows up for every host, no separate/duplicated data path.
+  - `xbotTheaterExtractYouTubeId(input)` is ported DIRECTLY from
+    X-Live's own `pflxYouTubeExtractId` (x-live-check/index.html) — same
+    regex logic, not reinvented — accepting a raw 11-char video ID or a
+    watch/live/embed/youtu.be URL, returning null on garbage input
+    rather than embedding something broken.
+  - A saved item plays through the EXACT SAME watch/embed/PIP-popout
+    code path a live broadcast already uses: `xbotTheaterWatchSaved(id)`
+    sets `_xbotTheaterWatchingId = 'saved:' + id` (prefixed so the two
+    id spaces — live session ids and playlist item ids — can never
+    collide), and `xbotTheaterRender()`/`xbotTheaterPopOut()` each got
+    one new branch at the top that sources from the playlist cache
+    instead of the session cache when the prefix is present — the
+    original live-session branch is otherwise byte-for-byte unchanged.
+  - Host UI: each saved item shows a ▶ WATCH and ✕ REMOVE action; an
+    always-present "paste a YouTube URL or video ID" input + ADD button
+    lets a host build the list from inside the Theater panel itself
+    (no trip to X-Live's Setup tab needed, simpler than the original
+    plan's "set from X-Live's Setup tab" framing — reusing X-Bot's own
+    already-open panel instead). A failed add (bad input) flags the
+    input's border red rather than calling an undefined `toast()` — no
+    such global function exists in this file, confirmed by grep before
+    writing the code, so nothing fabricated.
+- Verified: syntax gate clean (13 blocks). New 42-case unit test
+  (`test_xbot_theater_playlist_v177.js`) — 2 markup checks, 6
+  REGRESSION checks re-confirming the original v174 live-session watch/
+  PIP flow is byte-for-byte unchanged, 7 cases on the ported
+  `xbotTheaterExtractYouTubeId` (raw id, watch/live/embed/youtu.be URLs,
+  garbage → null, empty → null), and 27 cases on the playlist data layer
+  and UI (load/add/remove round-trip through the real
+  `pflxXBotLoadCfg`/`SaveCfg` bridge, title-falls-back-to-id, add-from-
+  input success/failure paths, the honest empty-state message, and a
+  saved item watching/popping-out through the exact shared embed/PIP
+  code, including cleanup when the watched item is removed and a safe
+  fallback for a stale/nonexistent saved id) — all 42 PASS. One
+  regression was found and fixed during verification, NOT in the
+  shipped code: the pre-existing `test_xbot_theater_v174.js` crashed
+  (uncaught `TypeError`) because its sandbox stub never defined
+  `pflxXBotLoadCfg`/`SaveCfg`, a dependency `xbotTheaterRenderList` now
+  legitimately calls via the new `xbotTheaterLoadPlaylist()`. Added
+  harmless no-op stubs to that older test (the same kind of forward-
+  compatibility fix every version-specific test in this session has
+  needed as later patches extend shared functions) — it now shows 20/21
+  passing, only its own expected stale-`PFLX_PATCH`-literal non-pass,
+  same as every other version test. Full regression suite re-run clean:
+  the 3 documented pre-existing Node-crash files unchanged, and every
+  version-specific test (`v171` through `v176`) shows only its own
+  single expected stale-version-literal non-pass.
+- HOST ACTIONS / BACKLOG: closes the last item explicitly flagged as
+  backlog from the X-Bot Controller epic. Still queued, untouched: xb-3
+  through xb-11 of the earlier X-Bot companion plan (X-Live Activated
+  indicator, consolidated Live Tools panel — Team mgmt is already
+  covered by xc-2, Noise Meter is reachable via xc-5/6's Controller
+  grid, so what remains there is dedicated Badge/Reward + Tax/Fine
+  quick actions — screen share via OBS/YouTube relay, host monitoring/
+  invite-to-share consent flow, a host monitoring panel in X-Live's
+  Theater tab, a properly date-gated once-per-day daily briefing (v171
+  covered a different, smaller set of X-Bot fixes, not this), and
+  player-side X-Tracker/Notes/Voice/Video Studio).
