@@ -15220,3 +15220,82 @@ Mission Control immediately after, since it touches live nav for active testers.
   — software grid + real Web MIDI hardware support) last, since those
   still need their own design passes. xb-3 through xb-11 of the earlier
   X-Bot companion plan remain queued behind this epic.
+
+## PATCH PLATFORM v174 — xc-3: Theater tab + PIP detach ported into X-Bot's Live tab (Sept 11, Ennis)
+- ASK: continuation of the Sept 11 "X-Bot Controller" message and its
+  confirmed sequencing (xc-1 the size-band foundation, xc-2 the Teams
+  board) — step 3: "It will need to include the virtual theater as
+  previously mentioned. That theater should allow a popout video as
+  well in PIP to allow for multi-task." This ports X-Live's watch-a-
+  live-broadcast Theater experience (`rTheater()`/`theaterWatch()`/
+  `theaterStopWatching()`) into X-Bot's Live tab as a third sub-tab,
+  gated to the Studio size band, with a detachable PIP popout for
+  multi-tasking while watching.
+- BUILT: a third THEATER pill alongside SESSIONS/TEAMS in the Live tab's
+  sub-tab row (`window.xbotLiveSwitchSubTab`, generalized from a
+  hardcoded 2-branch if/else to a map-driven `{sessions, teams,
+  theater}` lookup — verified the old 2-panel behavior is unchanged
+  since `document.getElementById('xbot-live-theater-panel')` simply
+  returned null in the pre-v174 DOM and the existing `if (el)` guard no-
+  ops safely). New `#xbot-live-theater-panel` reads the SAME session
+  list the xb-1 bridge (`pflxXBotLoadSessions`) already owns — no new
+  data source — and filters to sessions that are both `status ===
+  'active'` AND carry a `youtubeEmbedId` (i.e. genuinely live AND
+  broadcasting, matching X-Live's own `rTheater()` filter exactly).
+  New functions: `xbotTheaterRenderList` (loads/caches/renders the
+  watch list or an honest "nothing streaming right now" empty state),
+  `xbotTheaterWatch`/`xbotTheaterRender` (switches to a YouTube
+  `iframe.com/embed/<id>` view with the session title, a POP OUT and a
+  BACK action — and safely falls back to the list if the watched
+  session's status/broadcast changes mid-watch, rather than showing a
+  stale dead embed), `xbotTheaterStopWatching`, and `xbotTheaterPopOut`.
+- PIP detach required ZERO new drag/resize JS: `#pip-theater` is a new
+  `.pflx-pip-widget` following the exact same markup shape (`data-pip-
+  drag`, all 8 `data-pip-dir`/`data-pip-id` resize handles, S/M/L
+  presets) already used by `#pip-xcoin`/`#pip-sysevents`/
+  `#pip-livesession` — the generic `DOMContentLoaded` wiring
+  (`document.querySelectorAll('[data-pip-drag]')` etc.) picks it up for
+  free, attribute-driven, not hardcoded per-widget.
+  `xbotTheaterPopOut()` renders the same embed into `#pip-theater-body`
+  and calls the real generic `window.pflxPipOpen('pip-theater')` — no
+  bespoke PIP logic of its own.
+- Size-band gating: Studio-only (unlike Teams' Wide+Studio), pure CSS
+  off the same `#pflx-dock.pflx-band-studio` class v172's `render()`
+  already maintains — justified by v172's own Studio preset button
+  copy ("soundboard, controller grid, monitoring"), evidence already
+  committed to the platform rather than a fresh guess.
+- KNOWN SIMPLIFICATION (documented, not hidden): Ennis's message also
+  mentioned "the virtual theater as previously mentioned," which in the
+  broader plan includes a saved YouTube playlist picker — X-Live has no
+  such feature to port (only the live-broadcast watch view), so this
+  patch ships the real, working watch+PIP-detach half only. A saved-
+  playlist picker is a genuinely new build, not a port, and stays
+  backlogged rather than being faked.
+- Verified: syntax gate clean (13 blocks). New 21-case unit test
+  (`test_xbot_theater_v174.js`) — 4 markup-structure checks confirming
+  `#pip-theater` is a real `.pflx-pip-widget` with all 8 resize handles
+  and S/M/L presets wired the same way as the other PIP remotes, plus
+  17 sandboxed behavioral checks extracting the real shipped
+  `xbotTheaterRenderList`/`xbotTheaterWatch`/`xbotTheaterRender`/
+  `xbotTheaterStopWatching`/`xbotTheaterPopOut` block via brace/string
+  matching against a stubbed `pflxXBotLoadSessions`/`pflxPipOpen` —
+  scheduled/no-broadcast/ended sessions correctly excluded from the
+  watch list, the watch view renders the right embed id and title, a
+  session going non-live mid-watch falls back to the list instead of a
+  stale embed, and pop-out both renders into `#pip-theater-body` and
+  calls the real `pflxPipOpen` (plus a no-op-when-nothing-watched
+  safety check) — all 21 PASS. Full regression suite re-run clean: the
+  3 documented pre-existing Node-crash files unchanged, and
+  `test_xbot_briefing_v171.js`/`test_xbot_controller_v172.js`/
+  `test_xbot_teams_v173.js` each show their own now-expected single
+  non-pass (each patch's test asserts its OWN patch's `PFLX_PATCH`
+  literal, which this patch correctly moves past to 174) — every real
+  behavioral check across every suite still passes.
+- HOST ACTIONS / BACKLOG: xc-4 (soundboard for a Guest Host to DJ) and
+  xc-5/xc-6 (MIDI controller — "Both 1 and 2": a software performance-
+  pad grid AND real Web MIDI API hardware support) are next per the
+  sequencing recommendation — both still need their own design pass
+  (mapping UI, hardware-vs-software scope) before a line of code is
+  worth writing, unchanged by this patch. The saved-YouTube-playlist
+  picker noted above is also backlogged. xb-3 through xb-11 of the
+  earlier X-Bot companion plan remain queued behind this epic.
