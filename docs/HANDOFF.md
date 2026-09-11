@@ -15070,3 +15070,30 @@ Mission Control immediately after, since it touches live nav for active testers.
   Teams "PROJECT" button to "PRESENT" to avoid clashing with Mission
   Control's own Projects terminology). Investigation and plan-file update
   for that in progress, not yet built.
+
+## PATCH X-LIVE v0.33 — rename Teams' PROJECT button to PRESENT (Sept 11, Ennis)
+- ASK (verbatim, same Sept 11 image-based message as PATCH PLATFORM v171
+  above): "Also change the Project option in X-Live to Present. I dont
+  want to mix up the terminology." Refers to the Teams tab's fullscreen
+  display button (`rTeams()`/`projTeams()` — shows a full-screen team
+  roster for the classroom projector, same "pairs great with the
+  projector" family as the Randomizer/Post-a-Link tools), which was
+  labeled "📽️ PROJECT" — reading as a clash with Mission Control's own
+  "Projects" noun.
+- FIX: renamed the button label only, `📽️ PROJECT` → `📽️ PRESENT`
+  (`SHUFFLE PLAYERS / NEW NAMES / PRESENT / Teams: / REDRAFT / CLEAR`).
+  `projTeams()` itself is not user-facing so the function name is
+  untouched — display-only change. Confirmed via grep this was the only
+  "PROJECT" button label in the file; a separate, unrelated "📽️
+  PROJECTOR" toggle button (a different feature entirely — opens/closes
+  the general projector display) was correctly left alone.
+- Verified: syntax gate clean (2 blocks). Pure text-label change, no
+  logic touched, so no new unit test was needed; ran the full existing
+  suite and confirmed via a `git stash`/`pop` A-B comparison that the
+  two real pre-existing failures (`test_subapp_embed.js` 2/12,
+  `test_v029.js` 1/27) and two known Node-crash files (`test_v022.js`,
+  `test_v028.js`) are byte-identical before and after this patch.
+  Live-deploy confirmed via `curl` on the GitHub Pages URL
+  (`https://thetomorrowteacher.github.io/x-live/`, run through the Mac
+  since the cloud sandbox's proxy blocks direct external curls):
+  `PRESENT</button>` count 1, `📽️ PROJECT</button>` count 0.
