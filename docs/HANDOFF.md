@@ -15517,3 +15517,65 @@ Mission Control immediately after, since it touches live nav for active testers.
   Theater tab, a properly date-gated once-per-day daily briefing (v171
   covered a different, smaller set of X-Bot fixes, not this), and
   player-side X-Tracker/Notes/Voice/Video Studio).
+
+
+## PATCH PLATFORM v178 — X-Bot Live Tools launcher: Award/Fine/Badges + Noise Meter, one tap from the Live tab (Sept 12, Ennis)
+
+- ASK: xb-4 of the Sept 11 "X-Bot becomes the PFLX companion" plan called
+  for a consolidated "Live Tools" panel inside X-Bot's Live tab covering
+  Team management, Noise Meter, and Badge/Reward + Tax/Fine quick actions.
+  Team management already shipped as xc-2 (v173, the SESSIONS/TEAMS
+  sub-tab). Investigated the remaining two pieces before writing any code,
+  per the session's "only real, already-wired actions, never fabricate"
+  discipline.
+- DISCOVERY: `window.pflxXcPipOpen()` already opens a fully-built, real,
+  working panel — `#pip-xcoin` (preview.html ~49880-49992) — a
+  player-target dropdown (including "All Players"), Give +10/+25/+50/+100
+  XC buttons, Fine 10/25 buttons, a custom give/fine amount input, and 4
+  badge quick-award buttons (Teamwork/Leadership/Innovation/Quality), all
+  writing through the real `mcPlayers[].xc`/`.badges` + `mcSaveData()` +
+  `mcBroadcastToApps()` path with toast feedback. It was already gated
+  behind `isHostOrCohost()` and reachable — but only from X-Bot's HOST
+  tab's "WIDGET REMOTES" row, not the newer LIVE tab. Similarly,
+  `window.mcToggleNoiseMeter()` (global, ~line 48384) is the SAME function
+  xc-5/xc-6's Controller Grid (v176) already dispatches to for its `noise`
+  action. Neither Badge/Reward+Tax/Fine nor Noise Meter needed a single
+  new line of award/badge/noise logic — the whole remaining xb-4 ask was
+  really "give the Live tab one-tap launchers to two things that already
+  work," reshaping v178's scope from "build a new award mechanism" (the
+  original plan text's assumption) to pure delegation.
+- BUILT: a sixth "🛠 TOOLS" sub-tab alongside SESSIONS/TEAMS/THEATER/
+  SOUND/CONTROLLER in X-Bot's Live tab (`xbotLiveSwitchSubTab`'s panel
+  map extended, same map-driven pattern xc-3 generalized it to). The new
+  `#xbot-live-tools-panel` holds exactly two buttons: "🪙 Award / Fine XC
+  + Badges" (`xbotLiveOpenAwardTool()` → `window.pflxXcPipOpen()` if
+  present) and "🔊 Noise Meter" (`xbotLiveOpenNoiseTool()` →
+  `window.mcToggleNoiseMeter()` if present) — both a plain
+  `typeof ... === 'function'` guard then a direct call, nothing else. No
+  Studio-band CSS gating (unlike Theater/Sound/Controller's grid-based
+  panels) — two launcher buttons fit at any dock size, so the panel is
+  reachable regardless of dock band, a deliberate departure from the
+  Studio-only precedent.
+- Verified: syntax gate clean (13 blocks). New 12-case unit test
+  (`test_xbot_live_tools_v178.js`) — 5 markup checks (TOOLS pill, panel
+  div, both onclick wiring, panels-map entry) and 7 sandboxed behavioral
+  checks extracting the real shipped `xbotLiveOpenAwardTool`/
+  `xbotLiveOpenNoiseTool` via brace/string matching — confirming each
+  delegates to the real global when present, no-ops safely (no throw)
+  when the global is absent, and the two launchers never cross-trigger
+  each other — all 12 PASS. Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files unchanged, and every
+  version-specific test (`v171` through `v177`) now shows only its own
+  single expected stale-`PFLX_PATCH`-literal non-pass (confirmed via
+  `grep -A1 FAIL` on each — no other assertion regressed).
+- HOST ACTIONS / BACKLOG: this closes the Badge/Reward + Tax/Fine +
+  Noise-Meter piece of xb-4 in full (Team mgmt was already covered by
+  xc-2). Still queued, untouched: xb-3 (X-Live Activated indicator,
+  blocked on xb-6), xb-5 (screen share via the OBS/YouTube relay), xb-6/
+  xb-7 (host monitoring consent flow + Theater monitoring panel — needs
+  live browser/hardware to verify), xb-9 (a genuinely date-gated
+  once-per-day daily briefing — v171 shipped a different, smaller set of
+  fixes, not this), xb-10 (player-side X-Tracker/Notes/Voice/Video
+  Studio — needs Ennis's input on X-Tracker architecture and live camera/
+  mic hardware to verify), xb-11 (resize/fullscreen polish across every
+  new X-Bot tool, ships last per the plan's own sequencing).
