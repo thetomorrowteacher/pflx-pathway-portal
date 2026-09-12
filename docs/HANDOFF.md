@@ -15579,3 +15579,92 @@ Mission Control immediately after, since it touches live nav for active testers.
   Studio — needs Ennis's input on X-Tracker architecture and live camera/
   mic hardware to verify), xb-11 (resize/fullscreen polish across every
   new X-Bot tool, ships last per the plan's own sequencing).
+
+
+## PATCH PLATFORM v179 — X-Bot daily briefing, genuinely date-gated once per calendar day (Sept 12, Ennis)
+
+- ASK: xb-9 of the Sept 11 "X-Bot becomes the PFLX companion" plan called
+  for a real "Today's Briefing" card that fires once per calendar day on
+  login — any live/scheduled session today, a pending-approvals count for
+  hosts — replacing the generic per-tab tip. This is explicitly DIFFERENT
+  from PATCH PLATFORM v171, which only fixed X-Bot to auto-open on EVERY
+  login (not once/day) and changed how the tooltip renders — v171 never
+  added any date-gating at all.
+- ROOT CAUSE / WHY NOW: X-Bot's existing `PFLX_XBOT_BRIEFINGS`/
+  `pflxXBotBrief` system gates only on `visitedTabs` — an in-memory map
+  that resets on every reload/new session, so it's a per-tab-per-session
+  tooltip, not a per-day one. Confirmed via direct read of the live code
+  (preview.html ~52655-52700) before writing anything.
+- BUILT: extends the SAME IIFE that already owns
+  `PFLX_XBOT_BRIEFINGS`/`pflxXBotBrief`/`xbotAddMessage` rendering with a
+  small set of individually pure, unit-testable functions plus one
+  orchestrator:
+  - `pflxXBotBriefingDateStr(d)` — pure `YYYY-MM-DD` formatter (local time).
+  - `pflxXBotDailyBriefingDue(lastDateStr, todayStr)` — the pure date-gate:
+    same day -> not due; different day, or a missing/malformed stored
+    value -> due. Never throws.
+  - `pflxXBotDailyBriefingCloudKey(session)` — returns a PER-USER,
+    single-writer Supabase `app_data` key `pflx_xbot_briefing_<id>`,
+    matching the file's own existing `pflx_player_<id>` per-entity-row
+    convention (confirmed via grep) rather than a single shared
+    map-of-every-user's-id row — this sidesteps any cross-user merge
+    conflict entirely, since each user only ever writes their own row.
+  - `pflxXBotDailyBriefingLiveSessionCount(sessions)` — counts
+    `status === 'active'` sessions from the existing xb-1 bridge
+    (`pflxXBotLoadSessions`). Real X-Live session scheduling
+    (Phase 1g, `scheduledStart`) isn't built yet, so "any live/scheduled
+    session today" is honestly scoped to sessions that are ACTUALLY live
+    right now, not a calendar lookup that doesn't exist.
+  - `pflxXBotDailyBriefingPendingApprovals()` — reuses the EXACT SAME two
+    pending-item sources `renderApprovalsCard()` already aggregates
+    (`_pflxLoadRewardRequests()` filtered to `status === 'pending'`, plus
+    `mcTasks` per-player `submissions[]`/legacy `status === 'submitted'`)
+    as a count only — not a rebuilt approvals system.
+  - `pflxXBotDailyBriefingIsHost(session)` / `pflxXBotDailyBriefingMessage(...)`
+    — pure role-check and pure string composition (singular/plural
+    handled correctly; a non-host session never sees Approvals info even
+    if a count is passed in).
+  - `pflxXBotDailyBriefingCheck()` — the one piece that touches the
+    network/DOM: reads the per-user cloud row, gates on
+    `pflxXBotDailyBriefingDue`, and if due, posts the composed message via
+    the same `xbotAddMessage(msg, false, 'briefing')` renderer
+    `pflxXBotBrief` already uses, then writes today's date back to the
+    per-user row. Fails safe at every step (a missing Supabase client, a
+    failed read, or a failed write never throws and never blocks login —
+    a network hiccup shows the briefing anyway rather than silently
+    suppressing it).
+  - Hooked into the SAME single choke-point v171 already found and used
+    (`loginUser()`'s post-login `setTimeout`, which both the manual-login
+    form path AND `tryAutoLogin()`'s persisted-session restore path funnel
+    through) — right after v171's existing "auto-open on every login" IIFE,
+    wrapped in its own try/catch so a slow/failed check can never block
+    login.
+- Verified: syntax gate clean (13 blocks). New 50-case unit test
+  (`test_xbot_daily_briefing_v179.js`) — 3 wiring checks, 7 on the pure
+  date-gate (same-day/different-day/missing/malformed, never throws),
+  4 on the per-user cloud key, 4 on the live-session counter, 4 on the
+  host-role check, 7 on message composition (singular/plural, host vs.
+  non-host), 4 on the pending-approvals aggregation, and 7 end-to-end
+  orchestrator cases (first-run-of-day posts+saves; already-ran-today is
+  a true no-op; a player never sees Approvals; no active session no-ops;
+  and three fail-safe cases — no Supabase, a failed cloud read, a failed
+  cloud write — each confirmed to never throw and never suppress the
+  briefing) — all 50 PASS. Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files unchanged, and every
+  version-specific test (`v171` through `v178`) now shows only its own
+  single expected stale-`PFLX_PATCH`-literal non-pass (confirmed via
+  `grep -A1 FAIL` on each — no other assertion regressed).
+- HOST ACTIONS / BACKLOG: closes xb-9 as scoped (a real per-user,
+  per-calendar-day gate, distinct from v171's every-login fix). Honest
+  simplification, not hidden: "any... scheduled session today" is
+  currently just "any session live right now," since Phase 1g's real
+  session scheduling (`scheduledStart`) hasn't shipped — once that lands,
+  this briefing's live-session line should be revisited to also surface
+  sessions scheduled for later today, not just ones already live. Still
+  queued, untouched: xb-3 (X-Live Activated indicator, blocked on xb-6),
+  xb-5 (screen share via the OBS/YouTube relay), xb-6/xb-7 (host
+  monitoring consent flow + Theater monitoring panel — needs live
+  browser/hardware to verify), xb-10 (player-side X-Tracker/Notes/Voice/
+  Video Studio — needs Ennis's input on X-Tracker architecture and live
+  camera/mic hardware to verify), xb-11 (resize/fullscreen polish across
+  every new X-Bot tool, ships last per the plan's own sequencing).
