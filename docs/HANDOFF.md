@@ -16010,3 +16010,105 @@ Mission Control immediately after, since it touches live nav for active testers.
   direct, intended consequence of "simplest way possible, no Supabase,"
   not an oversight. If cross-device notes are ever wanted again, that's
   a deliberate future ask, not a bug to fix.
+
+## PATCH PLATFORM v185 — MC Player Dashboard redesign, Sub-patch 1: real Calendar + Projects views for players, sidebar parity (Sept 12, Ennis)
+- SYMPTOM: Ennis, frustrated, sent 4 screenshots of a mockup and said "The
+  update that I designed earlier is not working. This should have been
+  deployed earlier" -- pointing at a Netflix-style redesign of the MC
+  Player Dashboard (rearranged sidebar, per-tab dedicated pages, resize
+  sliders, horizontal carousel rows with slide arrows, dropdown "more
+  info/stats" expanders on Checkpoints/Projects).
+- ROOT CAUSE: this exact ask was made Sept 11 and logged in the Handoff
+  (inside the PATCH PLATFORM v171 entry's ASK note) as "tracked
+  separately, not part of this patch" -- then genuinely never scoped into
+  a plan or built. A real dropped ball, confirmed by grepping the
+  Handoff and the active plan file, not a misunderstanding.
+- INVESTIGATION: before writing code, read the real Player Portal router
+  (ppNav/ppRender*, mcRenderPlayerDashPreview) and sidebar HTML. Found
+  the sidebar's DOM order already matches the mockup's order almost
+  exactly (Dashboard, [Calendar], Seasons, Programs, Checkpoints,
+  Projects, Tasks, Job Board, Proposals) -- mc-host-only (gated by
+  body.pflx-as-player) hides items from players. Only two things were
+  actually missing for a real player: Calendar was host-only with NO
+  player-safe equivalent, and there was no Settings entry in the player
+  sidebar. Separately, mcNav's playerRoutes map silently aliased a
+  "Projects" sidebar click to the CHECKPOINTS view (no top-level
+  ppRenderProjects existed), so a player clicking Projects saw
+  Checkpoints instead. Both are real, concrete, unambiguous gaps -- this
+  sub-patch closes them. The Netflix-carousel VISUAL redesign (horizontal
+  scroll rows, slide arrows, resize sliders reusing the existing
+  pflxCardSize* engine, dropdown expanders) is real, substantial UI
+  work that follows as its own next sub-patch(es), per house discipline.
+- FIX:
+  1. New ppRenderCalendar(el) (+ ppCollectCalendarItems, ppCalJump,
+     ppCalDayChip, ppCalMoveMonth) -- a player-safe, read-only monthly
+     calendar. Deliberately NOT a reuse of the host's
+     mcRenderMasterCalendar/_mcCollectCalendarItems (those read every
+     Season/Program/Checkpoint/Project/Task platform-wide with no player
+     filtering, and jump into host-only management panels) -- scoped
+     instead to the player's active Season plus whatever
+     Checkpoints/Projects/Tasks they can actually see
+     (ppItemAssignedToActivePlayer, the same "can SEE" rule every other
+     Player Portal view already uses), with every day-chip jumping
+     through ppNav to the same detail views the rest of the portal
+     uses. Programs deliberately left out of this v1 (different "every
+     player sees every Program" visibility rule) -- documented, not
+     faked.
+  2. New ppRenderProjects(el) -- a real top-level Projects list,
+     mirroring ppRenderCheckpoints's own list-card pattern. Each
+     card's apply/locked/enter gate already lives in
+     ppRenderProjectDetail (unchanged) -- this list only adds a lock
+     hint via the same pflxPlayerCanEnterItem check.
+  3. Wired both into mcRenderPlayerDashPreview's switch and fixed
+     mcNav's playerRoutes map ('projects' now routes to the real
+     'projects' view instead of 'checkpoints'; added
+     'calendar': 'calendar').
+  4. Sidebar HTML: un-host-only'd the Calendar button; added a real
+     Settings entry that calls the SAME navigateTo('settings') the
+     profile dropdown already uses (not a new panel, not the host-only
+     mcsettings config panel).
+  5. Bumped PFLX_PATCH 184 -> 185 (PFLX_BUILD already current at
+     2026.09).
+- Verified: syntax gate clean (13 blocks). New 35-case unit test
+  (test_mc_player_dash_v1.js) -- wiring/markup checks (Calendar
+  un-host-only'd, new Settings button, host-only mcsettings untouched,
+  playerRoutes fixes, switch-case wiring) plus sandboxed behavioral
+  checks extracting the real shipped functions via string-marker
+  matching: ppCollectCalendarItems (season/checkpoint/project/task
+  date collection, range filtering, the "can SEE" gate actually
+  excluding hidden items, never throwing on an empty player state),
+  ppCalJump (correct detail-view routing per item type),
+  ppCalDayChip (HTML-escaping of both the id used inside the onclick
+  attribute and the label text), ppCalMoveMonth (Dec/Jan year
+  wraparound, safe no-op when the container isn't in the DOM),
+  ppRenderCalendar (renders a populated grid with all 7 weekday
+  headers), and ppRenderProjects (empty state, locked-vs-enterable
+  card rendering, correct click-through id, XC display, and the
+  visibility filter genuinely excluding a project the player can't see)
+  -- all 35 PASS. Three test-authoring bugs (not shipped-code bugs) were
+  found and fixed while writing this test: a regex anchor for the
+  playerRoutes fix that overshot 200 chars across the inserted
+  comment, a weekday-header check whose alternation pattern happened to
+  match unrelated substrings, and a JS-string-escaping mismatch that
+  checked for literal backslashes that don't survive JS string
+  evaluation. Full regression suite re-run clean: the 3 documented
+  pre-existing Node-crash files unchanged, and every version-specific
+  test (v171 through v184) shows only its own single expected
+  stale-PFLX_PATCH-literal non-pass.
+- BACKLOG (documented, not built this patch -- the actual Netflix-style
+  visual redesign Ennis's mockup asked for):
+  - Horizontal-scrolling "Netflix carousel" rows (with > slide-arrow
+    controls) replacing the current plain card grids on
+    Programs/Checkpoints/Projects/Tasks in ppRenderHome and the
+    top-level list views.
+  - Wiring the existing pflxCardSize*/pflxCardSizeSliderHtml resize-
+    slider engine (already used on host-dashboard card grids) into the
+    player views -- needs new player-specific keys/container ids added
+    to PFLX_CARD_SIZE_DEFAULTS/PFLX_CARD_SIZE_RANGE/
+    PFLX_CARD_SIZE_LIST_ID since the host's ids can't be reused
+    (different DOM, would collide).
+  - Dropdown "see more info/stats" expanders on Checkpoint/Project
+    cards.
+  - A true Programs entry in the player Calendar (deliberately left out
+    of this v1 -- different visibility rule than Checkpoints/Projects/
+    Tasks).
