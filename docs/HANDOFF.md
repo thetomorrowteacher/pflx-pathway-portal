@@ -15668,3 +15668,85 @@ Mission Control immediately after, since it touches live nav for active testers.
   Video Studio — needs Ennis's input on X-Tracker architecture and live
   camera/mic hardware to verify), xb-11 (resize/fullscreen polish across
   every new X-Bot tool, ships last per the plan's own sequencing).
+
+
+## PATCH PLATFORM v180 — X-Bot "Go Live (Screen)": YouTube/OBS relay card in the Live tab (Sept 12, Ennis)
+
+- ASK: xb-5 of the Sept 11 "X-Bot becomes the PFLX companion" plan called for
+  a screen-share control in X-Bot's Live tab via the already-working OBS/
+  YouTube relay, plus (per xb-3's own note) the eventual player-side embed.
+  Investigated the real YouTube engine before writing any code, per the
+  session's "only real, already-wired actions, never fabricate" discipline.
+- DISCOVERY: X-Bot is native to the SAME document as the "YOUTUBE LIVE API
+  ENGINE" IIFE (`ytCreateBroadcast`/`ytStartBroadcastById`/`ytStopBroadcast`/
+  `ytEndLive`, all real and already working in Mission Control's own
+  Settings → YouTube API panel) — unlike X-Live (a separately-deployed,
+  cross-origin app), X-Bot needs NO postMessage relay to reach them; it can
+  call the real functions directly. However, `ytCreateBroadcast()` is
+  tightly coupled to specific Settings-page-only DOM input ids
+  (`#yt-broadcast-title`, `#yt-broadcast-desc`, `#yt-broadcast-datetime`,
+  `#yt-broadcast-privacy`) — reimplementing broadcast CREATION inside X-Bot
+  would mean forking a second, DOM-independent creation path that could
+  drift from the already-tested original. Decision: do not reimplement
+  creation — deep-link to the real setup flow instead, and only call the
+  clean, parameter-driven `ytStopBroadcast()` directly for ending an
+  already-active stream. Also confirmed `ytConfig`/`ytActiveBroadcast` are
+  private closure variables with zero existing `window` exports — rather
+  than exposing raw private state, added one minimal, additive, READ-ONLY
+  getter (`window.ytGetLiveStatus`). Separately reconfirmed the
+  `#vt-panel-youtube` orphaned-dead-code pattern (referenced once, no
+  matching HTML anywhere) and confirmed the REAL, reachable path is Mission
+  Control's own `#mc-set-youtube` panel via `mcNav('mcsettings')` →
+  `mcSettingsTab('youtube')` — the new deep-link targets that real path,
+  following the exact chained-navigate-with-setTimeout precedent already in
+  the file (`doNavigate('settings');switchSettingsTab('host');setTimeout(...)`).
+- BUILT: a new "📡 Go Live (Screen) — via OBS/YouTube" card in X-Bot's Live
+  tab TOOLS sub-tab (below the existing Award/Fine and Noise Meter
+  launchers from v178), with a live status line (`#xbot-yt-live-status`)
+  rendered by `xbotLiveRenderYtStatus()` whenever the TOOLS sub-tab is
+  opened (same render-on-switch pattern SESSIONS/TEAMS/THEATER/SOUND/
+  CONTROLLER already use). Three real states, each reading
+  `window.ytGetLiveStatus()`: not connected → OPEN YOUTUBE SETUP deep-link;
+  connected but no broadcast → same deep-link with different copy;
+  active broadcast → 🔴 LIVE + the real (escaped) broadcast title + an END
+  STREAM button wired straight to the real `ytStopBroadcast()`.
+  `xbotLiveOpenYouTubeSetup()` does the navigateTo('mission-control') →
+  mcNav('mcsettings') → mcSettingsTab('youtube') chain. The card's copy
+  states the honest limits directly in the host UI (not just documented
+  here): one-way only (no player mic/camera back), typically 10-30s delay,
+  and the host still starts the stream in OBS themselves — X-Live doesn't
+  control OBS.
+- Verified: syntax gate clean (13 blocks). New 23-case unit test
+  (`test_xbot_yt_golive_v180.js`) — markup/wiring checks (card exists,
+  status container exists, the honest caveat text is in the rendered UI,
+  the TOOLS-switch render hook, no new broadcast-creation input was added),
+  2 engine-getter checks (fresh engine reports the correct all-false/null
+  default shape), 3 render-state checks (not-connected / authorized-no-
+  broadcast / active-broadcast, including an XSS-escaping check with a
+  deliberately hostile title containing `<script>` — confirmed the raw tag
+  never appears in the rendered HTML and the escaped form does), 2 safe-
+  no-op checks (missing `ytGetLiveStatus`, missing DOM element — neither
+  throws), 2 deep-link chain checks (correct navigateTo→mcNav→mcSettingsTab
+  sequence, and a safe no-op when all three are undefined), and 2 END-
+  STREAM delegation checks (calls the real `ytStopBroadcast`, safe no-op if
+  it's missing) — all 23 PASS. Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files unchanged, and every
+  version-specific test (`v171` through `v179`) shows only its own single
+  expected stale-`PFLX_PATCH`-literal non-pass (confirmed via `grep -A1
+  FAIL` on each — no other assertion regressed).
+- HOST ACTIONS / BACKLOG: the OAuth-gated, real end-to-end click-through
+  (actually starting a broadcast in Mission Control's Settings page, then
+  confirming X-Bot's TOOLS panel shows it live and END STREAM really stops
+  it) is fundamentally unscriptable/unverifiable via Node tests — it needs
+  Ennis with a real Google/YouTube account signed in. This matches xb-5's
+  own plan note ("real end-to-end click-through with Ennis once available
+  — OAuth-gated, can't be scripted/unit-tested"). The player-side embed of
+  an active X-Bot-initiated stream (reusing X-Live's YouTube iframe
+  technique inside X-Bot, per xb-8's PIP work) is not part of this patch —
+  xb-5 as scoped is the HOST-side control only. Still queued, untouched:
+  xb-3 (X-Live Activated indicator, blocked on xb-6), xb-6/xb-7 (host
+  monitoring/invite-to-share consent flow + Theater monitoring panel —
+  needs live browser/hardware to verify), xb-10 (player-side X-Tracker/
+  Notes/Voice/Video Studio — needs Ennis's input on X-Tracker architecture
+  and live camera/mic hardware to verify), xb-11 (resize/fullscreen polish
+  across every new X-Bot tool, ships last per the plan's own sequencing).
