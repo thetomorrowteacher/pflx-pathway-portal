@@ -16288,3 +16288,125 @@ Mission Control immediately after, since it touches live nav for active testers.
   resize sliders on each individualized tab -- needs re-confirming this
   still applies now that the redesign landed on the single Dashboard page
   rather than per-tab pages); a true Programs entry in the player Calendar.
+
+
+## PATCH PLATFORM v188 -- MC Player Dashboard redesign, Sub-patch 4 (SIZE/CONTENT CORRECTION): rebuilt Programs/Projects/Tasks home-row cards to match Ennis's mockup (Sept 12, Ennis)
+- SYMPTOM / CORRECTION: immediately after v187 shipped and was live-verified
+  (real Dashboard, Player Mode, carousel rows rendering, dropdown expanding
+  with real stats), Ennis sent his actual design mockup again with:
+  "the Netflix-style scrollable Programs/Projects does not directly follow
+  my design and sizes." Visual analysis of the mockup against the shipped
+  v187 cards found the gap was real: v187's Programs/Projects/Tasks home
+  cards were small, uniform ~200-240px chips with minimal content, while
+  the mockup showed larger, information-rich cards (status, dates, badge
+  chips, checklist progress) closer to what the dedicated Checkpoints/
+  Projects/Programs LIST pages already render.
+- SCOPE QUESTION, asked and answered: the mockup also shows host-only
+  management controls on these cards (Generate Checkpoints / Edit / Delete
+  on Programs; edit/delete icons on Tasks). Asked Ennis via AskUserQuestion
+  whether the rebuilt cards should (a) match content but drop host-only
+  actions, (b) include some player-safe actions I'd propose, or (c) match
+  the mockup exactly including host actions. Ennis picked (b) -- "include
+  some player-safe actions." Concluded and documented here: there is no
+  real player-safe equivalent of Generate Checkpoints/Edit/Delete on a
+  Program card (a player can't manage a Program's structure), so instead
+  of inventing a new affordance, the Program card now surfaces the two
+  REAL actions a player already has elsewhere in the portal -- Apply to
+  Join and Start/Continue (ppRenderPrograms' own existing logic, ported
+  not reinvented) -- in place of the host controls. For Tasks, the mockup's
+  checklist is real and shown (read-only progress preview, using the exact
+  same task.checklist / per-player submission.checklist data and percentage
+  math ppRenderTaskDetail already computes) but a live, standalone
+  check-off-and-persist-immediately mechanism independent of the existing
+  submission flow was deliberately NOT built this pass -- that is genuinely
+  new scope (a second checklist-persistence path, with its own
+  read-merge-write/tombstone considerations per the persistence guardrail)
+  and does not belong rushed into a sizing/content-density fix. Logged
+  below as backlog.
+- FIX:
+  1. `ppHomeProjectCardHtml(proj)` rebuilt: 340px/2-per-row, ported
+     DIRECTLY from `ppRenderProjects` (the real Projects list page) --
+     banner image (with LOCKED badge overlay) or gradient fallback icon,
+     parent-checkpoint tag (↪ Checkpoint Name), description snippet
+     (2-line clamp), real progress bar + done/total via
+     `pflxProjectCompletion`, XC-reward-pool chip, due-date urgency label.
+     Keeps the exact same "More info & stats" dropdown toggle
+     (home-pj- key prefix) v187/v186 already shipped -- the one genuine
+     player-safe action already proven to work, unchanged.
+  2. `ppHomeProgramCardHtml(pg)` rebuilt: 340px/2-per-row, ported
+     DIRECTLY from `ppRenderPrograms` -- banner or gradient icon,
+     description snippet, checkpoint count, and the SAME real
+     OPEN (green) / LOCKED-with-lockMessage (red) / PENDING (amber) /
+     PAY $ (cyan) status pill logic `ppRenderPrograms` already computes
+     (not a simplified binary state anymore). Apply to Join and
+     ▶ Start/Continue buttons (`mcApplyToProgramOrProject`,
+     `pflxEntryCtaLabel` -- both existing, already-tested functions)
+     replace the mockup's host-only Generate Checkpoints/Edit/Delete
+     controls, per the scope decision above. Still deliberately no
+     dropdown (Ennis asked for dropdown arrows on "Checkpoints, Projects"
+     specifically, not Programs -- unchanged from v187).
+  3. `ppHomeTaskCardHtml(t)` rebuilt: widened to 260px, now a real
+     task-management-style card -- status tag (OPEN/SUBMITTED/APPROVED,
+     not just an icon), linked checkpoint/project tag (🎬 Project Name or
+     🏁 Checkpoint Name, via the same `pflxFindProject`/`pflxFindCheckpoint`
+     lookups `ppRenderTaskDetail` uses), description snippet, a REAL
+     checklist-progress bar + N/M-checked line (same `task.checklist` +
+     per-player `submission.checklist` data and percentage math
+     `ppRenderTaskDetail` already computes -- read-only preview; see the
+     Scope Question above for why live in-card check-off wasn't built
+     this pass), XC chip, and up to 2 reward-badge chips
+     (`task.rewardBadges`). Replaces the old simple icon+title+XC-chip
+     card.
+  4. `ppHomeCheckpointCardHtml` left UNCHANGED -- its existing ~200px
+     sizing was already closest to the mockup's proportions for that row.
+  5. Small real bug found and fixed while rebuilding: the ORIGINAL
+     `ppRenderProjects` list-page's "no banner" locked-project badge
+     includes the word "Locked" next to the lock icon; the FIRST version
+     of the new `ppHomeProjectCardHtml`'s no-banner locked path only
+     showed the bare lock icon with no text. Fixed for consistency with
+     the real list-page behavior before shipping.
+- Verified: syntax gate clean (13 blocks). PFLX_PATCH bumped 187 -> 188
+  (PFLX_BUILD already correct at 2026.09, no change needed). New 53-case
+  unit test (`test_pp_home_cards_v188.js`) extracting the real shipped
+  `ppHomeProjectCardHtml`/`ppHomeProgramCardHtml`/`ppHomeTaskCardHtml`
+  source -- markup/sizing checks (340px Project/Program, 260px Task, no
+  Edit/Delete/Generate-Checkpoints strings anywhere), Project card
+  (name/description/progress/XC chip/LOCKED badge/parent-checkpoint
+  tag/urgency label/XSS escaping/banner-vs-fallback), Program card (all
+  4 status states -- OPEN/LOCKED+lockMessage/PENDING/PAY $, Apply button
+  shown only in the correct state, Start/Continue button, checkpoint
+  count, name escaping), Task card (title/description/XC
+  chip/APPROVED+strikethrough/SUBMITTED/OPEN states, checklist
+  progress N/M, linked project vs. checkpoint tag fallback, badge chips
+  capped at 2, no checklist block when task has none, XSS escaping) --
+  all 53 PASS. Updated the now-stale v187 test
+  (`test_pp_home_carousel_v187.js`): its `makeHomeProjCardSandbox`/
+  `makeHomeProgramCardSandbox`/`makeHomeTaskCardSandbox` helpers needed
+  new stub dependencies for the functions' new calls (`ppGetCheckpoints`,
+  `pflxFindCheckpoint`, `pflxFindProject`, `_mcUrgencyForDueDate`,
+  `pflxProjectCompletion`, `ppProgressBar`, `pflxPlayerApplicationState`,
+  `mcCheckpoints`, `pflxEntryCtaLabel`) -- the same
+  forward-compatibility pattern every version-specific test in this file
+  has needed as later patches extend shared functions. Also updated one
+  assertion ("a locked program shows LOCKED state") that tested the OLD
+  simplified binary state; the real ported status logic shows
+  "COHORT REQUIRED" (or a host's custom lockMessage) next to the lock
+  icon rather than a bare "LOCKED" literal, matching `ppRenderPrograms`'
+  real, already-shipped behavior -- not a regression, a corrected test
+  expectation. `test_pp_home_carousel_v187.js` now: 71 passed, 1 failed
+  (the single, expected, already-documented stale-PFLX_PATCH-literal
+  non-pass every version test in this file shows once a later patch
+  bumps the version). Full regression suite re-run clean: the 3
+  documented pre-existing Node-crash files (test_v1142.js, test_v1144.js,
+  test_v1144_v2.js) unchanged, and every other version-specific test
+  (v171 through v187) shows only its own single expected
+  stale-PFLX_PATCH-literal non-pass.
+- BACKLOG (deliberately not built this pass, flagged to Ennis): live,
+  in-card checklist check-off with immediate persistence for the Task
+  home card, independent of the existing full-submission flow -- a
+  genuinely new small feature (needs its own read-merge-write/tombstone
+  design per the persistence guardrail, since it would be a second write
+  path onto `task.submissions[]`), not folded into this sizing/content
+  fix. The org card (`ppHomeOrgCardHtml`), carousel scroll/drag mechanics
+  (`ppCarouselRowHtml`), and the resize-slider backlog item from v187 are
+  all unchanged and still pending as previously logged.
