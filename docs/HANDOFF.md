@@ -15869,3 +15869,144 @@ Mission Control immediately after, since it touches live nav for active testers.
   quick manual glance next time Ennis is in the app, since visual/timing
   polish like this benefits from an eyeball check even when the logic is
   proven — but nothing is blocked on it.
+
+## PATCH PLATFORM v183 — Tab bar consistent in every mode + fixed the size-preset "top buttons" + explicit tab-bar hide (Sept 12, Ennis)
+
+- ASK: Ennis, with 4 screenshots: "Move the tap to talk under the tab bar,
+  The tab bar should remain consistant in all tabs. Add the hide
+  function. The top buttons arent working." Clarified mid-investigation,
+  when asked what "hide function" meant: "I was refering to hiding the
+  toolbar."
+- ROOT CAUSE (a)/(b) — tab bar / tap-to-talk: the Voice Chat Section
+  (`#xbot-voice-section`, the "TAP TO TALK" orb) was placed in the HTML
+  BEFORE the `.xbot-mode-tabs` row — between the panel header and the
+  Host Broadcast composer — while every other mode's section (Notes,
+  Host, Live, Dev/Eng, Settings) sits AFTER the tab bar. Since
+  `#xbot-side-panel` is a plain flex column, DOM order is visual order:
+  in Voice mode the orb rendered above the tab bar; in every other mode
+  the tab bar rendered first because that mode's section lives after it.
+  Not a CSS/z-index bug — a structural one-section-in-the-wrong-slot bug.
+- ROOT CAUSE (c) — "top buttons arent working": `makeDrag()`'s
+  pointerdown handler (wired to the whole `#pflx-dock-header`) is
+  supposed to bail out before starting a drag gesture when the click
+  target is one of the header's own controls — it explicitly excluded
+  `.pflx-dock-tab`, `.pflx-dock-hbtn`, and `.pflx-dock-rsz`, but forgot
+  the v172 size-preset buttons (`.pflx-dock-size-btn`: ▪ Compact /
+  ◻ Standard / ▭ Wide / 🖥 Studio). Clicking any of them hijacked into a
+  drag gesture (`setPointerCapture` on the header) instead of firing
+  their own click handler — exactly the screenshot showing the size
+  buttons doing nothing.
+- FIX (a)/(b): moved the entire `#xbot-voice-section` block to sit
+  immediately after `.xbot-mode-tabs`, in the exact same DOM slot every
+  other mode section already uses (right before `#xbot-chat-messages`).
+  No JS logic touched — `switchXBotMode()`'s show/hide calls all still
+  target the same element by id, only its position in the document
+  changed. The tab bar now renders in the identical spot in every mode.
+- FIX (c): added `e.target.classList.contains('pflx-dock-size-btn')` to
+  `makeDrag()`'s exclusion check, alongside the three it already had.
+- FIX (hide the toolbar): added an explicit, band-independent hide/show
+  toggle for `.xbot-mode-tabs`, distinct from v172's Compact-band-only
+  auto-collapse. New `#pflx-dock-tabs-toggle` (☰) button in the dock
+  header (uses `.pflx-dock-hbtn`, already excluded from the drag hijack —
+  no risk of repeating the bug just fixed); new `state.tabsHidden`
+  field, persisted via a new `TABSHIDEK` localStorage key
+  (`pflx_dock_tabshidden`) alongside the dock's existing rect/tab/
+  autoSpeak persistence; new `.xbot-mode-tabs.xbot-tabs-hidden` CSS rule
+  (`max-height:7px !important`) that collapses the bar to a thin sliver
+  in ANY size band, not just Compact. Clicking the collapsed sliver
+  itself un-hides it entirely (same discoverability pattern as the
+  existing Compact-band peek), rather than just a temporary 3-second
+  peek — generalized the existing peek click-handler to check
+  `state.tabsHidden` first.
+- Verified: syntax gate clean (13 blocks). New 31-case unit test
+  (`test_xbot_dock_v183.js`) — 5 source-position checks confirming the
+  Voice section moved (and that the Host Broadcast composer now
+  immediately follows the panel header with nothing wedged between
+  them), 4 static + 4 real-condition-execution checks on the `makeDrag`
+  fix (proving a `.pflx-dock-size-btn` target is now excluded from the
+  drag gesture while the header itself still drags normally), 4 markup/
+  key checks and 6 sandboxed `persist()`/`restore()` round-trip checks
+  (true→true, false→false, and a never-stored default of `false` that
+  never throws) for the new hide toggle, and 9 sandboxed click-wiring
+  checks (toggle button flips state + calls render()/persist(), a click
+  on the hidden sliver un-hides it without also triggering the unrelated
+  peek class, normal peek behavior is unchanged when not explicitly
+  hidden, the pre-existing Minimize-to-FAB button wiring is untouched) —
+  all 31 PASS. One test-authoring bug was found and fixed during writing
+  (fragile regex string-surgery to turn the extracted `if (...) return;`
+  into a callable boolean expression mis-handled the real paren nesting;
+  replaced with a simpler `return true;`/`return false;` rewrite of the
+  extracted code, which is robust regardless of nesting). Full regression
+  suite re-run surfaced one genuine forward-compatibility gap in the
+  OLDER `test_xbot_controller_v172.js`: its `render()` sandbox stubbed
+  `document.getElementById` but not `document.querySelector`, which this
+  patch's new `render()` code now also calls — crashed with `TypeError:
+  document.querySelector is not a function`. Fixed by adding a
+  `querySelector: () => null` stub to that test's fake document, the
+  same kind of forward-compatibility fix every version test has needed
+  when a later patch extends a shared function it sandboxes; this is a
+  test-only fix, no shipped-code change. Re-ran clean (19 passed, 1
+  expected stale-version-literal). Full regression suite re-run clean
+  end to end: the 3 documented pre-existing Node-crash files unchanged,
+  and every version-specific test (`v171` through `v182`) shows only its
+  own single expected stale-`PFLX_PATCH`-literal non-pass.
+- HOST ACTIONS / BACKLOG: none required — fully verified by the test
+  suite (structural position, the real extracted drag-exclusion
+  condition, and real sandboxed click events). A quick live glance next
+  time Ennis is in the app is still worthwhile for the visual/UX feel of
+  the new hide toggle (is ☰ the right icon/label, does the collapsed
+  sliver feel discoverable enough), but nothing is blocked on it.
+
+## PATCH PLATFORM v184 — Notes panel simplified to plain localStorage, no Supabase (Sept 12, Ennis)
+
+- ASK: Ennis, same message as v183 above: "Notes should save in the
+  simplist way possible without causing any Supabase additions or
+  issues." v181 had shipped the Notes panel with a Supabase-backed
+  autosave (`app_data` row per session, key `pflx_xbot_notes_<sessionId>`,
+  `sb.from('app_data').select/.upsert`) — this patch replaces that
+  implementation entirely with plain `localStorage`, per Ennis's explicit
+  request to drop the cloud round-trip.
+- FIX: removed `window.pflxXBotNotesCloudKey`, and rewrote
+  `xbotNotesLoad`/`xbotNotesSaveNow` from `async function`s that called
+  `window.pflxSupabase()` + `sb.from('app_data')...` into plain
+  synchronous functions that call `window.localStorage.getItem/setItem`
+  directly. New `window.pflxXBotNotesLocalKey(session)` replaces the old
+  cloud-key function (same `'pflx_xbot_notes_' + session.id` naming, so
+  notes still don't bleed across different logins on a shared device —
+  only the storage backend changed, not the keying scheme).
+  `xbotNotesFormatSavedTime` and the 900ms debounce in
+  `xbotNotesScheduleSave` are unchanged — same autosave UX, simpler
+  persistence layer underneath. No new Supabase key, no new `app_data`
+  row, no cloud round-trip, no merge-conflict surface at all now (single
+  browser, single storage).
+- Verified: syntax gate clean (13 blocks). New 32-case unit test
+  (`test_xbot_notes_v184.js`) — 7 static checks confirming Supabase is
+  genuinely gone from the block (no `pflxSupabase`, no
+  `from('app_data')`, no `.upsert(`, no `async`/`await`, the old
+  cloud-key function name is gone) plus 25 sandboxed behavioral checks
+  (key derivation, the pure time formatter including noon/midnight edge
+  cases, 7 load-orchestrator cases including "don't clobber in-progress
+  typing on reopen," 8 save-orchestrator cases including a debounce
+  round-trip and a "rapid re-typing leaves exactly one pending save"
+  case, and a `localStorage.setItem` throwing — quota exceeded or a
+  blocked store — caught and shown honestly rather than crashing) — all
+  32 PASS. One test-authoring bug was found and fixed while writing this
+  test: the fake `setTimeout` used 0-based ids, which tripped the
+  shipped code's `if (xbotNotesSaveTimer)` truthiness guard (harmless in
+  every real browser, since `setTimeout` never returns `0`) — fixed by
+  starting the fake ids at 1, matching real browser behavior. Retired
+  the now-obsolete `test_xbot_notes_v181.js` (moved to `_to_delete/`):
+  it extracted the old `pflxXBotNotesCloudKey`/async functions this
+  patch deliberately removed by design (not moved — genuinely replaced),
+  so keeping it would only ever crash; `test_xbot_notes_v184.js` is now
+  the authoritative Notes test. Full regression suite re-run clean: the
+  3 documented pre-existing Node-crash files unchanged, and every
+  version-specific test (`v171` through `v183`) shows only its own
+  single expected stale-`PFLX_PATCH`-literal non-pass.
+- HOST ACTIONS / BACKLOG: none — no OAuth, no hardware, no cloud
+  round-trip left to verify; fully covered by the test suite. Trade-off
+  worth knowing: notes no longer follow a player across devices/browsers
+  (they're local to whichever device/browser wrote them) — this is the
+  direct, intended consequence of "simplest way possible, no Supabase,"
+  not an oversight. If cross-device notes are ever wanted again, that's
+  a deliberate future ask, not a bug to fix.
