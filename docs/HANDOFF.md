@@ -15807,3 +15807,65 @@ Mission Control immediately after, since it touches live nav for active testers.
   architecture; Voice recording and Video Studio — need real camera/mic
   hardware to verify actual capture), and xb-11 (resize/fullscreen polish
   across every new X-Bot tool, ships last per the plan's own sequencing).
+
+
+## PATCH PLATFORM v182 — X-Bot auto-open now waits for the intro video to finish (Sept 12, Ennis)
+
+- ASK: Ennis reported (with screenshots) that on login, the X-Bot chat
+  window pops up ON TOP of the PFLX Motion Graphic intro video (the
+  spinning "PROTOTYPE" logo transition), rather than after it finishes —
+  "I Want the X-bot automatic pop message to happen after the opening
+  video scene....therefore layer it behind."
+- ROOT CAUSE: `loginUser()`'s post-login block called
+  `pflxXBotAutoOpenOnLogin()` (v171) and `pflxXBotDailyBriefingCheck()`
+  (v179) immediately after `initPlatform(displayName)` — BEFORE
+  `playMotionIntro()` was even invoked further down the same function.
+  The intro overlay (`#pflx-motion-intro`) is `z-index:600`; the X-Bot
+  dock (`#pflx-dock`) is `z-index:100000`. So even though the two calls
+  raced against the video rather than being sequenced after it, the huge
+  z-index gap meant the dock always rendered ON TOP of the video the
+  instant it opened — exactly what the screenshots showed. A pure
+  z-index fix would have been the wrong tool here: the actual defect was
+  timing/sequencing, not stacking order, and patching z-index alone would
+  either still show the dock mid-video (just behind it, half-obscured) or
+  require re-raising it the moment the video ended — a more fragile fix
+  than just firing the calls at the right time in the first place.
+- FIX: moved both calls (same functions, same retry/fail-safe logic,
+  untouched) out of the pre-intro block and into
+  `playMotionIntro().then(() => { navigateTo('home'); ... })`, right after
+  `navigateTo('home')` and before the existing first-login tutorial check.
+  Since `loginUser()` is the single choke point both the manual-login-form
+  path and `tryAutoLogin()`'s persisted-session-restore path funnel
+  through (per v171's own original discovery), this fix covers both entry
+  points automatically. Now the dock only opens (and the daily briefing
+  check only fires) once the intro video has fully played AND faded out.
+- Verified: syntax gate clean (13 blocks). New 15-case unit test
+  (`test_xbot_intro_timing_v182.js`) — 8 source-order checks (confirming
+  the auto-open IIFE and daily-briefing check moved from before
+  `playMotionIntro()` to after `navigateTo('home')` inside its `.then()`,
+  and that neither call was duplicated) plus 7 real-execution checks that
+  extract the actual shipped `.then()` callback body and run it in a
+  sandbox to prove the REAL runtime order (`navigateTo` → dock auto-open →
+  daily briefing check → tutorial check), including a safe-no-op case
+  when `window.pflxDock` is missing — all 15 PASS. Also fixed a
+  forward-compatibility gap this patch exposed in the OLDER
+  `test_xbot_briefing_v171.js`: its extraction end-marker was anchored to
+  the auto-open IIFE's old 16-space indent (crashing outright once the
+  code moved one indent level deeper into the `.then()` callback), and it
+  asserted the IIFE sat "right after `initPlatform()`" — an assertion
+  this patch deliberately makes false. Updated both (marker indent +
+  position assertion now reflects the IIFE's new home) — the same kind of
+  forward-compatibility fix every version test has needed when a later
+  patch moves or extends code it originally anchored on; this is a
+  test-only fix, no shipped-code change. Full regression suite re-run
+  clean: the 3 documented pre-existing Node-crash files unchanged, and
+  every version-specific test (`v171` through `v181`) shows only its own
+  single expected stale-`PFLX_PATCH`-literal non-pass (confirmed via
+  `grep`/tail on each — no other assertion regressed).
+- HOST ACTIONS / BACKLOG: none — this is a pure timing fix, fully
+  verified by the test suite (both source-order and real sandboxed
+  execution order). A live click-through (log in, watch the intro video
+  play uninterrupted, confirm X-Bot pops up right after) is still worth a
+  quick manual glance next time Ennis is in the app, since visual/timing
+  polish like this benefits from an eyeball check even when the logic is
+  proven — but nothing is blocked on it.
