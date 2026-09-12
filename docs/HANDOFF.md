@@ -16112,3 +16112,69 @@ Mission Control immediately after, since it touches live nav for active testers.
   - A true Programs entry in the player Calendar (deliberately left out
     of this v1 -- different visibility rule than Checkpoints/Projects/
     Tasks).
+
+## PATCH PLATFORM v186 -- MC Player Dashboard redesign, Sub-patch 2: "more info & stats" dropdowns on Checkpoint/Project list cards (Sept 12, Ennis)
+- SYMPTOM: Ennis, on the still-open MC Player Dashboard redesign: "Those
+  dropdowns should be the player version of what the host sees in the
+  Projects, Checkpoints, etc. Build this now. Most of the redesign has come
+  from other places in MC." Referring to the mockup's dropdown-arrow icons
+  on Checkpoint/Project cards for "more info and stats."
+- INVESTIGATION: read the host's own mcRenderCheckpoints/mcRenderProjects
+  list cards first, since Ennis pointed at "what the host sees" as the
+  model. Host cards already show their info INLINE in the list -- a
+  "CHECKPOINT PROGRESS" panel (cohort-wide bar, completions, XC in
+  circulation) and a "MISSION CONTENTS" panel (nested Projects + Tasks
+  tree) sit directly in the card, no separate detail page needed. The
+  player's existing list cards (ppRenderCheckpoints/ppRenderProjects,
+  shipped in v185) had no such inline info at all -- the whole card was
+  just a click-through to a full detail page. Also confirmed the player
+  detail pages (ppRenderCheckpointDetail/ppRenderProjectDetail) already
+  compute the exact player-scoped equivalents of the host's stats
+  (pflxPlayerCheckpointProgress, pflxProjectCompletion, per-task
+  pflxTaskStateForPlayer) -- the right move was to reuse those same data
+  helpers behind a new, list-card-sized panel, not duplicate the detail
+  pages' full-hero markup into a dropdown.
+- FIX:
+  1. New `ppCheckpointStatsHtml(cp)` / `ppProjectStatsHtml(proj)` --
+     compact "more info & stats" panels built on the SAME data helpers the
+     player detail pages already use (pflxPlayerCheckpointProgress,
+     pflxProjectCompletion, pflxTaskStateForPlayer, ppItemInCheckpoint,
+     ppItemAssignedToActivePlayer, pflxPlayerCanEnterItem,
+     _mcUrgencyForDueDate) -- your own progress %, approved/total task
+     counts, a Projects/Tasks contents breakdown (with a lock hint on a
+     project you can see but not enter), and XC per row. Numbers can never
+     drift from what the full detail page already shows since they share
+     the same computation, not a re-derivation.
+  2. New `window.ppToggleDropdown(ev, key)` -- toggles a collapsed-by-
+     default panel and flips the arrow glyph (▾ collapsed / ▴
+     expanded), stopping propagation so opening the dropdown never
+     triggers the card's own click-through to the full detail page.
+  3. Wired a dropdown-arrow button + panel into every card in
+     ppRenderCheckpoints and ppRenderProjects. A row inside the panel
+     (a project or task) still navigates to that item's own detail via
+     ppNav on click, with its own stopPropagation.
+- Verified: syntax gate clean (13 blocks). New 36-case unit test
+  (test_pp_dropdowns_v186.js) -- wiring checks (toggle button + collapsed
+  panel present in both list renderers), plus sandboxed behavioral checks
+  extracting the real shipped functions via string-marker matching:
+  ppCheckpointStatsHtml (progress %, approved/total, empty state, locked
+  vs enterable project hint, correct click-through ids, XC display,
+  due-date urgency, HTML-escaping of a hostile project name, never throws
+  when the progress helper itself throws), ppProjectStatsHtml (completion
+  %, done/total, empty state, a linked task's status icon/XC/click-
+  through, the "can SEE" filter genuinely excluding a hidden task), and
+  ppToggleDropdown (stops propagation, opens/closes/flips the arrow on
+  alternating toggles, safe no-op when the target panel is absent) -- all
+  36 PASS. One older test (test_mc_player_dash_v1.js's ppRenderProjects
+  sandbox) needed the same forward-compatibility fix every prior patch in
+  this run of work has needed: its sandbox didn't yet stub the two newly-
+  called functions (ppToggleDropdown, ppProjectStatsHtml) -- fixed by
+  adding stub parameters, matching the established pattern. Full
+  regression suite re-run clean: the 3 documented pre-existing Node-crash
+  files unchanged, and every version-specific test (v171 through v185)
+  shows only its own single expected stale-PFLX_PATCH-literal non-pass.
+- BACKLOG (documented, not built this patch -- still the actual
+  Netflix-style visual redesign Ennis's mockup asked for): horizontal-
+  scrolling "Netflix carousel" rows with slide-arrow controls replacing
+  the plain card grids; wiring the pflxCardSize* resize-slider engine into
+  the player views; a true Programs entry in the player Calendar.
