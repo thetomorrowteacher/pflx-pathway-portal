@@ -16178,3 +16178,113 @@ Mission Control immediately after, since it touches live nav for active testers.
   scrolling "Netflix carousel" rows with slide-arrow controls replacing
   the plain card grids; wiring the pflxCardSize* resize-slider engine into
   the player views; a true Programs entry in the player Calendar.
+
+
+## PATCH PLATFORM v187 -- MC Player Dashboard redesign, Sub-patch 3 (CORRECTED SCOPE): Netflix-style scrollable carousel rows built directly on the Dashboard page (Sept 12, Ennis)
+- SYMPTOM / CORRECTION: after v186 shipped the "more info & stats" dropdowns
+  onto the dedicated Checkpoints/Projects LIST pages and Ennis confirmed
+  live in-browser that they worked, he sent the SAME Netflix-style mockup
+  again with a critical correction: "No this should be designed on the
+  dashboard page and scrollable exactly how I designed it in the picture
+  with scroll effects." The whole redesign -- horizontally-scrolling
+  Programs/Checkpoints/Projects/Tasks rows, drag/scroll effects, and the
+  per-card dropdown-arrow stats -- belongs on the player's HOME dashboard
+  itself (ppRenderHome), not spread across separate dedicated pages. v186's
+  dropdown functions and the dedicated list pages are unchanged and still
+  live; this patch adds the actual carousel layer on top of the Dashboard.
+- ROOT CAUSE (design, not a bug): confirmed via grep that no
+  horizontal-carousel/Netflix-row UI pattern existed anywhere in the
+  codebase (checked overflow-x, scroll-snap, carousel naming, scrollBy/
+  scrollLeft, drag handlers, arrow-button naming -- only unrelated
+  overflow-x:auto TABLE-scroll wrappers existed). This was genuinely new
+  UI, not a port of something already built.
+- FIX:
+  1. New `ppCarouselRowHtml(opts)` -- a single reusable horizontally-
+     scrolling row: native `overflow-x:auto` + `scroll-snap-type:x
+     proximity` gives free touch/trackpad drag-scroll with no JS, plus a
+     right-edge chevron button (`window.pflxCarouselScroll(rowId, dir)`,
+     `scrollBy({left, behavior:'smooth'})`, minimum-240px advance so a
+     narrow row never scrolls by a near-zero amount) and a desktop mouse
+     click-drag-to-scroll handler (`window.pflxCarouselDragStart`, no
+     `preventDefault()` so a plain click still fires a card's own onclick
+     on mouseup). No new library -- CSS scroll-snap + native scrollBy.
+  2. New compact home-row cards, each ~200px wide with `scroll-snap-
+     align:start`: `ppHomeCheckpointCardHtml(cp)` / `ppHomeProjectCardHtml
+     (proj)` reuse the SAME `ppCheckpointStatsHtml`/`ppProjectStatsHtml`/
+     `ppToggleDropdown` functions v186 already shipped for the dropdown
+     panels -- same data, same toggle mechanism -- but with a distinct
+     `home-cp-`/`home-pj-` DOM-id key prefix so a checkpoint's home-row
+     card and its list-page card never collide even though only one view
+     is ever mounted at a time. `ppHomeProgramCardHtml(pg)` is
+     deliberately card-only, no dropdown (Ennis asked for dropdown arrows
+     on "Checkpoints, Projects" specifically, not Programs) and mirrors
+     `ppRenderPrograms`'s own OPEN/LOCKED language.
+     `ppHomeTaskCardHtml(t)` uses the same three-state icon
+     (`pflxTaskStateForPlayer`) as everywhere else in the player portal.
+  3. New `ppHomeOrgCardHtml()` -- the mockup's cohort/org info card
+     ("American School of Dubai", "ASD - falconstudios@asdubai.org",
+     "COHORT: Falcon Studios", tier/ACTIVE pills). Ports the REAL org data
+     model host admins already manage (`ORGANIZATIONS[key]`, the same
+     lookup `hmcRenderOrgs` uses for its player-count tally: the org whose
+     `cohorts[]` contains the active player's own cohort), not a
+     fabricated card. Read-only, silently returns '' when
+     `ORGANIZATIONS` is undefined / no cohort / no matching org -- a
+     platform not using multi-org tenancy sees no change.
+  4. Wired into `ppRenderHome` right after the existing 2x2 nav-cards
+     grid (`html += '</div>'; // close grid`): the org card, then a
+     PROGRAMS row (all `mcPrograms`, matching the existing "every player
+     sees every Program" visibility rule), a CHECKPOINTS row (the
+     already-computed player-scoped `checkpoints` array), a PROJECTS row
+     (`ppGetProjects().filter(ppItemAssignedToActivePlayer)`), and a TASKS
+     row (the already-computed player-scoped `tasks` array) -- each row
+     gated on its collection actually having items, so no empty row ever
+     renders. Everything above the grid close (header, invite card, active
+     checkpoint hero, quick-stats tiles, nav grid) is untouched; everything
+     below (Upcoming Deadlines, X-Bot briefing) is untouched.
+- TOOLING NOTE (worth recording, not a code defect): the FIRST syntax-gate
+  run on Ennis's Mac reported all 13 blocks FAILED with no per-block error
+  text. Direct `df -h` over the AppleScript bridge found his Mac at 110MB
+  free on a 460GB disk (100% capacity) -- `node scripts/syntax_gate.js`
+  needs to `mkdtemp` a scratch directory and was crashing with `ENOSPC`,
+  not reporting a real syntax defect. Independently confirmed the patch
+  itself was valid two ways that don't depend on his disk: (1) `node
+  --check` on the newly-inserted JS in isolation from this session's own
+  sandbox, and (2) staging the actual on-device `preview.html` into this
+  sandbox and re-running the real `scripts/syntax_gate.js` against it --
+  13 blocks checked, 0 failed. HOST ACTION: Ennis's Mac needs disk space
+  freed up soon -- at 110MB free, ANY local build/tooling step that needs
+  scratch space (not just this one) will keep failing the same way until
+  space is freed.
+- Verified: syntax gate clean (13 blocks, confirmed via the disk-
+  unconstrained re-run above). New 72-case unit test
+  (test_pp_home_carousel_v187.js) -- wiring checks (every new function
+  defined+exported, the org card and all 4 carousel rows wired at the
+  right point in ppRenderHome, each row gated on its collection having
+  items), a `ppCarouselRowHtml` sandbox (empty cardsHtml -> no phantom
+  row, title/icon/subtitle render, scroll-snap + overflow-x:auto present,
+  drag handler and advance-arrow wired to the right row id, two different
+  rowIds never collide on DOM id), a `pflxCarouselScroll` sandbox (forward/
+  backward scroll direction, smooth behavior, minimum-advance floor on a
+  narrow row, safe no-op on a missing row), a `pflxCarouselDragStart`
+  sandbox (grabbing cursor, mousemove/mouseup wiring, scrollLeft actually
+  changes while dragging, cursor/listeners restored on mouseup, safe no-op
+  on a missing row), sandboxes for all four home-card renderers (correct
+  click-through ids, home-cp-/home-pj- key prefixes distinct from the
+  list-page cp-/pj- keys, dropdown stopPropagation, embeds the real stats
+  panel content, banner-image vs. fallback-icon states, lock badge on a
+  visible-but-not-enterable project, Programs card has NO dropdown by
+  design, task-card icon/strikethrough/XC states, HTML-escaping of a
+  hostile name), and a `ppHomeOrgCardHtml` sandbox (undefined
+  ORGANIZATIONS / no cohort / no matching org all return '', finds the
+  right org by cohort membership, renders name/shortName/contact/cohort/
+  tier/ACTIVE-INACTIVE, never throws on a malformed ORGANIZATIONS entry)
+  -- all 72 PASS. Full regression suite re-run clean: the 3 documented
+  pre-existing Node-crash/fail files (test_v1142.js, test_v1144.js,
+  test_v1144_v2.js) unchanged, and every version-specific test (v171
+  through v186) shows only its own single expected stale-PFLX_PATCH-
+  literal non-pass.
+- BACKLOG (still not built): wiring the pflxCardSize* resize-slider engine
+  into the player views (Ennis's original mockup annotation also asked for
+  resize sliders on each individualized tab -- needs re-confirming this
+  still applies now that the redesign landed on the single Dashboard page
+  rather than per-tab pages); a true Programs entry in the player Calendar.
