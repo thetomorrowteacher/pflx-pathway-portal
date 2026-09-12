@@ -15750,3 +15750,60 @@ Mission Control immediately after, since it touches live nav for active testers.
   Notes/Voice/Video Studio — needs Ennis's input on X-Tracker architecture
   and live camera/mic hardware to verify), xb-11 (resize/fullscreen polish
   across every new X-Bot tool, ships last per the plan's own sequencing).
+
+
+## PATCH PLATFORM v181 — X-Bot Notes panel: private, per-user per-session notes (Sept 12, Ennis)
+
+- ASK: xb-10 of the Sept 11 "X-Bot becomes the PFLX companion" plan called
+  for a player-side Notes panel (alongside X-Tracker/Voice/Video Studio).
+  Of that group, Notes was flagged as the one piece buildable now without
+  needing Ennis's input — X-Tracker needs a decision on whether it's a
+  separate app or a native view, and Voice/Video Studio need real
+  camera/mic hardware to verify. Notes is plain per-user text with no such
+  blocker.
+- BUILT: a new "📝 Notes" mode tab in X-Bot's tab row (visible to everyone —
+  players and hosts alike, not role-gated like Host/Live/Dev), holding a
+  single autosaving textarea. Per-user cloud key
+  (`pflx_xbot_notes_<sessionId>`) mirrors the file's own established
+  single-writer per-entity-row convention (`pflx_player_<id>`,
+  `pflx_xbot_briefing_<id>` from v179) — exactly one writer (the note's
+  owner) ever touches that row, so no merge design is needed beyond a
+  normal read-then-write. `xbotNotesLoad()` fetches the row when the tab is
+  opened (and is a safe no-op on a second open for the SAME session, so it
+  never clobbers in-progress typing with a stale server copy).
+  `xbotNotesScheduleSave()` debounces keystrokes (900ms) into
+  `xbotNotesSaveNow()`, which upserts `{text}` to Supabase and updates a
+  small status line ("Saved 3:45 PM" / "Saving…" / "Not saved (offline)" /
+  "Not saved (error)"). Every step fails safe: no active session disables
+  the textarea with an honest prompt; a missing Supabase client or a
+  failed read/write never throws and always tells the user plainly whether
+  it saved.
+- Verified: syntax gate clean (13 blocks). New 36-case unit test
+  (`test_xbot_notes_v181.js`) — 8 markup/wiring checks, an extracted-block
+  completeness check, 3 cloud-key checks, 4 pure time-formatter checks
+  (including the noon/midnight 12-hour edge cases), 7 load-orchestrator
+  cases (missing session, real text found, no stored row yet, a failed
+  cloud read, no Supabase client, and the same-session no-clobber
+  behavior), 5 save-orchestrator cases (correct table/key/payload/
+  onConflict, no session, a failed write, no Supabase client), and 3
+  debounce-wiring checks — all 36 PASS. One test-authoring bug (not
+  shipped code) was found and fixed during verification: the original test
+  fired its async orchestrator checks from un-awaited IIFEs, so
+  `process.exit()` ran before their promises resolved and 10 checks never
+  printed at all — rewritten so every check runs inside one awaited
+  `async main()`. Full regression suite re-run clean: the 3 documented
+  pre-existing Node-crash files unchanged, and every version-specific test
+  (`v171` through `v180`) shows only its own single expected
+  stale-`PFLX_PATCH`-literal non-pass (confirmed via `grep -A1 FAIL` on
+  each — no other assertion regressed).
+- HOST ACTIONS / BACKLOG: none — Notes needed no host action, no OAuth, and
+  no hardware to verify, so this patch is fully verified end-to-end by the
+  test suite above; no manual click-through caveat applies here (unlike
+  v180's YouTube OAuth flow or the still-open hardware-dependent items
+  below). Still queued, untouched: xb-3 (X-Live Activated indicator,
+  blocked on xb-6), xb-6/xb-7 (host monitoring/invite-to-share consent
+  flow + Theater monitoring panel — needs live browser/hardware to
+  verify), the rest of xb-10 (X-Tracker embed — needs Ennis's input on
+  architecture; Voice recording and Video Studio — need real camera/mic
+  hardware to verify actual capture), and xb-11 (resize/fullscreen polish
+  across every new X-Bot tool, ships last per the plan's own sequencing).
