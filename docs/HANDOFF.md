@@ -16584,3 +16584,97 @@ Mission Control immediately after, since it touches live nav for active testers.
   - `xbotNotesLoad`/`xbotNotesScheduleSave`/`xbotNotesSaveNow` rewritten around the new store shape; `xbotNotesNew`/`xbotNotesSelect`/`xbotNotesDeleteActive` are new CRUD entry points. `xbotNotesFormatSavedTime` (unchanged from v184) is reused as-is.
 - Verified: syntax gate clean (13 blocks). New 47-case unit test (`test_xbot_notes_v185.js`) — extracts the real shipped `xbotNotesMigrateLegacy`/`xbotNotesSafeFilename`/`xbotNotesFormatSavedTime` via brace-matching (every migration branch above, XSS-escaping on legacy text, filename sanitization edge cases) plus structural/wiring checks on `xbotNotesLoad`/`xbotNotesNew`/`xbotNotesDeleteActive`/`xbotNotesExec`/`xbotNotesDownloadActive` (reuses the real migration fn rather than reimplementing, confirms before destructive delete, refuses to format when not editable, builds a real Blob/download rather than a stub, revokes the object URL) and the real HTML markup (contenteditable editor replaces the old textarea entirely, all 6 toolbar buttons wired) — all 47 PASS. Full regression suite re-run: zero new regressions beyond the intended, documented one — `test_xbot_notes_v184.js` (the v184-era test) now fails beyond its own stale-version check because it exercises the OLD single-textarea contract this patch deliberately replaced; marked SUPERSEDED with a header note pointing at `test_xbot_notes_v185.js` rather than forced back to green. Every other version-specific test shows only its own single expected stale-`PFLX_PATCH`-literal non-pass; the 3 documented pre-existing Node-crash files unchanged; the already-documented pre-existing non-passes (`test_pp_home_cards_v188.js`, `test_xbot_controller_v176.js`, `test_xbot_dock_v183.js`, and the newly-flagged-in-v204 `test_xbot_theater_playlist_v177.js`/`test_xbot_theater_popout_dedupe_v196.js`) are all unrelated to Notes and unchanged.
 - HOST ACTIONS: `document.execCommand` (used for the rich-text toolbar) is a long-deprecated-but-still-broadly-functional browser API in Chromium/Edge, which is what this platform already targets elsewhere (see the MIDI Web-API Chrome/Edge-only precedent from the X-Bot Controller epic) — flagging honestly rather than silently, in case a future browser removes it; if that ever happens the fix is swapping the toolbar's implementation, not the note-storage model.
+
+## PATCH PLATFORM v206 — GAMESHOW COUNTDOWN for all of PFLX + host FX relay (Sep 15, Ennis)
+- REQUEST: Ennis: "add sfx and alarms to the timer. Lets make more dramatic effect for the 10 sec countdown. Make sure the voice is counting down. Add dramatic drops from the pack… more animations to the timer… The whole PFLX should flash yellow when the 10 sec countdown occurs. Once the time is off and the alarm is going off...PFLX should have a shaking animation and red flashing. This all should work for all PFLX users." Follow-ups: "Use the sound pack to make alarm and sfx", "The alarm sound in the timer should repeat about 5-7 times."
+- ASSETS (`public/sounds/countdown/`): `count_1..10.mp3`, `count_go.mp3`, `count_timesup.mp3` (Piper TTS voice en_US-ryan-high, pitched down + compressed + echo; ElevenLabs had 0 credits), and pack-built SFX: `fx_alarm.mp3` (glitch_009 looped + pulse_003), `fx_alarm_ring.mp3` (one 1.78s ring cut from it), `fx_drop.mp3` (impact_017 + impact_019), `fx_riser.mp3` (riser_009, peak lands on its last frame), `fx_tick_hi/lo.mp3` (click_026/024), `fx_heartbeat.mp3` (impact_021), `fx_alert.mp3` (glitch_001).
+- ENGINE `window.PflxFx` (byte-identical copy in X-Live): `startCountdown({id,endsAt,label,announce,soft,silent})` is idempotent by id. A small pill shows the clock. For the last 10 s, each second plays a voice number and a tick, flashes the whole screen yellow (orange for 3-2-1, with heartbeat and screen bumps), and shows a big popping number with a draining ring and scan line. The riser starts at T-5.17 s so its peak lands on 0. At 0 the finale plays: drop, "time's up", and the alarm ring × `alarmRepeats` (6). A TIME'S UP slam, red strobe and `body` shake (CSS `translate`) last exactly as long as the alarm (~11.3 s). `cancel(id)` ends it early (host STOP). The layer `#pflx-fx-layer` is z 210000 and appended to `<html>`, so the shake never moves it. Late safety: beats more than 600 ms late are skipped, and a finale more than 3 s late never fires. There is one finale per id (`finished[id]`), and soft re-announcements can't revive a cancelled id for 8 s. Honors `prefers-reduced-motion` (no shake/strobe).
+- RELAY `window.pflxLiveFx` + app_data `pflx_live_fx` = `{events:[…last 20, ≤10 min]}`.
+  - A host action writes one event via read-merge-write (`pflxFxMergeEvents`, union by id). Kinds: `countdown` (cdId, endsAt, sentAt), `cancel`, `show`.
+  - Every signed-in client subscribes over realtime (channel `pflx-live-fx`). Scope: `pflxFxInScope` means empty cohorts = everyone; otherwise a shared cohort, the sender, or an admin/master host.
+  - Receivers re-base countdowns on their own clock: `now + (endsAt - sentAt) - 150`.
+  - Only the freshly written burst plays (at ≥ newest − 5 s), and event ids dedupe. At boot, a countdown still running is joined in progress; everything else is marked seen.
+  - The same channel also watches `key=eq.sessions` and posts `pflx_xlive_sessions_changed` to iframes (X-Live refreshes instantly instead of the 5 s poll).
+- postMessage API (origin allowlist: own origin, thetomorrowteacher.github.io, localhost):
+  - `pflx_countdown {action start|cancel, id, endsAt, label, announce, soft, broadcast, cohorts}`
+  - `pflx_show_fx {fx, eventId, broadcast, cohorts}`
+  - `pflx_subapp_music {playing}` ducks platform BGM to 0 while X-Live music plays
+  - `pflx_theater_open`
+  - The platform only broadcasts when the signed-in platform user is a host (`pflxFxCanBroadcast`); the sub-app's claim is never trusted.
+- Ducking during the final 10 + finale: `PFLX_AUDIO.start('countdown')` (Theater at 20 %). `pflxBgmDuck('countdown', …, 0.25)` never overwrites a volume the player changed while ducked. `pflx_fx_duck` goes to iframes.
+- CYBER TIMER (X-Bot Host tab): `pflxXbotTimerFxSync()` — start/+1 min/resume relays a countdown to the X-Live class cohorts (`_xbotLiveCfg.cohorts`); pause/stop cancels. Old pflxSpeak numbers + `alarm` SFX defer to the engine while it runs. X-Live iframe now has `allow="…; autoplay"`.
+- Verified: syntax gate 15/15. `test_gameshow_fx_v206.js` 42 PASS covers scope, merge, origins, the host-only broadcast, relay re-basing/dedupe/stale tail/cancel, a signed-out window, soft pass-through, realtime filters, BGM duck/restore/keep-user-change, and Cyber Timer start/pause/resume/stop. Playwright (Supabase writes intercepted) is listed under v207.
+
+## PATCH PLATFORM v207 — LIVE THEATER for everyone on top of v203's playlists: sync, loop, host deck, editor, search, Shorts/Drive/TikTok/files, loading-screen fade (Sep 15, Ennis)
+- REQUESTS: "The theater should also play for everyone. The host can control all of this… the video should stream 'live'. I should also be able to loop videos or to loop a playlist of youtube videos" · "allow me to edit playlist, drag files, search youtube… google drive video play as well through a link. Also TikTok? Youtube Shorts playlist? A mix of all?" · "The streaming theater video should fade out and go mute during loading screens. It should fade back in after loading screen."
+- REBASE NOTE: parallel sessions shipped v202 (screenshare → Theater), v203 (named playlists + `cfg.theaterBroadcast`), v204 (Mission Dashboard) and v205 (X-Bot Notes v2) while this work was in progress, so this work ships as v206–v209 on top of fe64f61. v207 builds on v203: `cfg.theaterPlaylists` stays the library and v203's functions stay in place. STREAM TO EVERYONE / STOP / WATCH, render, pop-out/pop-in and login auto-start are wrapped. `cfg.theaterBroadcast` is still written and cleared.
+- LIVE RECORD app_data `pflx_theater_live` = `{id, active, playlistId, playlist:[{id,source,videoId,ref,title,durationSec,live}], index, startedAt, paused, pausedPos, loop:'none'|'one'|'all', cohorts, by, rev, updatedAt}`.
+  - Host writes are serialized (a write queue) and each does read→change→write; the advance is rev-checked.
+  - Everyone receives it by realtime (`pflx-theater-live`) plus a 30 s poll, with a clock-skew sample from `updatedAt`.
+  - Viewers play it in `#pip-theater`, which opens automatically for everyone in the audience (= X-Live class cohorts).
+  - Closing the pop-out leaves a "● LIVE THEATER ▶ WATCH" chip. The host's private panel preview stops when the live pop-out opens (never two videos).
+- PLAYER: a sync loop runs every 1.5 s and re-seeks on > 2.5 s drift. ENDED behaviour: loop one → same video, loop all → next wrapping, loop off → next then end. Any viewer advances locally at once; a host tab writes it for everyone. A "tap to join" button appears if autoplay is blocked.
+  - YouTube/Shorts: YouTube IFrame API (Shorts in a 9:16 frame).
+  - Files: `<video>` (duration auto-saved by the host).
+  - Google Drive: `<video src=drive uc?export=download>` first (full sync); on error it falls back to Drive's `/preview` iframe. That fallback starts from 0, can't be muted by PFLX, and advances only on a length the host enters.
+  - TikTok: `tiktok.com/player/v1/<id>` with its postMessage API (play/pause/seekTo/mute, onCurrentTime, onStateChange ended), best effort.
+- HOST DECK (top of X-Bot → Live → Theater while on air): now playing, ⏮ ⏸/▶ ⏭ ↺, loop OFF→ALL→ONE, the running list (PLAY jumps), ⧉ my pop-out, ■ STOP FOR EVERYONE, audience line.
+- EDITOR (replaces v203's list view):
+  - Playlist tabs with item counts and a ● on-air mark.
+  - Rows are draggable to reorder; ↑/↓ also reorder.
+  - Each row has a thumbnail, a source badge, an inline title rename, an editable length (m:ss, highlighted for Drive/TikTok), copy-to-playlist, a ▶ private preview (non-YouTube previews supported), 📡 play for everyone from this row, and ✕.
+  - Drop zone accepts video files and dragged links.
+  - The add box takes YouTube, Shorts, a YouTube playlist (imported keylessly through a hidden IFrame API player's `getPlaylist()`), Google Drive, TikTok (oEmbed title + thumbnail) and direct video-file links. vm/vt TikTok short links get a clear message.
+  - 📁 FILES uploads to Supabase Storage bucket `pflx-theater` (public, video types only, 50 MB cap, created this patch via migration `pflx_theater_video_bucket` with insert/read policies).
+  - 🔍 FIND VIDEOS uses the YouTube Data API key from Settings → YouTube API (`pflx_yt_config`); the Shorts toggle adds `videoDuration=short` + `#shorts`. Results offer + ADD / 📡 NOW. With no key it says so and links to a YouTube search.
+  - Live sessions with a stream get a 📡 button.
+- LOADING-SCREEN FADE: `PFLX_AUDIO.apply/_fadeVolume/refresh` now target EVERY Theater player (`#pflx-theater-live-yt`, `#xbot-theater-video-iframe`, `.pflx-theater-media`: YouTube via setVolume/mute, `<video>` via volume/muted, TikTok via mute/unMute). The fade takes 0.7 s out and 1.4 s back in. An iframe that finishes loading re-applies the level, and the private pop-out iframe now gets `enablejsapi`. Both `PFLX_LOADING.show` paths now call `PFLX_AUDIO.start('loading')` even when loading music is off. The ROOT CAUSE of the reported bug: the duck was only started when loading music actually played, and the pop-out iframe had no JS API. `duckLevels.loading = 0`.
+- Verified:
+  - syntax gate 15/15.
+  - `test_theater_live_v207.js` 61 PASS covers parsing of 12 link shapes, media URLs, move, next/loop, position/pause, add Short/TikTok/Drive/bad link, rename, length, reorder, nudge, copy, upload filtering/cap/URL, STREAM TO EVERYONE record + v203 pointer + audience + sources, pause/resume/skip/jump/loop/bad loop/📡 from row, stop clearing v203 pointer, players can't write, audience scoping, the overrides, and the PFLX_AUDIO fade of `<video>` + YouTube out and back.
+  - Playwright on the patched page (host + player logins with test identities; every Supabase/Storage write intercepted in memory) gave 33/33 functional checks:
+    - The login theme plays, and X-Bot is hidden during the intro.
+    - The editor renders. Short, Drive and TikTok links are added (5-source playlist). Search without an API key explains itself.
+    - STREAM TO EVERYONE writes the record and opens the YouTube IFrame API player in the pop-out.
+    - A loading screen fades YouTube to muted and back to 100, and fades a `<video>` item to 0/muted and back to 1.
+    - Host pause pauses and resume plays. Loop cycles to ONE, and ENDED with loop one restarts the same video (rev-checked write).
+    - The player gets the stream in the pop-out automatically, and closing it leaves the chip.
+    - The host countdown is relayed; the player runs it from the relay. The Theater is ducked during the final 10. The `body` shakes and the FX layer sits outside `<body>`. STOP ends the alarm.
+    - Cyber Timer start/stop relays and cancels. STOP FOR EVERYONE closes the pop-outs and the chip.
+    - The only page errors came from X-Coin's own iframe (React #418/#423/#425 hydration and a chunk load), which is pre-existing.
+- HONEST LIMITS: Drive's fallback player and TikTok's embed can't be frame-synced like YouTube/files. YouTube search needs the API key. Uploads cap at 50 MB (use Drive/YouTube for longer videos).
+
+## PATCH PLATFORM v208 — OFFICIAL LOGIN-SCREEN MUSIC: "Official GalaxyMusic X Theme Track for PFLX" (Sep 15, Ennis)
+- REQUEST: Ennis uploaded the track: "Add this music for the login screen."
+- FIX: asset `public/sounds/pflx-theme/pflx_x_theme_galaxymusic.mp3` (2:06, 160 kbps, unchanged). `window.PFLX_OFFICIAL_LOGIN_TRACK` sits in the first script next to the loading constant, and `sePlayLoginMusic()` uses it ahead of the per-tab login pick and the library fallback. The host Login Screen Music switch plus player mute/music-off still apply, and the existing fade-out at login is unchanged.
+- Verified: `test_login_music_v208.js` 8 PASS; Playwright login screen plays the theme.
+
+## PATCH PLATFORM v209 — X-Bot never shows over the intro video (Sep 15, Ennis)
+- REQUEST: "Dont show X-Bot over the intro screen."
+- CAUSE: v182 moved X-Bot's auto-open after the intro, but the dock (z 100000), its launcher (z 99999) and pop-out widgets still sit above `#pflx-motion-intro` (z 600) whenever they are already showing (a restored dock, the launcher, a Theater pop-out).
+- FIX: `playMotionIntro()` adds `body.pflx-intro-playing` while the video plays; `finish()` removes it (normal end and 30 s safety path; lite devices never get it). CSS hides `#pflx-dock`, `#pflx-dock-fab`, `.pflx-pip-widget` and `#pflx-theater-live-chip` under that class (visibility + pointer-events). Audio was already muted by `PFLX_AUDIO 'intro'`.
+- Verified: `test_intro_hides_xbot_v209.js` 6 PASS; Playwright shows the class on and both dock + launcher computed `visibility:hidden` 1.5 s into the intro, for host and player logins.
+
+## PATCH X-LIVE v0.35 — GAMESHOW MODE (Sep 15, Ennis)
+- REQUEST: "I want X-Live to feel like a futuristic live streaming gameshow… add sfx from the pack… arcade like music in well design areas… a more innovative and improved version of Nearpod/Mentimeter/Peardeck" + the countdown/alarm asks above.
+- SFX (PFLX Sound Library clips from prototypeflx.com):
+  - Host actions: go live (intro sting + SHOW FX 'intro' for everyone), next/prev whoosh, reveal hit, lock click, freeze glitch, pause power-down / resume riser, wheel spin riser + land impact + award sting, make groups, award/fine, end outro.
+  - Players (from session changes): slide whoosh with a card slide-in, CORRECT!/NOT QUITE banner + sting, pause/resume/freeze/lock sounds, "YOU'RE UP!" when the wheel picks them during a live session (`lastRandomPickId` is now written), end sting, submit click.
+- MUSIC (`xlMusic`, one looping `<audio>`, cross-faded): PLAY tab = Orbit Arcade, BOARDS/projector leaderboards = Clocktower Run, X-Rush question = Midnight Mission Run, open questions/timers = Event Horizon (calm), paused/lobby = Glass Interface Drift, frozen/text slides = quiet.
+  - 🎵/🔊 header toggles (`xl_music_on`/`xl_sfx_on`). Music defaults ON for hosts (the projector is the room speaker) and OFF for players.
+  - Music pauses when X-Live is hidden inside PFLX (IntersectionObserver) or the tab is hidden, ducks during countdowns, and tells the platform to duck its BGM.
+- SYNCED TIMERS: `s.showTimer = {id, seconds, startedAt, stoppedAt, slideId, label, updatedAt}` is LWW on its own stamp in `mergeSession`, and `s.fxEvents` is an append-only union capped at 30.
+  - Slides with a time limit (not X-Rush, not the Timer slide) start their clock when the host moves to them, and stop when leaving. At zero, answers lock (UI + `liveSubmitChoice/Text` guard, "TIME'S UP — ANSWERS LOCKED").
+  - The Timer slide gets ▶ START. SHOW CONTROL offers quick 10s/30s/1m/2m/5m, +30s, ■ STOP and 📽️ PROJECT (big ring).
+  - The Tools timer becomes the synced ring timer (10 s → 10 min; inside a running session it IS the session timer).
+  - X-Rush question clocks and Live Agenda timers run the countdown too.
+  - The host's own action broadcasts once; renders only soft re-announce (every 3 s, healing a start that raced a cancel).
+  - Inside PFLX the countdown is handed to the platform (all of PFLX flashes/shakes); standalone it runs in X-Live's own PflxFx.
+- SHOW CONTROL card (run panel): ON AIR header, current music zone, ring timer + buttons, and a SHOW FX pad (Intro, Drumroll, Big Hit, Boom, Glitch, Winner with confetti, Fail, Alarm, GO!) for everyone in the session. Tools tab also has a Show FX card (class cohorts).
+- PLAYER VIEW: LIVE strip (title, question n/N, players, mini ring) and Kahoot-style color/shape answer tiles.
+- Realtime: standalone subscribes to `sessions` (lazy supabase-js); inside PFLX the platform's nudge refreshes instantly.
+- Theater tab: "● LIVE THEATER — playing for everyone" card with WATCH IN SYNC (opens the platform pop-out).
+- Verified:
+  - syntax gate 2/2. `test_xlive_gameshow_v035.js` 34 PASS. All pre-existing X-Live tests unchanged (same 2 pre-existing `test_subapp_embed` fails + 3 crashing legacy tests as before).
+  - Playwright host + two players, standalone, Supabase `sessions` mocked in memory: 52 PASS. It covers go live, auto slide timer, intro FX, final-10 visuals + voice + ticks + music duck, TIME'S UP slam/shake/strobe/drop/voice, alarm ×6 with the shake held throughout, answer lock, CORRECT banner, the whoosh, timer slide START/+30s/STOP/projector ring, FX pad played once by players and never replayed to a late joiner, arcade music, the wheel's YOU'RE UP, and end.
+- FOUND, NOT FIXED (needs Ennis's OK): `saveSession()` read-merge-write lets ANY writer's stale copy win the plain fields. `mergeSession` is last-write-wins on the whole session's `updatedAt`, and a player's answer/join save stamps `updatedAt = now`. So a player whose poll copy is a few seconds old can revert the host's NEXT/PAUSE/LOCK (`currentSlideIndex`, `hostControls`) when they submit. Realtime refresh (this patch) shrinks the window a lot but doesn't close it. Suggested fix: host-owned fields carry their own stamps (like `showTimer`) or player saves never touch them.
