@@ -16742,3 +16742,74 @@ Mission Control immediately after, since it touches live nav for active testers.
     - 16:9 covers; pinned sliders (host and player); the slider resizes cards.
     - A real player's rule is unchanged.
     - Video, slideshow, Drive and Canva cover markup; upload buttons on all three forms; the slideshow advances.
+
+## PATCH X-LIVE v0.37 + PATCH PLATFORM v213 — live production mode (Sep 16, Ennis)
+- REQUEST: a live-production workflow:
+  - A host assigns cohorts; a player who joins stays signed in to the show.
+  - Strict timers, with a backstage presenter view like ProPresenter or PowerPoint presenter view.
+  - Multiple hosts.
+  - When the host pushes a game, activity or screen share, players are pulled in. Players can still browse other tabs, and X-Live then shows in the X-Bot PiP.
+- DECISIONS (Ennis):
+  - Timer behaviour at zero is a per-session choice: auto-advance, lock + alert, or manual.
+  - Screen share offers all three: direct, YouTube Live and LiveKit.
+  - The PiP opens automatically.
+- X-LIVE v0.37 (`x-live-check/index.html`, module "PATCH X-LIVE v0.37"). New session fields are all optional; older sessions default to lock + alert:
+  - `strictTimer`
+  - `coHosts[]`
+  - `hostsSeen{}` — merged as a union, keeping the latest time per host
+  - `segmentLog{slideId:{startedAt,endedAt,spentMs}}`
+  - `push{seq,at,slideId,label,by}`
+  - `pullOnAdvance`
+  - `shareProvider`
+  - `screenShare{active,provider,hostId,startedAt,room}`
+  - `hostControls.hold`
+  - Slide fields: `duration` (segment length for untimed types) and `notes` (speaker notes, host-only).
+  - Host-owned fields merge on `hostUpdatedAt` (v0.36), so a player's save never rolls them back.
+- ONE CLOCK PER SEGMENT:
+  - `xlSegSeconds` = `duration`, else the time limit of timed types. Old text slides that still carry the legacy `seconds:30` are therefore NOT timed.
+  - `xlSlideAutoTimer` starts it on every move.
+  - `xlStrictTick` (1 s, host clients with the show open) handles auto mode: when the segment ends plus 1.8 s, it re-loads the cloud copy, re-checks, then moves once (keyed per segment and clock), so two hosts never double-skip.
+  - HOLD stops the auto-advance. Open-ended segments never auto-move. The last segment only toasts.
+  - Stop Clock makes the segment open-ended.
+- BACKSTAGE (`L.screen = 'backstage'`; GO LIVE lands here):
+  - Big segment clock: countdown, then +over-time, turning red over time.
+  - Wall clock, show clock against the planned total, and pace (AHEAD / BEHIND / ON TIME from `xlRunOfShow`).
+  - NOW and UP NEXT cards, speaker notes, and the run of show (planned start and length, actual time, over/under; click a row to jump).
+  - A booth of co-hosts and hosts seen recently, plus the show FX pad.
+  - Controls: PREV/NEXT, HOLD, +30s, STOP CLOCK, REVEAL, PAUSE, LOCK, PUSH TO PLAYERS, SHARE SCREEN; the strict-mode picker; "pull players in on every move"; PROJECT, POP-OUT STAGE DISPLAY, RUN PANEL and END.
+  - The Timer slide gets ▶ START there.
+  - `?stage=<sessionId>` is a read-only, silent stage display for a second screen.
+- PUSH / PULL:
+  - `xlStampPush` fires on PUSH, GO LIVE, screen-share start and, optionally, every move.
+  - Joined players (and only joined players) are pulled onto the live screen once per push, if the push is less than 2 min old; they can leave again. The seen-marker is kept in sessionStorage.
+  - A joined player who reloads lands straight back in the show.
+  - Cohort matching is now case-insensitive and splits comma-separated cohorts. Every applicable active session gets a banner, with joined and PiP sessions sorted first.
+  - Named co-hosts pass `pflxSessionInCohortScope`.
+- SCREEN SHARE (slide type `screenshare` + Backstage button):
+  - Direct: WebRTC mesh from host to each joined player, signalled over the Supabase realtime broadcast channel `xlive-share-<sessionId>` (viewer-hello → offer / answer / ice). Uses Google STUN plus the optional TURN list in X-Live Setup. Capped at 40 viewers.
+  - YouTube: players are pulled onto the existing YouTube embed (OBS).
+  - LiveKit: `livekit-client@2` (jsDelivr). The host publishes the screen tracks and players subscribe. It needs `L.cfg.livekit = {url, tokenUrl}`, where tokenUrl is GET `?room=&identity=&publish=` → `{token}`. **Not configured yet**; Ennis is creating a LiveKit Cloud project. Next step: deploy a Supabase edge function using the `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` secrets.
+  - Inside PFLX this needs the iframe `allow="display-capture"` (v213).
+- `?pip=1&session=<id>`: compact live view with ⤢ OPEN X-LIVE (posts `pflx_xlive_expand`). X-Live also posts `pflx_xlive_push` to the shell.
+- PLATFORM v213:
+  - `#pip-xlive` widget (drag, resize, S/M/L, minimize), holding a compact X-Live frame.
+  - `pflxXlivePipCheck` reads app_data `sessions` (read-only) and opens for the latest unseen push (less than 2 min old) on a show the player joined, when the X-Live tab isn't on screen. Hosts in Host Mode are never pulled.
+  - Triggers: the sessions realtime nudge (now also a `pflx-sessions-changed` window event), a 20 s poll, and `pflx_xlive_push` from this browser.
+  - Closes (and blanks its frame) when X-Live is opened full-size. ⤢ closes it and opens the X-Live tab.
+  - The lite iframe gains `display-capture`.
+- VERIFIED:
+  - `test_xlive_production_v037.js`: 52 PASS (on v0.36 it stops early because the v0.37 header and module are missing).
+  - `test_xlive_role_parallel.js` now also extracts the new matcher: 21 PASS on both versions.
+  - The X-Live suite has no new failures. Gameshow Playwright is 53/53 (it closes Backstage to drive the run panel).
+  - New multi-client Playwright on X-Live v0.37, 35/35, with realtime broadcast faked over BroadcastChannel and a canvas standing in for the screen:
+    - builder card; GO LIVE opens Backstage (NOW, NEXT, notes, run of show, booth); push stamped
+    - an unjoined player is not pulled; a joined player on another tab is pulled once
+    - auto-advance, with a segment log of about 5–9 s; HOLD keeps the segment past zero and shows OVER TIME; release advances; open-ended segments never move
+    - direct share: player pulled in and receiving live frames; host sees 1 peer; stop tears down
+    - stage display; PiP view; lock + alert stays put and shows over/under
+    - reload rejoins; co-host scope; END closes Backstage
+  - Platform: `test_xlive_pip_v213.js` 18 PASS. Suite unchanged, including a crash check. Syntax gate 17/17.
+  - Playwright 14/14: PiP opens for a joined player on Home; the compact X-Live shows the live poll; the same push doesn't reopen; a new push via the nudge does; ⤢ closes and opens the X-Live tab; no PiP while X-Live is on screen; host mode is never pulled.
+- FOUND, NOT FIXED (needs Ennis's OK):
+  - X-Bot Live tab `xbotLiveGoLive` (platform) only sets `status='active'`. It doesn't set the current slide, host controls, `liveStartedAt`, the first segment clock or the push, unlike X-Live's GO LIVE. Shows started from X-Bot therefore have no run-of-show clock until a host moves.
+  - `pflxXBotMergeSession` treats `hostsSeen` as a plain host field, so an X-Bot save can drop booth entries (cosmetic).
