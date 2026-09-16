@@ -16700,3 +16700,45 @@ Mission Control immediately after, since it touches live nav for active testers.
 - Cards and launch tiles: plated with midnight seams. The home hero banner is solid #0a1428 with a light subtitle.
 - DARK ISLANDS keep light ink. These are login, loading screen, dock, motion intro, `.player-header`, ticker, tutorial cards, FX layer, `#mc-season-bar` and `.pflx-season-card` (a new class on `pflxSeasonCardHtml`'s root). They get light `--ink`/dark panels, and the generic clouddesk h1–h3 / text / input / placeholder rules and the shared light-ink input rule are wrapped in `:where(:not(<islands>, <islands> *))`, so they no longer repaint them.
 - Verified: `test_technodrome_skin_v211.js` 20 PASS (fails 19 on v210). Syntax gate 15/15. Platform suite: same failures as v210 (stale PFLX_PATCH literals only). Playwright before/after screenshots (home, MC, season bar, loading, login) checked.
+
+## PATCH PLATFORM v212 — MC Player Portal matches the Host view + Master Host Player Mode (Sep 16, Ennis)
+- REQUEST 1: "The Player Dashboard should be the same [as the Host Dashboard]… very important is the banners on each of the items… html files, slideshows, videos, or image… 16:9… give them the resize slider… Pin the resize slider."
+- REQUEST 2: the Master Host gets a true Player Mode. They are a player in every cohort, see every active Program/Project/Checkpoint/Task, can turn any of it off, and can adjust their own player settings like any other player.
+- POSTER-CARD KIT (in the v212 module, just before the FLP submissions modal):
+  - Functions: `ppCardShellOpen({accentRgb, onclick, attrs, dim})`, `ppCoverHtml(item, {icon, accentRgb, title, chips, inherit, compact})`, `ppCoverChip(label, rgb)`, `ppTaskCardExtrasHtml(t)`.
+  - CSS classes: `.pp-item-card`, `.pp-cover` (aspect-ratio 16/9), `.pp-card-body/-title/-desc/-meta/-actions`, `.pp-chip`. These are class-based (no inline colour literals), so the light-skin ink layer never repaints them. Light-skin and Technodrome rules are included.
+- REWRITTEN (whole-function swaps, sha-checked against the v211 text): `ppRenderPrograms`, `ppRenderCheckpoints`, `ppRenderProjects`, `ppRenderJobBoard` (now a grid with its own `ppjobs` slider), `ppRenderMyTasks`, `ppHomeCheckpointCardHtml` / `ppHomeProjectCardHtml` / `ppHomeProgramCardHtml`, and `ppBannerHeader`. In `ppBannerHeader`, image covers now use the same 16:9 frame with the title below, so the title is no longer inked dark on the dark wash.
+  - All existing logic is kept: apply/enter/pending/pay states, FLP buckets, dropdown stats, per-player progress, and job apply/hired states.
+  - `pflxApplyCardSize` now runs AFTER the list is in the DOM. Before, it ran first, so a stored size never applied.
+- COVERS: `window.pflxCoverMediaEl` is wrapped.
+  - Video file (mp4/webm/mov, or anything in the `pflx-theater` bucket), in either the embed or image slot: `<video muted autoplay loop playsinline>` with 🔇/🔊 and fullscreen buttons.
+  - `slideshow:url1|url2|…`: crossfade slideshow with arrows and dots, auto-advancing every 4.5 s (pauses on hover, and for 8 s after a click).
+  - Drive file links become `/file/d/<id>/preview`.
+  - Every iframe gets `loading="lazy"`. Images, uploaded HTML snapshots, Canva, Slides, YouTube and Vimeo are unchanged.
+  - Task cards with no cover borrow the project's (then the checkpoint's) STILL image only, so a 46-task list never mounts 46 live decks. The first headless run of that list timed out before this rule was added.
+  - Host Program/Checkpoint/Project forms get 🎬 Upload Video (≤50 MB → `pflx-theater/covers/…`) and 🖼 Upload Slideshow (≤20 images → downscaled → `pflx-banners/slides/…`), injected at runtime next to "Upload Artifact HTML". `pflxEmbedHint` describes the new kinds.
+  - Checkpoint detail, the home "active checkpoint" hero and task detail now show embed covers. Before, they showed static images only.
+- PINNED SLIDER: `pflxCardSizeSliderHtml` returns `.pflx-card-size-bar` (position:sticky; top:0).
+  - The host sizer divs (`#mc-*-sizer`) are sticky too; their bar alone can't stick because the sizer is its only box.
+  - Verified: at mc-content scrollTop 1500 and 2600 the bar sits at the same offset (the scrollport padding) for both host Projects and player Projects.
+  - New `jobs`/`ppjobs` size keys; the host Job Board gets `#mc-jobs-sizer` and a `var(--pflx-card-min)` grid.
+- MASTER HOST PLAYER MODE:
+  - `pflxMhpmActive()` = `pflxRole === 'player'` AND `pflxHostTier(activeSession) === 'master'` AND not mimicking.
+  - When active, `ppItemAssignedToActivePlayer` uses `pflxMhpmCohorts()`: every cohort from cohort groups, non-host player rosters, and the cohort tags on Seasons/Programs/Checkpoints/Projects/Tasks/Jobs (group ids mapped to names; player ids, N/A and 'all' skipped). New cohorts are joined automatically, or only the host's picked list is used. The Job Board uses the same list.
+  - Result on live data: 46/46 non-draft tasks visible (it was 0 with the host's own 'N/A' cohort). Drafts (inactive) stay hidden. Host-tier bypasses are unchanged.
+  - Settings: the ⚙ Player Mode settings modal (from the 🎮 PLAYER MODE strip at the top of every portal view) offers "Every cohort" or "Only the cohorts I pick", plus show/hide for Programs/Checkpoints/Projects/Tasks/Job Board. Hidden sections show a "HIDDEN IN YOUR PLAYER MODE" card, and the home rows honour the toggles.
+  - Stored in NEW app_data key `pflx_master_player_mode` = `{ [hostId]: {cohortMode, cohorts, show, updatedAt, by} }`. Saves are read-merge-write (only this host's entry changes; a stored entry with a newer `updatedAt` is never overwritten).
+  - Deliberately NOT stored on the players row and never added to real cohorts, so rosters, "N players" counts, completion ratios and leaderboards are untouched.
+  - "👤 Edit my player profile" switches to Host Mode → Players → the normal `mcEditPlayer(<host id>)`.
+  - Toolbar toggle text: HOST VIEW/PLAYER VIEW → HOST MODE / PLAYER MODE.
+- TESTS:
+  - `test_mc_player_parity_v212.js`: 58 PASS; on v211 the file stops early after its PATCH and module-presence checks fail.
+  - The pp sandbox tests (v185 dash, v187 carousel, v188/v189 home cards, v190–v193 tabs) now stub the card kit on `global`, like their other injected dependencies. v189's "banner height 170px" check also accepts the superseding 16:9 cover.
+  - NOTE for future regressions: diffing only FAIL lines hides new crashes. These sandboxes had started throwing ReferenceError, which was caught only by comparing error output per file.
+  - Platform suite otherwise unchanged (stale PFLX_PATCH literals; pre-existing crashes in v1142/v1144/xbot-theater tests). Syntax gate 16/16.
+  - Playwright (live data read-only; app_data writes mocked): 31/31 on Technodrome, 23/23 on Default + Cyberpunk. Coverage:
+    - HOST/PLAYER MODE labels; Master Host activation and all-cohort visibility.
+    - The modal saves only `pflx_master_player_mode`; custom cohorts and hidden Tasks work.
+    - 16:9 covers; pinned sliders (host and player); the slider resizes cards.
+    - A real player's rule is unchanged.
+    - Video, slideshow, Drive and Canva cover markup; upload buttons on all three forms; the slideshow advances.
