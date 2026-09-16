@@ -16835,4 +16835,25 @@ Mission Control immediately after, since it touches live nav for active testers.
   - `test_xlive_livekit_v0371.js`: 15/15.
   - `xl37_test.py`: 35/35 on v0.37.1.
   - Full x-live suite: same failure counts as v0.37 HEAD. The failures in test_subapp_embed, v022, v028, v029 and gameshow_v035 were already there.
-- **Pending (Ennis):** add the two LiveKit secrets in Supabase. Then run a real host→player LiveKit share.
+- **DONE (Sep 16, 04:3x UTC):** the LiveKit secrets are set.
+  - Key `APIJUyLWXxhhENR` (description "pflx-xlive").
+  - The function now trims both env values.
+  - LiveKit `/rtc/validate` returns `success` for both host and viewer passes.
+  - Real end-to-end test, run in the desktop browser pane on the live X-Live v0.37.1 (`xlLkLoad` + `XL_LK_DEFAULT` + `SB_HEADERS`, room `xlive-share-e2e-test`, not saved to sessions):
+    - The host (admin-0) connected and published a `screen_share` track.
+    - The viewer (player-e2e) connected and subscribed; the video was live at 320×180, 46 frames in 3 s.
+    - The viewer's own publish was refused: "insufficient permissions".
+  - Function is now v12, clean (the temporary sha256-prefix log was removed).
+- **Gotchas from the setup:**
+  - LiveKit shows a key's secret only in the "Generated API key" dialog.
+  - The dialog's copy icons did not reach the macOS clipboard from the in-app browser; the same stale 43-char value was pasted 3 times. Cmd+A / Cmd+C inside the field worked.
+  - Check the Supabase Secrets DIGEST column: it is sha256 of the saved value.
+  - `/rtc/validate?access_token=` distinguishes "invalid API key" (wrong key id) from "invalid token" (secret mismatch).
+- **Follow-ups (Ennis):**
+  - The key's secret appeared in a chat screenshot. Rotate it: create a new key → update both secrets → revoke `APIJUyLWXxhhENR`.
+  - Revoke the unused first key `APIgMPUjx6XECF9`.
+- **Egress (report only, nothing changed):**
+  - The org is at 179/250 GB for the cycle ending 21 Sep, about 7 GB/day, projecting to about 213 GB. The spend cap is on, so overage means restriction (402), not a bill.
+  - Top source: open prototypeflx.com tabs (both www and apex) re-downloading `like.pflx_mc_%` (~1.9 MB), coinCategories (~0.8 MB), tasks (~0.46 MB) and users (~0.29 MB) about every 3 min, roughly 3.5 GB/day.
+  - A `node` client polls `notificationSettings` about 6.3k times a day (tiny).
+  - Proposed fix awaiting OK: changed-only (updated_at) pulls.
