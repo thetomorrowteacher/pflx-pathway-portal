@@ -17034,6 +17034,35 @@ Mission Control immediately after, since it touches live nav for active testers.
 - **FIXED in v222 (6a2bda5, Ennis approved):** the team board now uses its own `pflxXBotAvatarHtml`. Before that, `pflxXBotRenderTeams` called `_pcAvatarHtml`, which is private to the chat IIFE, so the team board throws once teams have members. It was already broken before v219 and now shows under CLASS.
 - **Also noted, not fixed:** some v203 Theater playlist helpers (create/rename/delete/remove) save from the cached `_xbotLiveCfg` instead of a fresh read. The hub now keeps that cache current from the feed, which narrows the window but doesn't remove it.
 
+**PLATFORM v223 (2c00659) + X-LIVE v0.37.5 (c9d788b): one sound per person — no more echo**
+- **Symptom (Ennis):** the Theater video and the Cyber Timer played "2 sounds … like an echo".
+- **Cause:** the same account was open in two windows (a Chrome tab and a prototypeflx tab in the desktop app's browser pane, which was still on v216).
+  - Each window joined the Theater live stream.
+  - Each window ran the timer relay (`pflxFxInScope` passes events whose `by` is the viewer), so the other window played the host's own countdown after a network delay.
+- **Fix — `window.pflxSoundOwner`:** only the window used last (pointerdown/keydown, capture phase) makes live sound.
+  - **Channels:** a per-user Supabase broadcast channel `pflx-audio-<userId>` (with `self:false`) plus BroadcastChannel `pflx-audio-<userId>`.
+  - **Messages:**
+    - `claim` / `beat` {at}: the newest `at` wins; ties go to the larger tab id.
+    - `hello`: a new window asks, and the owner answers with `beat`. The new window claims after 0.9–1.3 s if it is visible (2.2–3.7 s if hidden) when nobody answers.
+    - `peer`: sent by non-owners every 30 s. The owner beats every 5 s only while a peer was heard in the last 120 s.
+    - `release`: sent on `pagehide`. A window whose owner has been silent for 25 s re-joins.
+  - Signed-out pages are never muted.
+- **Gated:**
+  - Theater live media: `soundHere()` in the v207 closure — mute/unMute, `A._post` forces volume 0, `sync` keeps it muted.
+  - PflxFx `isMuted`.
+  - `pflxPlaySfx` / `pflxSpeak`, wrapped (speech is cancelled when the sound leaves).
+- **UI:** the pop-out shows `#ptl-elsewhere` "🔇 Sound is on in your other PFLX window · PLAY SOUND HERE" (calls `pflxTheaterLiveTap`, which claims).
+- **Sub-apps:**
+  - The Platform posts `{type:'pflx_audio_owner', here}` to every iframe when ownership changes, and answers `pflx_audio_query`.
+  - `pflx_audio_use` from an iframe claims the sound.
+  - X-Live v0.37.5: `xlAudioHere` gates `xlSfx`, `xlUiPlay` and `xlMusic.target()`. A pointerdown/keydown in X-Live posts `pflx_audio_use`, and X-Live posts `pflx_audio_query` on load.
+- **Live hub:** previewing the video the class is already watching opens the class pop-out instead; 📡 NOW closes a same-video preview; opening a preview claims the sound.
+- **Tests:**
+  - `v223/v223_test.py`: two contexts as the same host + a player. The fake Supabase now relays broadcast through the Python server, so contexts can talk. 24/24.
+  - `pw/xl375_test.py`: 8/8.
+  - v219 e2e 70/71 and v216 e2e 28/29: only the patch-number checks fail.
+- **Windows on an older build don't take part.** Reload stale tabs (the desktop app's browser-pane tab was still on v216).
+
 ## PATCH PLATFORM v219 — DarkCampus icon: removed baked-in black square frame (Sept 16, Ennis)
 - **SYMPTOM:** Ennis, with two screenshots of the DarkCampus app icon: "Darkcampus still has this square around it. Can you remove?" Clarified location via AskUserQuestion → "somewhere on the live site I missed" → then directly: "The loading screen has it and the Homebase."
 - **ROOT CAUSE:** `public/DarkCampus Logo 1.png` (1454×1428 RGBA) had a fully opaque (alpha=255) BLACK rectangular frame baked directly into the pixel data — an accidental artboard/frame-guide export defect, not a CSS border/outline/box-shadow. Exact bands: top rows 14-18, bottom rows 1409-1413 (both 5px thick, columns 31-1422), left columns 31-35, right columns 1418-1422 (both ~1400px tall). Invisible against a dark background (matches the Home App Hub tile's default dark gradient), visible as a thin square line once a light/Technodrome-style skin renders the tile as a white card — which is why it only showed up "on the live site" and not in any local preview.
