@@ -16813,3 +16813,26 @@ Mission Control immediately after, since it touches live nav for active testers.
 - FOUND, NOT FIXED (needs Ennis's OK):
   - X-Bot Live tab `xbotLiveGoLive` (platform) only sets `status='active'`. It doesn't set the current slide, host controls, `liveStartedAt`, the first segment clock or the push, unlike X-Live's GO LIVE. Shows started from X-Bot therefore have no run-of-show clock until a host moves.
   - `pflxXBotMergeSession` treats `hostsSeen` as a plain host field, so an X-Bot save can drop booth entries (cosmetic).
+
+## PATCH X-LIVE v0.37.1 — LiveKit Cloud hookup (Sep 16, Ennis)
+
+- LiveKit Cloud project **PFLX Theater** (`p_2egzeozjabu`), URL `wss://pflx-theater-igofuujw.livekit.cloud`. It's the same project the X-Live "LiveKit" screen-share provider uses.
+- Supabase edge function `livekit-token` **v2** is deployed (verify_jwt on). The source is in the x-live commit message and in the gs_stage tarball `xl0371/edge/livekit-token.index.ts`.
+  - The v1 function had old self-hosted credentials and a placeholder URL hardcoded. Both are **gone**.
+  - The key comes from the Edge Function secrets `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`, with `LIVEKIT_URL` optional (defaults to the Cloud URL). Until the secrets are set it answers 503 with "LiveKit secrets are not set".
+  - Requests:
+    - `GET ?room=&identity=&publish=0|1`
+    - legacy `POST {roomName, identity, role}`
+  - Returns `{token, url, role}`.
+  - Rooms must start with `xlive-share-`. Names are limited to `[A-Za-z0-9_.:-]{1,128}`.
+  - **Publish** is granted only to Console roster hosts (role≠player, hostTier or isHost), or to the session's createdBy / coHosts / hostsSeen. Hosts can publish screen_share and screen_share_audio only. Tokens last 4h.
+- X-Live v0.37.1 (x-live a2f894a):
+  - xlLkToken sends SB_HEADERS only to Supabase `/functions/` URLs and surfaces the server's `error` text.
+  - A failed share start now restores `screenShare`/`push`. Before, it left a phantom active share in memory.
+  - Setup has a new "⚡ USE PFLX THEATER" button that fills in the fields. SAVE is still required.
+- `pflx_lite_config.livekit` is set server-side with a jsonb merge (url + tokenUrl). **Caveat:** saveCfg writes the config wholesale, so a host tab opened before this change can drop the key on its next save. If LiveKit shows "Not set up", tap USE PFLX THEATER → SAVE.
+- Tests:
+  - `test_xlive_livekit_v0371.js`: 15/15.
+  - `xl37_test.py`: 35/35 on v0.37.1.
+  - Full x-live suite: same failure counts as v0.37 HEAD. The failures in test_subapp_embed, v022, v028, v029 and gameshow_v035 were already there.
+- **Pending (Ennis):** add the two LiveKit secrets in Supabase. Then run a real host→player LiveKit share.
