@@ -16992,7 +16992,47 @@ Mission Control immediately after, since it touches live nav for active testers.
 - **Tests:** `test_xgems_v218.js` 34/34; `test_proxy_v218.mjs` 13/13; e2e (fake Supabase + fake Gemini + fake proxy, `v218/`) 43/43; v217 e2e 38/39 and v216 e2e 28/29 (only the patch-number check).
 - **Pending (Ennis):** the proxy has NO provider keys (GET shows all false), so players' X-Bot/X-Gems only answer with a GEMINI_API_KEY in the pflx-pathway-portal Vercel env, a cohort host key, or their own ⚡ connection.
 - **Seen, not fixed (needs OK):** under the clouddesk skin, `pflxToast` text is dark on a dark toast (unreadable).
-- **Next:** Ennis asked to combine YouTube with the X-Bot Theater, possibly redesigning the X-Bot Live tab — proposal first.
+- **YouTube + Theater:** shipped as v220 (below).
+
+**PLATFORM v220 (2c9a82e): Live hub — X-Bot Theater + YouTube in one Live tab** (built as v219; 15bd21f, the DarkCampus icon, took that number)
+- **Ennis chose:** one Live hub; players watch, search and suggest; one Library.
+- **Module:** `window.pflxLiveHub`, rendered into `#plh-root` at the top of `#xbot-live-section`. The legacy sub-tab row (`#xbot-live-legacy-tabs`) is hidden. The old panels (sessions/teams/theater/sound/controller/tools) stay in the DOM, and the hub shows or hides them. The theater panel is moved above the sessions panel.
+- **Visibility:**
+  - The 🔴 Live tab shows for every logged-in user (`pflxInjectRolePill` + `pflxLiveHub.syncTabs`).
+  - The ▶ YouTube tab is hidden, and `switchXBotMode('yt')` redirects to Live › WATCH.
+  - `pflxSetRole` is wrapped to re-render the hub and dispatch `pflx-role-changed`.
+- **Layout:**
+  - Stage: the Theater live record (`pflxTheaterLive.state`), with host controls or the player WATCH button.
+  - Tabs: host ON AIR · WATCH · LIBRARY · CLASS · STUDIO; player ON AIR · WATCH · LIBRARY. The last tab is saved in localStorage `pflx_live_hub_tab_v1`.
+  - `#plh-preview`: one personal player for any source (YouTube nocookie, file, Drive, TikTok, live sessions). It has class `pflx-theater-media`, so PFLX_AUDIO fades it.
+  - `xbotTheaterWatchSaved` / `xbotTheaterWatch` are overridden to use it. YouTube watches are logged with `pflxYT.logWatch`.
+- **ON AIR:**
+  - Host: suggestion queue (✓ PLAY NEXT / 📡 NOW / ✕), the Theater deck + live sessions, and the X-Live session list.
+  - Player: live sessions in their cohort, plus MY SUGGESTIONS.
+- **WATCH:** `pflxYT` is the engine (search, moderation, cache, daily limit). Hosts get ＋QUEUE / 📡NOW / 📌POST / ✓CH; players get 💡SUGGEST.
+- **LIBRARY:**
+  - One list (ALL / CLASS / POSTED / MY CHANNEL) of `pflx_lite_config.theaterPlaylists`, `pflx_xbot_yt_resources` and `pflxYT.myPls`.
+  - New resource type `theater` (refId = playlist id).
+  - The Theater `render()` puts `editorHtml(true)` (no search) into `#plh-lib-theater`.
+- **Suggestions:**
+  - Players write only `pflx_live_sugg_<playerId>` {playerId, brand, cohort, items:[{id, videoId, title, at, updatedAt, status pending|withdrawn}]}. Merge is by id, newer `updatedAt` wins, 30-day / 40-item cap.
+  - Hosts write only `pflx_live_suggdec` {items:{id:{status approved|declined, mode, at, by, playerId, title}}}. Merge is by id, later `at` wins, 30-day / 500 cap.
+  - Hosts load suggestions with `like 'pflx_live_sugg_%'` and filter to the literal prefix (LIKE `_` also matches `pflx_live_suggdec`).
+  - Limits: 3 waiting, 10 per day, no duplicate pending, and the title is re-checked with `pflxYT.classify`.
+  - Approve → `pflxTheaterLiveEnqueue` (new, rev-checked `write()`) inserts after the current video. If nothing is on air it starts playing (mode `now`); NOW jumps to it.
+  - Players are notified live via the feed, or at login (localStorage `pflx_live_sugg_seen_v1`, only decisions under 7 days old).
+  - Hosts get a live toast plus a badge on the Live tab and the ON AIR tab.
+- **Live feed:** `pflxAppDataFeed('pflx-livehub')` handles the suggestion rows, decisions, `pflx_lite_config` (refreshes the host's `_xbotLiveCfg` / playlist cache when newer) and `sessions`. The hub adds no polling reads; the 4 s timer only re-renders the stage.
+- **pflxYT fixes:**
+  - `saveResources(removedId)` is now read-merge-write with a `removed` list (cap 300).
+  - New exports: `renderPart`, `loadMyPlaylists`, `addResource`, `settings`, `titleOk`, `logWatch`.
+  - `rerender` calls `pflxLiveHub.onYT()`.
+- **Tests:**
+  - `test_livehub_v219.js` 22/22.
+  - e2e (`v219/`: host + player + a second player device; fake Supabase, fake YouTube Data API and IFrame API) 70/70.
+  - v218 e2e 42/43, v217 e2e 37/39, v216 e2e 28/29: only the patch number and the old YouTube-tab check differ.
+- **Known, pre-existing, not fixed (needs OK):** `pflxXBotRenderTeams` calls `_pcAvatarHtml`, which is private to the chat IIFE, so the team board throws once teams have members. It was already broken before v219 and now shows under CLASS.
+- **Also noted, not fixed:** some v203 Theater playlist helpers (create/rename/delete/remove) save from the cached `_xbotLiveCfg` instead of a fresh read. The hub now keeps that cache current from the feed, which narrows the window but doesn't remove it.
 
 ## PATCH PLATFORM v219 — DarkCampus icon: removed baked-in black square frame (Sept 16, Ennis)
 - **SYMPTOM:** Ennis, with two screenshots of the DarkCampus app icon: "Darkcampus still has this square around it. Can you remove?" Clarified location via AskUserQuestion → "somewhere on the live site I missed" → then directly: "The loading screen has it and the Homebase."
