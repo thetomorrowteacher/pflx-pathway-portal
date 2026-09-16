@@ -42,12 +42,12 @@
 
 import crypto from 'node:crypto';
 
-export const config = { api: { bodyParser: { sizeLimit: '256kb' } } };
+export const config = { api: { bodyParser: { sizeLimit: '1mb' } } };   // X-Gems send instructions + knowledge
 
 const MODELS = {
   anthropic: process.env.PFLX_AI_MODEL || 'claude-sonnet-4-6',
   openai: process.env.PFLX_AI_MODEL_OPENAI || 'gpt-4o-mini',
-  gemini: process.env.PFLX_AI_MODEL_GEMINI || 'gemini-2.0-flash',
+  gemini: process.env.PFLX_AI_MODEL_GEMINI || 'gemini-2.5-flash',   // gemini-2.0-flash was shut down 2026-06-01
   deepseek: process.env.PFLX_AI_MODEL_DEEPSEEK || 'deepseek-chat',
 };
 const KEYS = {
@@ -146,7 +146,8 @@ export default async function handler(req, res) {
     }
     if (!apiKey) return res.status(503).json({ error: 'no-key' });
 
-    const system = String(body.system || '').slice(0, 6000);
+    // X-Gems (Gemini personas) carry their instructions + knowledge in the system prompt.
+    const system = String(body.system || '').slice(0, provider === 'gemini' ? 200000 : 6000);
     const maxTokens = Math.min(4000, parseInt(body.maxTokens, 10) || 1500);
     let messages = Array.isArray(body.messages) && body.messages.length
       ? body.messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '').slice(0, 24000) })).slice(-24)
@@ -176,16 +177,26 @@ export default async function handler(req, res) {
       text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     } else {
       const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ system_instruction: { parts: [{ text: system }] }, contents,
-          generationConfig: { maxOutputTokens: maxTokens } }),
+      // Client may pin a Gemini model (X-Gems); only gemini-* ids are accepted.
+      const wanted = /^gemini-[a-z0-9.\-]{2,40}$/.test(String(body.model || '')) ? String(body.model) : MODELS.gemini;
+      const gen = { maxOutputTokens: maxTokens };
+      const t = Number(body.temperature);
+      if (Number.isFinite(t)) gen.temperature = Math.max(0, Math.min(2, t));
+      const payload = { system_instruction: { parts: [{ text: system }] }, contents, generationConfig: gen };
+      if (body.grounding) payload.tools = [{ google_search: {} }];
+      const call = (model) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
       });
-      const data = await r.json();
+      let r = await call(wanted);
+      let data = await r.json();
+      // retired / unknown model -> the current Flash alias
+      if (!r.ok && (r.status === 404 || /not found|not supported/i.test((data.error && data.error.message) || '')) && wanted !== 'gemini-flash-latest') {
+        r = await call('gemini-flash-latest');
+        data = await r.json();
+      }
       if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'gemini upstream' });
-      text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts &&
-        data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '';
+      text = ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+        .map(pt => pt && pt.text || '').join('');
     }
     return res.status(200).json({ text });
   } catch (e) {
