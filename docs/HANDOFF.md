@@ -16897,3 +16897,81 @@ Mission Control immediately after, since it touches live nav for active testers.
   - True peak: 0.02 dBFS (essentially clipping) → -1.07 dBTP measured on the actual shipped MP3 (verified post-encode, safe headroom, no clipping)
 - Verified: `node scripts/syntax_gate.js preview.html` 17/17 (only the `PFLX_PATCH` bump touched the file itself — the audio is a plain asset swap at the same filename/path, no JS/HTML changes needed). Live file on the device re-measured directly (not just the local build) and its loudnorm output matches the intended master exactly (-11.50 LUFS / -1.07 dBTP / LRA 3.10). Full `test_*.js` regression sweep: zero new non-version failures (same already-documented pre-existing gaps as v214).
 - HOST ACTIONS: give the live track a listen on a real device/speakers when convenient — ffmpeg's objective loudness/band measurements confirm the technical fix, but the final subjective call on tone is yours; flag if you want it pushed louder, brighter, or with a different bass balance and I'll re-run the chain.
+
+## Sep 16 (Ennis) — X-Live v0.37.2–v0.37.4, PLATFORM v216 + v217, Supabase trigger
+
+**X-Live**
+- **v0.37.2 (5a5df21):**
+  - MUSIC/SFX default ON for everyone (new pref keys `xl_music_on_v2` / `xl_sfx_on_v2`).
+  - Player dashboard (MY EXO, i.e. any non-tab player screen) plays `pflx-music/glass_interface_drift_full.mp3`. That file is platform commit 0ea15d4, Ennis's upload re-encoded to 128 kbps.
+  - Hover blip (mouse only) and click tick on every button/tab/[onclick]; `data-nosfx` opts an element out.
+  - Music tries autoplay and only reports `pflx_subapp_music` playing once it really plays.
+- **v0.37.3 (d42e12d):** the hover sound is now `pflx-ui/ui_hover_soft.mp3` at gain 0.35, made from blip_018 (trimmed, low-passed). blip_003 was too harsh.
+- **v0.37.4 (d0baa31):** projector paging on every projector page.
+  - Side arrows, swipe, trackpad side-scroll, ←/→ keys.
+  - Deck: weekly / teams / roster (when teams exist) / goal, with dots, PREV/NEXT and pause (`L.projDeck`, `L.projAuto`).
+  - PRESENT opens the roster page paused.
+  - Arrows on the wheel/timer screens step into the deck.
+  - Controls moved bottom-centre.
+
+**Supabase (migration `app_data_touch_skip_noop`)**
+- A BEFORE INSERT/UPDATE trigger on `public.app_data`:
+  - stamps `updated_at = now()` on every real change;
+  - **drops identical re-saves** (returns NULL), so there is no row version and no realtime echo.
+- Callers still get success. An upsert with `.select()` would return [] for a no-op; nothing in PFLX does that (all apps were checked).
+
+**PLATFORM v216 (b0e4308): changed-only sync + live reward scenes.** Built as v214 and renumbered after db58672/880f5ad landed.
+- **Shared realtime feed:** `pflxAppDataFeed(name, fn, statusCb)` is ONE unfiltered app_data subscription per tab. The pflx-mc and pflx-roster channels were two identical ones.
+- **Changed-only backup pull:** `_mcFetchChangedRows` does the 3-min pull as (key, updated_at) first, then fetches only the changed rows.
+  - Tombstones and coinCategories ride the same `.or()` query.
+  - Full pull at boot and on every 10th tick.
+  - `pflxRowSeen` records applied stamps; realtime marks a row only when the payload carries data.
+  - In production a backup tick is one ~1 KB request (it was ~3.5 MB per tab).
+- **coinCategories** (the badge catalog) now also arrives live.
+- **Echo mirror:** on a cloud echo, the legacy users/tasks/checkpoints/projects mirror waits 2–8 s and runs only if the legacy row is still older than the MC row minus 15 s. That covers writers outside the Console.
+- **Player reconcile:** `_mcReconcilePlayersFromMc` is deferred 8 s while `_mcApplyingCloud`. It used to bump updatedAt, which made players reject the host's per-player row and lose the pending popups.
+- **Rewards:**
+  - An online player gets the full popup live: the roster handler calls `pflxNotify.liveDeliver`, which replaces the toast.
+  - Login replay reads the cloud row first, at 1.2 s and again at 8 s.
+  - Each device keeps shown txIds in localStorage `pflx_reward_seen_v1`.
+  - Clearing is a read-merge-write that removes only the delivered txIds.
+  - Rank-up now fires (`_xcBeforeAward`); XC/rank popups have proper labels.
+  - Queued events drop data: artwork over 4 KB; the popup looks badge art up by name.
+- **Tests:** `test_sync_v216.js` 19/19, plus a multi-client e2e with a fake Supabase that has the trigger semantics (`v216/` e2e files), 28/28. React hydration errors #418/#423/#425 are pre-existing (they appear on v213 too).
+- **Not done (needs OK):**
+  - Trades (`pflx_mc_trades`) and MC approvals (`pflx_mc_approvals`) are localStorage-only, so they don't sync across devices.
+  - Reward-request and coin-submission approval can pay twice from a stale card.
+
+**PLATFORM v217 (6ea5638): X-Bot YouTube**
+- **Keys:**
+  - A host-only YouTube Data API key and Channel ID box in X-Bot ⚙ AI Engine Keys (`xbot-key-youtube`, `xbot-yt-channel`) and in MC Settings → X-Bot → AI Engine (`settings-key-youtube`).
+  - It is shared as `pflx_yt_shared` {apiKey, channelId, settings}.
+  - MC Settings → YouTube API shares back (`adoptLocalConfig`), and the Theater search falls back to the shared key.
+- **Tab:** a new X-Bot tab "▶ YouTube" (`pflxYT`).
+  - Everyone: SEARCH and RESOURCES (`pflx_xbot_yt_resources`).
+  - Hosts also get MY PLAYLISTS (public playlists by Channel ID), ACTIVITY and SAFETY.
+  - Playback is a youtube-nocookie embed.
+- **Cache:** `pflx_ytc_<hash>` holds searches for 24 h; `pflx_ytc_pl_<id>` holds playlist items for 6 h.
+- **Limit:** `settings.dailyLimit` new searches per player per day (Ennis chose 5; the code default is 5). Hosts are unlimited.
+- **Safety toggles:** `playersEnabled`, `strict`, `learningOnly` (categoryId 26/27/28 via videos.list), `approvedOnly` + `approvedChannels`, `blockTerms`, `autoFine` + `fineId`.
+- **Moderation (`classify`):**
+  - BLOCK → search not run, logged, live host toast, auto fine.
+  - REVIEW (weed/gore/naked/bomb-gun phrases…) → blocked, never fined.
+  - WELLBEING (self-harm, "want to die") → never fined; the player sees support text and hosts get a "check-in" toast.
+- **Logs:** `pflx_yt_log_<playerId>_<yyyymmdd>` (entries: search/watch, cached/limited/flag/fined).
+  - MC Settings → X-Bot → YouTube shows safety plus all activity (flag filter).
+  - Enforcement is client-side.
+- **Fine popups:** `award()` skips its extra xc event when `source === 'modifier'`, so a fine shows one popup.
+- **Tests:** `test_xbot_youtube_v217.js` 37/37 and an e2e with a fake YouTube API, 39/39 (`v217/`).
+- **Pending (Ennis):**
+  - Create the API key (restrict it to YouTube Data API v3 and prototypeflx.com).
+  - Paste it and the Channel ID into X-Bot.
+  - Pick the fine in X-Bot → YouTube → Safety.
+
+**Other notes**
+- `livekit-token` v12 is clean; the LiveKit key is `APIJUyLWXxhhENR`. Its secret was shown in a chat screenshot, so rotate it (new key → both Supabase secrets → revoke). Also revoke `APIgMPUjx6XECF9`.
+- **Egress:** 179/250 GB on Sep 16, mostly from the 3-min full pulls that v216 removed.
+- **YouTube key location:** Ennis asked for it to live in X-Bot's AI Engine Keys, which is done.
+- **Next:** X-Gems. A Gemini Gem powers X-Bot as a persona.
+  - Brand line "Powered by Gemini Gems" as TEXT only; no Google G / Gemini logos. The mark is an original faceted-gem X-Gem mark with a four-color shimmer.
+  - "Open outside app" ↗ opens the Gem share link.
