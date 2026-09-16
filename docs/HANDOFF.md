@@ -17031,7 +17031,7 @@ Mission Control immediately after, since it touches live nav for active testers.
   - `test_livehub_v219.js` 22/22.
   - e2e (`v219/`: host + player + a second player device; fake Supabase, fake YouTube Data API and IFrame API) 70/70.
   - v218 e2e 42/43, v217 e2e 37/39, v216 e2e 28/29: only the patch number and the old YouTube-tab check differ.
-- **Known, pre-existing, not fixed (needs OK):** `pflxXBotRenderTeams` calls `_pcAvatarHtml`, which is private to the chat IIFE, so the team board throws once teams have members. It was already broken before v219 and now shows under CLASS.
+- **FIXED in v222 (6a2bda5, Ennis approved):** the team board now uses its own `pflxXBotAvatarHtml`. Before that, `pflxXBotRenderTeams` called `_pcAvatarHtml`, which is private to the chat IIFE, so the team board throws once teams have members. It was already broken before v219 and now shows under CLASS.
 - **Also noted, not fixed:** some v203 Theater playlist helpers (create/rename/delete/remove) save from the cached `_xbotLiveCfg` instead of a fresh read. The hub now keeps that cache current from the feed, which narrows the window but doesn't remove it.
 
 ## PATCH PLATFORM v219 — DarkCampus icon: removed baked-in black square frame (Sept 16, Ennis)
