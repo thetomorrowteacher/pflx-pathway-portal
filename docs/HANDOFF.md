@@ -16857,3 +16857,23 @@ Mission Control immediately after, since it touches live nav for active testers.
   - Top source: open prototypeflx.com tabs (both www and apex) re-downloading `like.pflx_mc_%` (~1.9 MB), coinCategories (~0.8 MB), tasks (~0.46 MB) and users (~0.29 MB) about every 3 min, roughly 3.5 GB/day.
   - A `node` client polls `notificationSettings` about 6.3k times a day (tiny).
   - Proposed fix awaiting OK: changed-only (updated_at) pulls.
+
+## PATCH PLATFORM v214 — Login screen re-proportioned: bigger logo, tighter box, no scroll to see the TTT credit (Sep 16, Ennis)
+- REQUEST (4 screenshots comparing window sizes): "Make the Prototype FLX logo larger....the login box slightly smaller....and I dont want to have to scroll down to see The Tomorrow Teacher Production. Can you re-proportion this to fit how I need?"
+- ROOT CAUSE: the login column (logo → panel → version → TTT credit) was taller than the viewport on common desktop/laptop heights, so the credit footer required scrolling `.login-view` (its own single scroll container, per the earlier "whole login scrolls as one page" fix) to reach. The logo itself was proportionally small (320px) relative to the vertical space the box and its internal spacing consumed.
+- FIX, all pure CSS trims/increases in `preview.html`'s login block, applied via a single verified Python patch script (12 `do()` calls, each asserting an exact match count before writing):
+  - `.login-view` outer padding: `40px 0` → `20px 0`.
+  - `.login-inner` padding: `20px 40px 40px` → `10px 40px 16px`.
+  - `.login-logo` base size: `320×320px` → `380×380px` (bigger, per the request), bottom margin `6px` → `4px`.
+  - Mobile `.login-logo` overrides tightened proportionally: `200px`→`220px` (≤768px), `160px`→`180px` (≤480px) — kept the logo-larger intent at mobile sizes too.
+  - `.login-subtitle` bottom margin: `36px` → `20px`.
+  - `.login-panel` padding: `36px 32px` → `26px 32px` (the "box slightly smaller" ask).
+  - `.login-panel-label` bottom margin: `16px` → `12px`.
+  - `.login-divider` margin: `20px 0` → `14px 0`.
+  - `.login-version` top margin: `30px` → `16px`.
+  - `.login-credit-footer` top margin: `6px` → `4px`; padding: `0 16px 34px` → `0 16px 18px`.
+  - `.brand-select, .pin-input, .modal-input, .modal-textarea, .media-url-input` AND the separate `.login-input` rule (both share a byte-identical property block) bottom margin: `15px` → `12px`.
+- HONEST LIMIT: this is a proportion/spacing pass, not a guaranteed zero-scroll on every possible viewport — an extremely short window (e.g. a small laptop at high browser-UI-chrome zoom) can still require a sliver of scroll. It meaningfully shrinks the total column height (roughly 60-70px of cumulative vertical trim across the 10 rules above, on top of the larger logo) and was the requested direction; it was not verified against every physical screen size.
+- Verified: `node scripts/syntax_gate.js preview.html` — 17/17 blocks clean. All 12 CSS values grep-confirmed landed exactly as intended (base `.login-logo` 380px, `.login-view` padding `20px 0`, `.login-credit-footer` padding `0 16px 18px`, etc.). Full `test_*.js` regression sweep (53 files) re-run: no new regressions from this patch — every non-pass is either the single expected stale-`PFLX_PATCH`-literal check baked into each older version-specific test file, one of the 3 documented pre-existing Node-crash files (`test_v1142.js`/`test_v1144.js`/`test_v1144_v2.js`), or an already-documented pre-existing gap (`test_pp_home_cards_v188.js`, `test_xbot_controller_v176.js`, `test_xbot_dock_v183.js`, `test_xbot_notes_v184.js` — superseded by v205's rewrite).
+- NEWLY NOTICED (not caused by this patch, unrelated code area — pure CSS on `.login-*` classes never touches this): `test_gameshow_fx_v206.js` fails one case, "X-Live iframe may autoplay." Flagging for whoever picks up gameshow/X-Live-embed work next; not investigated this patch since it's outside this patch's scope.
+- BACKLOG: still pending from before this window — the glitch-effects-timed-to-login-music request ("time glitch effects to happen and occur matching with the music on the login screen") — needs a read of the actual shipped v206-209 "official login music" system (commit `636bc37`) before scoping, not yet started.
