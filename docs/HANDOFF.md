@@ -16972,6 +16972,24 @@ Mission Control immediately after, since it touches live nav for active testers.
 - `livekit-token` v12 is clean; the LiveKit key is `APIJUyLWXxhhENR`. Its secret was shown in a chat screenshot, so rotate it (new key → both Supabase secrets → revoke). Also revoke `APIgMPUjx6XECF9`.
 - **Egress:** 179/250 GB on Sep 16, mostly from the 3-min full pulls that v216 removed.
 - **YouTube key location:** Ennis asked for it to live in X-Bot's AI Engine Keys, which is done.
-- **Next:** X-Gems. A Gemini Gem powers X-Bot as a persona.
-  - Brand line "Powered by Gemini Gems" as TEXT only; no Google G / Gemini logos. The mark is an original faceted-gem X-Gem mark with a four-color shimmer.
-  - "Open outside app" ↗ opens the Gem share link.
+- **X-Gems shipped as v218** (below).
+
+**PLATFORM v218 (68db3c6): X-Gems — Gemini Gems powering X-Bot** · proxy `6edaa1a`
+- **What it is:** a host turns a Gemini Gem into an X-Gem; a player picks it in X-Bot and X-Bot takes on that persona. Gems have no public API, so the X-Gem holds a copy of the Gem's instructions + knowledge and calls the Gemini API with a pinned model — same behaviour every time.
+- **Module:** `window.pflxXGems` (own `<script>` before the FLP submissions modal).
+  - Rows: `pflx_xgems` {items: meta} (live via `pflxAppDataFeed('pflx-xgems')`) and `pflx_xgem_<id>` {instructions, files:[{name,text}]} (on demand).
+  - Meta: name, tagline, emoji/image (160px webp), shareUrl, model, temperature, grounding, starters (≤4), keywords, autoRoute, allCohorts/cohorts, enabled.
+  - Knowledge: .txt .md .csv .json .pdf (pdf.js 3.11.174 from cdnjs); first 100k chars go in the prompt.
+  - Active persona per device: localStorage `pflx_xgem_active_v1`.
+- **X-Bot chat:** `#xgem-bar` (chat mode only): chips, banner (X-Gem wordmark, "Powered by Gemini Gems" as text, starters, ↗, ✎ for hosts). Selecting swaps the header/placeholder; replies get the gem mark + "💎 NAME · X-GEM · GEMINI" (`decorate` hook in `xbotAddMessage`).
+- **Routing:** `XBOT_AI.respond()` → after the dormant gate → `personaFor(input)` (selected gem, else keyword match when autoRoute) → `respondAs` (own history; prompt = player SAFETY first, persona, instructions, knowledge, current user; Gemini first with {model, temperature, grounding, maxTokens 1024}, then other engines). Auto-connected replies start "↪ X-Bot connected you to NAME".
+- **↗ Open outside app:** opens shareUrl in a new tab; only `https://gemini.google.com/` or `https://g.co/` links are accepted.
+- **MC Settings → X-Bot → 💎 X-Gems:** list/create/edit/delete (`renderAdmin` into `#pflx-xgem-admin`).
+- **Branding:** original SVG faceted gem with a rotating red/yellow/green/blue gradient; shimmer "G" in the wordmark. No Google/Gemini logos anywhere.
+- **Gemini engine fixes:** `gemini-2.0-flash` (shut down 2026-06-01) → `gemini-2.5-flash`. `callGemini/callProxy(…, opts)`; 404/not-found → one retry on `gemini-flash-latest`; all text parts joined.
+- **Proxy (`api/pflx-ai.js`, 6edaa1a):** body limit 1mb; default gemini-2.5-flash; accepts `model` (gemini-* only), `temperature` (0–2), `grounding` (google_search tool); 404 → gemini-flash-latest; gemini system prompt up to 200k chars (others 6000). Verified live (400 KB POST → 503 no-key, not 413).
+- **Light skins:** X-Gem CSS is prefixed `html body` + inherit rules because clouddesk sets `color` on every span/div and light mode forces `[style*="color:#fff"]`; don't use inline white text in this UI.
+- **Tests:** `test_xgems_v218.js` 34/34; `test_proxy_v218.mjs` 13/13; e2e (fake Supabase + fake Gemini + fake proxy, `v218/`) 43/43; v217 e2e 38/39 and v216 e2e 28/29 (only the patch-number check).
+- **Pending (Ennis):** the proxy has NO provider keys (GET shows all false), so players' X-Bot/X-Gems only answer with a GEMINI_API_KEY in the pflx-pathway-portal Vercel env, a cohort host key, or their own ⚡ connection.
+- **Seen, not fixed (needs OK):** under the clouddesk skin, `pflxToast` text is dark on a dark toast (unreadable).
+- **Next:** Ennis asked to combine YouTube with the X-Bot Theater, possibly redesigning the X-Bot Live tab — proposal first.
