@@ -17122,3 +17122,29 @@ Mission Control immediately after, since it touches live nav for active testers.
   - Mission Control checkpoint/project reward popups (`pflxFirePrizePackTrigger` → `pflxGrantLootReward` → `PflxDataBus.award()` + `pflxNotify`) — current animation/SFX treatment not fully confirmed; worth a dedicated look.
   - X-Live's own slide/session/live-stream-control animations (separate `x-live-check` repo) — already has strong `xlSfx()` coverage on session/slide controls (`liveGoLiveSession`, `liveRevealSlide`, slide nav, `liveToggleControl`, `liveEndSession`) but no matching CSS flash/pulse on those transitions — the natural "sub-patch 2" for this rollout, since the SFX side is already done there and just needs the visual half.
 - **HONEST LIMIT:** not yet confirmed with a live browser click-through (toast pop, X-Bot Live tab switch nav SFX+pop, team-draft stagger) — verified via syntax gate + extraction-based unit test + sandbox-executed logic run only. Worth a quick visual/audio check next time Ennis is on: open X-Bot's LIVE tab, switch TEAMS↔SESSIONS a couple times (listen for the nav tone, watch the panel pop), then draft a team and watch the columns cascade in.
+
+## DATA SURGERY — DD Core/Studio cohort cleanup completed (Sept 16, Ennis)
+- **ASK:** Ennis: "remove all DD core/studio cohorts and put all of those players in PlayerPool and Falcon Studios. If their email has a .31 then put them in Falcon Studios (MS Division)" (confirmed via AskUserQuestion: ".31" = the ASD grad-year email suffix, e.g. `name.31@asdubai.org` = Class of 2031 = Middle School).
+- **ROOT CAUSE (found before touching data):** the cohort-*registry* cleanup was already done at some earlier point — verified via Supabase that `app_data.pflx_organizations` already has `orgs.ASD.cohorts = ["Falcon Studios","Falcon Studios (MS Division)"]` and `cohortPatch.removed` already lists all 7 DD names (`DD Core 1/2/3/5`, `DD Studio 2/3/7`). What was never done was the underlying PLAYER DATA: 55 real records in `app_data.pflx_mc_players.items` still carried a DD cohort name on `cohort` (string) and/or `cohorts` (array) — and since `pflxCohortHub.list()` unions in any cohort name still referenced by a live player regardless of registry-removal status, those 7 ghost cohorts kept resurfacing in Cohort Manager (and presumably in X-Live's separate cohort picker, still to be checked/fixed in that repo).
+- **DATA HYGIENE FOUND:** the two fields had drifted — most of the 55 already had `cohorts: ["PlayerPool"]` (array) while `cohort` (string) still said the old DD name; a handful had the two fields disagreeing with EACH OTHER (e.g. Muhammad Allana: `cohort: "DD Studio 7"` vs `cohorts: ["DD Studio 2"]`). This migration normalized both fields together rather than papering over just one.
+- **FIX (Supabase, single transaction, project `hyxiagexyptzvetqjmnj`):** read-modify-write against `app_data` key `pflx_mc_players` — for every item where `cohort` IN (the 7 DD names) OR `cohorts` contained any of them, set `cohorts = [target, "PlayerPool"]` and `cohort = target + ", PlayerPool"` where `target` = `"Falcon Studios (MS Division)"` if `email ~ '\.31@'` else `"Falcon Studios"`; all other players' records byte-untouched (confirmed: total player count unchanged at 142 before/after).
+  ```sql
+  BEGIN;
+  WITH current AS (SELECT data FROM app_data WHERE key = 'pflx_mc_players' FOR UPDATE),
+  transformed AS (
+    SELECT jsonb_set(current.data, '{items}', (
+      SELECT jsonb_agg(CASE
+        WHEN (item->>'cohort') IN ('DD Core 1','DD Core 2','DD Core 3','DD Core 5','DD Studio 2','DD Studio 3','DD Studio 7')
+          OR (item->'cohorts') ?| array['DD Core 1','DD Core 2','DD Core 3','DD Core 5','DD Studio 2','DD Studio 3','DD Studio 7']
+        THEN item || jsonb_build_object(
+          'cohorts', jsonb_build_array(CASE WHEN (item->>'email') ~ '\.31@' THEN 'Falcon Studios (MS Division)' ELSE 'Falcon Studios' END, 'PlayerPool'),
+          'cohort', (CASE WHEN (item->>'email') ~ '\.31@' THEN 'Falcon Studios (MS Division)' ELSE 'Falcon Studios' END) || ', PlayerPool',
+          'updatedAt', (extract(epoch from now())*1000)::bigint)
+        ELSE item END)
+      FROM jsonb_array_elements(current.data->'items') AS item)) AS new_data FROM current)
+  UPDATE app_data SET data = transformed.new_data, updated_at = now() FROM transformed WHERE app_data.key = 'pflx_mc_players';
+  COMMIT;
+  ```
+- **VERIFIED (SELECT after commit):** 0 players still reference any of the 7 DD names; 26 now `Falcon Studios, PlayerPool` (both `cohort` string and `cohorts` array), 29 now `Falcon Studios (MS Division), PlayerPool` — 55 total, matching the pre-migration dry-run count exactly; total roster size unchanged at 142.
+- **FLAGGED, NOT TOUCHED:** two DIFFERENT player ids share the same email (`jkhoury.30@asdubai.org` — `player-import-1774891628716-35` and `player-1780476401097-o742t`, both "John Khoury") — a likely duplicate account from a prior import. Both were migrated identically (consistent target cohort), but merging/deleting the duplicate is a separate decision left for Ennis, not assumed here.
+- **NOT YET DONE (separate, queued):** X-Live (`x-live-check`, a different deployed app) shows its OWN stale cohort picker (Ennis's screenshot: has "Core 3"/"Core 5" and "DD Studio 3" that don't match Cohort Manager at all, is missing the real ASBGV `R/CS 6A-8B` cohorts, and has a duplicate "Player Pool"/"PlayerPool" entry) — root cause not yet confirmed (X-Live doesn't share code with the Console, so it isn't reading `pflxCohortHub`; needs its own investigation in that repo). Also queued: a platform-wide policy so every player (not just this DD group) also carries PlayerPool going forward, an org indicator on the player MC dashboard, and surfacing System Events in X-Live/X-Bot with animations/SFX — all discussed with Ennis, none built yet.
