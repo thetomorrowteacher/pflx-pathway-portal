@@ -17346,3 +17346,22 @@ Mission Control immediately after, since it touches live nav for active testers.
   - The CharacterForge instructions ask for "Ben 10-style" art and a "Midjourney prompt", but also say "Nano banana prompt" in the steps.
   - The ThinkTable instructions start with a "paste into Gemini Gem Manager" header block.
 - **BACKLOG:** stars/rarity were not built (the STEP badge was chosen instead); a per-cohort order for the select screen; card art for the other two X-Gems.
+
+## DATA — CharacterForge prompt renamed to "character design prompt" + ProtoDev Gem knowledge attached (Sept 17, Ennis)
+- **ASK (Ennis):**
+  - "strip away naming the prompt. Just call it character design prompt."
+  - "ProtoDev Gem in Gemini: its Knowledge Base still isn't attached … Fix it!"
+- **CharacterForge instructions:** 5 exact-string replacements, both in PFLX and in the Gemini Gem:
+  - "Midjourney image prompts", "Nano banana prompt" and "MidJourney prompt" became "character design prompt(s)".
+  - The heading "Midjourney Prompt: … formatted specifically for Midjourney generation" became "Character Design Prompt: … the student can paste into an image generator".
+  - The Midjourney-only `--v 6.0` suffix was dropped.
+  - "Ben 10-style" was left unchanged, as asked.
+  - The text went from 3,633 to 3,639 chars, SHA-256 `5fe28d82…`.
+- **Where it was applied:**
+  - **PFLX:** SQL `jsonb_set(replace(...))` on `app_data` key `pflx_xgem_xg-characterforge` only; `updatedAt` = DB now − 10 min.
+  - **Gemini Gem** `c7e82ed48a2b`: edited in the Gem editor. The first save returned BardErrorInfo 1155; the retry returned `[true]`.
+  - The Drive Gem file (`1H903ppb…`) re-parsed with the same hash, and no "Midjourney" or "Nano banana" remains.
+- **ProtoDev Gemini Gem `520ec25ac68b`:** Knowledge now holds `Gemini Gems/ProtoDev - Knowledge Base.md` (v2 with ENTRY #, Drive id `1wcEpwiW…`), attached through the Drive picker and saved (`[true]`).
+  - Earlier in-page File uploads never persisted.
+  - The instructions were checked before saving (hash `596a5075…`), so nothing was reverted.
+  - Chat test: the Gem answered "slicer 1.7.3 or later" and "12, 24, 36 and 48 tooth", citing the KB file.
