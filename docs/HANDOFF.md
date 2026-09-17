@@ -17482,3 +17482,123 @@ Mission Control immediately after, since it touches live nav for active testers.
   3. Optional: add a Vercel Firewall rate-limit rule for `/api/pflx-ai`.
   4. If PFLX is ever served from a new domain, add it to `PFLX_ALLOWED_ORIGINS`.
 - **BACKLOG:** the YouTube key field stays as is (separate project, correct use). Revoke the exposed "...mn7I" Gemini key in AI Studio when convenient.
+
+## PATCH PLATFORM v229 — KOKORO VOICE FOR X-BOT + ANNOUNCER CLIPS HOSTED (Sept 17, Ennis)
+- **ASK (Ennis):** "add kokoro and lets also use Kenney Voiceover Pack for gamified X-Live and Battle Arena". Choices: Kokoro on by default on strong devices; the announcer voice is picked by the host per session.
+- **WHAT SHIPPED (pflx-platform f8f2606):**
+  - New `window.pflxVoice` module, placed after v223's `pflxSoundOwner`.
+    - Runs Kokoro-82M (Apache-2.0, `kokoro-js@1.2.0` from jsdelivr, model `onnx-community/Kokoro-82M-v1.0-ONNX`) in a module Worker made from a blob.
+    - WebGPU uses fp32 (the kokoro-js recommendation). The CPU/wasm path uses q8.
+    - Text is split into sentence chunks of 260 characters or less. Each chunk becomes a 16-bit WAV blob and plays through an `<audio>` element. The next chunk is generated while the current one plays.
+  - Engine setting is per device (`localStorage pflx_voice_v1`: engine / voice / speed):
+    - `auto` (default): Kokoro only on devices with a real WebGPU adapter. Software adapters are excluded (swiftshader, llvmpipe, isFallbackAdapter). Other devices keep today's voices: the browser voice for read-aloud, ElevenLabs for voice chat.
+    - `kokoro`: Kokoro always; falls back to CPU q8 if WebGPU is missing or fails.
+    - `browser`.
+    - `elevenlabs`: voice chat only.
+  - Download behaviour:
+    - The model downloads only on the first real utterance: about 330 MB on GPU, about 90 MB on CPU, one time, then cached by the browser.
+    - Until it is ready, the browser voice speaks.
+    - Lines of 16 characters or less (Cyber Timer countdown numbers, "Time's up") never wait: the browser voice says them the first time and the Kokoro version is cached for next time.
+  - X-Bot ⚙ now opens with a VOICE block (`#pvx-box`): engine, 28 voices in 4 groups, speed 0.7–1.4, ▶ TEST / ■ STOP, and a live status line (checking / downloading N% / ready on GPU or CPU / error). Labels stay readable on light skins.
+  - Routing:
+    - `pflxSpeak(text, opts)` → `pflxVoice.speak`.
+    - `pflxSpeakStop` and the dock 🔊 toggle also stop Kokoro.
+    - `xbotSpeak` asks `pflxVoice.handlesVoiceChat()` first and keeps the ElevenLabs path as the fallback. The Kokoro and browser paths restart `xbotSpeechRecognition` when speech ends.
+    - `xbotSpeak` is silent in a window that doesn't own the sound (v223).
+    - `pflxVoice` stops when its window loses the sound.
+  - Kenney Voiceover Pack (CC0) hosted at `public/sounds/pflx-announcer/{female,male}/<line>.mp3` with `LICENSE.txt`.
+    - 39 lines per voice, about 1 MB total: numbers 1–10, game lines, and 8 of the war lines.
+    - Leading silence trimmed; mono 44.1 kHz 96k.
+    - Female `war_supressing_fire` typo fixed. Male `hold` renamed `war_hold` so both voices share one list. Unused war lines (rpg, sniper, fire_in_the_hole, suppressing_fire, medic, get_down, reloading) dropped.
+  - `PFLX_PATCH` 228 → 229. Renumbered from 226 because v226–v228 shipped from other sessions first.
+- **Verified:**
+  - Syntax gate 24/24.
+  - `test_voice_v229.js` 16/16: anchors; WAV header and clamping; text clean (markdown, emoji, links); chunking.
+  - Playwright `v226_test.py` 25/25 against real kokoro-js from the CDN:
+    - defaults to auto with no GPU → browser voice and no download;
+    - voice chat keeps ElevenLabs on auto without GPU;
+    - browser engine: voice chat speaks and restarts listening;
+    - other window stays silent;
+    - kokoro engine: browser voice while downloading; progress shown in settings; model ready on CPU q8 in about 9 s;
+    - read-aloud plays generated audio, long text plays in chunks, stop works;
+    - countdown numbers: instant first time, Kokoro once cached;
+    - Kokoro voice chat restarts listening with no ElevenLabs call;
+    - voice choice saved; TEST plays; light-skin labels readable;
+    - no page errors; a software-only WebGPU device is not "strong".
+  - WebGPU path: auto on a (test-allowed) software adapter loaded Kokoro on webgpu/fp32 in 16 s. Generation on a software GPU was too slow to finish in the test window; real GPUs are fast.
+  - v223 sound suite on v229: 24/24.
+  - Live: `PFLX_PATCH = 229`; the voice panel shows 28 voices; announcer mp3s serve 200 audio/mpeg.
+- **SECURITY FINDING (reported, NOT changed — awaiting Ennis):** `getElevenLabsKey()` in `preview.html` falls back to a hard-coded ElevenLabs API key in client code, so anyone can read it from the page source. Recommended:
+  1. Rotate that key in ElevenLabs.
+  2. Remove the fallback (or move ElevenLabs TTS behind the `/api` proxy).
+  With Kokoro on, strong devices no longer call ElevenLabs.
+- **BACKLOG:** optional Kokoro "stream as the AI types" (kokoro-js `TextSplitterStream`); an optional warm-up download while idle on Wi-Fi.
+
+## PATCH X-LIVE v0.38 — GAMESHOW ANNOUNCER, host picks the voice per session (Sept 17, Ennis)
+- **WHAT SHIPPED (x-live 2017f1b):** `xlAnnounce(clips, voice, opts)` plays Kenney clips from the Platform (`XL_SOUND_ROOT + 'pflx-announcer/'`).
+  - Pooled `<audio>` elements, sequenced with a 900 ms gap.
+  - The same line is not repeated within 1.5 s.
+  - Music ducks while a line plays.
+  - Silent when the player's 🎙 VOICE header button is off (`xl_ann_on_v1`) or when this window doesn't own the PFLX sound (v0.37.5).
+- **Host controls:**
+  - SHOW CONTROL and backstage get an 🎙 ANNOUNCER picker: ♀ FEMALE / ♂ MALE / OFF, stored as `session.announcer`, a host-owned plain field merged by `hostUpdatedAt`.
+  - A 15-line pad: READY·SET·GO, ROUND, FINAL ROUND, HURRY UP, CORRECT, WRONG, CONGRATS, NEW HIGH SCORE, LEVEL UP, OBJECTIVE DONE, IT'S A TIE, TIME OVER, MISSION COMPLETE, MISSION FAILED, GAME OVER.
+  - Pad presses ride on `s.fxEvents` as `{ann}`. They reach every player once and are never replayed on first sight; the host's own window plays them once.
+- **Automatic lines** (`xlAnnWatch`, run for every viewer including the host):
+  - X-Rush start → GO;
+  - moving to the last slide (decks with 3+ slides) → FINAL ROUND;
+  - pause or HOLD → HOLD;
+  - session end → MISSION COMPLETED (also from the host's END button);
+  - 30 s left on a timer of 45 s or more (not paused) → HURRY UP, once per timer.
+  - Player only: reveal → CORRECT / WRONG; randomizer picks you → POWER UP.
+- **Verified:**
+  - Syntax gate 2/2.
+  - `test_xlive_announcer_v038.js` 17/17.
+  - Playwright `xl038_test.py` 27/27, with X-Live inside a PFLX parent:
+    - every clip exists in both voices;
+    - VOICE button on by default; first sight is silent;
+    - each automatic line: GO, FINAL ROUND, HOLD, CORRECT, WRONG, POWER UP, MISSION COMPLETED, HURRY UP once;
+    - short timers stay silent; male voice and OFF are respected;
+    - a host pad event plays ready → set → go in order on the player;
+    - music ducks and returns; the player mute works; the sound window is respected;
+    - host UI: picker, 15-line pad, MALE saved with a preview, pad FINAL ROUND sent to players and not heard twice by the host, OFF dims the pad;
+    - no page errors.
+  - Earlier suites are unchanged from their v0.37.6 baseline: `xl375_test.py` 8/8; gameshow and pip unit tests show the same pre-existing failures as v0.37.6.
+  - Live on GitHub Pages: `xlAnnounce` present and plays.
+
+## BATTLE ARENA — GAMESHOW ANNOUNCER (host-picked voice) + ONE SOUND WINDOW INSIDE PFLX (Sept 17, Ennis)
+- **WHAT SHIPPED (pflx-battle-arena 01b35ea, `public/preview.html`):** a new `ANN` engine between `SFX` and `MUSIC` that plays the same Platform-hosted Kenney clips.
+  - Voice is resolved from context:
+    1. The LIVE event being played (`ev.announcer`).
+    2. Otherwise the active Showdown match (`match.announcer`).
+    3. Otherwise the Arena default the host picks in Settings, stored in app_data `arena_announcer` `{voice, updatedAt, by}` and loaded at boot, newest wins.
+  - Players toggle it in the side panel (🎙 Announcer voice ON/OFF) or in Settings (`pflx_ba_ann_on`).
+- **Lines:**
+  - Quiz battle: READY SET GO; CORRECT / WRONG; TIME OVER; FINAL ROUND before the last round; YOU WIN / YOU LOSE / IT'S A TIE.
+  - Cipher: start; sabotage (throttled); crisis → HURRY UP; crisis resolved / failed; keys → POWER UP; terminals → OBJECTIVE ACHIEVED; body or vote → HOLD; eject; MISSION COMPLETED / FAILED.
+  - Rift: start; eliminations (throttled); PvP → FINAL ROUND; win / lose.
+  - Creator Showdown: start; HURRY UP at 30 s; 5-4-3-2-1; TIME OVER; winner → YOU WIN, others → CONGRATULATIONS.
+  - Cartridge games: start; season win → LEVEL UP; LIVE-event personal best → NEW HIGH SCORE; else win / lose.
+- **Host picks the voice per session:**
+  - Settings → Arena announcer.
+  - Showdown mode settings → 🎙 Announcer Voice: Arena default / female / male / off (`esportsHostConfig[mode].announcer`, copied onto new matches).
+  - LIVE event launch form → `#lpAnn`, defaulting to the Arena voice.
+  - Host event card → 🎙 VOICE button that cycles female → male → off (`baLiveSetAnnouncer`, upsert).
+- **Sound window (platform v223):**
+  - The Arena listens for `pflx_audio_owner`, sends `pflx_audio_query` on load and `pflx_audio_use` on a click when it doesn't own the sound.
+  - `SFX` gain and `MUSIC` volume go to 0 in a window without the sound, which fixes Arena echo across two PFLX windows.
+  - `MUSIC.refresh()` added; music ducks to 35% under the announcer.
+- **Verified:**
+  - Syntax gate 3/3.
+  - `tests/test_announcer.js` 14/14.
+  - Playwright `ba_test.py` 34/34 (host via iframe SSO):
+    - quiz battle: start / correct / wrong / final round / tie, with clips playing in order;
+    - Settings: MALE saved to the cloud, and a second device loads it;
+    - side-panel toggle off and on;
+    - other window: announcer and SFX gain are 0; a click asks for the sound, which comes back;
+    - music ducks;
+    - LIVE: launch select defaults to the Arena voice; card cycles the voice; OFF event is silent; high score in the event voice; duel lose in the Arena voice;
+    - Showdown: mode picker saves; match start in the mode voice; HURRY UP; countdown; TIME OVER;
+    - no page errors.
+  - Live on Vercel: `ANN` present and speaking.
+- **NOTE:** cartridge games (`public/games/*`) keep their own SFX. The announcer speaks around them (start / result) from the Arena shell.
