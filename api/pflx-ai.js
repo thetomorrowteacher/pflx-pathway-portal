@@ -15,7 +15,9 @@
  *       provider?: 'anthropic' | 'openai' | 'gemini'   (default anthropic)
  *       system?:   string
  *       prompt?:   string                    — single-turn convenience
- *       messages?: [{ role, content }]       — multi-turn (wins over prompt)
+ *       messages?: [{ role, content, images? }] — multi-turn (wins over prompt)
+ *                  images (user turns): [{ mimeType: image/jpeg|png|webp, data: base64 }]
+ *                  → Gemini inline_data · Claude image blocks · OpenAI image_url (DeepSeek: text only)
  *       maxTokens?: number
  *       cohort?:   string                    — if a per-cohort host key is set
  *                                              for this cohort, it is used
@@ -42,7 +44,7 @@
 
 import crypto from 'node:crypto';
 
-export const config = { api: { bodyParser: { sizeLimit: '1mb' } } };   // X-Gems send instructions + knowledge
+export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };   // X-Gems send instructions + knowledge; v226: + pictures (Vercel caps bodies at 4.5 MB)
 
 const MODELS = {
   anthropic: process.env.PFLX_AI_MODEL || 'claude-sonnet-4-6',
@@ -56,6 +58,28 @@ const KEYS = {
   gemini: process.env.GEMINI_API_KEY || '',
   deepseek: process.env.DEEPSEEK_API_KEY || '',
 };
+// v226: pictures on user turns (validated; max 3 per turn, 3.4 MB of base64 per request)
+const IMG_MIME = /^image\/(jpeg|png|webp)$/;
+const IMG_B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+function cleanImages(list) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 8)
+    .filter(i => i && IMG_MIME.test(String(i.mimeType || '')) && typeof i.data === 'string' && i.data.length > 0 && i.data.length <= 2600000 && IMG_B64.test(i.data))
+    .slice(0, 3)
+    .map(i => ({ mimeType: String(i.mimeType), data: i.data }));
+}
+function capImages(messages, budget) {
+  // newest pictures win; older ones are dropped (the text says a picture was shared)
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m.images || !m.images.length) continue;
+    const size = m.images.reduce((s, im) => s + im.data.length, 0);
+    if (size > budget) { m.content = '(' + m.images.length + ' picture(s) shared earlier)\n' + m.content; m.images = []; }
+    else budget -= size;
+  }
+  return messages;
+}
+
 // client provider names → proxy provider names
 const PROV_MAP = { claude: 'anthropic', anthropic: 'anthropic', openai: 'openai', gemini: 'gemini', deepseek: 'deepseek' };
 
@@ -150,16 +174,24 @@ export default async function handler(req, res) {
     const system = String(body.system || '').slice(0, provider === 'gemini' ? 200000 : 6000);
     const maxTokens = Math.min(4000, parseInt(body.maxTokens, 10) || 1500);
     let messages = Array.isArray(body.messages) && body.messages.length
-      ? body.messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content || '').slice(0, 24000) })).slice(-24)
-      : [{ role: 'user', content: String(body.prompt || '').slice(0, 24000) }];
-    if (!messages[0].content) return res.status(400).json({ error: 'missing prompt/messages' });
+      ? body.messages.map(m => {
+          const role = m.role === 'assistant' ? 'assistant' : 'user';
+          return { role, content: String(m.content || '').slice(0, 24000), images: role === 'user' ? cleanImages(m.images) : [] };
+        }).slice(-24)
+      : [{ role: 'user', content: String(body.prompt || '').slice(0, 24000), images: [] }];
+    if (!messages[0].content && !messages[0].images.length) return res.status(400).json({ error: 'missing prompt/messages' });
+    capImages(messages, 3400000);
+    const hasImg = m => m.images && m.images.length;
 
     let text = '';
     if (provider === 'anthropic') {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: MODELS.anthropic, max_tokens: maxTokens, system, messages }),
+        body: JSON.stringify({ model: MODELS.anthropic, max_tokens: maxTokens, system,
+          messages: messages.map(m => ({ role: m.role, content: hasImg(m)
+            ? [...m.images.map(im => ({ type: 'image', source: { type: 'base64', media_type: im.mimeType, data: im.data } })), { type: 'text', text: m.content || '.' }]
+            : m.content })) }),
       });
       const data = await r.json();
       if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'anthropic upstream' });
@@ -170,13 +202,16 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model: MODELS[provider], max_tokens: maxTokens,
-          messages: [{ role: 'system', content: system }, ...messages] }),
+          messages: [{ role: 'system', content: system }, ...messages.map(m => ({ role: m.role, content: (hasImg(m) && provider === 'openai')
+            ? [{ type: 'text', text: m.content || '.' }, ...m.images.map(im => ({ type: 'image_url', image_url: { url: `data:${im.mimeType};base64,${im.data}` } }))]
+            : m.content }))] }),
       });
       const data = await r.json();
       if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || provider + ' upstream' });
       text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     } else {
-      const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [...(hasImg(m) ? m.images.map(im => ({ inline_data: { mime_type: im.mimeType, data: im.data } })) : []), { text: m.content || '.' }] }));
       // Client may pin a Gemini model (X-Gems); only gemini-* ids are accepted.
       const wanted = /^gemini-[a-z0-9.\-]{2,40}$/.test(String(body.model || '')) ? String(body.model) : MODELS.gemini;
       const gen = { maxOutputTokens: maxTokens };

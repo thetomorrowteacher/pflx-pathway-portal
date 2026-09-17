@@ -17193,3 +17193,78 @@ Mission Control immediately after, since it touches live nav for active testers.
 - **FIX (Supabase, project `hyxiagexyptzvetqjmnj`, keys `cohortGroups` + `pflx_mc_cohortgroups`, guarded/idempotent):** both keys now carry the same 18 entries (12 original + 6 `cg-seed-asbgv-*`), kept in sync as always. `L.cfg.cohorts` (X-Live's own "My Class" *selected* filter, a separate field on `pflx_lite_config`) was deliberately left untouched — it's currently `["SeasonPass","Global Digital Intern","PlayerPool"]`, which are real, actively-used cohorts (40 GDI + ~22 PlayerPool + 1 SeasonPass players), not stale data; adding the 6 ASBGV cohorts to that active selection would change what "My Class" shows for whoever is currently hosting X-Live, so that's left for Ennis/a host to toggle on in Setup themselves now that the R/CS chips render properly, unless he says otherwise.
 - **VERIFIED:** post-write query confirms both keys hold exactly 18 entries each, 6 matching `cg-seed-asbgv-%`, 0 matching the abandoned `cg-rcs-%` naming, 18 distinct ids (no duplicates); `pflx_mc_players` re-checked unchanged (266/124/266 distinct) throughout.
 - **HOST ACTIONS:** none required for this fix itself. Worth having Ennis (or another host) open X-Live's Setup tab once and confirm the 6 R/CS cohort chips now render with the teal color/description — that's the one thing a Node-side Supabase query can't confirm. Also worth deciding whether the "3rd recurrence" pattern above (successful-looking `app_data` writes not persisting) needs its own dedicated investigation rather than being re-patched each time it's noticed.
+
+## PATCH PLATFORM v226 — X-BOT IMAGE ATTACH: 📷 / paste / drop pictures into X-Bot and X-Gems (Sept 17, Ennis)
+- **ASK (Ennis):** after the ProtoDev Gem was built, he asked whether "adding image upload to X-Bot chat" is possible, and to build it if so. The goal is for the ProtoDev X-Gem to read a student's Project Development Infographic screenshot inside PFLX, instead of sending the student out to Gemini.
+- **WHY IT WAS MISSING:** X-Bot chat was text-only end to end:
+  - `#xbot-chat-input` had no file input.
+  - Every engine caller mapped history as `{ role, content }`.
+  - The proxy (`api/pflx-ai.js`) rebuilt Gemini `contents` as `parts: [{ text }]`.
+  - The body limit was 1mb.
+  - All four vision-capable paths (Gemini direct, Claude direct, OpenAI direct, and the proxy) already had APIs that accept images, so nothing new was needed server-side beyond passing them through.
+- **FIX (platform, `preview.html`):**
+  - **Input bar:** a new 📷 button (`#xbot-attach-btn`) sits between the mic and the input, with a hidden `#xbot-attach-input` (accept `image/*`, multiple).
+  - **Tray:** `#xbot-attach-tray` shows thumbnails with ✕ above the input. `.xbot-chat-input-area` is now `flex-wrap: wrap`; the tray takes `order:-1; flex-basis:100%`.
+  - **Paste and drop:** Ctrl/Cmd+V of an image into the input attaches it, and so does dropping a file on `#xbot-chat-messages` (dashed outline while dragging).
+  - **New module `window.pflxXBotImages`** (its own `<script>`, right after the X-Gems script):
+    - Decodes each picture in the browser and shrinks it to JPEG. The longest side is 1600px, and it steps down in quality/size until the base64 is ≤ ~900 KB. Transparent PNGs get a white background.
+    - Makes a 160px thumbnail for display.
+    - Limits: max 3 per message; a picture over 2.5 MB of base64 is rejected.
+    - API: `pick`, `onPicked`, `addFiles`, `remove`, `clear`, `count`, `take`, `busy`, `showInLastUserBubble`, `trimHistory`, `clean`, and per-engine formatters `geminiParts` / `claudeContent` / `openaiContent` / `proxyMessage` / `textOf`, plus `canSee`.
+  - **`xbotHandleSend`:**
+    - Takes the pending pictures and sends them with the message.
+    - A picture-only send gets the default text "Here is my picture." / "Here are my pictures."
+    - Sending is blocked with a toast while a picture is still shrinking.
+    - The user bubble shows the thumbnails (`.xbot-msg-images`).
+    - Both the normal path and the moderation-warned path pass the pictures.
+  - **`XBOT_AI.respond(userInput, extra)`:**
+    - Stores `{role, content, images}` in history and runs `trimHistory`.
+    - A message with a picture is steered to a vision engine (Gemini → Claude → OpenAI, whichever is available) when `pickModel` would have chosen `local`.
+    - If only a text engine answers, the reply starts with "📷 This AI engine can't see pictures…".
+  - **Engine callers:**
+    - `callGemini` uses `inline_data` parts.
+    - `callClaude` uses base64 image blocks.
+    - `callOpenAI` uses data-URL `image_url`.
+    - `callLocal` is text only.
+    - `callProxy` sends `messages[].images = [{mimeType, data}]` for every provider except `deepseek`.
+  - **X-Gems:** `respondAs(p, input, AI, images)` keeps the pictures in the persona's own history, with the same text-only note.
+  - **Privacy and cost:**
+    - Pictures live only in memory, in the chat history for this page.
+    - They are never written to localStorage, IndexedDB or `app_data`.
+    - The Chat Monitor log (`xbotLogMessage`) records `📷×N <text>`, via `xbotAddMessage._imgNote`, never pixels.
+    - Only the 2 newest picture turns keep their pixels in the history sent to the AI. Older turns become "(N pictures shared earlier)". The total picture budget per request is 3.2 MB of base64.
+- **FIX (proxy, `pflx-pathway-portal/api/pflx-ai.js`):**
+  - The body limit is now `4mb` (Vercel caps bodies at 4.5 MB).
+  - New `cleanImages()`: only jpeg/png/webp, valid base64, ≤ 2.6 MB each, max 3 per user turn; assistant turns never carry pictures.
+  - New `capImages()`: 3.4 MB budget per request, newest pictures win; dropped ones are noted in the text.
+  - Per provider: Gemini gets `inline_data` parts before the text; Anthropic gets base64 image blocks; OpenAI gets `image_url` data URLs; DeepSeek gets text only.
+  - A message with a picture but no text is accepted; text-only requests are byte-identical to before.
+  - The deploy is backward compatible: an older client just never sends `images`.
+- **Verified:**
+  - `node scripts/syntax_gate.js` passes: 22/22 blocks.
+  - `test_xbot_images_v226.js`: 32/32. It runs the real extracted module in a vm for validation, format builders, history trimming and `canSee`, and also checks the source wiring (button, respond signature, both send paths, log note, 5 engine callers, no storage writes).
+  - `test_proxy_images_v226.mjs`: 13/13. It imports the real handler with a mocked `fetch` and covers the Gemini, Claude, OpenAI and DeepSeek shapes, bad-picture filtering, the budget, picture-only messages, the unchanged text path, and 400 on an empty message.
+  - **E2E `e2e/v226_test.py`: 33/33.** Setup: Playwright, host plus player, fake Supabase, fake proxy, fake Gemini and Claude. It covers:
+    - the button is visible in chat and hidden in other modes;
+    - tray, count badge, non-picture refused, ✕, cap of 3;
+    - a 2400×1350 PNG arrives as a 1600×900 JPEG and an 800×600 JPG keeps its size;
+    - only `{mimeType,data}` is sent; bubble thumbnails show; the tray clears;
+    - the Chat Monitor shows `📷×2`; no picture bytes in localStorage or `app_data`;
+    - a follow-up keeps the pictures; picture-only send works; the 3rd picture turn drops the oldest;
+    - paste and drop both work;
+    - the ProtoDev X-Gem gets the picture with its own prompt and model;
+    - a direct Gemini key sends `inline_data`;
+    - a DeepSeek-only engine shows the can't-see note;
+    - a short message with a picture goes to direct Claude with an image block, not local;
+    - a plain follow-up returns to local, text only;
+    - no page errors.
+  - **Regression:** an A/B sweep of all 58 `test_*.js` files on the device against the v225 and v226 builds found zero differences. The 38 non-clean files are the same pre-existing set documented in v221/v224/v225.
+  - The device build is byte-identical to the tested build (md5 `55135e51…`).
+- **ALSO:** a `git status` from the Cowork VM left an undeletable empty `.git/index.lock` in `pflx-pathway-portal` (no delete permission yet). Delete permission was granted and the lock removed. Future sessions: expect this whenever git runs from `device_bash` without delete permission.
+- **HOST ACTIONS:**
+  - X-Bot / X-Gem replies still need an AI key: `GEMINI_API_KEY` (or Anthropic/OpenAI) in the pflx-pathway-portal Vercel env, a cohort host key, or the player's own ⚡ connection. Without a key, a picture gets the same "needs an AI connection" reply as text.
+  - Update the ProtoDev X-Gem instructions: its "X-GEM MODE" block ("you can't see images here") is now out of date. Students can attach the infographic directly in X-Bot.
+- **BACKLOG:**
+  - A host on/off switch for picture uploads (per cohort) was not built. Pictures go wherever text already goes, under the same safety prompt.
+  - No picture moderation beyond the provider's own safety filters.
+  - Voice mode doesn't attach pictures.
