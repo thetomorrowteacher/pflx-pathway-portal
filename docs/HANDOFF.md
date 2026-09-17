@@ -17268,3 +17268,81 @@ Mission Control immediately after, since it touches live nav for active testers.
   - A host on/off switch for picture uploads (per cohort) was not built. Pictures go wherever text already goes, under the same safety prompt.
   - No picture moderation beyond the provider's own safety filters.
   - Voice mode doesn't attach pictures.
+
+## PATCH PLATFORM v227 — X-GEM SELECT SCREEN: a character-select grid for X-Gems + the 4 official X-Gems created (Sept 17, Ennis)
+- **ASK (Ennis):** "make the X-Gems in PFLX. Make a X-Gem selection screen like the attachment when you choose X-Gem." The attachment was a mobile game's character-select grid. His follow-up screenshot circled the **"+ X-Gem"** chip in the X-Bot bar as the place where you choose. His choices: missing art gets a locked-style placeholder, and the star row becomes a **Gem chain STEP** badge plus the FLX stage.
+- **FIX (platform, `preview.html`), new module `window.pflxXGemSelect`** (its own `<script>`, right after the X-Gems script):
+  - **Screen:** a full-screen overlay (`#xgsel`, z-index 100040).
+    - Layer order: `#pflx-dock` (100000) < the screen < the X-Gem editor (100060).
+    - While the screen is open, `body.xgsel-open` lifts `.pflx-toast` to 100070.
+    - **Top bar:** back arrow, the "X-Gems" wordmark, an X-Gem count, the ACTIVE persona, and ✕.
+    - **Tools row:** a Favorites hex toggle, Sort (Gem chain / A→Z / Newest) and an FLX-stage filter that lists only the stages in use.
+  - **Cards (4:5):**
+    - Beveled gold/accent frame (`gem.accent`) with a halftone inner background and portrait art (`gem.card`).
+    - STEP hex badge (`gem.step`), stage chip (`gem.stage`), name plate, ♥ favorite, and an ACTIVE tag (or HIDDEN for hosts).
+    - An X-Bot card comes first. With no art, the card shows a black gem silhouette with "ART COMING SOON".
+  - **Detail panel** (a right-hand panel on desktop, a bottom sheet under 760px):
+    - Big card, tagline, a STEP chip and a stage chip.
+    - Buttons: SELECT (or a disabled ACTIVE), Open in Gemini, Favorite, and Edit (hosts only).
+    - "Try asking" starters: tapping one selects the X-Gem and sends that line.
+  - **Interaction:**
+    - Click a card for its detail; double-click, or Enter twice, to select.
+    - Arrow keys, Home and End move between cards. Esc closes the detail first, then the screen, and leaves the editor alone. Focus is trapped inside the screen.
+    - Reduced motion is respected.
+  - **Hosts** also see hidden and other-cohort X-Gems, plus a **NEW X-GEM** card that opens the editor.
+  - **Favorites and sort** live in localStorage (`pflx_xgem_favs_v1:<user id>`, `pflx_xgem_sort_v1`). They are conveniences only, never written to the cloud.
+  - **Fonts:** Audiowide + Exo 2, loaded on first open (new-surface font rule).
+- **FIX (inside `pflxXGems`):**
+  - **Bar:** the old hosts-only "＋ X-Gem → editor" chip is gone. An **"X-Gems"** chip (grid icon) now sits right after X-Bot, for everyone, and opens the screen. The active X-Gem's banner mark also opens it, focused on that gem.
+  - `mark()` accepts `public/…` image paths.
+  - `renderAll()` refreshes the open screen, so a live feed update redraws it.
+  - **Editor:** new fields for CARD ART (cover-cropped 480×600 webp data URL, ≤140 kB), CARD COLOR, GEM CHAIN STEP and FLX STAGE. New-gem defaults include them.
+  - **API:** `openSelect(id)`, `usable()`, `hostView`, `byId`, `_card`, `_clearCard`.
+  - `PFLX_PATCH` is now 227.
+- **ASSETS:**
+  - `public/xgems/protodev-card.webp` and `thinktable-card.webp` (480×600), cropped from Ennis's key art. The ThinkTable art has its stray "CHAT D" text removed.
+  - `public/xgems/protodev-icon.webp` and `thinktable-icon.webp` (160×160).
+  - The device transfer re-encoded these webps: the bytes differ from the tested copies, but the dimensions are the same and the files are valid.
+- **DATA (Supabase `app_data`, written through the anon REST upsert, the same path as the editor's `writeRow`):**
+  - **New rows:** `pflx_xgems` with 4 items, and `pflx_xgem_xg-characterforge`, `_xg-clientcall`, `_xg-thinktable`, `_xg-protodev` (instructions + files). Before this there were 0 `pflx_xgem%` rows.
+  - **Timestamps:** `updatedAt` = DB clock − 10 min; `createdAt` is staggered further back. Verified 0 future stamps.
+  - **Sources** (the live Gem files in Drive "Gemini Gems", parsed from their protobuf):
+    - **CharacterForge** (step 1, Connection, 🛸, #ff8a3d, temp 0.8): Gem instructions (3.6k), no knowledge.
+    - **ClientCall** (step 2, Connection, 📡, #ff4fb8, temp 0.7): Gem instructions (11.5k) + the text of `PFLX_ The Nexus Narratives.pdf` (19.1k chars).
+    - **ThinkTable** (step 3, Ideation, 💡, #ffb42e, temp 0.7, art): Gem instructions (9.2k).
+    - **ProtoDev** (step 4, Creation, 🛠️, #4c8dff, temp 0.6, art): the X-Gem instructions from `ProtoDev - X-Gem Setup.md` v2 (X-GEM MODE + ENTRY # Growth Log, 27.6k) + `ProtoDev - Knowledge Base.md` v2 (69.9k).
+  - **All four:** Gemini 2.5 Flash, every cohort, visible, auto-connect on (keywords per gem), 3–4 starters each.
+  - **Share links:** `https://gemini.google.com/gem/<Drive file id>`. All 4 Gem files are shared "anyone with the link: reader".
+- **Verified:**
+  - Syntax gate 23/23.
+  - `test_xgem_select_v227.js` 28/28 (source-level: wiring, editor fields, no cloud writes from the module, escaping, layer order, a11y, fonts).
+  - **E2E (`e2e_v227.py`, Playwright, fake Supabase + proxy) 49/49:**
+    - Bar order.
+    - Player sees X-Bot + 4 in chain order, with no hidden or other-cohort gems.
+    - STEP 1–4, stage chips, 2 placeholders, art loads.
+    - Detail panel; no Edit for players.
+    - Toast above the screen.
+    - SELECT → persona + chat.
+    - Banner reopen shows ACTIVE.
+    - Esc/arrows/Enter.
+    - Favorites filter per player, never in the cloud.
+    - Sorts, stage filter.
+    - A starter sends with the ThinkTable prompt.
+    - The ProtoDev prompt carries X-GEM MODE, ENTRY # and the KB.
+    - Double-click X-Bot clears the persona.
+    - Back/Esc close.
+    - Phone: 2 columns, bottom sheet, no sideways scroll.
+    - Host: hidden/other-cohort gems + NEW card, editor above the screen, card upload/step/stage/colour saved (webp ≤140 kB), other gems untouched, the player sees the change live.
+    - No page errors.
+  - **Regression:** v226 image e2e 32/33 on v227 (only the patch-number check). A/B run of all 59 device `test_*.js` files, v226 vs v227: the only difference is `test_xbot_images_v226.js` "PFLX_PATCH is 226" (expected).
+  - **Live:**
+    - prototypeflx.com HTML is byte-identical to the tested build (md5 `02d9fbba…`); `/public/xgems/protodev-card.webp` returns 200.
+    - A live page load reads the 4 X-Gems from the cloud (patch 227, steps 1–4, art on ThinkTable and ProtoDev), with no page errors.
+- **HOST ACTIONS:**
+  - X-Gem replies still need an AI key: `GEMINI_API_KEY` in the pflx-pathway-portal Vercel env, a cohort host key, or the player's own ⚡.
+  - Upload CharacterForge and ClientCall card art when ready: Select screen → card → ✎ Edit → CARD ART.
+  - ProtoDev Gemini Gem: its Knowledge file is still not attached in Gemini; the X-Gem already carries the KB.
+- **NOTED, NOT CHANGED (Ennis's Gems, left as-is):**
+  - The CharacterForge instructions ask for "Ben 10-style" art and a "Midjourney prompt", but also say "Nano banana prompt" in the steps.
+  - The ThinkTable instructions start with a "paste into Gemini Gem Manager" header block.
+- **BACKLOG:** stars/rarity were not built (the STEP badge was chosen instead); a per-cohort order for the select screen; card art for the other two X-Gems.
