@@ -17365,3 +17365,20 @@ Mission Control immediately after, since it touches live nav for active testers.
   - Earlier in-page File uploads never persisted.
   - The instructions were checked before saving (hash `596a5075…`), so nothing was reverted.
   - Chat test: the Gem answered "slicer 1.7.3 or later" and "12, 24, 36 and 48 tooth", citing the KB file.
+
+## DATA — CharacterForge v3: "fusion alien" design, franchise name removed (Sept 17, Ennis)
+- **ASK (Ennis):** "Change Ben-10 style. The goal is to create an amalgamated alien like character that could fuse into something interesting based on the Personality Trait Inventory … ben 10 was used because the characters are already in that style. So you can configure how to prompt this best."
+- **CHANGE:** the CharacterForge instructions were rewritten to v3 (6,787 chars, SHA-256 `756b0ad1…`). No show or franchise name remains.
+  - **Input:** reads the Personality Trait Inventory (traits / what I enjoy / what makes me different).
+  - **Fusion Recipe:** 3–5 keywords become fusion sources (animal, plant, element, material, force, machine part), each tied to a visible body part.
+  - **"Fuse, don't stack":** the sources blend into one species.
+  - **Signature Feature:** comes from "what makes me different".
+  - **Kept from before:** traits → powers, interests → gear/weapons.
+  - **House style described instead of named:** thick black outlines, flat cel shading with hard shadows, exaggerated heroic proportions, a readable silhouette, 2–3 colours plus a glowing accent at the fusion seams, alien-hero "transformation" feel.
+  - **New prompt template:** covers all of the above and ends with a front/side turnaround on a plain white background. It must never contain a franchise name.
+  - **Greeting:** rewritten for fusion.
+- **Where it was applied:**
+  - **Gemini Gem `c7e82ed48a2b`:** instructions (hash-checked in the page) and a new description; saved `[true]`.
+  - **PFLX:** `pflx_xgem_xg-characterforge` (REST upsert, `updatedAt` = now − 10 min). In `pflx_xgems`, the CharacterForge item got a new tagline ("Fuse your traits and interests into an original alien character") and added the keywords "personality trait inventory" and "fusion alien".
+- **Test (live Gem):** traits loyal/curious/calm/determined, basketball + drawing, "remembers everything I read".
+  - The Gem returned a Fusion Recipe (wolf / owl / jellyfish / obsidian), the alien "Lexicor" with an Akashic-visor signature feature, and a filled-in prompt with no franchise name.
