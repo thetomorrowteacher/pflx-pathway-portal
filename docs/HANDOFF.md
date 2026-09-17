@@ -17382,3 +17382,17 @@ Mission Control immediately after, since it touches live nav for active testers.
   - **PFLX:** `pflx_xgem_xg-characterforge` (REST upsert, `updatedAt` = now − 10 min). In `pflx_xgems`, the CharacterForge item got a new tagline ("Fuse your traits and interests into an original alien character") and added the keywords "personality trait inventory" and "fusion alien".
 - **Test (live Gem):** traits loyal/curious/calm/determined, basketball + drawing, "remembers everything I read".
   - The Gem returned a Fusion Recipe (wolf / owl / jellyfish / obsidian), the alien "Lexicor" with an Akashic-visor signature feature, and a filled-in prompt with no franchise name.
+
+## DATA — CharacterForge v5: the Personality Trait Inventory drives colours and style (Sept 17, Ennis)
+- **ASK (Ennis):** "Also use the Personality Trait Inventory to determine colors, and other style elements as well."
+- **CHANGE:** CharacterForge instructions v5 (9,947 chars, SHA-256 `c5565606…`).
+  - **New "Style Recipe" rule.** Every choice is tied back to the student's answer:
+    - **Colours:** 2–3 main colours plus 1 glowing accent from a trait → colour guide (8 trait groups). A named favourite colour wins. The accent comes from the trait the student is proudest of.
+    - **Shape language:** rounded = friendly, square = steady, angular = bold.
+    - **Build**, **eyes/face**, **markings** (from interests), **surface finish**, **glow pattern** and **pose**.
+  - **New output section 3 "Style Recipe"**, placed between the Fusion Recipe and the Concept Breakdown.
+  - **Prompt template:** new slots for [build], [shape language], [eyes], [markings], [surface finish], [glow pattern], [main colors] and [pose].
+  - **Greeting:** it now mentions colours and shapes and asks for a favourite colour. If the student's first message already shares their traits, the full greeting is skipped. (A test showed the Gem printing the greeting before answering.)
+- **Where it was applied:** Gemini Gem `c7e82ed48a2b` (hash-checked, saved `[true]`) and PFLX `pflx_xgem_xg-characterforge` (REST upsert, `updatedAt` = now − 10 min).
+- **Test (v4, live Gem):** kind / funny / creative / patient, music + gaming, "makes anyone laugh", favourite colour orange.
+  - Result: a Style Recipe with orange (favourite) + purple main colours and a yellow accent; rounded shapes; wide friendly eyes; sound-wave and pixel markings; a matte + iridescent finish; swirling glow; a playful jump pose.
