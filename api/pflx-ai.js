@@ -43,6 +43,15 @@
  *   PFLX_ALLOWED_ORIGINS — OPTIONAL; extra comma-separated origins allowed to POST (v228)
  *   PFLX_RATE_PER_MIN / PFLX_RATE_PER_HOUR — OPTIONAL per-IP limits (default 60 / 600) (v228)
  *   PFLX_AI_MODEL_GEMINI_FALLBACK — OPTIONAL model tried when Gemini is out of quota (default gemini-2.5-flash-lite)
+ *   ELEVENLABS_API_KEY — OPTIONAL; enables X-Bot's ElevenLabs voice for everyone (v230)
+ *   ELEVENLABS_VOICE_ID / ELEVENLABS_MODEL — OPTIONAL (default EXAVITQu4vr4xnSDxMaL / eleven_flash_v2_5)
+ *   PFLX_TTS_PER_MIN / PFLX_TTS_PER_HOUR — OPTIONAL per-IP voice limits (default 12 / 120) (v230)
+ *
+ * === Speak (v230) ===
+ *   POST /api/pflx-ai  { action: 'tts', text, voiceId? }   (same origin gate + limits)
+ *   → 200 audio/mpeg
+ *   → 503 { error: 'no-key' } · 429 { error: 'busy' } · 402 { error: 'billing' } · 502 { error: 'tts' }
+ *   The ElevenLabs key never reaches a browser (it used to be hard-coded in preview.html).
  *
  * === Protection (v228) ===
  *   POST is accepted only from PFLX sites (Origin allowlist); anything else → 403 { error: 'origin' }.
@@ -111,15 +120,15 @@ function originAllowed(origin) {
 const RATE_MIN = Math.max(1, parseInt(process.env.PFLX_RATE_PER_MIN, 10) || 60);
 const RATE_HOUR = Math.max(RATE_MIN, parseInt(process.env.PFLX_RATE_PER_HOUR, 10) || 600);
 const HITS = new Map();   // ip -> [timestamps in the last hour]
-function rateCheck(ip, now = Date.now()) {
+function rateCheck(ip, now = Date.now(), map = HITS, perMin = RATE_MIN, perHour = RATE_HOUR) {
   const key = String(ip || 'unknown');
-  const list = (HITS.get(key) || []).filter(t => now - t < 3600000);
+  const list = (map.get(key) || []).filter(t => now - t < 3600000);
   const lastMin = list.filter(t => now - t < 60000);
-  if (lastMin.length >= RATE_MIN) { HITS.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((lastMin[0] + 60000 - now) / 1000)) }; }
-  if (list.length >= RATE_HOUR) { HITS.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((list[0] + 3600000 - now) / 1000)) }; }
+  if (lastMin.length >= perMin) { map.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((lastMin[0] + 60000 - now) / 1000)) }; }
+  if (list.length >= perHour) { map.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((list[0] + 3600000 - now) / 1000)) }; }
   list.push(now);
-  HITS.set(key, list);
-  if (HITS.size > 5000) { for (const [k, v] of HITS) { if (!v.length || now - v[v.length - 1] > 3600000) HITS.delete(k); } }
+  map.set(key, list);
+  if (map.size > 5000) { for (const [k, v] of map) { if (!v.length || now - v[v.length - 1] > 3600000) map.delete(k); } }
   return { ok: true };
 }
 function clientIp(req) {
@@ -161,6 +170,56 @@ function sendUpstream(res, provider, status, data) {
   return res.status(502).json({ error: upstreamMsg(data) || provider + ' upstream' });
 }
 async function readJson(r) { try { return await r.json(); } catch (e) { return {}; } }
+
+// ── v230: ElevenLabs text-to-speech (key only in server env) ──
+const TTS = {
+  key: process.env.ELEVENLABS_API_KEY || '',
+  voice: process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL',
+  model: process.env.ELEVENLABS_MODEL || 'eleven_flash_v2_5',
+  fallback: 'eleven_multilingual_v2',
+  perMin: Math.max(1, parseInt(process.env.PFLX_TTS_PER_MIN, 10) || 12),
+  perHour: 0,
+  hits: new Map(),
+};
+TTS.perHour = Math.max(TTS.perMin, parseInt(process.env.PFLX_TTS_PER_HOUR, 10) || 120);
+const TTS_BILLING_MSG = 'The voice account is out of credits. X-Bot will use the built-in voice.';
+function ttsKind(status, data) {
+  const d = (data && data.detail) || {};
+  const s = String((d && d.status) || '') + ' ' + String((d && d.message) || (typeof d === 'string' ? d : ''));
+  if (/quota_exceeded|payment|subscription|credits|billing/i.test(s)) return 'billing';
+  if (status === 429 || /too_many|rate.?limit|busy|concurren|system_busy/i.test(s)) return 'busy';
+  if ((status === 400 || status === 404 || status === 422) && /model/i.test(s)) return 'model';
+  return 'error';
+}
+async function speak(res, body) {
+  if (!TTS.key) return res.status(503).json({ error: 'no-key', provider: 'elevenlabs' });
+  const text = String(body.text || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'missing-text' });
+  const voice = /^[A-Za-z0-9]{10,40}$/.test(String(body.voiceId || '')) ? String(body.voiceId) : TTS.voice;
+  const call = (model) => fetch('https://api.elevenlabs.io/v1/text-to-speech/' + voice, {
+    method: 'POST',
+    headers: { accept: 'audio/mpeg', 'content-type': 'application/json', 'xi-api-key': TTS.key },
+    body: JSON.stringify({ text, model_id: model, voice_settings: { stability: 0.5, similarity_boost: 0.75 } }),
+  });
+  let r = await call(TTS.model);
+  if (!r.ok) {
+    let data = await readJson(r);
+    let kind = ttsKind(r.status, data);
+    if (kind === 'model' && TTS.model !== TTS.fallback) {
+      r = await call(TTS.fallback);
+      if (!r.ok) { data = await readJson(r); kind = ttsKind(r.status, data); }
+    }
+    if (!r.ok) {
+      if (kind === 'busy') return sendBusy(res, 30);
+      if (kind === 'billing') return res.status(402).json({ error: 'billing', message: TTS_BILLING_MSG });
+      return res.status(502).json({ error: 'tts', status: r.status });
+    }
+  }
+  const buf = Buffer.from(await r.arrayBuffer());
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(200).send(buf);
+}
 
 // client provider names → proxy provider names
 const PROV_MAP = { claude: 'anthropic', anthropic: 'anthropic', openai: 'openai', gemini: 'gemini', deepseek: 'deepseek' };
@@ -221,7 +280,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       hasKey: !!KEYS.anthropic, // back-compat for the Module Builder probe
-      providers: { anthropic: !!KEYS.anthropic, openai: !!KEYS.openai, gemini: !!KEYS.gemini, deepseek: !!KEYS.deepseek },
+      providers: { anthropic: !!KEYS.anthropic, openai: !!KEYS.openai, gemini: !!KEYS.gemini, deepseek: !!KEYS.deepseek, elevenlabs: !!TTS.key },
       model: MODELS.anthropic,
       cohortKeys: !!(_secret() && process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
     });
@@ -234,6 +293,13 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
+
+    // ── v230: X-Bot voice (ElevenLabs), its own tighter per-IP limit ──
+    if (body.action === 'tts') {
+      const tl = rateCheck(clientIp(req), Date.now(), TTS.hits, TTS.perMin, TTS.perHour);
+      if (!tl.ok) return sendBusy(res, tl.retryAfter);
+      return await speak(res, body);
+    }
 
     // ── Host setup: encrypt a raw cohort key and hand back ciphertext ──
     if (body.action === 'encrypt') {
@@ -336,4 +402,4 @@ export default async function handler(req, res) {
   }
 }
 // test hooks (pure helpers, no secrets)
-handler._test = { originAllowed, rateCheck, classifyUpstream, HITS };
+handler._test = { originAllowed, rateCheck, classifyUpstream, HITS, ttsKind, TTS };
