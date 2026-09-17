@@ -17611,3 +17611,54 @@ Mission Control immediately after, since it touches live nav for active testers.
     - no page errors.
   - Live on Vercel: `ANN` present and speaking.
 - **NOTE:** cartridge games (`public/games/*`) keep their own SFX. The announcer speaks around them (start / result) from the Arena shell.
+
+## PATCH PLATFORM v230 — ELEVENLABS KEY REMOVED FROM THE PAGE; X-Bot voice chat speaks through the PFLX server (Sept 17, Ennis)
+- **FINDING (from v229, approved by Ennis: "yes"):** `getElevenLabsKey()` in `preview.html` fell back to a hard-coded ElevenLabs API key. Anyone could read it from the page source, and every student's voice chat spent that account.
+  - A pattern search found no other copy in platform, X-Live, Arena or pathway-portal.
+  - The key is still in pflx-platform **git history** until it is rotated.
+- **FIX — proxy (pflx-pathway-portal a7a71f7, `api/pflx-ai.js`):** new `POST {action:'tts', text, voiceId}` returning `audio/mpeg`.
+  - The key comes from the `ELEVENLABS_API_KEY` env var; optional `ELEVENLABS_VOICE_ID` (default EXAVITQu4vr4xnSDxMaL) and `ELEVENLABS_MODEL` (default eleven_flash_v2_5, one retry on eleven_multilingual_v2).
+  - Same v228 origin gate as chat, plus its own per-IP voice limit: `PFLX_TTS_PER_MIN` / `PFLX_TTS_PER_HOUR`, default 12 / 120. `rateCheck` now takes a map and limits as parameters.
+  - Text is capped at 500 characters; voice ids are validated (no path injection).
+  - Errors: quota → 402 billing; rate limit → 429 busy (Retry-After 30); anything else → 502 `tts` with no upstream detail.
+  - Health reports `providers.elevenlabs` (boolean).
+- **FIX — platform (pflx-platform 839b59c):**
+  - `getElevenLabsKey()` returns only a host's own saved key, or `''`.
+  - `xbotSpeak` order:
+    1. A personal key calls ElevenLabs directly, as before, now with eleven_flash_v2_5 because eleven_monolingual_v1 is retired.
+    2. With no personal key, `window.pflxServerTts()` goes to the proxy.
+    3. With no server audio, `xbotSpeakLocal()` uses the built-in Kokoro or browser voice and restarts listening.
+  - Server backoff: 10 min after no-key, billing or blocked; 1 min after busy.
+  - A rejected personal key now falls back to the built-in voice instead of going silent. The `play()` rejection is caught.
+  - Unchanged: the Mission Control briefing TTS still only uses a personal key.
+  - `PFLX_PATCH` 229 → 230.
+- **Verified:**
+  - Syntax gate 24/24.
+  - `test_proxy_tts_v230.mjs` 18/18:
+    - no key → 503 with no upstream call;
+    - health boolean; audio bytes returned with no-store;
+    - key sent only server-side; model; trimming; bad voice id → default voice; 500-character cap; empty text → 400;
+    - foreign origin and no-origin → 403;
+    - voice limit 3/min then 429, and chat is not blocked by it;
+    - model retry; quota → 402; rate → 429; bad server key → 502 with no leak;
+    - key absent from all 18 responses.
+  - `test_proxy_guard_v228.mjs` still 32/32.
+  - `test_tts_proxy_client_v230.js` 9/9. `test_voice_v229.js` 16/16.
+  - Playwright `v230_test.py` 10/10:
+    - no key-shaped string in the page;
+    - server voice plays and the browser never calls ElevenLabs;
+    - server with no key → built-in voice and listening restarts;
+    - no request storm;
+    - personal key → direct call with that key and the current model;
+    - rejected personal key → built-in voice;
+    - server voice used again after the pause;
+    - no page errors.
+  - Live:
+    - `PFLX_PATCH = 230`; zero key-shaped strings in the page;
+    - proxy health shows `elevenlabs:false`;
+    - curl without an Origin gets 403;
+    - on prototypeflx.com `pflxServerTts` returns null and backs off, as expected with no env key.
+- **HOST ACTIONS:**
+  1. **Rotate (regenerate) the old ElevenLabs key** in ElevenLabs → Settings → API Keys. It is still readable in git history and in old cached copies of the page.
+  2. To keep ElevenLabs as X-Bot's voice-chat voice for everyone: in Vercel project **pflx-pathway-portal** → Settings → Environment Variables, add the new key as `ELEVENLABS_API_KEY`, then redeploy. Without it, devices use Kokoro (strong devices) or the browser voice.
+  3. Optional: set a spend cap in ElevenLabs.
