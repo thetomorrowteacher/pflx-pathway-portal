@@ -40,6 +40,15 @@
  *   PFLX_KEY_SECRET   — REQUIRED to enable per-cohort host keys (encrypt/decrypt secret)
  *   SUPABASE_URL + SUPABASE_ANON_KEY  — REQUIRED for per-cohort key lookup (app_data is anon-readable)
  *   PFLX_ADMIN_SECRET — OPTIONAL; if set, the encrypt action requires a matching adminSecret
+ *   PFLX_ALLOWED_ORIGINS — OPTIONAL; extra comma-separated origins allowed to POST (v228)
+ *   PFLX_RATE_PER_MIN / PFLX_RATE_PER_HOUR — OPTIONAL per-IP limits (default 60 / 600) (v228)
+ *   PFLX_AI_MODEL_GEMINI_FALLBACK — OPTIONAL model tried when Gemini is out of quota (default gemini-2.5-flash-lite)
+ *
+ * === Protection (v228) ===
+ *   POST is accepted only from PFLX sites (Origin allowlist); anything else → 403 { error: 'origin' }.
+ *   Per-IP limits per warm instance → 429 { error: 'busy', message, retryAfter }.
+ *   Upstream quota / rate-limit / overload → 429 { error: 'busy', ... } after one Gemini fallback try.
+ *   Upstream billing problems (prepaid credits empty, billing off) → 402 { error: 'billing', message }.
  */
 
 import crypto from 'node:crypto';
@@ -79,6 +88,79 @@ function capImages(messages, budget) {
   }
   return messages;
 }
+
+// ── v228: who may POST (browser Origin allowlist) ──
+const ORIGINS = new Set([
+  'https://prototypeflx.com', 'https://www.prototypeflx.com',
+  'https://pflx-platform.vercel.app', 'https://pflx-pathway-portal.vercel.app',
+  'https://pflx-battle-arena.vercel.app', 'https://pflx-xcoin-app.vercel.app',
+  'https://pflx-darkcampus.vercel.app', 'https://thetomorrowteacher.github.io',
+  ...String(process.env.PFLX_ALLOWED_ORIGINS || '').split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean),
+]);
+const ORIGIN_PATTERNS = [
+  /^https:\/\/pflx-[a-z0-9-]+-thetomorrowteachers-projects\.vercel\.app$/,   // team preview deploys
+  /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/,                          // local testing
+];
+function originAllowed(origin) {
+  const o = String(origin || '').trim();
+  if (!o || o === 'null') return false;
+  return ORIGINS.has(o) || ORIGIN_PATTERNS.some(re => re.test(o));
+}
+
+// ── v228: per-IP limits (best effort: counts live in each warm instance) ──
+const RATE_MIN = Math.max(1, parseInt(process.env.PFLX_RATE_PER_MIN, 10) || 60);
+const RATE_HOUR = Math.max(RATE_MIN, parseInt(process.env.PFLX_RATE_PER_HOUR, 10) || 600);
+const HITS = new Map();   // ip -> [timestamps in the last hour]
+function rateCheck(ip, now = Date.now()) {
+  const key = String(ip || 'unknown');
+  const list = (HITS.get(key) || []).filter(t => now - t < 3600000);
+  const lastMin = list.filter(t => now - t < 60000);
+  if (lastMin.length >= RATE_MIN) { HITS.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((lastMin[0] + 60000 - now) / 1000)) }; }
+  if (list.length >= RATE_HOUR) { HITS.set(key, list); return { ok: false, retryAfter: Math.max(1, Math.ceil((list[0] + 3600000 - now) / 1000)) }; }
+  list.push(now);
+  HITS.set(key, list);
+  if (HITS.size > 5000) { for (const [k, v] of HITS) { if (!v.length || now - v[v.length - 1] > 3600000) HITS.delete(k); } }
+  return { ok: true };
+}
+function clientIp(req) {
+  const h = req.headers || {};
+  return String(h['x-forwarded-for'] || '').split(',')[0].trim() || String(h['x-real-ip'] || '') || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+// ── v228: turn upstream failures into messages students can act on ──
+const GEMINI_FALLBACK = process.env.PFLX_AI_MODEL_GEMINI_FALLBACK || 'gemini-2.5-flash-lite';
+const BUSY_MSG = 'X-Bot is busy right now. Try again in a minute.';
+const BILLING_MSG = 'X-Bot is out of AI credits. Ask your host to top up the AI account.';
+function upstreamMsg(data) { return String((data && data.error && (data.error.message || data.error.status)) || (data && typeof data.error === 'string' ? data.error : '') || ''); }
+function classifyUpstream(status, data) {
+  const msg = upstreamMsg(data);
+  const e = (data && typeof data.error === 'object' && data.error) || {};
+  const st = String(e.status || '');
+  const code = String(e.code || '') + ' ' + String(e.type || '');
+  if (/prepayment credits|credits are depleted|billing|credit balance|payment/i.test(msg) || /insufficient_quota|billing/i.test(code)) return 'billing';
+  if (status === 429 || status === 529 || st === 'RESOURCE_EXHAUSTED' || /quota|rate.?limit|resource.?exhausted|overloaded/i.test(msg)) return 'busy';
+  if (status === 503 && /overloaded|unavailable|try again/i.test(msg)) return 'busy';
+  return 'error';
+}
+function retryAfterOf(data) {
+  try {
+    const d = (data && data.error && data.error.details) || [];
+    for (const x of d) { const m = /^(\d+(?:\.\d+)?)s$/.exec(String(x && x.retryDelay || '')); if (m) return Math.min(3600, Math.ceil(Number(m[1]))); }
+  } catch (e) {}
+  return 60;
+}
+function sendBusy(res, retryAfter) {
+  const n = Math.max(1, Math.min(3600, retryAfter || 60));
+  res.setHeader('Retry-After', String(n));
+  return res.status(429).json({ error: 'busy', message: BUSY_MSG, retryAfter: n });
+}
+function sendUpstream(res, provider, status, data) {
+  const kind = classifyUpstream(status, data);
+  if (kind === 'busy') return sendBusy(res, retryAfterOf(data));
+  if (kind === 'billing') return res.status(402).json({ error: 'billing', message: BILLING_MSG, detail: upstreamMsg(data).slice(0, 200) });
+  return res.status(502).json({ error: upstreamMsg(data) || provider + ' upstream' });
+}
+async function readJson(r) { try { return await r.json(); } catch (e) { return {}; } }
 
 // client provider names → proxy provider names
 const PROV_MAP = { claude: 'anthropic', anthropic: 'anthropic', openai: 'openai', gemini: 'gemini', deepseek: 'deepseek' };
@@ -127,10 +209,13 @@ async function fetchCohortKey(cohort) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = String((req.headers && req.headers.origin) || '');
+  const allowed = originAllowed(origin);
+  res.setHeader('Vary', 'Origin');
+  if (allowed) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
 
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -142,6 +227,10 @@ export default async function handler(req, res) {
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method' });
+  // v228: only PFLX sites may spend the AI key, and each IP gets a fair share
+  if (!allowed) return res.status(403).json({ error: 'origin', message: 'This AI service only answers PFLX sites.' });
+  const rl = rateCheck(clientIp(req));
+  if (!rl.ok) return sendBusy(res, rl.retryAfter);
 
   try {
     const body = req.body || {};
@@ -193,8 +282,8 @@ export default async function handler(req, res) {
             ? [...m.images.map(im => ({ type: 'image', source: { type: 'base64', media_type: im.mimeType, data: im.data } })), { type: 'text', text: m.content || '.' }]
             : m.content })) }),
       });
-      const data = await r.json();
-      if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'anthropic upstream' });
+      const data = await readJson(r);
+      if (!r.ok) return sendUpstream(res, 'anthropic', r.status, data);
       text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
     } else if (provider === 'openai' || provider === 'deepseek') {
       const base = provider === 'deepseek' ? 'https://api.deepseek.com/v1' : 'https://api.openai.com/v1';
@@ -206,8 +295,8 @@ export default async function handler(req, res) {
             ? [{ type: 'text', text: m.content || '.' }, ...m.images.map(im => ({ type: 'image_url', image_url: { url: `data:${im.mimeType};base64,${im.data}` } }))]
             : m.content }))] }),
       });
-      const data = await r.json();
-      if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || provider + ' upstream' });
+      const data = await readJson(r);
+      if (!r.ok) return sendUpstream(res, provider, r.status, data);
       text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     } else {
       const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user',
@@ -222,14 +311,22 @@ export default async function handler(req, res) {
       const call = (model) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
       });
-      let r = await call(wanted);
-      let data = await r.json();
+      let used = wanted;
+      let r = await call(used);
+      let data = await readJson(r);
       // retired / unknown model -> the current Flash alias
-      if (!r.ok && (r.status === 404 || /not found|not supported/i.test((data.error && data.error.message) || '')) && wanted !== 'gemini-flash-latest') {
-        r = await call('gemini-flash-latest');
-        data = await r.json();
+      if (!r.ok && (r.status === 404 || /not found|not supported|no longer available/i.test(upstreamMsg(data))) && used !== 'gemini-flash-latest') {
+        used = 'gemini-flash-latest';
+        r = await call(used);
+        data = await readJson(r);
       }
-      if (!r.ok) return res.status(502).json({ error: (data.error && data.error.message) || 'gemini upstream' });
+      // v228: out of quota / rate-limited -> one try on the lighter model (its own, larger quota)
+      if (!r.ok && classifyUpstream(r.status, data) === 'busy' && used !== GEMINI_FALLBACK) {
+        used = GEMINI_FALLBACK;
+        r = await call(used);
+        data = await readJson(r);
+      }
+      if (!r.ok) return sendUpstream(res, 'gemini', r.status, data);
       text = ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
         .map(pt => pt && pt.text || '').join('');
     }
@@ -238,3 +335,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message || 'server' });
   }
 }
+// test hooks (pure helpers, no secrets)
+handler._test = { originAllowed, rateCheck, classifyUpstream, HITS };

@@ -17418,3 +17418,67 @@ Mission Control immediately after, since it touches live nav for active testers.
   - Remixes: basketball → super-jump power + thruster high-top boots; cats → retractable claws / night vision; pizza → golden-crust tan / tomato-red / cheese-yellow scheme.
   - No literal basketball, cat or pizza, and no franchise name in the prompt.
 - **Gotcha:** the Browser pane width changes the "Update" button position. A `ref` click can land off-screen and silently do nothing. Always confirm that a `kHv0Vd` request returned `[true]`.
+
+## PATCH PLATFORM v228 — AI PROXY LOCKED TO PFLX SITES + FRIENDLY "BUSY / OUT OF CREDITS" MESSAGES; X-Bot key found missing (Sept 17, Ennis)
+- **SYMPTOM (Ennis):** "Xbot and X-Gems aren't working. I need a real solution to make this functional."
+- **ROOT CAUSE 1 (no key):** `GET /api/pflx-ai` reported every provider `false`, and every POST returned `503 no-key`. X-Bot fell back to canned answers, and every X-Gem said it needed an AI connection.
+  - The Google Cloud key Ennis had added sits in **Settings → YouTube API** (project 276938884976). The Gemini API is disabled on that project (403), so it cannot power X-Bot.
+  - The school Workspace account (`ejohnson@asb.ac.th`) is blocked from AI Studio. Gemini keys live under **info@thetomorrowteacher.org → AI Studio → project "PFLX Apps"** (`gen-lang-client-0117780331`), which has 3 keys. AI Studio flags "...mn7I" as publicly exposed, so don't use it.
+- **HOST ACTION (done by Ennis, 17 Sep):** `GEMINI_API_KEY` was added to pflx-pathway-portal (Production). The GET now shows `gemini: true`.
+- **ROOT CAUSE 2 (still open when this entry was written):** the key works, but every Gemini model (2.5-flash, 2.5-flash-lite, flash-latest, flash-lite-latest) returned *"Your prepayment credits are depleted."* The PFLX Apps project is on **prepaid billing with a $0 balance**.
+  - **HOST ACTION:** AI Studio → Billing → PFLX Apps → add credits (and set a spend cap).
+- **RISK FOUND:** the proxy answered **any website and any script** (`Access-Control-Allow-Origin: *`, no auth, no limits), so once a key existed anyone could spend it. There was also no fallback when Gemini hit a quota; free tier is ~10 requests/min and ~250/day on 2.5 Flash. Ennis approved hardening ("yes").
+- **FIX A (proxy, `pflx-pathway-portal/api/pflx-ai.js`):**
+  - **Origin allowlist.** POST and preflight are accepted only from:
+    - prototypeflx.com and www.prototypeflx.com;
+    - pflx-platform / pflx-pathway-portal / pflx-battle-arena / pflx-xcoin-app / pflx-darkcampus `.vercel.app`;
+    - `pflx-*-thetomorrowteachers-projects.vercel.app` (preview deploys);
+    - thetomorrowteacher.github.io;
+    - `http://localhost` and `127.0.0.1` (testing);
+    - anything added in the optional env `PFLX_ALLOWED_ORIGINS` (comma-separated).
+  - Anything else (including requests with no Origin, e.g. curl, and `null` from file:// and sandboxed frames) gets `403 {error:'origin'}` before any upstream call. CORS now echoes the allowed origin plus `Vary: Origin`, never `*`.
+  - The **GET status stays open**; it only returns booleans.
+  - **Per-IP limits:** 60/min and 600/hour by default (env `PFLX_RATE_PER_MIN` / `PFLX_RATE_PER_HOUR`), keyed by the first `x-forwarded-for` hop. Over the limit → `429 {error:'busy', message, retryAfter}` plus a `Retry-After` header.
+    - This is best effort: counts live in each warm instance. A whole class shares the school's IP, hence the generous default.
+    - For a hard wall, add a Vercel Firewall rate-limit rule on `/api/pflx-ai`.
+  - **Gemini quota fallback:** upstream 429 / `RESOURCE_EXHAUSTED` → one retry on `gemini-2.5-flash-lite` (env `PFLX_AI_MODEL_GEMINI_FALLBACK`). The existing 404 → `gemini-flash-latest` step still runs first. The order can be flash → flash-latest → flash-lite (at most 3 calls).
+  - **Error classes (`classifyUpstream`):**
+    - **billing:** prepaid credits, credit balance, `insufficient_quota` → `402 {error:'billing'}`. No pointless fallback.
+    - **busy:** 429, Anthropic 529 overloaded, OpenAI rate limit → `429 busy` (Retry-After taken from Google's RetryInfo when present).
+    - **Other:** unchanged, `502 {error: message}`.
+  - Non-JSON upstream bodies no longer throw.
+  - `handler._test` exposes the pure helpers for the test (no secrets).
+- **FIX B (platform, `preview.html`), new `window.pflxAiErr` (defined just before `const XBOT_AI`):**
+  - `codeOf(status, err)` maps proxy codes and raw Gemini text to `busy` / `billing` / `origin` / `no-key`.
+  - `summary(codes, name)` returns a plain sentence, or `null` when any failure is unknown.
+  - **Wiring:**
+    - `callProxy` and browser-key `callGemini` put `err.code` (plus `retryAfter`) on the error.
+    - `XBOT_AI.respond` collects codes. Busy or billing → the static answer plus an italic note; otherwise the old path runs.
+    - `pflxXGems.respondAs` uses the summary. **Students never see raw error text any more** ("⚠️ ProtoDev couldn't answer right now. Try again in a minute."); hosts still get the raw list for unknown errors.
+    - `PFLX_AI_ASSIST.complete` throws the friendly line.
+  - **Wording:**
+    - busy: "⏳ ProtoDev is busy right now (lots of people are asking at once). Try again in a minute."
+    - billing: students get "…AI is offline right now. Let your host know."; hosts get "…the AI account is out of credits. Top it up in Google AI Studio → Billing (PFLX Apps project)."
+    - origin / no-key: the host lines name `PFLX_ALLOWED_ORIGINS` / `GEMINI_API_KEY`; the student lines don't.
+  - `PFLX_PATCH` 227 → 228 (`PFLX_BUILD` stays 2026.09).
+- **Verified:**
+  - Syntax gate: 23/23 blocks.
+  - `test_proxy_guard_v228.mjs` **32/32**: 10 allowed and 10 hostile origins (look-alike domains, `http://`, `pflx-evil.vercel.app`, `x-thetomorrowteachers-projects.vercel.app`, `null`); no wildcard CORS; missing Origin blocked; encrypt gated; preflight 403/200; 5/min then 429 with no upstream call; other IP unaffected; minute window slides; hourly cap; 429 → flash-lite answered; both out → 429 with Retry-After 17 from RetryInfo; no double call when already on lite; 404 → latest → lite chain; prepaid → 402 with 1 call; 400 → 502; non-JSON → 502; Anthropic 529 → busy; OpenAI rate limit → busy; Anthropic credit balance → billing; `insufficient_quota` → billing; keys absent from every response.
+  - `test_proxy_images_v226.mjs` 13/13 (now sends an Origin header; the test was updated for the new gate).
+  - `test_ai_errors_v228.js` 22/22.
+  - Playwright `e2e_v228.py` 15/15, as student and host against a fake proxy:
+    - ok → ProtoDev answers;
+    - busy (student and host) → friendly line with no "Proxy(" or "429";
+    - billing: student gets tell-your-host with no "credits"; host gets "out of credits … AI Studio";
+    - origin (host) → names the env var;
+    - unknown error: student gets generic, host gets raw;
+    - X-Bot busy → static answer + busy note (no "recharging"); X-Bot billing → tell-your-host; recovery → answer;
+    - AI Assist → friendly throw;
+    - no page errors (known React #418 noise from embedded sub-apps filtered).
+  - A/B regression, 60 device tests v227 vs v228: identical except the version asserts. `test_xgem_select_v227.js` and `test_xbot_images_v226.js` now accept "this patch or later".
+- **HOST ACTIONS:**
+  1. Add prepaid credits to AI Studio project PFLX Apps (and a spend cap).
+  2. Consider switching to postpaid Tier 1 billing for classroom volume.
+  3. Optional: add a Vercel Firewall rate-limit rule for `/api/pflx-ai`.
+  4. If PFLX is ever served from a new domain, add it to `PFLX_ALLOWED_ORIGINS`.
+- **BACKLOG:** the YouTube key field stays as is (separate project, correct use). Revoke the exposed "...mn7I" Gemini key in AI Studio when convenient.
