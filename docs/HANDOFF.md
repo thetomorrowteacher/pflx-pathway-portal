@@ -17396,3 +17396,25 @@ Mission Control immediately after, since it touches live nav for active testers.
 - **Where it was applied:** Gemini Gem `c7e82ed48a2b` (hash-checked, saved `[true]`) and PFLX `pflx_xgem_xg-characterforge` (REST upsert, `updatedAt` = now − 10 min).
 - **Test (v4, live Gem):** kind / funny / creative / patient, music + gaming, "makes anyone laugh", favourite colour orange.
   - Result: a Style Recipe with orange (favourite) + purple main colours and a yellow accent; rounded shapes; wide friendly eyes; sound-wave and pixel markings; a matte + iridescent finish; swirling glow; a playful jump pose.
+
+## DATA — CharacterForge v6: interests are remixed, never literal (Sept 17, Ennis)
+- **ASK (Ennis):** "If a sport like basketball is on the personality trait inventory... it doesnt mean the character should have a basketball... maybe they have a cool sneaker design... harness fireballs... cats → cat like agility, sharp claws... pizza → pizza color scheme. This should be random and creatively done."
+- **CHANGE:** CharacterForge instructions v6 (SHA-256 `f36dfe5e…`).
+  - **New "Remix Interests (never literal)" rule:** never hand the alien the literal object. Each interest is remixed through a randomly chosen channel, with example lists that are explicitly not fixed:
+    - power (basketball → fireballs / super-jump)
+    - body feature (cats → agility / retractable claws / slit eyes)
+    - gear or outfit (basketball → glowing high-top sneaker design)
+    - colour scheme (pizza → crust / tomato / cheese)
+    - markings / texture
+    - pose / attitude
+  - **Colour rule:** a favourite food, place, animal or team can set the whole palette.
+  - **Fusion Recipe:** now also lists each "Interest Remix" and the channel used.
+  - **Gear & Weapons:** now "remixed, never the literal object".
+  - **Greeting:** new examples (high-top boots / fireball throws, cat reflexes / claws).
+  - The old "basketball → energy sphere blasters" and "court-line markings" examples were removed.
+- **Where it was applied:** Gemini Gem `c7e82ed48a2b` (hash-checked, saved `[true]`) and PFLX `pflx_xgem_xg-characterforge` (REST upsert, `updatedAt` = now − 10 min).
+- **Test (live Gem):** competitive / loyal / funny / hardworking; basketball, cats, pizza; "never gives up".
+  - The greeting was skipped (one welcome line).
+  - Remixes: basketball → super-jump power + thruster high-top boots; cats → retractable claws / night vision; pizza → golden-crust tan / tomato-red / cheese-yellow scheme.
+  - No literal basketball, cat or pizza, and no franchise name in the prompt.
+- **Gotcha:** the Browser pane width changes the "Update" button position. A `ref` click can land off-screen and silently do nothing. Always confirm that a `kHv0Vd` request returned `[true]`.
