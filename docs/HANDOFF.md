@@ -18383,3 +18383,79 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: same as the X-LIVE entry above -- these are
   best-guess picks by crest factor since audio can't be auditioned in
   this environment; trivially swappable.
+
+
+## PATCH X-LIVE v0.54 — Battle Arena Games Expansion Phase B: boss-tier Archives + The Hive swarm (Sept 23, Ennis)
+- SYMPTOM: N/A -- new feature, not a bug fix. Continuation of the confirmed
+  Battle Arena Games Expansion plan: Phase A (Archive Battle cinematics/
+  music/Dragon Ball SFX, PATCH X-LIVE v0.51/v0.52/v0.53) shipped and was
+  live-confirmed; this is Phase B, per the Sept 23 confirmed decision
+  "Boss structure: both -- Trojan + the Hack Guild roster become new
+  high-tier unlocks in the normal pickFoe() ladder; The Hive is a
+  separate special multi-unit 'swarm' encounter."
+- ROOT CAUSE / DESIGN: `pickFoe()`'s old filter (`f.tier < 5`) was really
+  standing in for "exclude the Exhibit-only season boss (Core)" -- the
+  Archive Core was the only tier-5 entry. Made that intent explicit
+  (`core.exhibitOnly = true`, filter now `!f.exhibitOnly`) so tier could
+  be freed up for real difficulty scaling above Overseer.
+- FIX:
+  - **Boss ladder** (`SMF_SEASON.evoGame.archive`): 4 new stage-5 entries
+    inserted after Overseer -- Breach, Wraith, Vector (tiers 5-7, "of the
+    Hack Guild") then Trojan (tier 8). `pickFoe()`'s existing
+    `c[min(c.length-1, floor(wins/2))]` index math needed zero logic
+    changes -- purely a data addition. At stage 5 the ladder now reads:
+    Overseer (wins 0-1) → Breach (2-3) → Wraith (4-5) → Vector (6-7) →
+    Trojan (8+, capped forever at Trojan). Each boss has a real mechanic,
+    not just flavor text, wired into `resolve()`/`foeAttack()`:
+    - Breach: nullifies the player's first free Guard move each fight,
+      once (`B.breached` flag), then behaves normally after.
+    - Wraith: phases through every third strike (`B.turn % 3 === 1`),
+      taking zero damage that turn.
+    - Vector: strikes a second time on its own main turn (`foeAttack`'s
+      `scale === 1` call only -- not on a wrong-answer free hit).
+    - Trojan: a wrong answer costs the player TWO free hits instead of
+      one (`B.foe.id === 'trojan'` branch in `resolve()`'s wrong-answer
+      path).
+    Reward XC/orbs/Sync XP scale off the already-existing `perTier`
+    formula in `finish()` -- Trojan (tier 8) automatically pays out more
+    than Overseer (tier 4) with no new reward code.
+  - **The Hive**: new `SMF_SEASON.evoGame.hive` array (3 fixed units --
+    Hive Drone, Hive Sentinel, Hive Matron), completely separate from
+    `g.archive` so `pickFoe()` never sees it. New `pickHive()`,
+    `hiveUnlocked()` (gated on `wins >= 9`, the same win count the ladder
+    first reaches Trojan), and `window.xlHiveNew()` (seeds a battle
+    exactly like `xlBattleNew()` but against the first Hive unit). A new
+    "⚠ HIVE ALERT · FIGHT THE SWARM" button appears on the pre-battle
+    screen once unlocked. `finish()` was extended: downing a Hive unit
+    that is NOT the last one advances straight to the next unit on the
+    SAME health bar (no rest, no reward posted yet) instead of ending the
+    encounter; only the final unit's fall pays out, multiplied by the
+    swarm size (3x) on top of the existing `perTier` formula (a 3-unit
+    clear ending on tier-4 Hive Matron pays 210 XC vs. a solo tier-4
+    win's 70 XC). A normal 1-vs-1 battle is completely unaffected --
+    `B.hive` is only ever set by `xlHiveNew()`, and every new branch in
+    `finish()`/`resolve()`/`foeAttack()` is gated on the foe's real id or
+    on `B.hive`.
+- Verified: `node scripts/syntax_gate.js index.html` clean (5 blocks).
+  New 66-case unit test (`test_xlive_bosstier_hive_v054.js`) -- structural
+  regex checks on the archive/hive JSON and the pickFoe()/xlBattleHTML
+  wiring, plus sandboxed behavioral checks executing the REAL extracted
+  `pickFoe()`/`pickHive()`/`hiveUnlocked()`/`xlHiveNew()`/`resolve()`/
+  `foeAttack()`/`finish()` (brace-counting extraction, not a
+  reimplementation) against a fixture roster: ladder progression at every
+  win threshold (0/3/5/7/9/100 -- confirms Core is never reachable even at
+  wins=100), each boss mechanic's real behavior (Breach's one-time guard
+  nullify, Wraith's every-third-strike phase, Vector's double strike,
+  Trojan's double free-hit), and the full 3-unit Hive sequence (zero
+  payout until the 3rd unit, then exactly one 210 XC payout) -- all 66
+  PASS. Full 39-file regression suite re-run: the 6 files that already
+  failed before this patch (test_subapp_embed.js, test_v022/028/029.js,
+  test_xlive_gameshow_v035.js, test_xlive_story_embed_v040.js) failed
+  identically before and after (confirmed via git-stash before/after
+  comparison) -- zero new regressions.
+- HOST ACTIONS / BACKLOG: none required to ship. Trojan/Hack Guild names
+  and mechanics are a reasonable first pass, not confirmed with Ennis
+  beyond the high-level "both" decision -- easy to rename/retune (all in
+  one JSON array + a handful of `f.id === '...'` checks) if he wants
+  different flavor once he plays it. Phase C (Spar/PvP practice mode) is
+  next in the confirmed build order (A → B → C → D → E).
