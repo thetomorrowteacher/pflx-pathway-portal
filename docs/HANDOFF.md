@@ -18048,3 +18048,59 @@ Mission Control immediately after, since it touches live nav for active testers.
 - HOST ACTIONS / BACKLOG: none required. Sizing was again tuned by eye
   against Ennis's screenshots, not an exact spec -- flagged as best-effort,
   revisit if exact target measurements are ever provided.
+
+## PATCH X-LIVE v0.48 — Studio Hub Evo portrait crop now follows each Evo's actual face, not one fixed spot (Sept 23, Ennis)
+- SYMPTOM/ASK: Ennis, after v0.47 shipped a fixed-crop Evo portrait: "The
+  profile picture should change to each new level Evo selected. It should
+  be cropped into the face of the evo no matter which level it is on."
+- ROOT CAUSE: v0.47's crop wrapper used a single
+  `transform-origin:50% 30%` for every Evo, on the assumption that the
+  character art was similarly composed/centered across all evolution
+  stages and lines. Investigated by downloading and visually inspecting
+  all 12 real production assets that exist today (4 lines x stages 1/2/4 --
+  stages 3 and 5 consistently 404 and fall back to the procedural
+  `exoCoreSVG`, which needs no crop). The assumption was wrong: measured
+  face-center position ranges from ~29%-78% horizontally and ~27%-58%
+  vertically depending on line/stage (e.g. mythweaver stage 1 at
+  (29%,27%) vs. neonborn stage 1 at (78%,57%) -- completely different
+  framing), so the fixed origin only looked right for a minority of Evos.
+- FIX: added `EXO_FACE_FOCAL` (a measured `{line: {stage: {x,y}}}` table,
+  keyed by line+stage since that's the only axis with real, checkable art
+  differences today) and `exoFaceFocalOrigin(exo)` right after
+  `exoArtFile()`/before `exoArtHTML()`. The function remaps a raw
+  full-image-% face position into local transform-origin coordinates
+  through the real `object-fit:cover;object-position:'center 22%'` crop
+  math for the file's 1024x1536 (2:3) source art against a square target
+  (full width always visible pre-transform; roughly the source's
+  y:7%-74% band is the pre-transform visible window -- worked out
+  geometrically, not guessed). `rMe()`'s Evo portrait wrapper now calls
+  `(ex ? exoFaceFocalOrigin(ex) : '50% 40%')` instead of the old fixed
+  literal. A missing/unmapped line or stage (including 3/5, which have no
+  real art yet) safely falls back to `'50% 40%'` rather than throwing.
+  `exoArtHTML`/`exoAvatarHTML` themselves are untouched -- this only
+  changes the Studio Hub's own crop wrapper, so nothing else that renders
+  Evo art (Evo Bay's own portrait, member avatars) is affected.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 69-case unit test (`test_xlive_studio_hub_facefocal_v048.js`)
+  extracts the real shipped `EXO_FACE_FOCAL` table and
+  `exoFaceFocalOrigin()` function via brace-counting and executes them
+  for real: all 4 lines x stages 1/2/4 present, measured values round-trip
+  through the crop-window remap math correctly, different lines/stages
+  produce genuinely different origins (proving this is a real per-Evo
+  lookup and not a disguised fixed value), unknown line / missing exo /
+  missing stage / no-art stages (3, 5) all fall back safely, and every
+  real table entry's output stays clamped into [0,100] on both axes --
+  all 69 PASS. Updated one assertion in the prior
+  `test_xlive_studio_hub_v047.js` that pinned the now-superseded fixed
+  `50% 30%` origin, replacing it with a check that the crop wrapper
+  structure is intact and the origin is computed (`exoFaceFocalOrigin`),
+  not literal -- now 11/11 PASS. Full existing X-Live test suite re-run
+  via `git stash` comparison: identical pass/fail counts to the pre-patch
+  commit (same 2 pre-existing, unrelated failures in
+  `test_xlive_gameshow_v035.js` and `test_xlive_story_embed_v040.js`,
+  confirmed present before this diff too).
+- HOST ACTIONS / BACKLOG: the `EXO_FACE_FOCAL` table is measured by eye
+  against today's real assets, not derived from any metadata Arena
+  provides -- if Arena ever uploads new/replacement art for a line/stage,
+  this table can drift and should be re-measured against the new asset.
+  Revisit if an Evo's portrait starts looking off-center again.
