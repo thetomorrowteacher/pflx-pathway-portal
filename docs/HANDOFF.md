@@ -17836,3 +17836,111 @@ Mission Control immediately after, since it touches live nav for active testers.
   - New 26-case unit test `test_xlive_story_embed_v040.js` (x-live-check) — `PFLX_SUBAPPS.story`'s shape, a sandboxed `pflxOnEmbedFrameLoad` confirming the `story` key posts a brand-only + `targetView:'story'` message, the `missioncontrol` key still falls back to `'mission-control'` when no `targetView` is set on its entry, unrelated keys are still ignored, no-brand is still a safe no-op, `xlStoryToggleEmbed`'s state-flip + re-render, and `rStory()`'s markup (embed slot only appears when `embedOpen` is true, existing PUSH A STORY BEAT / THE ROOM cards untouched) — all 26 PASS.
   - Full regression sweep on both repos' existing test suites. Two pre-existing, unrelated-to-this-patch failures confirmed via a `git stash`/re-run comparison against the pre-patch commit (identical failures before AND after this patch): `test_v029.js` ("FROM DECK button sits next to + ADD SLIDE", a stale UI-layout assertion from an older patch) and `test_xlive_gameshow_v035.js` ("render runs the effects sync on every path"). `test_v022.js`/`test_v028.js` have pre-existing crashes (`SLIDE_TYPES is not defined` / a stale slide-type count) unrelated to this patch. Two genuine forward-compatibility test-anchor updates made (same pattern as every prior patch that extended a shared function/collection this session): `test_platform_mc_embed_relogin.js`'s hardcoded end-marker string updated to match the new `pflxTryEmbedIdentityLogin(msg.brand, 2, msg.targetView);` call site (12/12 PASS after); `test_xlive_missioncontrol_subapp.js`'s `PFLX_SUBAPPS` count assertion updated from 4 to 5 sub-apps (11/11 PASS after). `test_subapp_embed.js`'s pre-existing 2 failures (a stale raw-`<iframe>` assumption predating the earlier "persistent embed portal" patch) confirmed unchanged before/after via the same stash comparison — untouched by this patch, already flagged as a stale test.
 - HOST ACTIONS: none required. Worth a real click-through when convenient: open X-Live's STORY tab as a host, tap "OPEN STORY MODE", confirm the embedded Story Mode instance logs in automatically and lands on the story view (not a login screen or Mission Control).
+
+## PATCH X-LIVE v0.41–v0.45 — Studio Hub rebuild: native Story Mode, Marketplace, and a Canva-mockup-matched player dashboard (Sept 22–23, Ennis)
+
+- CONTEXT: Ennis sent a Canva-designed reference mockup of the target "Studio
+  Hub" (formerly "MY EXO") player dashboard and asked for a redesign plus a
+  'Story' → 'Campaign' tab rename. This entry documents the whole accumulated,
+  previously-unshipped batch in one go, per Ennis's explicit instruction to
+  fold everything into one deployment rather than ship incrementally — five
+  sub-patches (v0.41–v0.45), verified together, committed together.
+
+### v0.41 — Story Mode is native
+- The v0.40 Console-iframe embed for Story Mode is gone. The flythrough engine
+  now mounts directly inside X-Live as a full-screen overlay from the STORY
+  tab (players get the tab too, not just hosts). Quests route to the Mission
+  Control embed, nodes to Core Pathways, the Vault to UPGRADES (X-Coin),
+  mini-games to PLAY (Battle Arena); the Evo HUD card reads `player_avatars`.
+  Progress still reads `app_data` `pflx_story_<id>`.
+
+### v0.42 — UPGRADES is the Marketplace
+- Game upgrades load from X-Coin's own catalog (`app_data` `modifiers`, type
+  `upgrade`) in X-Coin's card style, alongside the existing session upgrades
+  (Front of the Line, Music Picker, Choose Your Seat, Off-Task Ticket).
+  Purchases post a negative award through the existing data bus and record
+  into `app_data` `pflx_upgrade_purchases` for X-Coin/MC to honor.
+
+### v0.43 — MY EXO becomes the Studio Hub
+- The player dashboard leads with their Startup Studio (logo, tagline, live
+  X-Coin stats: XC pool, members, tax rate, treasury) read from `app_data`
+  `startupStudios`, then Evo management, then the Story Mode campaign block,
+  badges, and recent activity.
+
+### v0.44 — Studio Hub swipe panes
+- Three swipeable panes: STUDIO | EVO BAY | ARCHIVE BATTLE. Evo Bay is the
+  Archive Battle prototype's care-loop dashboard (rest timer, stats,
+  abilities, a card deck with unowned/next-stage cards greyed out). Archive
+  Battle is a turn battle gated by term-bank questions. Orbs, rest timers,
+  owned cards, and the active build live in `pflx_story_<id>`; Sync XP/stage
+  write to `player_avatars`. Studio logos serve from `/public/`.
+
+### v0.45 — matched against Ennis's Canva mockups (this pass)
+- SYMPTOM/ASK: Ennis sent a second batch of Canva reference screenshots and
+  asked directly: "analyze the mockups against your code. What is different
+  in the image? Fix the code to match the images." (He clarified mid-thread
+  that none of the screenshots were real X-Live captures — all Canva design
+  references — after an earlier miscommunication where they were mistaken
+  for confirmed live renders; corrected before any further claims were made.)
+- FIX — deltas found and closed:
+  - `story` tab display label changed `'📖 STORY'` → `'📖 CAMPAIGN'` in both
+    the host and player tab arrays (`rTabsHtml`-adjacent tab config). Internal
+    key `'story'` and `rStory()` untouched — display rename only, no routing
+    changes, no schema changes.
+  - `rMe()`'s single Evo card split into two, matching the mockup's layout:
+    an `evo` portrait card (avatar, name, line/stage) and a separate
+    `evoStats` card (Sync XP + Energy orb bars, EVO BAY/MARKETPLACE buttons,
+    XC total, the `xlStoryCampaignBlock()` campaign block). Badges/recent
+    activity (`side`) moved out of the grid to sit below as a full-width row.
+  - Studio logo recolor: `.hub-head img` → `.hub-logo`, changed from an
+    `<img>` with a `box-shadow` glow to a masked `<div>`
+    (`background-color:#00f0ff` + `mask-image:url(<studio logo>)`) with a
+    `filter:drop-shadow(...)` glow — matches the real PrototypeFLX/X-Bot mark
+    treatment in `preview.html` (`rgba(0,240,255,...)` drop-shadow) rather
+    than X-Live's own softer accent cyan (`#7de9ff`). A CSS `mask-image` on a
+    plain `<div>` with a solid `background-color` is the only way to force an
+    arbitrary-colored source PNG to an exact target hue while keeping its
+    alpha-channel silhouette for a shape-accurate glow — masking an `<img>`
+    with its own `src` is a no-op (the mask only gates visibility, the
+    image's own pixel colors still paint through).
+  - NEW: a small circular X-Live brand-mark badge
+    (`.hub-brandmark`/`.hub-brandmark span`) in the bottom-right corner of the
+    Studio banner card, masked from `XLIVE_LOGO_STACKED` in the same brand
+    cyan, shown only `if (st)` (player is actually in a Studio) — the one
+    clear, repeated mockup element the code didn't render anywhere.
+  - Checked and confirmed ALREADY MATCHING, no change needed: the EVO BAY
+    pane (`xlEvoBayHTML` — card art, orb/Sync XP bars, stat grid, Care panel,
+    Abilities, card deck with locked next-stage cards), the `.evb .mood`
+    hungry/ok/fed pill styling, `abHTML()`'s ability cost/type format, and
+    the MUSIC/SFX/VOICE audio buttons.
+  - Deliberately NOT changed, flagged instead of guessed at: (1) a stray
+    text glyph and (2) a small dark square seen in two mockup screenshots —
+    both read as low-confidence Canva placeholder-image artifacts, not real
+    UI; (3) whether the mockup implies hiding the STUDIO/EVO BAY/ARCHIVE
+    BATTLE pill row in favor of swipe-only navigation — kept the pill row
+    visible since removing it would drop already-working nav on an
+    ambiguous annotated-screenshot read.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 18-case unit test (`test_xlive_studio_hub_mockup_v044.js`)
+  against the real shipped source — tab-label rename, the `.hub-logo` mask/
+  glow CSS, the new `.hub-brandmark` badge (CSS + markup, correctly gated
+  inside `if (st)`), and the card-split structure (`evo`/`evoStats`/campaign
+  wiring) all PASS. Full existing X-Live test suite re-run; one real
+  regression found and fixed as part of this pass — `test_xlive_story_v039.js`
+  asserted the STORY tab's literal `'📖 STORY'` label (pre-dating the
+  Campaign rename), updated to assert `'📖 CAMPAIGN'` instead, now 28/28
+  PASS. Six other test files show pre-existing failures/crashes UNRELATED
+  to this patch (confirmed via `git stash` comparison — identical failure
+  counts with and without this patch's diff): `test_subapp_embed.js` (2
+  iframe-rendering checks), `test_v022.js`/`test_v028.js` (crash on an
+  undefined global, stale forward-compat), `test_v029.js` (1, FROM DECK
+  button placement), `test_xlive_gameshow_v035.js` (1, effects-sync path),
+  `test_xlive_story_embed_v040.js` (3, `rStory()` embed-open gating) — none
+  touch the Studio Hub, tab labels, or anything this patch changed; logged
+  here as known pre-existing staleness rather than silently ignored, not
+  fixed in this pass (out of scope for "match the code to the mockups").
+- HOST ACTIONS / BACKLOG: none required to use this patch. Two open,
+  low-confidence mockup details are flagged above for Ennis's direct read
+  rather than guessed at (the stray glyph/small-square placeholders, and the
+  swipe-tabs-visibility question) — revisit only if he confirms they're real
+  intent, not Canva artifacts.
