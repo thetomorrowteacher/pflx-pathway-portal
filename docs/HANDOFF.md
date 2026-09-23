@@ -17944,3 +17944,58 @@ Mission Control immediately after, since it touches live nav for active testers.
   rather than guessed at (the stray glyph/small-square placeholders, and the
   swipe-tabs-visibility question) — revisit only if he confirms they're real
   intent, not Canva artifacts.
+
+## PATCH X-LIVE v0.46 — Studio Hub card sizing/proportions fixed for every screen width; cards scroll together as one row (Sept 23, Ennis)
+
+- SYMPTOM: Ennis compared his Canva reference mockup against the live v0.45
+  Studio Hub across two screenshots at different screen widths and reported:
+  "Your sizes arent matching my size proportions. They should match exactly.
+  Also all cards should be scrollable on the same row."
+- ROOT CAUSE: `.hub-logo` (the Studio logo, 64px) and `.hub-brandmark` (the
+  new corner X-Live badge, 28px) were FIXED pixel sizes rendered inside the
+  Studio banner card, which itself stretches fluidly to fill the viewport.
+  At the one screen width the reference mockup happened to be captured at,
+  the fixed-size logo/badge looked correctly proportioned; at a wider
+  screen the card grew but the logo/badge stayed the same absolute size, so
+  they read as too small relative to the (now bigger) card -- the mismatch
+  Ennis was seeing. Separately, the Evo portrait / Evo progress / Badges
+  cards sat in the shared `.grid2` class (a fluid 2-col grid that collapses
+  to 1 column under 640px) -- at narrower widths this stacked and resized
+  the cards rather than keeping a consistent size, which is what "all cards
+  should be scrollable on the same row" was asking to fix.
+- FIX:
+  - `.hub-logo` width/height/flex-basis and `.hub-brandmark`'s width/height
+    AND its corner offset (right/bottom) all switched from fixed px to
+    `clamp(min, Nvw, max)` -- they now scale WITH the viewport, so the same
+    visual proportion holds at any screen width instead of only at one.
+    `.hub-brandmark span` (the masked mark inside the badge) scales the
+    same way so it never looks off-center as the badge grows/shrinks.
+  - New `.hub-cardrow` class: `display:flex; overflow-x:auto;
+    scroll-snap-type:x proximity`, with each direct `.card` child pinned to
+    a fixed `flex:0 0 clamp(280px,42vw,440px)` (86vw on mobile so one card
+    nearly fills the screen, carousel-style). `rMe()`'s Studio Hub pane now
+    wraps the Evo portrait, Evo progress, and Badges/Recent cards in
+    `.hub-cardrow` instead of the shared `.grid2` -- all three scroll
+    together as one row, at a CONSTANT width, on every screen size.
+    Deliberately did NOT touch `.grid2` itself (verified it's used by
+    another, unrelated view at a separate call site in the file) or the
+    Studio banner card's own full-width layout (matches how the reference
+    mockup itself keeps the banner separate from the row below it).
+  - The Evo portrait avatar (`exoAvatarHTML`) was bumped from 150px to
+    190px now that its card has a stable, generous fixed width to fill,
+    matching the reference mockup's noticeably larger circular avatar.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 17-case unit test (`test_xlive_studio_hub_cardrow_v046.js`)
+  against the real shipped source -- confirms the clamp()-based sizing on
+  `.hub-logo`/`.hub-brandmark`/its span, the new `.hub-cardrow`'s
+  scroll/snap/fixed-width behavior, that the SHARED `.grid2` class and its
+  other call site are byte-for-byte untouched, and that `rMe()` now wires
+  the cardrow correctly with the upsized avatar -- all 17 PASS. Full
+  existing X-Live test suite re-run: identical pass/fail counts to before
+  this patch (the same 6 pre-existing, unrelated failures logged in the
+  v0.41-v0.45 entry above, none touching the Studio Hub).
+- HOST ACTIONS / BACKLOG: none required. The `clamp()` bounds and the
+  `.hub-cardrow` card width (`42vw`, capped 280-440px) were chosen by eye
+  against Ennis's screenshots, not from an exact design spec/Figma file --
+  flagged as a best-effort proportion match, not pixel-perfect; revisit if
+  Ennis has exact target measurements.
