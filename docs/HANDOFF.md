@@ -17999,3 +17999,52 @@ Mission Control immediately after, since it touches live nav for active testers.
   against Ennis's screenshots, not from an exact design spec/Figma file --
   flagged as a best-effort proportion match, not pixel-perfect; revisit if
   Ennis has exact target measurements.
+
+## PATCH X-LIVE v0.47 — Studio Hub header composition matched to mockup; face-crop on the Evo avatar; the Evo art ring becomes a real glow (Sept 23, Ennis)
+
+- SYMPTOM: two rounds of direct feedback from Ennis comparing the live
+  Studio Hub against his Canva mockup: (1) "notice on my mockup, the
+  startup studio logo has nothing under it. It is on the side of the other
+  info therefore it is larger. the studio name and slogan is also larger.
+  The Evo profile and name etc is larger and the evo picture is cropped in
+  to see more of its face." (2) mid-turn addition: "There is also a cyan
+  outline around the Evo profile picture. That should also have a glow."
+- FIX:
+  - `.hub-logo` clamp max raised 132px -> 190px (min 96px), and
+    `align-self:flex-start` added so it top-aligns beside the header text
+    instead of vertical-centering against a short 3-line block -- matches
+    Ennis's own read of why the mockup's logo reads larger ("nothing under
+    it... on the side of the other info").
+  - New scoped rules `.hub-head .cardT{font-size:clamp(18px,2.4vw,30px)}`
+    and `.hub-tag{font-size:clamp(13px,1.5vw,19px)}` (up from a fixed
+    12.5px) grow the studio name and tagline WITHOUT touching the shared,
+    file-wide base `.cardT` rule (11.5px, used all over the app).
+  - Evo portrait name: fixed 17px -> `clamp(20px,2.6vw,30px)`; stage/line
+    subtext similarly bumped.
+  - Evo portrait avatar: wrapped in a fixed 210x210 `overflow:hidden`
+    circle, with the rendered art (whatever `exoAvatarHTML` actually
+    returns -- real art, SVG fallback, or initials) scaled 1.35x via CSS
+    `transform` and `transform-origin:50% 30%` (top-weighted) so the crop
+    reads as "more face, less full figure" per Ennis. This is a
+    display-only wrapper around the call site in `rMe()` -- `exoAvatarHTML`/
+    `exoArtHTML` themselves are unchanged, so nothing else that calls them
+    (Evo Bay's own portrait, member avatars, etc.) is affected by the crop.
+  - `exoArtHTML`'s avatar ring (`box-shadow:0 0 0 1.5px rgba(120,220,255,...)`,
+    a flat outline with zero blur) now also carries two blurred layers
+    (`0 0 16px`, `0 0 34px`) -- a real glow, not just a ring. This IS the
+    shared function, so the fix applies everywhere an Evo avatar renders,
+    not only the Studio Hub -- the right scope, since Ennis's ask was about
+    the visual treatment of the ring itself, not this one card.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 10-case unit test (`test_xlive_studio_hub_v047.js`) against
+  the real shipped source -- the glow, the logo/type clamp sizing (and
+  that the SHARED base `.cardT` rule is untouched), and the face-crop
+  wrapper's exact structure -- all 10 PASS. Updated one assertion in the
+  prior `test_xlive_studio_hub_cardrow_v046.js` that pinned the avatar to
+  its old 190px value (intentionally superseded by this patch's 210px
+  crop-circle) -- now 17/17 PASS. Full existing X-Live test suite re-run:
+  identical pass/fail counts to before this patch (same 6 pre-existing,
+  unrelated failures already logged in the v0.41-v0.46 entries above).
+- HOST ACTIONS / BACKLOG: none required. Sizing was again tuned by eye
+  against Ennis's screenshots, not an exact spec -- flagged as best-effort,
+  revisit if exact target measurements are ever provided.
