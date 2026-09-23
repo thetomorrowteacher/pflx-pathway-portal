@@ -18255,3 +18255,131 @@ Mission Control immediately after, since it touches live nav for active testers.
   `XL_SFX` hardcoded dictionaries. Phase B (boss-tier Archives: Trojan +
   Hack Guild as `pickFoe()` ladder unlocks, The Hive as a separate
   multi-unit swarm encounter) is next per the confirmed build order.
+
+## PATCH X-LIVE v0.51/v0.52/v0.53 — real Archive Battle music + Dragon Ball SFX + a smoother global hover/click (Sept 23, Ennis)
+- SYMPTOM/ASK: Ennis: "Use a gamified music track from in the folder that
+  hasn't been used during game play. There are also dragon ball sfx that
+  can be used during battles. I have also add a lot of new UI sounds. Use
+  them throughout hovers and clicks within PFLX. The current is too harsh.
+  It should feel and sound smooth and futuristic."
+- ROOT CAUSE / CONTEXT: found Ennis's "PFLX Sound Library" (285 clips,
+  already cut and deployed at `pflx-platform-check/public/sounds/
+  pflx-library/`, served to both apps via each one's own `XL_SOUND_ROOT`/
+  `PFLX_UI_SFX_ROOT` constant) plus 6 newer source packs he'd added to the
+  same Downloads folder since the library was built (Dragon Ball Z Punch,
+  and 5 UI sound packs: Fantasy UI Sounds, Best UI Sound Effects,
+  Futuristic HUD Interface Sound Design, The Perfect Futuristic UI Click,
+  Popular Sound Effects For Audio Edits) -- none of the 6 had been cut
+  into individual clips yet. Also found the Console has a real, live
+  in-app Sound Library browser (`preview.html`'s `pflxSoundLibLoad`/
+  X-Bot Soundboard picker, from the earlier xc-4 patch) that fetches
+  `pflx-library/manifest.json` at runtime in a SLIM schema
+  (`{id,n,c,d,s}`), distinct from the fuller build-time schema
+  (`{id,category,group,mp3,wav,duration,size_kb,source_file,...}`) in
+  Ennis's own reference copy of the library -- both had to be updated,
+  in their own schema, kept in sync.
+- FIX:
+  - **v0.51 (music)**: `XL_MUSIC.battle` (v0.50's placeholder, reusing
+    the `rush` zone's file) now points at
+    `loop_drive_8bar_orbit_drift_129bpm.mp3`. Of the 8 source tracks
+    already cut into `10_Music_Loops`, 5 were already assigned to a zone
+    (Clocktower Run, Event Horizon, Glass Interface Drift, Midnight
+    Mission Run, Orbit Arcade) and 3 were not (Into The Singularity,
+    Orbit Drift, Sci-Fi Suspense Trailer) -- Orbit Drift was picked as
+    the closest sibling to the already-used, clearly game-y "Orbit
+    Arcade." Into The Singularity and the Suspense Trailer are the
+    other two unused options if this one doesn't land right; swapping
+    is a one-line change either way.
+  - **v0.52 (Dragon Ball battle SFX)**: wrote a reusable ffmpeg-based
+    slicer (`silencedetect` to find clip boundaries, peak-normalize each
+    segment to -1dBFS, export MP3 VBR + WAV 16-bit, matching the
+    library's own README convention exactly) and ran it on the Dragon
+    Ball pack -- 29 individual punch/impact clips, added to
+    `pflx-library/04_Impacts_Hits` as `impact_022` through `impact_050`
+    in BOTH the deployed copy and Ennis's own reference library, with
+    both manifest.json files updated in their own schema. Three specific
+    clips are wired into real battle moments via new `XL_SFX` entries
+    (`battleHit`/`battleCrit`/`battleFoeHit`), played at the EXACT
+    `hitFoe`/`critFoe`/`hitMe` flag-set points `resolve()`/`foeAttack()`
+    already instrument (from v0.50) -- a landed strike plays `battleHit`,
+    a 3-streak crit plays the louder/longer `battleCrit` instead (not
+    just the visual flash), and the Archive's own counter landing on the
+    player plays `battleFoeHit`. The other 26 cut clips sit in the
+    library unassigned, for the Spar/boss-tier phases still ahead.
+  - **v0.53 (smoother global hover/click)**: cut all 5 new UI packs the
+    same way (92 clips total, categorized into `01_UI_Clicks`/
+    `02_UI_Blips`/`07_Transitions_Swells` by duration, matching the
+    library's own auto-categorization rule) and added them to the
+    library. Picked a replacement hover and click clip using `ffmpeg
+    astats`' crest factor (peak-to-average ratio) as an objective
+    smoothness proxy, since audio can't be listened to in this
+    environment: the OLD click (`click_007.mp3`) measured crest 8.5 (a
+    sharp, harsh spike); the new click (`click_041.mp3`, cut from "The
+    Perfect Futuristic UI Click!") measures 2.6 at the same ~0.26s
+    length. The new hover (`click_030.mp3`, cut from "Best UI Sound
+    Effects") measures 1.7, the smoothest of everything auditioned.
+    `XL_SFX.uiHover`/`uiClick` now point at these two clips; the
+    Console's own `PFLX_UI_SFX.hover`/`click` were updated to the SAME
+    two files in the same patch (see PATCH PLATFORM v243) so X-Live and
+    the Console sound identical everywhere, matching "throughout hovers
+    and clicks within PFLX."
+  - Honestly flagged, not hidden: every pick in this patch (battle
+    track, 3 Dragon Ball SFX, hover/click) was made by duration/
+    crest-factor/naming heuristics, not by listening -- every choice is
+    a single string in `XL_SFX`/`XL_MUSIC` and trivially swappable once
+    Ennis actually hears them. The other 26 Dragon Ball clips and 90
+    other UI-pack clips are in the library, unused, for later picks.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 21-case unit test (`test_xlive_battle_audio_v051_v053.js`)
+  -- structural checks on the new `XL_MUSIC`/`XL_SFX` values and the real
+  wiring in `resolve()`/`foeAttack()`, plus sandboxed behavioral checks
+  (extracting the real `flashOff`/`resolve`/`foeAttack` via the same
+  brace-counting pattern as the v0.50 test, with a spy `xlSfx()`) proving
+  a correct non-crit strike plays `battleHit` (not `battleCrit`), a
+  3-streak crit plays `battleCrit` instead, a wrong answer's real
+  reduced-power hit still plays `battleHit`, the Archive's real
+  counter-hit plays `battleFoeHit`, and a dodge plays neither -- all 21
+  PASS. `test_xlive_archivebattle_presentation_v050.js`'s one
+  now-stale literal check (the old placeholder file path) was updated to
+  a shape-only regex rather than re-asserting a value this patch
+  intentionally changed; still 45/45 PASS. Full 37-file regression suite
+  re-run via `git stash` comparison: identical pass/fail counts and
+  messages with and without this patch's diff -- zero regressions.
+- HOST ACTIONS / BACKLOG: the battle track and all SFX picks here are
+  best-guess defaults (see above) -- listen and tell me if any should
+  swap to a different cut clip (all are one-line changes). The remaining
+  26 Dragon Ball clips and 90 UI-pack clips are in the library for Spar/
+  boss-tier phases and any other future hover/click needs.
+
+## PATCH PLATFORM v243 — smoother, less harsh global hover/click SFX (Sept 23, Ennis)
+- SYMPTOM/ASK: same message as PATCH X-LIVE v0.51-v0.53 above -- "The
+  current is too harsh. It should feel and sound smooth and futuristic,"
+  applying to hovers/clicks "throughout PFLX."
+- ROOT CAUSE: `PFLX_UI_SFX.hover`/`click` (from PATCH PLATFORM v241,
+  ported from X-Live's own v0.37.2/v0.37.3 mechanism) pointed at
+  `pflx-ui/ui_hover_soft.mp3` and `pflx-library/01_UI_Clicks/
+  click_007.mp3` -- measured via `ffmpeg astats`, `click_007` has a
+  crest factor of 8.5 (a sharp transient tick, the harshest clip in the
+  whole 285-clip library by a wide margin).
+- FIX: `PFLX_UI_SFX.hover`/`click` now point at `click_030.mp3` (crest
+  1.7) and `click_041.mp3` (crest 2.6) -- both newly cut from Ennis's 5
+  new UI sound packs (see the X-LIVE v0.51-v0.53 entry above for the
+  full cutting/library-update writeup; this patch only changes the two
+  file references, since the library update itself is shared
+  infrastructure both apps read from the same deployed path). X-Live's
+  own `XL_SFX.uiHover`/`uiClick` were updated to the SAME two files in
+  the same pass, so the Console and every sub-app sound identical.
+  `window.PFLX_PATCH` bumped 242 -> 243, `PFLX_BUILD` already current
+  (2026.09).
+- Verified: `node scripts/syntax_gate.js preview.html` clean (28 blocks,
+  0 failed -- the block count has grown well past the 12 recorded when
+  that check was first documented, all still pass). `test_platform_ui_sfx_
+  v241.js`'s two literal-value assertions (checking hover/click equal the
+  OLD file paths) were updated to the new intentionally-changed values --
+  29/29 PASS. Full 69-file platform regression suite re-run via `git
+  stash` comparison: every file's exit code identical with and without
+  this patch's diff -- zero regressions (the large pre-existing set of
+  stale-`PFLX_PATCH`-literal and other unrelated failures is unchanged).
+- HOST ACTIONS / BACKLOG: same as the X-LIVE entry above -- these are
+  best-guess picks by crest factor since audio can't be auditioned in
+  this environment; trivially swappable.
