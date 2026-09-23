@@ -18104,3 +18104,43 @@ Mission Control immediately after, since it touches live nav for active testers.
   provides -- if Arena ever uploads new/replacement art for a line/stage,
   this table can drift and should be re-measured against the new asset.
   Revisit if an Evo's portrait starts looking off-center again.
+
+## PATCH X-LIVE v0.49 — Evo Bay Card Deck: owned + locked cards now scroll together as one row (Sept 23, Ennis)
+- SYMPTOM/ASK: Ennis, from 5 Evo Bay dashboard screenshots: "The cards of
+  each evo collected should be on the same row. The cards not obtained
+  should be greyed out and faded."
+- ROOT CAUSE: `xlEvoBayHTML()`'s "Card deck" panel rendered the current
+  stage's owned/buyable cards in their own 3-col `.shop` grid, then a
+  full-width "STAGE N+1 · <name> · unlocks at X Sync XP" divider line,
+  then a SECOND, separate `.shop` grid below it for the next stage's
+  locked cards -- two visually stacked blocks, not one continuous row.
+- FIX: added `.evb-deckrow`, the same horizontally-scrollable
+  flex + `scroll-snap-type:x` row pattern already proven out by the
+  Studio Hub's `.hub-cardrow` (PATCH X-LIVE v0.46). It now wraps BOTH
+  `deckHTML(n, false)` (this stage's owned/buyable cards) and
+  `deckHTML(n + 1, true)` (next stage's locked cards) together;
+  `.evb-deckrow .shop{display:contents}` neutralizes `.shop`'s own grid
+  layout inside the row so each `.s` card becomes a direct flex item
+  (fixed `flex:0 0 clamp(150px,40vw,200px)`, `scroll-snap-align:start`)
+  instead of staying pinned to its old 3-col grid. A slim inline
+  `.evb-divider` (96px wide, dashed borders on both sides) sits between
+  the two groups in the same row, carrying the same stage number/name/
+  Sync XP threshold the old full-width divider showed -- the information
+  wasn't dropped, just repositioned to fit inline.
+  The "greyed out and faded" half of the ask was ALREADY true before
+  this patch -- `.evc.locked img{filter:grayscale(1) brightness(.45)}`
+  and `.shop .s.locked{opacity:.75}` already grey/fade locked cards; the
+  real gap was purely the layout, so no change was needed there.
+  `deckHTML()` itself (the function that builds each card) is untouched.
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 18-case unit test (`test_xlive_evobay_deckrow_v049.js`)
+  against the real shipped source -- confirms the old two-block markup is
+  gone, both deck calls now sit inside one `.evb-deckrow`, the inline
+  divider still carries the real stage/name/XP info, the CSS row
+  actually scrolls with scroll-snap, `.shop` is neutralized via
+  `display:contents`, the pre-existing locked-card fade styling is
+  unchanged, and `deckHTML()` itself is untouched -- all 18 PASS. Full
+  existing X-Live test suite re-run: identical pass/fail counts to the
+  v0.48 baseline (same 2 pre-existing, unrelated failures in
+  `test_xlive_gameshow_v035.js` and `test_xlive_story_embed_v040.js`).
+- HOST ACTIONS / BACKLOG: none required.
