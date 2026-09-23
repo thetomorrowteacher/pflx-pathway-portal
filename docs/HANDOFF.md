@@ -18144,3 +18144,114 @@ Mission Control immediately after, since it touches live nav for active testers.
   v0.48 baseline (same 2 pre-existing, unrelated failures in
   `test_xlive_gameshow_v035.js` and `test_xlive_story_embed_v040.js`).
 - HOST ACTIONS / BACKLOG: none required.
+
+## PATCH X-LIVE v0.50 — Archive Battle presentation layer: star-field arena, real hit/act/crit animations, a battle music zone (Sept 23, Ennis)
+- SYMPTOM/ASK: Ennis, kicking off the "Battle Arena Games Expansion" epic
+  (see the plan doc, Update Sept 23): "more popup animation scenes with
+  the Evo card and the Archive bot... chances of critical hits, misses,
+  normal hits, with animations"; a follow-on specified the visual
+  treatment directly: "the background screen of a moving space of stars,
+  and the floating cards of the Evos or the Archive... battle animations,
+  sfx, vfx, and music should play." This patch is Phase A of the
+  confirmed 5-phase build order (A: cinematics → B: boss tier → C: Spar →
+  D: Battle Arena team race → E: board-game mode).
+- ROOT CAUSE (why this was possible as a small, low-risk patch): research
+  found real, half-built infrastructure already in place. `resolve()`/
+  `foeAttack()` already computed hit/miss/crit as REAL game mechanics
+  (correct answer = full-power hit, wrong answer = a reduced 0.4x hit,
+  a 3-correct streak = a 1.5x crit) -- but nothing on screen showed it.
+  `@keyframes hit`/`@keyframes act` and the `.evc.hit`/`.evc.act`/
+  `.evb-foe.hit svg` CSS selectors already existed, but `B.hitFoe` was
+  only ever READ in `xlBattleHTML()`, never SET anywhere -- dead CSS
+  hooks with no JS trigger. Archive Battle also never called
+  `xlMusic.set(...)` at all, so it just inherited whatever ambient zone
+  track happened to already be playing -- no battle-specific music, and
+  nothing ever silenced the main track going into a fight.
+- FIX:
+  - New `flashOff(keys, ms)` helper (before `resolve()`): schedules a
+    `setTimeout` that clears the given flag(s) back to `false` and
+    re-renders, but only if the SAME battle object (`B`) is still active
+    -- guards against a stale timer from a battle the player already
+    left/won/lost touching the wrong state.
+  - `resolve(a, correct)` now sets `B.actMe = true` (cleared after
+    420ms) the instant the player acts, and `B.hitFoe = true` (+
+    `B.critFoe` on a streak crit, cleared after 480ms) at the exact
+    moment a strike actually lands -- including on a WRONG answer, since
+    the real game logic already lands a reduced-power hit there too
+    (this was confirmed against the real `mult = correct ? 1 : 0.4`
+    logic, not assumed).
+  - `foeAttack(scale)` now sets `B.actFoe = true` unconditionally (the
+    foe visually lunges even on a miss) and `B.hitMe = true` only in the
+    real-damage path, placed correctly AFTER the `B.dodge > 0` early
+    return so a dodge never triggers the player-hit animation.
+  - New compound CSS rules handle the fact that two independent
+    `animation:` declarations on the same element don't combine unless
+    given their own compound selector: `.evb-foe.act`, `.evb-foe.hit`,
+    `.evb-foe.act.hit`, `.evb-foe.hit.crit`, `.evb-foe.act.hit.crit` for
+    the foe SVG, and `.evc.act.hit` for the player's card. A new
+    `critflash` keyframe gives a crit hit a real flash/glow/brightness
+    treatment, not just the pre-existing text-only "· CRITICAL" log
+    suffix.
+  - New `.evb-stage` wrapper (star-field background via two
+    independently-panning `::before`/`::after` radial-gradient dot
+    layers, `evbstars1`/`evbstars2` keyframes at different speeds/
+    directions for parallax depth) now wraps every Archive Battle
+    screen state in `xlBattleHTML()` (the no-Evo hint, the pre-fight
+    prompt, and the real battle view). The foe panel and the player's
+    card wrapper (a new `.evb-float` div, not the `.evc` element itself,
+    to avoid animation-property conflicts with the hit/act/crit
+    keyframes) get a continuous gentle bob via `evbfloat`.
+  - `xlBattleHTML()`'s player-card render now post-processes the SHARED
+    `cardHTML()` output via a targeted string replace
+    (`.replace('class="evc', 'class="evc' + myCls)`) to inject the
+    act/hit classes, rather than modifying `cardHTML()` itself --
+    `cardHTML()` is also used by the Evo Bay deck and shop, so it stays
+    untouched.
+  - New `XL_MUSIC.battle` zone (reuses the `rush` zone's track file as a
+    placeholder pending a real battle track from Ennis -- confirmed via
+    research that no audio-upload UI exists anywhere in the file, so
+    "I will upload music for game play" means handing over clip files
+    for me to slot into the existing hardcoded `XL_MUSIC`/`XL_SFX`
+    dictionaries, not a live upload feature). `xlMusicZone()` now
+    returns `'battle'` when the Archive Battle hub pane is open, checked
+    before the generic `'dash'` fallback. Both `xlHubGo()` and the hub's
+    swipe-scroll handler now call `xlMusic.set(xlMusicZone())` after
+    updating the active pane, since neither previously re-checked music
+    on tab/swipe navigation.
+  - Deliberately OUT of scope for this patch, to limit risk to a
+    working, previously-untouched combat resolver: turn-sequencing/
+    staggered timing (an attacker beat, then a delayed counter-beat) --
+    `resolve()`/`foeAttack()` stay fully synchronous. Also out of scope,
+    tracked as later phases: boss-tier Archives (Phase B), Spar PvP
+    (Phase C), Data Cache mid-battle powerups, and any new SFX beyond
+    wiring the existing `XL_SFX` system (Ennis is supplying additional
+    clips).
+- Verified: `node scripts/syntax_gate.js index.html` clean, 5 blocks, 0
+  failed. New 45-case unit test (`test_xlive_archivebattle_presentation_v050.js`)
+  -- 23 structural/regex checks against the real shipped source (CSS
+  star-field/float/critflash/compound rules, `xlBattleHTML()`'s
+  `.evb-stage` wrapping and card-class injection, `XL_MUSIC.battle` +
+  `xlMusicZone()` ordering + `xlHubGo()`/swipe-handler wiring) plus 22
+  sandboxed behavioral checks executing the REAL extracted `flashOff()`/
+  `resolve()`/`foeAttack()` function bodies via a `new Function(...)`
+  factory with a fake-timer harness (a landed correct strike sets
+  actMe/hitFoe and damages the foe; flags clear at their real 420ms/
+  480ms timers, not before; a flashOff scheduled against a since-replaced
+  battle object correctly no-ops rather than touching the new battle's
+  state; a 3-hit streak sets critFoe and deals real 1.5x damage; a wrong
+  answer lands a reduced 0.4x hit -- still setting hitFoe, never critFoe
+  -- while still triggering the Archive's own free counter-hit; a
+  dodged attack sets actFoe but never hitMe and never changes player HP)
+  -- all 45 PASS. Full existing X-Live test suite (37 files) re-run via
+  `git stash` comparison against the pre-diff baseline: identical
+  pass/fail counts and messages with and without this patch's diff in
+  6 pre-existing, unrelated files (`test_subapp_embed.js`, `test_v022.js`
+  and `test_v028.js` -- both hard Node crashes unrelated to this patch,
+  `test_v029.js`, `test_xlive_gameshow_v035.js`,
+  `test_xlive_story_embed_v040.js`) -- confirmed zero regressions.
+- HOST ACTIONS / BACKLOG: Ennis to supply the real Archive Battle music
+  track (currently a placeholder reusing the `rush` zone's file) and any
+  additional SFX clips, to be slotted into the existing `XL_MUSIC`/
+  `XL_SFX` hardcoded dictionaries. Phase B (boss-tier Archives: Trojan +
+  Hack Guild as `pickFoe()` ladder unlocks, The Hive as a separate
+  multi-unit swarm encounter) is next per the confirmed build order.
