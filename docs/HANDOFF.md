@@ -18975,3 +18975,130 @@ login intro, NOT a hard gate blocking Home.
   mode as a pushable live-session activity type) and item 5 (X-Bot tool
   push broadcasting live into a running session) remain open, next in the
   queue.
+
+## PATCH X-LIVE v0.83 — X-Mods, competitor half (Oct 1, Ennis)
+
+Ennis's verbatim spec, in full (reproduced here since it's the authoritative
+source of requirements): "Build X-Mods into X-Live: one shared upgrade
+system for X-Live sessions that turns on automatically for whatever
+activity is on screen." Followed by context (X-Rush's `PFLX_POWERUPS`/
+`raceEvents` as the pattern to reuse, not duplicate), the 10 named mods
+split AUDIENCE/COMPETITOR, automatic activity-based gating, a max-3-per-
+player-per-day limit with a 20-40 XC cost range, and a host feed+toggle.
+Ennis's standing rule on this feature: "report first, then fix" — plan
+before editing, build and test but do not commit/push/deploy until told.
+A research-and-scoping pass (same session, prior turn) read the real
+`PFLX_POWERUPS`/`raceEvents`/`mergeSession`/Marketplace code first and
+surfaced several real conflicts between the spec and the live codebase
+before any code was written — see that turn's report for the full detail;
+summarized in the SCOPE/ASSUMPTIONS sections below.
+
+- SYMPTOM: nothing — this is new-feature work, not a bugfix.
+- SCOPE, STATED NOT HIDDEN: the spec asks for 10 mods (5 AUDIENCE / 5
+  COMPETITOR). Only the 5 COMPETITOR mods (Cerebro Scan, Vault Deal,
+  Chrono Shift, Intercept, All In) are built this patch. The 5 AUDIENCE
+  mods (Signal Link, Hive Mind, Nexus Drop, Fan Surge, Overdrive) all need
+  a non-roster "a logged-in PFLX member who isn't a joined participant of
+  this session can watch/act on it" surface that does not exist anywhere
+  in this codebase (confirmed via full-file search this session) and is
+  already a backlogged, unbuilt epic ("Phase 1e — Audience mode" in the
+  standing X-Live plan). Shipping no-op audience mods would look done
+  without being real, so they're deferred rather than faked.
+- APPROACH: reuses the exact `PFLX_POWERUPS`/`raceEvents` pattern (a
+  registry object, a PURE trigger-validator returning `{ok, event}` or
+  `{ok:false, reason}`, an append-only event array unioned by id in
+  `mergeSession()`, a UI wrapper that validates then saves) but as a
+  SEPARATE system — X-Mods spend real X-Coin (mirrors the Marketplace's
+  `confirmGameUpgrade`'s `postAward`/`p.xc`/`liteLog` deduction pattern,
+  never the Nitro-spend pattern) and follow whatever slide type the host
+  currently has on screen, not quiz_race alone.
+- NEW: `PFLX_XMODS` registry (`index.html:4099`), `s.xmodEvents` unioned
+  by id in `mergeSession()` (`:2529-2532`, identical discipline to
+  `raceEvents` directly above it). Pure helpers: `pflxXModDayStr`/
+  `pflxXModDailyCount` (`:4134`, the cross-session daily cap — DERIVED by
+  scanning every session currently loaded into `L.sessions` for that
+  player's events today, never a separately-mutable counter, per the
+  `pflx-persistence-guardrail` skill), `pflxXModUsableNow`, `pflxXModEliminatedOptions`
+  (`:4166`, Cerebro Scan's deterministic wrong-answer picks),
+  `pflxXModInterceptActive` (`:4195`), and the master validator
+  `pflxXModTrigger` (`:4215`). UI layer: `liveTriggerXModUi`/
+  `liveXModPromptUi`/`liveToggleXMods` (`~5621`), player tray
+  `pflxXModTrayHtml` wired into `rLiveNative()` (`:6055`), host toggle +
+  live feed `pflxXModHostFeedHtml` wired into `rLiveRun()` (`:5853`).
+- MODIFIED (additive, both already-shipped/tested functions):
+  `pflxRaceTriggerPowerup`'s steal-blocking check now also recognizes an
+  armed Intercept (blocks the steal AND redirects the stolen amount to
+  the defender, per the spec's own parenthetical "absorbs the current
+  Steal"); `pflxRacePowerupBonus` gained a second pass over `s.xmodEvents`
+  for All In's risked double/lose, plus the intercepted-steal redirect
+  payout. An empty/absent `xmodEvents` array is a no-op in both, so every
+  pre-existing fixture/session behaves byte-identically.
+- ASSUMPTIONS MADE (flagged for Ennis, not silently decided — full
+  rationale is also in the file's own new header comment):
+  1. Intercept follows the spec's parenthetical ("absorbs the current
+     Steal") over its looser prose ("the next player can answer for those
+     points") — built as a Steal-specific shield that redirects the
+     stolen amount to the defender, since no "next player answers" relay
+     concept exists anywhere in X-Live.
+  2. Vault Deal's "between activities" trigger = the current slide is
+     revealed/locked (the gap before the host advances) — there's no
+     separate "intermission" state in the session model to key off.
+  3. Chrono Shift is REAL but currently INERT: it's a genuine purchase
+     (tray button, event log, host feed, X-Coin deduction), but
+     timer/project/social slides have no existing per-player/per-team
+     lock-out for a time bonus to extend (only quiz_race has one, via
+     `raceExpired`) — so buying it doesn't yet change anything
+     mechanically. Needs either new timer-enforcement infrastructure or a
+     simpler alternate behavior from Ennis before it's a real mechanic.
+  4. All In is scoped to `quiz_race` only, dropping the spec's `project`
+     worksIn entry — Project Work has no scorable "result" to double or
+     lose.
+  5. Cerebro Scan is self-only, `quiz_race`-only, and clamps its
+     elimination so the board never drops below 2 options (correct + at
+     least 1 wrong).
+  6. The daily cap (item 6 above, `pflxXModDailyCount`) can under-count
+     for a client that hasn't loaded one of today's OTHER sessions for
+     that player — a known, documented limitation of deriving the count
+     rather than storing it.
+- Verified: `node scripts/syntax_gate.js index.html` clean (9 blocks). New
+  89-case unit test (`test_xmods.js`) extracts the real shipped registry/
+  validator/derived-state functions — plus the modified
+  `pflxRaceTriggerPowerup`, `pflxRacePowerupBonus`, and `mergeSession`'s
+  xmodEvents union block — via brace-counting and runs them in a `vm`
+  sandbox against realistic fixtures: registry shape/cost-range/role
+  checks, day-string bucketing, cross-session daily-count summation
+  (including safe-on-empty/missing-array cases), `pflxXModUsableNow`
+  gating for every mod/slide-type combination including all 5 dark types,
+  Cerebro Scan's deterministic elimination (never strips the correct
+  answer, clamps on 2-option and 3-option slides, stable across
+  re-renders), the Intercept/Steal integration end-to-end (purchase →
+  armed → a steal against the target is blocked AND redirected → consumed
+  → a second steal is no longer blocked; a plain steal with no
+  intercept/shield is unaffected, regression-checked), the
+  `pflxRacePowerupBonus` redirect/All-In math (thief gets 0, original
+  target gets 0, defender gets the full amount; All In's win/lose/wrong-
+  answer cases), the full `pflxXModTrigger` validator (unknown mod,
+  disabled session, wrong activity type, insufficient XC, daily limit at
+  and under the cap, success shape, Vault Deal guaranteed-vs-risk via an
+  injectable `rand`, All In win/lose via the same, both rejected once
+  their slide is revealed/not-between) — all 89 PASS. Full 59-file
+  regression suite re-run against a real `git show HEAD:index.html`
+  backup (not `git stash`): a direct before/after diff of every test
+  file's pass/fail summary line was byte-identical with zero exceptions
+  (the handful of pre-existing `ERR_INVALID_ARG_TYPE`/`usage:` failures,
+  `test_v028.js`'s pre-existing `pflxRacePowerupBonus is not defined`
+  crash, and `test_xlive_story_embed_v040.js`'s pre-existing 3 failures
+  were all independently reproduced against the clean baseline, confirmed
+  unrelated to this patch) — zero new regressions.
+- HOST ACTIONS: none required to use what shipped. Ennis should weigh in
+  on assumption 3 (Chrono Shift) specifically before it's considered a
+  finished mod, not just a tracked purchase — everything else is usable
+  as-is. NOT yet verified live in a real two-tab browser session (a host
+  running a quiz_race slide, a player buying Cerebro Scan/Intercept/All
+  In/Vault Deal/Chrono Shift and seeing the real effect) — Chrome/browser
+  automation was not used this patch; flag for Ennis or a future session
+  to click through for real.
+- BACKLOG: the 5 AUDIENCE X-Mods (blocked on the Phase 1e audience-mode
+  bridge); Chrono Shift's real timer-enforcement wiring (assumption 3
+  above); team-wide application of any mod (every mod here is self-only
+  this patch, unlike X-Rush's `teamCapable` Freeze/Fog precedent).
