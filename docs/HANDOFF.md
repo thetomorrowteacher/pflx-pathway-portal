@@ -18786,3 +18786,97 @@ Mission Control immediately after, since it touches live nav for active testers.
 - Full 74-file regression suite re-run against `preview.html.pre-v251-backup`: two files (`test_v249_theater_notify_only.js`, `test_theater_live_v207.js`) initially crashed with `chip.querySelector is not a function` — their mocked chip/DOM elements pre-dated this patch's new `chip.querySelector('em')` call. Fixed both in place (not shipped-code bugs — the same forward-compatibility pattern already documented repeatedly this session, e.g. `test_xbot_theater_v174.js` needing new stubs as later patches extended shared functions): added a minimal mocked `<em>` (scrollWidth/clientWidth/classList/style.setProperty) that `querySelector('em')` returns, a safe no-op for tests that don't exercise title-scroll behavior themselves. Both files confirmed passing (19/19 and 61/61) after the fix. Re-ran the full suite after both fixes: identical pass/fail counts on every file between the pre- and post-patch versions except the two version-specific tests for this and the prior patch (each correctly showing its own single expected stale-`PFLX_PATCH`-literal non-pass) — zero new regressions.
 - NOT verified live in-browser this pass — worth a real look next time Ennis is on to confirm the scroll speed/pacing feels right and the title is genuinely readable end to end.
 - HOST ACTIONS / BACKLOG: none for this patch.
+
+## PATCH X-LIVE v0.76 — Nexus Narratives: 2487 world lore in the glossary cards, Phase 1a (Sept 27, backfilled)
+- BACKFILLED ENTRY: this patch shipped as a real, committed change (`ad2d7b1`, session `session_015GPmbdqixVECZxHy11Z2xJ`, Claude Opus 5.5) but its Handoff entry was never written at the time. Reconstructed from the real commit message and diff by a later session (PATCH X-LIVE v0.82's session) while investigating a version-number collision — detail beyond the commit message itself (live verification, click-through) was not independently re-confirmed.
+- WHAT SHIPPED: text-only update to the in-game question-bank glossary cards so the world lore matches the locked "2487" Story Bible. No progress, X-Coin, or ledger logic touched.
+  - The Nexus: a digital plane humanity found in 2026 but did not build; players enter it through their Evos at a Nexus Gate (was "ring like space station colony").
+  - Startup Studios: four startup companies built by PFLX (2 cards).
+  - Tessera: the ring city orbiting Earth under one united government; X-Bot, PFLX's AI, issues "The Future is Unwritten. Write it." (2 cards).
+  - "EXO Unit" card renamed to "Evo" (avatar and portal into the Nexus).
+  - X-Coins: experience coins owned by the people.
+  - Evo Bay card label "Evo · EXO Unit · Studio" → "Evo · Studio".
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH PLATFORM v252 — Story Mode Act Zero briefing updated to the 2487 Nexus lore, Phase 1a (Sept 27, backfilled)
+- BACKFILLED ENTRY: real, committed (`b81dc16`, session `session_015GPmbdqixVECZxHy11Z2xJ`), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED: text-only change to the Act Zero briefing caption, in both `preview.html` and `story_assets/story_data.js`. No progress, X-Coin, or ledger logic touched. "The Nexus is a ring-like space station..." now reads: "You are aboard the PFLX station, orbiting Earth above Tessera. Through the Nexus Gate lies the Nexus, a dimension no one built. Everything on this station was built by people who were your age when they started."
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH PLATFORM v253 + v254 — Story Mode Chapter 1: Nexus Narratives in the Cluster sector (Sept 27, backfilled)
+- BACKFILLED ENTRY: real, committed as one combined commit (`c4421b9`, session `session_015GPmbdqixVECZxHy11Z2xJ`, "v253 + v254, both unreleased until now"), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED:
+  - Chapter gate titled by Studio slogan (Fueling Purpose, Forging Identity); "Pick Your Studio" step removed (the Studio now comes from the diagnostic instead).
+  - "Read the Issue": a graphic-novel reader for Aiko and Priya with cold opens (Tessera ring, Arrival Port, backstage at the Innovation Expo), `{brand}` substitution, and a Firewall-hold fallback.
+  - The Locator Key (`a6-locator`): Chapter close, key awarded, client marked complete, next Chapter's intro plays as the departure.
+  - Cluster sector map with the one ship; four 15s chapter intros scored with "Event Horizon" (Chapter N+1's intro doubles as Chapter N's departure).
+  - Empathy Map cutscene slot added (video pending).
+  - Explicitly NOT included: `public/sounds/pflx-library/manifest.json` (separate, unapproved).
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH X-LIVE v0.77 + v0.78 + v0.79 — Story quest-list sync, the Locator Key, and Evo Clash open from the start (Sept 27, backfilled)
+- BACKFILLED ENTRY: real, committed as one combined commit (`35546d0`, "includes v0.77 + v0.78", session `session_015GPmbdqixVECZxHy11Z2xJ`), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED:
+  - v0.77: Story quest lists brought in line with Platform v253 (Studio-pick step removed, "Read the Issue" added), the 2487 glossary cards, and a slow-breathe background added to the Studio Hub.
+  - v0.78: The Locator Key (`a6-locator`) added to `XL_STORY`/`SMF_STORY`/`SMF_SEASON` — the campaign is now 7 acts, 29 quests (was fewer; `test_xlive_story_v039.js` updated to expect 29).
+  - v0.79: a player with no Evo yet can hatch a Stage 1 starter of their Studio's line directly inside Evo Clash (and the Evo Bay pane) and go straight into the fight — same `player_avatars` row shape as the Arena's own "ACTIVATE EXO" flow, never overwrites an existing Evo, no XC awarded or charged.
+- Verified (per the commit message): new `test_v079_evoclash_start.js`; `test_xlive_story_v039.js` updated for the 29-quest count. Re-confirmed currently passing (9/0 and clean respectively) as part of PATCH X-LIVE v0.82's own regression sweep.
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH PLATFORM v255 — Sound Library: Cinematic Booms, Mixkit music + SFX, new Full Tracks category (Sept 27, backfilled)
+- BACKFILLED ENTRY: real, committed (`d0b8870`, session `session_01PWkXLRN3xyc3nMZE5r6oMP` — a different session id than the Story/Campaign work around it), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED:
+  - +21 Cinematic Booms (`impact_boom_01`..`21`) added to the Impacts category.
+  - +13 Mixkit tracks cut into 52 stingers and 31 loops (9 bar-aligned tracks × 3 loops each; Piano Horror, Singing Bowl Meditation, Tapis, and Vertigo each get one 16s ambient loop).
+  - +6 Mixkit SFX (UI tone, futuristic hum, arcade game over, laser gun thunder, intro transition, epic orchestra transition).
+  - +13 Mixkit full tracks in a new `11_Music_Full_Tracks` category (`PFLX_SOUNDLIB_CATS` entry added), for Theater and background music use.
+  - Library manifest grew 406 → 529 clips; `PFLX_PATCH` 254 → 255. Built-in sound packs themselves unchanged.
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH PLATFORM v256 — Campaign Mode: Story Mode rebuilt as a game, graphic audio in the Issues (Sept 28, backfilled)
+- BACKFILLED ENTRY: real, committed (`d3e9d14`, session `session_015GPmbdqixVECZxHy11Z2xJ`), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED:
+  - Cluster Map is now home, with a sticky HUD (Brand, Studio, XC, XP, Locator Keys, story-audio toggle, Evo Clash). A current-mission card with a Continue action.
+  - Chapters are stations; the Chapter view is a level path (Prologue P0/P1, Levels 1-5, Locator Key finale). Levels list their missions.
+  - Full-screen cutscenes with Skip; the Chapter intro auto-plays once; a title-card fallback covers a browser that can't play the MP4.
+  - The Issue reader is now driven by graphic audio: one clip per panel, captions timed to a `marks.json`, the currently-spoken line highlighted, a Firewall hand-off, tap-to-play fallback, full-screen reader. Aiko (ElevenLabs "Raven") and Priya (Kokoro review copy) voice files live in `public/story-art/audio/`.
+  - A ClientCall portrait + entrance animation when ClientCall enters the story; X-Gem guide art (CharacterForge, ClientCall, ThinkTable, ProtoDev) on levels and missions.
+  - Audiowide + Exo 2 fonts loaded by Story Mode. The quest engine and saved progress themselves are unchanged.
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH X-LIVE v0.80 — Campaign Mode lives in X-Live (Sept 28, backfilled)
+- BACKFILLED ENTRY: real, committed (`9b4577b`, session `session_015GPmbdqixVECZxHy11Z2xJ`), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED: the Console's Campaign Mode engine (Cluster Map, Chapters, levels, Issues with graphic audio, ClientCall/X-Gem art, the Locator Key) is embedded directly into X-Live and opens from the CAMPAIGN tab and the JOIN / CONTINUE buttons, replacing the earlier scroll flythrough.
+  - Host adapter: identity comes from `L.me`/roster; one shared `pflx_story_<id>` record carries the Evo care loop (read before mount); quest rewards are proposed as `pflx_award_proposed` (source `'story'`); Evo Clash opens the Studio Hub tab.
+  - Gates between levels keep the Checkpoint Vault and interlude games.
+  - Art, audio, and cutscenes load from `prototypeflx.com/public/`.
+- Verified (per the commit message): new `test_v080_campaign_mode.js`; `test_v071_arcade_flow.js` updated to search the Evo Clash block for `finish()`. Re-confirmed currently passing (13/0 and clean respectively) as part of PATCH X-LIVE v0.82's own regression sweep.
+- IMPORTANT, flagged while backfilling (PATCH X-LIVE v0.82's session): this patch is real groundwork for Ennis's later Task F item 4 ask ("Campaign mode should be layered and integrated right inside") — Campaign Mode now lives inside X-Live as its own tab — but Ennis confirmed (AskUserQuestion, Oct 1) this does NOT fully satisfy that ask: he still wants Campaign content launchable AS an activity INSIDE a running live session (host pushes a quest/chapter and every player's screen follows, same as any other live-session activity type). That remains open, tracked under Task F below.
+- HOST ACTIONS / BACKLOG: Task F item 4 (Campaign content as a live-session-pushable activity type) remains open — see the Task F entries below.
+
+## PATCH PLATFORM v257 — No Story view on the Console: Campaign Mode lives in X-Live (Sept 28, backfilled)
+- BACKFILLED ENTRY: real, committed (`d9f2641`, session `session_015GPmbdqixVECZxHy11Z2xJ`), Handoff entry never written at the time — reconstructed from the commit message as above.
+- WHAT SHIPPED: `doNavigate('story')` now lands on X-Live (`'lite'`) instead of the Console's own Story view, completing the companion move with PATCH X-LIVE v0.80 above.
+- HOST ACTIONS / BACKLOG: none noted in the original commit.
+
+## PATCH X-LIVE v0.82 — Next-Show Countdown, Task F item 1 of 5 (Oct 1, Ennis)
+- ASK (Ennis, verbatim, one message with 4 other asks — see "Task F" below): "There should be an active counter for all users till the next X-Live show. There should be settings in the Live Theater for this."
+- CONTEXT: while starting on this, found that a different Claude session (`session_015GPmbdqixVECZxHy11Z2xJ`) had shipped real, committed X-Live v0.76–v0.80 (see the backfilled entries directly above) since this session's last checkpoint — an in-progress draft of this patch under the number "v0.76" collided with that session's already-shipped, unrelated v0.76 before anything was committed. Caught before shipping; renumbered to v0.82 (the next free number after the real v0.80 HEAD — v0.81 was skipped, since an abandoned, uncommitted staging attempt under that number from the other session sits in the working tree and was left untouched, per Ennis's instruction).
+- FIX: new host-configurable `cfg.nextShowAt` (an ISO datetime-local string) + `cfg.nextShowLabel` (an optional title), added to `DEFAULT_CFG` and stored on the same `pflx_lite_config` row every other piece of Setup already lives on — a plain, merge-safe field addition, no new storage key. A new settings sub-card in the Live Theater tab (`rTheater()`, host-only) lets a host set or clear the date/time and an optional label. A live-ticking countdown card (pure formatter `pflxNextShowCountdownText(iso, nowMs)`, a DOM-id-targeted 1s interval via `pflxEnsureNextShowCountdown()` — the exact same architecture as the existing `pflxSessionTimerText`/`pflxEnsureSessionTimer` pair, not a new pattern) shows to every user, host and player, at the top of the Theater tab, and hides itself automatically once the target time passes — it never shows a negative or "already started" state; a live/active session's own banners take over messaging at that point.
+- Verified: `node scripts/syntax_gate.js index.html` clean (9 blocks). New 38-case unit test (`test_v082_next_show_countdown.js`) extracts the real shipped `pflxNextShowCountdownText`/`pflxNextShowCardHtml`/`pflxSaveNextShow`/`pflxClearNextShow` via brace-counting and runs them against realistic fixtures: empty/null/malformed/past dates all return `null`; minute/hour/day formatting boundaries (including the exact 15-minute "imminent" cutoff); host-only settings-card gating (a non-host sees the display card but never the settings inputs); save/clear correctly call `saveCfg()`/`render()` exactly once each and no-op entirely for a non-host; missing DOM input elements fail safe to empty strings rather than throwing. All 38 PASS. Full 60-file regression suite re-run against a real `index.html.pre-v082-backup`: one file (`test_theater.js`) initially crashed with `pflxEnsureNextShowCountdown is not defined` — its hand-built sandbox extracts `rTheater()` in isolation and pre-dates this patch's two new calls. Fixed in place (not a shipped-code bug — the same forward-compatibility pattern used repeatedly this session): added safe no-op stubs for `pflxEnsureNextShowCountdown`/`pflxNextShowCardHtml` to that sandbox, plus `L.cfg`/`L.isHost` defaults. Confirmed 18/18 passing after the fix. Re-ran the full suite after: identical pass/fail counts between pre- and post-patch on every file except this patch's own new test (correctly failing against the pre-patch backup, proving it checks a real difference) — zero new regressions.
+- HOST ACTIONS / BACKLOG: see "Task F" below — items 2-5 remain open.
+
+## PATCH PLATFORM v258 — Next X-Live Show Countdown, platform-wide badge (Oct 1, Ennis)
+- Companion to PATCH X-LIVE v0.82 above. Ennis confirmed (AskUserQuestion) the counter should be visible platform-wide, not just inside X-Live.
+- FIX: a small fixed-position badge (top-right) reads the SAME `cfg.nextShowAt`/`cfg.nextShowLabel` fields X-Live's Setup now owns, via the existing xb-2 `pflxXBotLoadCfg()` bridge — zero new cross-app plumbing, zero new storage. `pflxNextShowCountdownText` is a byte-for-byte port of X-Live's own pure formatter of the same name (not a reinvention), so the two apps can never disagree on the same target. Polls the cfg every 60s, ticks the displayed countdown every 1s locally between polls, and hides itself automatically once the target passes. Hooked into the same post-login choke point the daily briefing / X-Bot auto-open already use (`pflxXBotDailyBriefingCheck`'s call site), which covers both manual login and `tryAutoLogin()`'s persisted-session restore path. `pflxNextShowStart()` is idempotent — safe to call on every login without stacking a second pair of intervals.
+- `PFLX_PATCH` 257 → 258, `PFLX_BUILD` → `2026.10`.
+- Verified: `node scripts/syntax_gate.js preview.html` clean (29 blocks). New 21-case unit test (`test_v258_next_show_countdown.js`) extracts the real shipped IIFE via brace-counting and runs it in a `vm` sandbox with a mocked DOM/window: the countdown math matches X-Live's own (day/hour/minute formatting, the 15-minute imminent boundary); the poll correctly pulls `nextShowAt`/`nextShowLabel` off the real `pflxXBotLoadCfg()` bridge and falls back to empty strings when unset; the poll fails safe when the bridge is missing entirely or throws; `pflxNextShowStart()` is confirmed idempotent (a second/third call never creates a second pair of intervals). All 21 PASS. Full 74-file regression suite re-run against `preview.html.pre-v258-backup` (the real pre-patch `HEAD:preview.html`): identical pass/fail counts on every file except this patch's own new test — zero new regressions.
+- NOT verified live in-browser this pass — worth a real look next time Ennis is on to confirm the badge's position doesn't collide with anything else fixed-position (the Theater LIVE chip, the system-event banner) at small viewport sizes.
+- HOST ACTIONS / BACKLOG: see "Task F" below.
+
+## Task F — X-Live live-session feature set, scoping + progress (Oct 1, Ennis)
+Ennis's verbatim ask, one message, five parts: "There should be an active counter for all users till the next X-Live show. There should be settings in the Live Theater for this. Also, If a player's cohort is currently launched into an X-Live session then upon login players should see a large join X-Live now popup notification/ button. When clicked the player should be launched directly into the launched X-Live session. A live session should have all participants in the same activity much like nearpod. When the host moves the activity then the players will move with the hosts launched activity. Campaign mode should be layered and integrated right inside. Also, the host should be able to push X-Live tools from X-Bot so that it functions live inside of the X-Live launched session Such as the timer, team grouping, random selector, Link/QR code share, and other tools for live engagement."
+
+Confirmed with Ennis via AskUserQuestion before building: (1) the countdown should be platform-wide, not X-Live-only — DONE, see v0.82/v258 above. (2) the join-now popup should be a large, dismissible modal right after the login intro (not a hard gate blocking Home) — NOT yet built. (3) "same activity, Nearpod-style" — investigated and found this is ALREADY TRUE today: `s.currentSlideIndex` is written by the host (`liveMoveCurrentSlide`/`liveJumpToSlide`) through the existing merge-safe `saveSession()` path and propagated to every player via a real Supabase realtime subscription (`xlRtClient.channel('xlive-sessions').on('postgres_changes', ...)`, not just polling) — no new work needed, marked satisfied. (4) Campaign mode should be wired as a live-session-pushable activity type, not just its own X-Live tab (which v0.80 above already gives it) — NOT yet built. (5) host-triggered X-Bot tools (timer, team grouping, a new random selector, a new Link/QR code share, and others) should broadcast to every player's live-session screen in real time, reusing the same realtime-synced session row that already makes item 3 true — NOT yet built.
+
+Status: item 1 DONE (v0.82/v258). Item 3 confirmed already satisfied by existing infrastructure, no patch needed. Items 2, 4, and 5 remain open — next in the queue, same one-small-verified-patch-at-a-time discipline as every other epic in this project.
