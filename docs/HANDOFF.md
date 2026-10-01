@@ -19102,3 +19102,95 @@ summarized in the SCOPE/ASSUMPTIONS sections below.
   bridge); Chrono Shift's real timer-enforcement wiring (assumption 3
   above); team-wide application of any mod (every mod here is self-only
   this patch, unlike X-Rush's `teamCapable` Freeze/Fog precedent).
+
+## PATCH X-LIVE v0.84 -- Chrono Shift, wired for real (Oct 1, Ennis: "wire it")
+- SYMPTOM: Chrono Shift (one of the 5 X-Mods shipped in PATCH X-LIVE v0.83)
+  was a real, tested, XC-deducted purchase -- tray button, event log, host
+  feed all worked -- but was mechanically INERT. The v0.83 Handoff entry
+  flagged it directly: "Chrono Shift is a real purchase but not yet wired
+  to any actual timer effect (nothing exists today to extend)." Ennis's
+  one-line follow-up instruction, "wire it," referenced this exact gap.
+- ROOT CAUSE / APPROACH: the v0.83 note assumed new per-player/per-team
+  timer-lockout infrastructure would need to be built from scratch
+  ("timer/project/social slides have no existing per-player/per-team
+  lock-out to extend"). Re-investigating the live session model (lines
+  ~8118-8249 and ~8620-8645 of index.html) found this assumption was
+  incomplete: X-Live already has a real, working, host-synced SHARED
+  countdown -- `s.showTimer` (session-wide object `{id, seconds,
+  startedAt, stoppedAt, slideId, label, updatedAt}`, merge-safe
+  last-write-wins by `updatedAt` in `mergeSession()`, PATCH X-LIVE v0.35).
+  It's auto-started for ANY slide with a configured time limit via
+  `xlSlideAutoTimer()` -- confirmed both `'social'` and `'project'` slide
+  types have `hasTimer: true` in their registry entries -- and rendered to
+  every player via `xlPlayerStripHtml()` (the generic player gameshow
+  strip, not scoped to the `'timer'` slide type) and to the host via the
+  run-control panel. This existing infrastructure is exactly what a
+  "extend the timer" effect needs; no new lockout system was required.
+- FIX: new `pflxXModApplyChronoShift(s, sl, now)` (pure function, inserted
+  right after `pflxXModTrigger`): if `s.showTimer` is currently running
+  AND bound to the purchasing slide (`t.slideId === sl.id`), adds
+  `PFLX_XMOD_CHRONO_BONUS_SECONDS` (120s) to it; otherwise starts a fresh
+  120s clock bound to that slide. This mirrors the EXACT running/
+  not-running branch logic the host's own pre-existing "+30s" button
+  (`xlShowTimerAdd`) already uses -- just rewritten to operate on a
+  caller-supplied `s`/`sl` (safe to call from a PLAYER's own client)
+  instead of `xlRunningSession()` (which only ever resolves on the host's
+  device, since `L.liveRunningSessionId` is host-local state).
+  Wired into `liveTriggerXModUi(key, opts)`: right after
+  `s.xmodEvents.push(result.event)` and before `saveSession(s)`, on a
+  `chrono_shift` purchase it looks up the purchasing slide via
+  `result.event.slideId` (which `pflxXModTrigger` already stamps onto
+  every event), calls `pflxXModApplyChronoShift`, then re-broadcasts via
+  the existing `xlCastCountdown()` so every connected client's countdown
+  display updates immediately, not just the purchaser's local state. Added
+  a dedicated toast message for `chrono_shift` ("+120s added to the clock
+  for everyone!"), mirroring the existing `vault_deal`/`all_in` custom-copy
+  branches instead of falling through to the generic "X used!" message.
+- ASSUMPTION MADE, STATED NOT SILENTLY NARROWED: this is SESSION-WIDE, not
+  per-player. No per-player timer-lockout concept exists anywhere in
+  X-Live today (only `quiz_race` has one, via `raceExpired`), so one
+  player's Chrono Shift purchase extends the clock for the WHOLE CLASS,
+  not just the purchaser. The original X-Mods spec language ("that team's
+  timer") implied a personal-only effect; this is the honest, buildable
+  version on real, already-shipped infrastructure, rather than overclaiming
+  a per-player effect that doesn't exist anywhere in the codebase.
+- NEW/MODIFIED functions: `PFLX_XMOD_CHRONO_BONUS_SECONDS` (new const,
+  120), `pflxXModApplyChronoShift(s, sl, now)` (new, pure), window-exposed
+  as `window.pflxXModApplyChronoShift`. `liveTriggerXModUi(key, opts)`
+  modified: new `chrono_shift` branch before `saveSession(s)`, new
+  `chrono_shift` toast-message branch.
+- Verified: syntax gate clean (9 blocks). New 33-case unit test
+  (`test_chrono_shift_v084.js`) extracts the real shipped
+  `pflxXModApplyChronoShift`/`xlTimerInfo` via brace-counting (never a
+  reimplementation), plus the real `mergeSession` showTimer-merge line
+  (regex-matched and asserted present before use, so the test fails loudly
+  if that merge logic's shape ever changes rather than silently testing a
+  stale copy) -- covering extend-while-running, start-fresh (never
+  started / stopped / naturally expired / bound to a different slide),
+  binding via `result.event.slideId`, null-safety, and a full
+  `mergeSession` round-trip proving the extension survives the existing
+  last-write-wins merge in BOTH directions (a chrono-shifted local never
+  gets clobbered by a stale incoming copy, and vice versa). All 33 PASS.
+  Full regression suite (122 `test_*.js` files) re-run against the real
+  pre-patch device snapshot (md5 `1a8289559ac85b59f384af8a229db045`,
+  staged before any edit this turn) -- byte-identical pass/fail outcome on
+  every single file, zero new regressions (the 2 pre-existing failures,
+  "FROM DECK button sits next to + ADD SLIDE" and "rStory() existing THE
+  ROOM progress list", are unchanged and unrelated to this patch).
+  Device-deployed `index.html` confirmed byte-identical (md5
+  `1005a5e0a032c8055975dbd7e9fcdcc9`) to the cloud-verified copy before
+  commit, so the regression results above apply directly to what shipped.
+  NOT yet verified live in a real two-tab browser session (host + player)
+  -- Chrome automation was not used this pass; flagged as the natural next
+  manual check (purchase Chrono Shift as a player on a running
+  `'project'`/`'social'`/`'timer'` slide, confirm the host's and every
+  player's displayed clock actually extends by 120s in real time).
+- HOST ACTIONS / BACKLOG: none required to ship. Still open from v0.83:
+  the 5 AUDIENCE X-Mods (blocked on the Phase 1e audience-mode bridge);
+  team-wide application of any mod (every X-Mod is self-only; no
+  `teamCapable` concept like X-Rush's Freeze/Fog exists for X-Mods). New
+  from this patch: if Ennis wants Chrono Shift to be per-player/per-team
+  instead of session-wide, that needs new timer-tracking infrastructure
+  (a per-player or per-team clock map) that does not exist anywhere in
+  X-Live today -- flagged here rather than silently building it on an
+  assumption.
