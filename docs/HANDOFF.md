@@ -18880,3 +18880,98 @@ Ennis's verbatim ask, one message, five parts: "There should be an active counte
 Confirmed with Ennis via AskUserQuestion before building: (1) the countdown should be platform-wide, not X-Live-only — DONE, see v0.82/v258 above. (2) the join-now popup should be a large, dismissible modal right after the login intro (not a hard gate blocking Home) — NOT yet built. (3) "same activity, Nearpod-style" — investigated and found this is ALREADY TRUE today: `s.currentSlideIndex` is written by the host (`liveMoveCurrentSlide`/`liveJumpToSlide`) through the existing merge-safe `saveSession()` path and propagated to every player via a real Supabase realtime subscription (`xlRtClient.channel('xlive-sessions').on('postgres_changes', ...)`, not just polling) — no new work needed, marked satisfied. (4) Campaign mode should be wired as a live-session-pushable activity type, not just its own X-Live tab (which v0.80 above already gives it) — NOT yet built. (5) host-triggered X-Bot tools (timer, team grouping, a new random selector, a new Link/QR code share, and others) should broadcast to every player's live-session screen in real time, reusing the same realtime-synced session row that already makes item 3 true — NOT yet built.
 
 Status: item 1 DONE (v0.82/v258). Item 3 confirmed already satisfied by existing infrastructure, no patch needed. Items 2, 4, and 5 remain open — next in the queue, same one-small-verified-patch-at-a-time discipline as every other epic in this project.
+
+## PATCH PLATFORM v259 — "Join X-Live Now" popup, Task F item 2 of 5 (Oct 1, Ennis)
+
+Picks up where the PATCH X-LIVE v0.82 / PATCH PLATFORM v258 entry above left
+off. Task F item 2, verbatim: "If a player's cohort is currently launched
+into an X-Live session then upon login players should see a large join
+X-Live now popup notification/ button. When clicked the player should be
+launched directly into the launched X-Live session." Confirmed scope (same
+AskUserQuestion pass as item 1): a dismissible modal shown right after the
+login intro, NOT a hard gate blocking Home.
+
+- SYMPTOM: nothing — this is new-feature work, not a bugfix.
+- APPROACH: ported X-Live's own cohort-match logic (`xlCohortsOf`/
+  `xlSessionForCohorts`, `x-live-check/index.html` ~8880-8916) into
+  `preview.html` as `pflxJoinNowCohortsOf`/`pflxJoinNowSessionApplies`, so
+  the Console and X-Live can never disagree on "does this active session
+  apply to me." `pflxJoinNowPick(sessions, mine, myId)` filters to active,
+  in-cohort-scope sessions the player hasn't already joined
+  (`liveParticipants`), picking the most recently started one. Reads the
+  session list via the SAME `pflxXBotLoadSessions()` bridge the v258
+  countdown and the PATCH PLATFORM v213 host-push PiP pull-in already use —
+  no new storage, no new cross-app channel.
+- JOIN NOW: rather than duplicating X-Live's real join/attendance-award
+  logic (`liveJoinSession`) inside the Console — which would risk drifting
+  from the proven original or double-awarding — JOIN NOW deep-links into
+  the SAME `pip-xlive` PIP widget + `?pip=1&session=<id>` mechanism PATCH
+  PLATFORM v213 already proved out for the host-push pull-in, opened at the
+  "large" preset. The player lands directly in that session's live view,
+  where the existing in-X-Live JOIN button does the real
+  `liveJoinSession()` call. Deliberately did NOT reuse `pflxXlivePipOpen()`
+  itself — that function dereferences `s.push.label` unconditionally, which
+  would throw on a session with no `push` object (the normal case for a
+  not-yet-joined player who hasn't been "pushed" by the host) — instead
+  wrote a small parallel open function with the same frame-src-building
+  logic, honest about why it isn't sharing the original.
+- NOT NOW / dismiss: per-session, `sessionStorage`-backed
+  (`pflx_joinnow_dismissed_<id>`) so dismissing one session's popup doesn't
+  suppress a DIFFERENT session's popup later, and doesn't persist across a
+  real logout/new tab (sessionStorage, not localStorage) — a deliberate,
+  documented simplification; flag to Ennis if a longer-lived "don't ask me
+  about this specific session again" is wanted instead.
+- GATING: a real host (role admin/host/teacher/instructor, or `hostTier`
+  set) never sees the popup — they run the show, they don't join it — BUT
+  a host currently previewing as a player (`window.pflxRole === 'player'`)
+  still sees it, matching how every other player-facing surface in PFLX
+  (the Host/Player parallel-mode work, Sept 10) already treats that
+  toggle.
+- Z-INDEX: the modal is `z-index:100050`, deliberately ABOVE the X-Bot
+  dock's `100000` — the dock already auto-opens on the same post-login hook
+  (`pflxXBotAutoOpenOnLogin`) right before this check runs, so without this
+  the dock would sit on top of and hide the join-now modal. Still below
+  nothing else on the page (the system-event-banner at `10070` is lower and
+  unaffected).
+- Wired into the SAME post-login choke point as the v171 X-Bot auto-open,
+  the v179 daily briefing, and the v258 countdown (`preview.html`
+  ~23431-23433, inside `playMotionIntro().then()`), right after
+  `pflxNextShowStart()` — covers both manual login and `tryAutoLogin()`'s
+  persisted-session restore path. Wrapped in its own try/catch so a slow or
+  failed check never blocks login.
+- VERSION CHECK (per the near-miss documented in the v0.82/v258 entry
+  above): confirmed via `git log` before patching that `ebaeb52` (PATCH
+  PLATFORM v258) was genuinely the current HEAD and `PFLX_PATCH = 258` in
+  the live file matched it exactly — no collision this time.
+- Verified: syntax gate clean (29 blocks). New 36-case unit test
+  (`test_v259_join_now.js`) extracting the real shipped IIFE via
+  brace-counting from its own landmark comment and running it in a `vm`
+  sandbox with a mocked DOM/sessionStorage — cohort-matching edge cases
+  (comma/semicolon split, case-insensitivity, `allCohorts`, no-cohorts-set
+  = applies to everyone), session picking (excludes already-joined,
+  excludes out-of-scope, picks most-recent), the real JOIN NOW side
+  effects (frame src built correctly, PIP opened at the large preset,
+  modal hidden after), dismiss persistence via sessionStorage and
+  suppression on a second check, host-gating (real host never even loads
+  the session list; a previewing-as-player host still sees the popup), and
+  five fail-safe paths (missing bridge, no activeSession, no cohort, a
+  throwing cloud load, a stray `Go()` with nothing picked) — all 36 PASS.
+  Full 76-file regression suite re-run against a real pre-patch file
+  backup (`preview.html.pre-v259-backup`, deleted after verification, not
+  `git stash` — see the standing lesson in this doc's own history about
+  `git stash` silently failing in this sandbox): the exact same 60
+  pre-existing failures present before this patch are still present
+  after, unchanged file-for-file, plus the single expected
+  stale-`PFLX_PATCH`-literal non-pass on `test_v258_next_show_countdown.js`
+  (the same harmless pattern every prior patch's own version-test exhibits
+  once a later patch bumps the constant) — zero new regressions.
+- HOST ACTIONS: none required. NOT yet verified live in a real two-tab
+  browser session (a real logged-in player account whose cohort has an
+  active X-Live session, confirming the modal actually appears, JOIN NOW
+  actually opens the PIP at the right session, and NOT NOW actually
+  suppresses it) — Chrome/browser automation was not used this patch;
+  flag for Ennis or a future session to click through for real.
+- BACKLOG (Task F, unchanged from the item list above): item 4 (Campaign
+  mode as a pushable live-session activity type) and item 5 (X-Bot tool
+  push broadcasting live into a running session) remain open, next in the
+  queue.
