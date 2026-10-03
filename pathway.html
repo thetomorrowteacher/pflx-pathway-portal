@@ -2757,7 +2757,7 @@
     <!-- Rank Section -->
     <div class="pc-rank-section">
       <div class="pc-rank-row">
-        <span class="pc-rank-label">EVOLUTION RANK</span>
+        <span class="pc-rank-label">PRO RANK</span>
         <span class="pc-rank-name" id="pcRankName"></span>
       </div>
       <div class="pc-rank-bar-track">
@@ -13084,7 +13084,7 @@ window.pflxCoop = pflxCoop;
 
 // ═══════════════════════════════════════════════════════════════════
 // GALAXY CLUSTERS — host-built node-cluster sites in deep space.
-// Hosts (and players with host-like Evo Rank 5+) can found a cluster
+// Hosts (and players with host-like Pro Rank 5+) can found a cluster
 // site in a distant galaxy. It renders as a stargate beacon on the map
 // plane, persists per pathway (localStorage + Supabase app_data), and
 // the cockpit HUD shows a bearing indicator to the nearest one.
@@ -13137,7 +13137,7 @@ const pflxClusters = {
 
   create() {
     if (!this.canCreate()) {
-      pflxSpaceToast('🔐', 'CLUSTER FOUNDING LOCKED', 'Founding new node clusters requires Host status or Evo Rank 5+.', '');
+      pflxSpaceToast('🔐', 'CLUSTER FOUNDING LOCKED', 'Founding new node clusters requires Host status or Pro Rank 5+.', '');
       return;
     }
     var name = prompt('Name this galaxy cluster site:', 'New Frontier');
@@ -13681,7 +13681,7 @@ function pflxKeyLoop() {
   pflxShip.y = Math.max(-40000, Math.min(40000, pflxShip.y));
 
   // ── WARP RANGE GATE ── deep space (distant galaxy clusters) needs a
-  // warp-capable hull (Tier 4+, which is itself Evo-rank gated in the
+  // warp-capable hull (Tier 4+, which is itself Pro-rank gated in the
   // X-Coin Ship Bay). Non-warp ships hit a soft range wall and bounce.
   if (!pflxShip.upgrades.warpDrive) {
     var __wdx = pflxShip.x - 1000, __wdy = pflxShip.y - 1000;
@@ -13693,7 +13693,7 @@ function pflxKeyLoop() {
       if (!pflxKeyLoop._warpWarned || Date.now() - pflxKeyLoop._warpWarned > 6000) {
         pflxKeyLoop._warpWarned = Date.now();
         if (typeof pflxSpaceToast === 'function') {
-          pflxSpaceToast('🌀', 'WARP DRIVE REQUIRED', 'Deep space is beyond this hull\'s range. Upgrade to a warp-capable ship (Tier 4+) in the X-Coin Ship Bay — higher Evo Ranks unlock higher tiers.', 'RANGE LIMIT');
+          pflxSpaceToast('🌀', 'WARP DRIVE REQUIRED', 'Deep space is beyond this hull\'s range. Upgrade to a warp-capable ship (Tier 4+) in the X-Coin Ship Bay — higher Pro Ranks unlock higher tiers.', 'RANGE LIMIT');
         }
         if (typeof SFX !== 'undefined' && SFX.play) { try { SFX.play('error'); } catch (e) {} }
       }
