@@ -19194,3 +19194,125 @@ summarized in the SCOPE/ASSUMPTIONS sections below.
   (a per-player or per-team clock map) that does not exist anywhere in
   X-Live today -- flagged here rather than silently building it on an
   assumption.
+
+## PATCH X-LIVE v0.85 -- myRecord() loses every host/admin's real data (Oct 3, Ennis)
+- SYMPTOM: Ennis (admin-1, THETOMORROWTEACHER) reported X-Live's Studio Hub
+  showing "eMagination Studios" while the Home dashboard showed "Innov8" for
+  the same account -- a studio-display mismatch between the two surfaces.
+- ROOT CAUSE (two independent bugs, both real):
+  1. The canonical Supabase `pflx_mc_players` field `studioId` was EMPTY
+     STRING for admin-1 (confirmed via direct SQL against the live
+     production `app_data` table, project `hyxiagexyptzvetqjmnj`) -- "Truth
+     lives on player.studioId" (preview.html's own comment) was simply
+     never populated for this account.
+  2. With the canonical field empty, each surface fell back to a DIFFERENT
+     stale/derived value: Home dashboard (`preview.html`) fell back to a
+     local/session-cached `activeSession.studioId` ("Innov8", provenance
+     unknown/stale); X-Live (`x-live-check/index.html`) fell back to
+     deriving a studio from the player's Evo `line` via the hardcoded
+     `LINE_STUDIO` map (`mythweaver` -> `studio-emagination`).
+  3. A SEPARATE, more general bug made (2)'s X-Live fallback even trigger
+     at all for a host/admin: `loadRoster()` filters host/admin accounts
+     OUT of `L.roster` entirely (into `L.hostRoster` instead, PATCH
+     X-LIVE v0.37), but `myRecord()` (line ~7067) only ever searched
+     `L.roster` -- so for ANY host/admin account, `myRecord()` always fell
+     through to a dummy placeholder object (`{id, brand, xc:0, totalXc:0,
+     badges:0}`) with no real `studioId` at all, forcing the Evo-line
+     fallback above even once a real `studioId` existed in Supabase. This
+     silently degraded every host/admin's own "ME"/Studio Hub display in
+     X-Live, not just the studio field -- real `xc`/`totalXc`/`badges`
+     were lost too, for every host account, every session.
+- FIX:
+  - `myRecord()` now also checks `L.hostRoster` before falling back to the
+    dummy object: `L.roster.find(...) || (L.hostRoster || []).find(...) ||
+    {dummy}`. Roster still wins over hostRoster if a (hypothetical) id
+    existed in both, matching the existing precedence.
+  - Confirmed `loadRoster()`'s `mapRosterUser(u)` already correctly maps
+    `studioId: u.studioId || ''`, so once a real `studioId` is on the
+    Supabase record, `myRecord()` now surfaces it for a host/admin for the
+    first time.
+- DATA (Supabase surgery): canonical `studioId` for `admin-1` was empty,
+  which both the "Innov8" Home display and this fix's own test depended
+  on resolving -- a merge-safe, single-record `jsonb_set` on
+  `app_data.data->'items'` (key `pflx_mc_players`) set admin-1's
+  `studioId` to `"studio-innov8"`, every other field/record left byte-for-
+  byte untouched (`jsonb_agg` over all 266 items with a `CASE WHEN id =
+  'admin-1'` guard, `ORDER BY` ordinality preserved). Before: `""`. After:
+  `"studio-innov8"`. Verified via a follow-up SELECT: `item_count` still
+  266, `admin1_studioid` = `studio-innov8`, `admin1_name` unchanged ("Mr.
+  Johnson"). Innov8 was chosen as the real value (not guessed) because
+  it's what the Home dashboard already showed AND what Ennis's own
+  screenshot annotation treated as correct (the "Add the same color"
+  annotation assumed Innov8 was the right studio, just wanted the bottom
+  card's color to match it) -- not a blind pick between the two
+  conflicting surfaces.
+- Together, these two fixes mean X-Live will now resolve the SAME real
+  `studioId` (Innov8) Home already shows, instead of an unrelated
+  Evo-line-derived value -- the two surfaces should match on next load/
+  roster refresh.
+- Verified: syntax gate clean (9 blocks, x-live-check/index.html). New
+  10-case unit test (`test_xlive_myrecord_hostroster_v085.js`) extracting
+  the real shipped `myRecord()` via marker+brace matching -- player case
+  unchanged, the host/admin bug case now resolves the real hostRoster
+  record, no-match/missing-hostRoster/null-L.me edge cases all fail safe,
+  roster-precedence-over-hostRoster confirmed -- all 10 PASS. Full
+  63-file regression suite re-run (with the correct `node test_x.js
+  index.html` invocation these older files expect): 7 pre-existing
+  failures unrelated to this change (deck-picker button placement, story
+  embed markup, subapp embed edge cases, gameshow effects-sync assertion,
+  a couple of stale `require()`'d helper-module paths) -- none reference
+  `myRecord`, `roster`, `hostRoster`, or `studioId`; zero new regressions
+  from this patch's one-line fix.
+- HOST ACTIONS: none required -- the Supabase write and code fix are both
+  already live. Ennis should hard-refresh both the Home dashboard and
+  X-Live to confirm both now show "Innov8" consistently.
+
+## PATCH PLATFORM v260 -- Startup Studio card now matches the top pill's real color (Oct 3, Ennis)
+- SYMPTOM: Ennis annotated a Home dashboard screenshot (red arrows + "Add
+  the same color") pointing at both the top purple INNOV8 studio pill AND
+  the small dark icon in the lower "STARTUP STUDIO" card, asking the
+  bottom card's icon to match the top pill's color treatment.
+- ROOT CAUSE: the top pill (`pflxStudioChipHtml(sid, opts)`, used at this
+  exact call site via `window.pflxStudioChipHtml(__homeSid, {size:34})`)
+  already colors itself from the real per-studio swatch in
+  `PFLX_STUDIO_VISUAL[sid].color` (via `pflxStudioMeta(sid)` -- Innov8 =
+  `#9333ea`). The "Startup Studio" card directly below it, however, was
+  entirely HARDCODED to a fixed gold (`#f5c842`) border/background/label
+  color regardless of which studio the player actually belongs to --
+  never studio-color-aware at all, so it could never match the pill above
+  it for any studio other than one that happened to be gold.
+- FIX: the card's `studioData` variable (already being resolved a few
+  lines up via the same `pflxStudioMeta(__homeSid)` the pill uses) now
+  drives the card's own color: `const studioColor = (studioData &&
+  studioData.color) || '#f5c842'` (gold kept ONLY as the fallback when no
+  studio metadata resolves at all, e.g. a player with no studio), converted
+  to an rgba triplet via the EXISTING `hexToRgb()` helper (reused, not
+  reinvented -- it already backs `_ppPortfolioStat`'s own colored-stat
+  boxes). Applied to: the card's left border, its background tint, the
+  "STARTUP STUDIO" label text, the XC-staked figure, the logo-icon
+  background/border (or the 🏢 fallback box when no logo is set). Equity's
+  green stays green (a semantic color, not a studio-branding one) and is
+  unchanged.
+- Verified: syntax gate clean (29 blocks, preview.html). New 14-case unit
+  test (`test_platform_studio_card_color_v260.js`) extracting the real
+  shipped `hexToRgb()` and the real "Startup Studio card" if-block via
+  marker+brace matching, run end-to-end against a minimal fake DOM:
+  Innov8 (`#9333ea`) and eMagination (`#2563eb`) both render their own
+  real color with zero gold leaking in; no-metadata and no-`.color`-field
+  cases still fall back to the original gold cleanly (no `"undefined"`
+  injected into a style string); stake/equity numbers unaffected by the
+  color change -- all 14 PASS. Full 77-file regression suite re-run: 42
+  pre-existing failures, all confirmed to be the already-known
+  stale-`PFLX_PATCH`-literal pattern (each xbot-*/xc-*/pp-* test asserting
+  an exact old patch number, e.g. "PFLX_PATCH bumped to 204") or other
+  pre-existing drift unrelated to this change -- spot-checked
+  `test_mc_dashboard_v204.js` and `test_mc_player_dash_v1.js`
+  specifically (the two closest to the touched Home-dashboard code) and
+  confirmed their only failure is the same stale-version-literal pattern,
+  every other real behavioral check still passing; zero new regressions
+  from this patch.
+- `PFLX_PATCH` bumped 259 -> 260 (`PFLX_BUILD` already `2026.10`, no
+  change needed).
+- HOST ACTIONS: none required. Ennis should hard-refresh Home and confirm
+  the Startup Studio card's icon/border/label now show Innov8's purple,
+  matching the top pill as his annotation asked.
