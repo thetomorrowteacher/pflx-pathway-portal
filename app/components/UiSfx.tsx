@@ -3,7 +3,7 @@ import { useEffect } from "react";
 
 const SOUND_ROOT = "https://www.prototypeflx.com/public/sounds/";
 const SOUNDS: Record<string, string> = {
-  hover: "pflx-ui/ui_hover_soft.mp3",
+  hover: "pflx-library/02_UI_Blips/blip_039.mp3", // Ennis locked blip_039 as THE hover sound (matches Console v263 / X-Live v0.87 / DarkCampus). Was pflx-ui/ui_hover_soft.mp3.
   click: "pflx-library/01_UI_Clicks/click_007.mp3",
 };
 const UI_SEL =
