@@ -12591,7 +12591,8 @@ const pflxCargoUI = {
     }
     foot.innerHTML =
       '<span>PENDING CREDIT: <b>' + (pflxCargo.data.pendingXC || 0) + ' XC</b></span>' +
-      '<button class="cargo-shop" onclick="pflxShipOpenUpgrades()">⬡ SHIP BAY</button>';
+      '<button class="cargo-shop" onclick="pflxShipOpenUpgrades()">⬡ SHIP BAY</button>' +
+      '<button class="cargo-shop" onclick="pflxOpenMarketplace(\'all\')">🛒 MARKETPLACE</button>';
     this.bumpBadge();
   },
   craft(id) {
@@ -13380,11 +13381,27 @@ setTimeout(function () {
 
 // Open marketplace redirect
 function pflxShipOpenUpgrades() {
-  // Navigate to X-Coin marketplace Ship Bay
+  // Navigate to X-Coin marketplace Ship Bay. The Console now honours this hop
+  // (it used to ignore { target, path } and only understand { url }).
   try {
-    window.parent.postMessage({ type: 'pflx_navigate', target: 'xcoin', path: '/player/marketplace' }, '*');
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'pflx_navigate', target: 'xcoin', path: '/player/marketplace' }, '*');
+      return;
+    }
   } catch(e) {}
   alert('Ship upgrades are available in the X-Coin Marketplace → Ship Bay tab.');
+}
+
+// The ONE connected PFLX marketplace (platform + game + session upgrades, taxes & fines).
+// Opens in X-Coin through the Console; browsing works from here, buying happens where each kind lives.
+function pflxOpenMarketplace(tab) {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'pflx_open_app', app: 'xcoin', tab: tab || 'all' }, '*');
+      return;
+    }
+  } catch(e) {}
+  try { window.open('https://pflx-xcoin-app.vercel.app/player/marketplace', '_blank', 'noopener'); } catch(e) {}
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -14200,6 +14217,7 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
   <button class="ship-mode-btn active" id="shipModeGuided" onclick="pflxShipSetMode('guided')">Guided</button>
   <button class="ship-mode-btn" id="shipModeFree" onclick="pflxShipSetMode('free')">Free</button>
   <button class="ship-mode-btn" id="shipUpgradeBtn" onclick="pflxShipOpenUpgrades()" style="margin-top:4px;color:#f5c842;border-color:rgba(245,200,66,0.3);">Ship Bay</button>
+  <button class="ship-mode-btn" id="shipMarketBtn" onclick="pflxOpenMarketplace('all')" style="margin-top:4px;color:#7de9ff;border-color:rgba(125,233,255,0.3);">🛒 Marketplace</button>
 </div>
 
 <!-- Camera Mode Toggle -->
