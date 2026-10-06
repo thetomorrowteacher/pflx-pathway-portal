@@ -19495,3 +19495,8 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - FIX (DATA only, no code/version change): survivor = import row (the one referenced by tasks/projects/chat/checkpoints). Carried over from the self-signup row: email kayce.lee22@gmail.com (player-typed; import email jae.baik7@gmail.com dropped, kept only in backup), PFLX User Cert badge (digitalBadges 1), pathway content-creator, studioId studio-mindforge. Brand KAYCE and PIN 7150 kept. XC 0/0 on both sides, nothing to reconcile. Loser removed from `pflx_mc_players` + `users`; loser id (not brand) added to `pflx_player_tombstones`.
 - DATA: roster 261→260, users 261→260; single transaction; backup `backup_players_merge_kayce_20261006` (roster/users/per-player rows for both ids). Orphan `pflx_player_player-1786997224661-bxhm8` row left in place (inert, tombstoned).
 - Verified: post-merge SELECTs — one Kayce Lee row, survivor fields as above, tombstone present.
+
+## DATA — NAIYA BAIGMOHAMED XC SUMMED 4,900 + 3,900 = 8,800 (Oct 6, Ennis)
+- SYMPTOM/DECISION: the earlier duplicate merge kept the higher balance (4,900) and assumed it already included the import row 3,900. Ennis said to merge them together, i.e. treat them as separate earnings and add.
+- FIX (DATA only): xc/xcoin/totalXcoin set to 8,800 on `pflx_mc_players`, `users` and `pflx_player_player-1782293539007-n3j3g`, updatedAt stamped so stale clients cannot revert (totalXcoin is monotonic, 8,800 wins any merge). Guarded: transaction aborts unless all three were exactly 4,900.
+- Verified: all three copies read 8800/8800; roster still 260. Original balances remain in backup_players_merge_20261006.
