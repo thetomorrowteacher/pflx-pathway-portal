@@ -19500,3 +19500,9 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - SYMPTOM/DECISION: the earlier duplicate merge kept the higher balance (4,900) and assumed it already included the import row 3,900. Ennis said to merge them together, i.e. treat them as separate earnings and add.
 - FIX (DATA only): xc/xcoin/totalXcoin set to 8,800 on `pflx_mc_players`, `users` and `pflx_player_player-1782293539007-n3j3g`, updatedAt stamped so stale clients cannot revert (totalXcoin is monotonic, 8,800 wins any merge). Guarded: transaction aborts unless all three were exactly 4,900.
 - Verified: all three copies read 8800/8800; roster still 260. Original balances remain in backup_players_merge_20261006.
+
+## PATCH PLATFORM v266 — CLAIM CODE NOW 4 DIGITS, matches the 4-digit PIN (Oct 6, Ennis)
+- SYMPTOM: Ennis noted PFLX code/PIN entry is 4 digits but the v265 emailed claim code was 6 digits.
+- FIX: Edge Function pflx-claim-code (deployed v4): generateCode = rand % 10000 padded to 4; verify regex /^\d{4}$/. Client: #claim-code-input maxlength 4, placeholder/description say 4-digit, verify requires length 4. PFLX_PATCH 265→266. Trade-off accepted by Ennis: 10,000 combos, mitigated by 5 attempts per code, 3 sends/15 min per email, 10 min TTL.
+- DATA/HOST: Gmail secrets GMAIL_USER + GMAIL_APP_PASSWORD were set by Ennis today; live test sent a code to the admin-1 roster email (ok:true). Live checks after redeploy: 6-digit verify → invalid_input 400, wrong 4-digit → wrong_code attemptsLeft 4. Codes only go to emails on the roster (ennisjohnsonjr@gmail.com is not on it).
+- Verified: syntax gate 29/29; test_claim_logic_v265 25/25; test_platform_claim_verify_v265 24/24; full regression 42 failing = same pre-existing legacy baseline.
