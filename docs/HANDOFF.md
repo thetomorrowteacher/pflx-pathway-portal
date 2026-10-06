@@ -19489,3 +19489,9 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - LEFT ALONE ON PURPOSE: historical logs still naming the old import ids (dc_badge_feed, dc_messages_mc-xcoin-feed, dc_pflx_triage_ledger); orphan row `pflx_player_player-import-1774891628716-19` (Charlotte) kept rather than hard-deleted.
 - NOTE: pins differ between the two old Charlotte rows; she keeps the survivor's pin. If she is locked out, the v265 emailed-code reset fixes it once Gmail secrets are set.
 - STILL DUPLICATE NAME (different people/emails, not merged): Kayce Lee (KC, kayce.lee22@gmail.com unclaimed) vs Kayce Lee (KAYCE, jae.baik7@gmail.com claimed) — Ennis to confirm if same person.
+
+## DATA — KAYCE LEE DUPLICATE MERGED, roster 261→260 (Oct 6, Ennis)
+- SYMPTOM: Kayce Lee on the roster twice (import row `player-import-1784088653745-12` brand KAYCE, claimed; self-signup row `player-1786997224661-bxhm8` brand KC, unclaimed) with different emails. Ennis confirmed same person.
+- FIX (DATA only, no code/version change): survivor = import row (the one referenced by tasks/projects/chat/checkpoints). Carried over from the self-signup row: email kayce.lee22@gmail.com (player-typed; import email jae.baik7@gmail.com dropped, kept only in backup), PFLX User Cert badge (digitalBadges 1), pathway content-creator, studioId studio-mindforge. Brand KAYCE and PIN 7150 kept. XC 0/0 on both sides, nothing to reconcile. Loser removed from `pflx_mc_players` + `users`; loser id (not brand) added to `pflx_player_tombstones`.
+- DATA: roster 261→260, users 261→260; single transaction; backup `backup_players_merge_kayce_20261006` (roster/users/per-player rows for both ids). Orphan `pflx_player_player-1786997224661-bxhm8` row left in place (inert, tombstoned).
+- Verified: post-merge SELECTs — one Kayce Lee row, survivor fields as above, tombstone present.
