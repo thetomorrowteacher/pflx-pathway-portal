@@ -19614,3 +19614,12 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - STILL UNMATCHED PDF pages: Electro-Core (p25), Voltshade (p30), Cryo-Vex (p40). Guesses: Cryo-Vex maybe PrimeIce (Nicholas Advani), Voltshade maybe VoltTech/Volt.
 
 - UPDATE (Oct 8, Ennis): Brady Lung (AETHERTECH) now uses the AetherIon title wordmark from the PDF as his logo (extracted from page 2, magenta script on pale lavender) instead of the headshot. No separate AetherTech logo file exists in Supabase or on the Mac; if Brady has one, swap it in.
+
+## DATA — Canva EXPO deck logos applied as profile pictures (Oct 8, Ennis)
+- SOURCE: Canva deck Official Digital Design Portfolio EXPO (DAHMrGL_XOM, 66 pages; pages 43 and 46-65 are blank templates). Logo priority per Ennis.
+- Brady Lung (AETHERTECH, -14): real AetherTech A-in-circle logo from deck page 16 replaces the AetherIon wordmark.
+- 21 more players got their brand logo (240px JPEG): Liv Thomas -44, Dana Aref -20, Zoe Gegenheimer -88, Luke Nelson -45, Zachary Melamed -87, Irwin Rosh -29, Kai Anand -38, Ryan Kamel (3pdbe), Cameron Miller (a9ali), Sammy Diab -71, Dreyken Phanbuh -21, Jack Khouri -32, Omar Abdulla -62, Ali Adas -6, Jeongwoo Lim -34, Nicholas Advani -57, Rasheed Salama -66, Ali Moloo -8, Mia Pocha -51 (those had no picture). Upgraded from PDF headshot to logo: Jude Schulze ION -36, Aarna Nagory Barnie -1, Caden Hemmy NovaWave -15.
+- Not changed: players who already had their own picture; Kay Bouez Wonderglow (deck heart logo too faint, headshot kept); pages with Add Brand Logo Here placeholders (Naiya, Ethan, Christopher); deck students not on the roster (Seonwoo, Kian Punjani, Alexander Gates, Kyrah Kamboj).
+- GUARD: image only, roster and per-player rows updatedAt bumped; XC/totalXcoin/badges verified identical to backup (0 diffs, 278 players). Roster players with a picture: 65.
+- BACKUPS: backup_pics4_20261008_*, backup_pics5_20261008_*; staging rows artstage14/15_20261008_* can be ignored.
+- BACKLOG: vision statements are in the deck student pages (create/impact/perspective/future sentence); backfill not done, needs OK.
