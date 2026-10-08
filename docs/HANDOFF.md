@@ -19612,3 +19612,5 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - Brady Lung (AETHERTECH) = AetherIon headshot; Sophia Hariri (CedarTree) = Cedar character headshot; Rami EL Ghalal (?uestioning) = Mystery headshot (question-mark hoodie). Roster players with a picture: 43 -> 46 (the earlier 44 figure was an overcount by one). XC and badges unchanged. Backups backup_pics3_20261008_*; staging artstage11/12 rows are safe to ignore.
 - NOTE: Maryam Haya already carries the Cedar script logo (Ennis said Cedar is Maryam); Sophia now has the Cedar character art from the same page. Confirm which Maryam if wrong.
 - STILL UNMATCHED PDF pages: Electro-Core (p25), Voltshade (p30), Cryo-Vex (p40). Guesses: Cryo-Vex maybe PrimeIce (Nicholas Advani), Voltshade maybe VoltTech/Volt.
+
+- UPDATE (Oct 8, Ennis): Brady Lung (AETHERTECH) now uses the AetherIon title wordmark from the PDF as his logo (extracted from page 2, magenta script on pale lavender) instead of the headshot. No separate AetherTech logo file exists in Supabase or on the Mac; if Brady has one, swap it in.
