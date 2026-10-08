@@ -19609,6 +19609,6 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 
 ## DATA - more PFLX Universe pictures + Lianna logo (Oct 8, Ennis)
 - Lianna Alansari: picture is now her own Sakura lotus logo (sent by Ennis), replacing the SUKURA wordmark from the PDF. Brand name already Sakura everywhere (roster, player row, users) - no rename needed.
-- Brady Lung (AETHERTECH) = AetherIon headshot; Sophia Hariri (CedarTree) = Cedar character headshot; Rami EL Ghalal (?uestioning) = Mystery headshot (question-mark hoodie). Roster players with a picture: 44 -> 47. XC and badges unchanged. Backups backup_pics3_20261008_*; staging artstage11/12 rows are safe to ignore.
+- Brady Lung (AETHERTECH) = AetherIon headshot; Sophia Hariri (CedarTree) = Cedar character headshot; Rami EL Ghalal (?uestioning) = Mystery headshot (question-mark hoodie). Roster players with a picture: 43 -> 46 (the earlier 44 figure was an overcount by one). XC and badges unchanged. Backups backup_pics3_20261008_*; staging artstage11/12 rows are safe to ignore.
 - NOTE: Maryam Haya already carries the Cedar script logo (Ennis said Cedar is Maryam); Sophia now has the Cedar character art from the same page. Confirm which Maryam if wrong.
 - STILL UNMATCHED PDF pages: Electro-Core (p25), Voltshade (p30), Cryo-Vex (p40). Guesses: Cryo-Vex maybe PrimeIce (Nicholas Advani), Voltshade maybe VoltTech/Volt.
