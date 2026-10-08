@@ -19631,3 +19631,9 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - Verified: syntax gate 29 blocks, 0 failed; helper unit test (free text escaped, template sentence unchanged).
 - STANDARD GOING FORWARD: the diagnostic already saves the four-field vision at signup (cadFinishToOnboarding -> player record) and the portfolio reads it, so new players are covered; the old gap was players who signed up before that or whose record was merged away.
 - SKIPPED: Mia Pocha (page text is garbled), Nicholas Advani, Ali Adas, Ethan Kibalian, Christopher Daghers, Omar Fahmi (blank on deck); Seonwoo, Kian Punjani, Alexander Gates, Kyrah Kamboj (not on the roster). Kyrah and Kian have vision text in the deck if they get accounts.
+
+## DOCS — Evo Rank to Pro Rank cleanup, round 2 (Oct 8, Ennis)
+- SCAN: git grep across platform, arena, darkcampus, xcoin, pathway-portal, sparklab and x-live found no player- or host-facing Evo Rank label left in code. Remaining hits are identifiers kept on purpose (evoRank, mcGetEvoRank*, pflxPlayerEvoRank, minEvolutionRank, EVO_ORDER, the evo sort key).
+- DOCS CHANGED (loose .md files in My Apps/PFLX Apps, not in git): PFLX_BETA_TESTER_GUIDE.md (section 12 is now Pro Rankings), PFLX_MASTER_SPEC.md (Higher Pro Ranked, higher-pro-ranked, routing chain), PFLX_AVATAR_SYSTEM_AND_LITE_MODE_SPEC.md (Pro Ranks, Pro Rank progression), PFLX_ADMIN_HUB_PLAN.md (Pro rankings). Originals in My Apps/PFLX Apps/tmp/evo_pro_md_backup_20261008/.
+- NOT FOUND / NOT CHANGED: the generated System Document, Rate Card and Handbook (PDF + web) are not in any repo or the Mac folders searched, so they still need regenerating from the current labels. Old tester screenshots in Drive show EVO RANK and cannot be edited.
+- BACKLOG: decide Pro Rank vs the planned Pro tier mode before building the tier system.
