@@ -19605,3 +19605,10 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 ## DATA - three more PFLX Universe profile pictures (Oct 8, Ennis)
 - Per Ennis: Sukura = Lianna Alansari (brand Sakura), Zorion = Wali Mayo (brand Zorian), Cedar = Maryam. Set: Lianna (SUKURA neon logo), Wali Mayo (Zorion headshot), Maryam Haya (Cedar script logo). Cedar went to Maryam Haya because Maryam Elbadawi (CedarSonic) already had her CedarSonic picture and the rule is pictures only for players without one - swap if Ennis meant Elbadawi. Roster players with a picture: 41 -> 44. XC and badges verified unchanged. Backups: backup_pics2_20261008_* ; staging row artstage10_20261008_profiles is safe to ignore.
 - STILL UNMATCHED PDF pages: Mystery, Electro-Core, Voltshade, Cryo-Vex, AetherIon (maybe AETHERTECH, Brady Lung).
+
+
+## DATA - more PFLX Universe pictures + Lianna logo (Oct 8, Ennis)
+- Lianna Alansari: picture is now her own Sakura lotus logo (sent by Ennis), replacing the SUKURA wordmark from the PDF. Brand name already Sakura everywhere (roster, player row, users) - no rename needed.
+- Brady Lung (AETHERTECH) = AetherIon headshot; Sophia Hariri (CedarTree) = Cedar character headshot; Rami EL Ghalal (?uestioning) = Mystery headshot (question-mark hoodie). Roster players with a picture: 44 -> 47. XC and badges unchanged. Backups backup_pics3_20261008_*; staging artstage11/12 rows are safe to ignore.
+- NOTE: Maryam Haya already carries the Cedar script logo (Ennis said Cedar is Maryam); Sophia now has the Cedar character art from the same page. Confirm which Maryam if wrong.
+- STILL UNMATCHED PDF pages: Electro-Core (p25), Voltshade (p30), Cryo-Vex (p40). Guesses: Cryo-Vex maybe PrimeIce (Nicholas Advani), Voltshade maybe VoltTech/Volt.
