@@ -19749,3 +19749,9 @@ The Archive token set is now available locally alongside the Evo tokens: eight e
 - Verified: local render at 760px and 390px (no horizontal overflow, text escaped, titles with HTML shown literally), `pflx-badge-art` returns a 200x200 JPEG for badge-self-directed-player and 404 for unknown/invalid ids, notify bad_action/bad_token and claim-code bad_action/invalid_input/no_match paths still return the right codes. No test email was sent.
 - GOTCHA: the claim-code function in production is the 4-digit version (v4); the older local copy was 6-digit. Redeploys must start from the deployed source.
 - BACKLOG: Gmail's round sender avatar comes from the Gmail account profile (set a profile photo on the sending account); optional: send one test email to the host to eyeball it in a real inbox; X-Coin cohort pickers still read the raw cohort string; helper table `cohort_calc_tmp_20261008` still exists.
+
+## PATCH PLATFORM v1.284 (addendum) — EMAIL LOGOS + REAL-INBOX TEST (October 8, Ennis)
+- FEEDBACK: first test (sent through the Gmail connector) showed no images and a white background; Ennis also wanted his own logos used.
+- FINDING: the Gmail connector's sanitizer strips every <img>, the <style> block and background styles from htmlBody, so a test sent through it is NOT representative. Test through the real SMTP path (pflx-notify) instead.
+- FIX: header now uses the full Prototype FLX logo with tagline (`public/prototypeflx-logo-email.png`, 800x126) and the footer uses The Tomorrow Teacher logo (`public/ttt-logo-email.png`, 480x65) linking to thetomorrowteacher.org; `<body bgcolor>` added; both functions redeployed (pflx-notify v4, pflx-claim-code v6). Commit d8aea4f (logos in pflx-platform).
+- TEST: a temporary `test_email` action (hard-locked to ennisjohnsonjr@gmail.com, 1/min) was deployed, used once to send the real coin email over SMTP (200 ok), then removed in the next deploy; verified it now returns bad_action.
