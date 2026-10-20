@@ -13,43 +13,50 @@
        function which fails when Neuroflux et al aren't in mockUsers.
   ═══════════════════════════════════════════════════════════════════ -->
   <script>
+    // v295 -- shared PFLX server login (pflx-auth). Apps hold a signed
+    // sign-in pass, never the PIN.
+    window.pflxAuth = window.pflxAuth || (function () {
+      var EP = 'https://hyxiagexyptzvetqjmnj.supabase.co/functions/v1/pflx-auth', ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5eGlhZ2V4eXB0enZldHFqbW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwODM4MTYsImV4cCI6MjA4OTY1OTgxNn0.hqHVlRu775dZfJrKxSFMNEPhANu5EFm7gJpaJ3RnbnY', TK = 'pflx_auth_v1';
+      function call(b) { return fetch(EP, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: 'Bearer ' + ANON }, body: JSON.stringify(b) })
+        .then(function (r) { return r.json().catch(function () { return { ok: false }; }); }, function () { return { ok: false, error: 'offline' }; }); }
+      function save(tok, p) { try { var exp = Date.now() + 2592000000; try { exp = JSON.parse(atob(tok.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'))).exp || exp; } catch (e) {} localStorage.setItem(TK, JSON.stringify({ token: tok, pid: p.id, brand: p.brand, role: p.role, exp: exp })); } catch (e) {} }
+      function cur() { try { var t = JSON.parse(localStorage.getItem(TK) || 'null'); if (t && t.token && t.exp > Date.now()) return t; } catch (e) {} return null; }
+      return {
+        login: function (who, pin) { return call({ action: 'login', who: who, pin: pin }).then(function (r) { if (r && r.ok) save(r.token, r.player); return r || { ok: false }; }); },
+        verify: function (tok) { tok = tok || (cur() || {}).token; if (!tok) return Promise.resolve(null); return call({ action: 'verify', token: tok }).then(function (r) { if (r && r.ok) { save(tok, r.player); return r.player; } return null; }); },
+        token: function () { var c = cur(); return c ? c.token : ''; },
+        clear: function () { try { localStorage.removeItem(TK); } catch (e) {} }
+      };
+    })();
+    window.pflxIsPflxOrigin = function (o) { return /^https:\/\/(www\.)?prototypeflx\.com$/.test(o) || /^https:\/\/pflx-[a-z0-9-]+\.vercel\.app$/.test(o) || /^https:\/\/x-live[a-z0-9-]*\.vercel\.app$/.test(o) || /^https:\/\/thetomorrowteacher\.github\.io$/.test(o) || /^http:\/\/localhost(:\d+)?$/.test(o) || o === window.location.origin; };
+
     (function () {
       try {
         var p = new URLSearchParams(window.location.search);
         if (p.get('sso') !== 'pflx' || !p.get('brand')) return; // fall through to normal login
-
-        var brand = p.get('brand');
-        var role  = (p.get('role') || 'player').toLowerCase();
-        var isHost = role === 'admin' || role === 'host' || role === 'master host' || role === 'master-host' || role === 'teacher' || role === 'instructor';
-
-        var user = {
-          id:            p.get('id') || ('platform-' + Date.now()),
-          name:          p.get('user') || brand,
-          brandName:     brand,
-          brand:         brand,
-          role:          isHost ? 'admin' : 'player',
-          isHost:        isHost,
-          cohort:        p.get('cohort') || 'PlayerPool',
-          email:         p.get('email') || '',
-          pin:           p.get('pin') || '',
-          xcoin:         parseInt(p.get('xc'), 10) || 0,
-          totalXcoin:    parseInt(p.get('xc'), 10) || 0,
-          digitalBadges: 0,
-          level:         1,
-          rank:          1,
-          claimed:       true,
-          onboardingComplete: true,
-          __pflxFromPlatform: true
-        };
-        try {
-          localStorage.setItem('pflx_pathway_user', JSON.stringify(user));
-          localStorage.setItem('pflx_user', JSON.stringify(user));
-          localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
-        } catch (e) {}
-        // Redirect to the actual app. preview.html / pathway.html will pick up the
-        // localStorage user and render with no login flash.
-        window.location.replace('/preview.html' + (window.location.search || ''));
-      } catch (e) { /* fall through to normal login */ }
+        // v295: only a link carrying a valid sign-in pass signs you in;
+        // identity and role come from the server, not the URL.
+        var tok = p.get('token') || '';
+        if (!tok) return;
+        document.documentElement.style.visibility = 'hidden';
+        window.pflxAuth.verify(tok).then(function (who) {
+          if (!who) { document.documentElement.style.visibility = ''; return; }
+          var isHost = /^(admin|host|master|instructor|teacher)$/i.test(String(who.role || ''));
+          var user = {
+            id: who.id, name: who.name || who.brand, brandName: who.brand, brand: who.brand,
+            role: isHost ? 'admin' : 'player', isHost: isHost,
+            cohort: p.get('cohort') || 'PlayerPool', email: '', pin: '',
+            xcoin: parseInt(p.get('xc'), 10) || 0, totalXcoin: parseInt(p.get('xc'), 10) || 0,
+            digitalBadges: 0, level: 1, rank: 1, claimed: true, onboardingComplete: true, __pflxFromPlatform: true
+          };
+          try {
+            localStorage.setItem('pflx_pathway_user', JSON.stringify(user));
+            localStorage.setItem('pflx_user', JSON.stringify(user));
+            localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
+          } catch (e) {}
+          window.location.replace('/preview.html' + (window.location.search || ''));
+        });
+      } catch (e) { document.documentElement.style.visibility = ''; }
     })();
   </script>
   <title>PFLX Core Pathway Development — Login</title>
@@ -570,31 +577,31 @@ let mockUsers = [
   {
     id: "admin-0", name: "PrototypeFLX", brandName: "PrototypeFLX",
     role: "admin", avatar: "PF", cohort: "N/A", pathway: "Host",
-    email: "host@prototypeflx.com", pin: "0000", claimed: true, isHost: false,
+    email: "host@prototypeflx.com", pin: '', claimed: true, isHost: false,
     digitalBadges: 0, xcoin: 0, totalXcoin: 0, level: 99, rank: 10,
   },
   {
     id: "admin-1", name: "Mr. Johnson", brandName: "TheTomorrowTeacher",
     role: "admin", avatar: "MJ", cohort: "N/A", pathway: "Host",
-    email: "ennisjohnsonjr@thetomorrowteacher.org", pin: "1111", claimed: true, isHost: false,
+    email: "ennisjohnsonjr@thetomorrowteacher.org", pin: '', claimed: true, isHost: false,
     digitalBadges: 0, xcoin: 0, totalXcoin: 0, level: 99, rank: 10,
   },
   {
     id: "player-1", name: "Alex Rivera", brandName: "PixelProphet",
     role: "player", avatar: "AR", cohort: "Cohort 2", pathway: "Digital Design",
-    email: "alex.rivera@school.edu", pin: "3847", claimed: true, isHost: false,
+    email: "alex.rivera@school.edu", pin: '', claimed: true, isHost: false,
     digitalBadges: 28, xcoin: 1850, totalXcoin: 8500, level: 9, rank: 3,
   },
   {
     id: "player-2", name: "Jordan Lee", brandName: "MotionMaster",
     role: "player", avatar: "JL", cohort: "Cohort 3", pathway: "Content Creator",
-    email: "jordan.lee@school.edu", pin: "5291", claimed: false, isHost: false,
+    email: "jordan.lee@school.edu", pin: '', claimed: false, isHost: false,
     digitalBadges: 42, xcoin: 2900, totalXcoin: 12500, level: 13, rank: 4,
   },
   {
     id: "player-3", name: "Sam Chen", brandName: "CodeCrafter",
     role: "player", avatar: "SC", cohort: "Cohort 2", pathway: "Web Dev",
-    email: "sam.chen@school.edu", pin: "7063", claimed: false, isHost: false,
+    email: "sam.chen@school.edu", pin: '', claimed: false, isHost: false,
     digitalBadges: 15, xcoin: 450, totalXcoin: 2100, level: 4, rank: 2,
   },
 ];
@@ -754,15 +761,19 @@ pinSubmitBtn.addEventListener('click', handlePinSubmit);
 function handlePinSubmit() {
   if (!selectedUser || pinInput.value.length < 4) return;
 
-  const correctPin = selectedUser.pin || (selectedUser.role === 'admin' ? '0000' : '1234');
-  if (pinInput.value === correctPin) {
+  // v295: PIN checked by the server; no default-PIN fallback.
+  const __pinVal = pinInput.value;
+  window.pflxAuth.login(selectedUser.id || selectedUser.brandName || '', __pinVal).then(function (r) { __afterPin(!!(r && r.ok), r && r.error); });
+}
+function __afterPin(ok, err) {
+  if (ok) {
     // Save session
     localStorage.setItem('pflx_pathway_user', JSON.stringify(selectedUser));
     if (keepSignedIn) localStorage.setItem('pflx_pathway_keep_signed_in', 'true');
     // Navigate to portal
     window.location.href = 'preview.html';
   } else {
-    pinError.textContent = 'Incorrect PIN. Contact your instructor.';
+    pinError.textContent = err === 'too_many_attempts' ? 'Too many tries — wait 15 minutes.' : 'Incorrect PIN. Contact your instructor.';
     pinError.style.display = 'block';
     pinInput.classList.add('error');
     pinInput.value = '';
@@ -804,6 +815,7 @@ document.getElementById('resetPinBtn').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 let _ssoHandled = false;
 function attemptSSO() {
+  return; // v295: links are verified by the head script (pflx-auth); no URL/PIN trust
   if (_ssoHandled) return;
   const params = new URLSearchParams(window.location.search);
   const sso = params.get('sso');

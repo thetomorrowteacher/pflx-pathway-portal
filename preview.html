@@ -1698,6 +1698,9 @@
     // can't carry the profile image (data URIs are too long for URLs), so
     // postMessage is how the right avatar actually gets here.
     window.addEventListener('message', function (ev) {
+      // v295: only PFLX pages may push an identity into this frame.
+      var __o = ev.origin || '';
+      if (!(/^https:\/\/(www\.)?prototypeflx\.com$/.test(__o) || /^https:\/\/pflx-[a-z0-9-]+\.vercel\.app$/.test(__o) || /^https:\/\/thetomorrowteacher\.github\.io$/.test(__o) || __o === window.location.origin)) return;
       var msg;
       try { msg = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data; } catch (e) { return; }
       if (!msg || typeof msg !== 'object') return;
@@ -1715,7 +1718,7 @@
             isHost:             !!isHost,
             cohort:             u.cohort || 'PlayerPool',
             email:              u.email || '',
-            pin:                u.pin || '',
+            pin:                '',
             xcoin:              typeof u.xc === 'number' ? u.xc : (typeof u.xcoin === 'number' ? u.xcoin : 0),
             totalXcoin:         typeof u.totalXcoin === 'number' ? u.totalXcoin : (typeof u.xc === 'number' ? u.xc : 0),
             digitalBadges:      typeof u.digitalBadges === 'number' ? u.digitalBadges : 0,
