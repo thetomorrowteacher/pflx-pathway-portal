@@ -4568,6 +4568,7 @@ window.pflxSpace = (function () {
   function tick() {
     if (!running) return;
     requestAnimationFrame(tick);
+    if (window.pflxGLPaused) { clock.getDelta(); return; } // Portal view is up: idle the open-space renderer
     const dt = Math.min(clock.getDelta(), 0.1);
     const t = clock.elapsedTime;
 
@@ -14832,5 +14833,9 @@ if (new URLSearchParams(location.search).has('openspace')) (function () {
   obs.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
+
+<!-- v1: Portal view (course dashboard) toggle -->
+<link rel="stylesheet" href="cp-portal.css?v=1">
+<script src="cp-portal.js?v=1"></script>
 </body>
 </html>
